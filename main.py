@@ -22,22 +22,29 @@ UI_INDEX = BASE_DIR / "ui" / "index.html"
 
 def main():
     """Initializes the SQLite database and launches the PyWebView native desktop window."""
-    # Direct API bridge
-    api = HarnessAPI()
+    try:
+        # Direct API bridge
+        api = HarnessAPI()
 
-    # Create native Windows desktop window using Chromium WebView2
-    window = webview.create_window(
-        title="HARNESS // Personal Execution OS",
-        url=str(UI_INDEX),
-        js_api=api,
-        width=1220,
-        height=850,
-        min_size=(920, 620),
-        background_color="#0a0c10",
-    )
+        # Create native Windows desktop window using Chromium WebView2
+        window = webview.create_window(
+            title="HARNESS // Personal Execution OS",
+            url=str(UI_INDEX),
+            js_api=api,
+            width=1220,
+            height=850,
+            min_size=(920, 620),
+            background_color="#0a0c10",
+        )
 
-    # Launch event loop
-    webview.start(debug=False)
+        # Launch event loop
+        webview.start(debug=False)
+    except Exception as e:
+        import traceback
+        log_file = BASE_DIR / "crash.log"
+        with open(log_file, "w", encoding="utf-8") as f:
+            f.write(traceback.format_exc())
+        raise
 
 
 if __name__ == "__main__":
