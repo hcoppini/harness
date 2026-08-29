@@ -1,9 +1,10 @@
 /**
- * Section 2: TUM ROADMAP & ICONIC METRO TRANSIT ENGINE
- * - Authentic 5-line parallel transit corridor (Trunk, CS, Academics, SIGG, German).
- * - Real-Time Day Beacon: Daily moving train that advances day by day from Sep '26 to Jul '28.
- * - Dynamic track illumination: Track fills up to today's exact position.
- * - Alternating 35° angled transit typography: Zero label overlap, 100% legibility.
+ * Section 2: TUM ROADMAP & HORIZON TRANSIT ENGINE (Version 3.0)
+ * - Single dominant solid mainline spine (The TUM Trunk Line).
+ * - Real-Time Day Beacon: Daily moving indicator that advances smoothly day after day.
+ * - Alternating horizontal cards: Even above, odd below (Zero overlap, 100% legibility).
+ * - Distinct SIGG GPW 45° branch line from Oct '26 to Apr '27.
+ * - Five visual Phase Zones across the top header.
  * - Smooth drag, mouse-wheel scrolling, auto-centering on Today, and station slide-over ledger.
  */
 
@@ -26,7 +27,7 @@ const MetroMap = {
 
     // Mouse drag scrolling
     container.addEventListener("mousedown", (e) => {
-      if (e.target.closest(".station-node-v2") || e.target.closest(".station-drawer")) return;
+      if (e.target.closest(".metro-spine-card") || e.target.closest(".station-drawer")) return;
       this.isDragging = true;
       container.classList.add("grabbing");
       this.startX = e.pageX - container.offsetLeft;
@@ -100,21 +101,16 @@ const MetroMap = {
     if (!canvasWrap) return;
 
     const stations = this.data.stations;
-    const spacing = 160;
-    const startX = 160;
+    const spacing = 260; // Generous horizontal breathing room between stations
+    const startX = 220;
+    const spineY = 255;  // Single dominant horizontal centerline
     const totalTrackLength = (stations.length - 1) * spacing;
-    const totalWidth = startX + totalTrackLength + 320;
+    const totalWidth = startX + totalTrackLength + 360;
 
     canvasWrap.style.minWidth = `${totalWidth}px`;
+    canvasWrap.style.height = "520px";
 
-    // 1. Parallel Track Corridor Coordinates (Strict Beck angles)
-    const trackCS = 150;       // Line 1: CS & Code Independence (Glacier Blue)
-    const trackAca = 185;      // Line 2: Academics & GPA (Champagne Gold)
-    const trackTrunk = 230;    // Line 3: TUM Central Trunk (Pure White)
-    const trackSIGG = 275;     // Line 4: SIGG GPW (Terracotta)
-    const trackGerman = 310;   // Line 5: German Goethe (Sage Green)
-
-    // 2. Real-Time Day Progress Calculation (Advances day by day)
+    // 1. Real-Time Day Progress Calculation (Advances day by day)
     const startDate = new Date(2026, 8, 1);  // Sep 1, 2026
     const endDate = new Date(2028, 6, 31);    // Jul 31, 2028
     const now = new Date();
@@ -128,7 +124,7 @@ const MetroMap = {
       isPreLaunch = true;
       const msDiff = startDate.getTime() - now.getTime();
       const daysUntil = Math.max(1, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
-      currentX = startX - 50;
+      currentX = startX - 70;
       beaconTitle = `DEPARTURE GATE // SEP 1, 2026`;
       beaconSub = `${daysUntil} day(s) to Kickoff • Station 1: Pure Syntax`;
     } else {
@@ -141,23 +137,42 @@ const MetroMap = {
       currentX = startX + progressRatio * totalTrackLength;
 
       const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-      beaconTitle = `▲ YOU ARE HERE • DAY ${elapsedDays + 1} OF ${totalDays}`;
-      beaconSub = `${dateStr} // Real-time position`;
+      beaconTitle = `● TODAY • DAY ${elapsedDays + 1} OF ${totalDays}`;
+      beaconSub = `${dateStr} • Real-time timeline position`;
     }
 
     this.currentBeaconX = currentX;
 
-    // 3. Render SVG Tracks (Background Guide Rails + Illuminated Active Beams)
-    const siggStartIdx = 1; // Oct '26
-    const siggEndIdx = 7;   // Apr '27 (Warsaw GPW Finals)
-    const siggStartX = startX + siggStartIdx * spacing;
-    const siggEndX = startX + siggEndIdx * spacing;
+    // 2. SIGG Branch Coordinates (Oct '26 station 1 to Apr '27 station 7)
+    const siggStartX = startX + 1 * spacing;
+    const siggEndX = startX + 7 * spacing;
+    const siggTrackY = spineY + 65;
 
+    // 3. Phase Boundaries (Subtle Architectural Markers)
+    const phases = [
+      { name: "Phase 1: Year 3 Liceum", x: startX, width: 4.8 * spacing },
+      { name: "Phase 2: SIGG Finals & Year 3 Lock", x: startX + 5 * spacing, width: 4.8 * spacing },
+      { name: "Phase 3: Summer Mass & B1", x: startX + 10 * spacing, width: 1.8 * spacing },
+      { name: "Phase 4: Matura Crucible", x: startX + 12 * spacing, width: 7.8 * spacing },
+      { name: "Phase 5: Official CKE & TUM", x: startX + 20 * spacing, width: 1.8 * spacing },
+    ];
+
+    let phaseHeadersHtml = phases
+      .map((p) => {
+        return `
+          <div class="phase-zone-label" style="left: ${p.x - 40}px;">
+            ${p.name}
+          </div>
+        `;
+      })
+      .join("");
+
+    // 4. Build SVG Graphic Tracks (One Solid Spine + SIGG Express Bypass)
     let svgHtml = `
-      <svg width="${totalWidth}" height="480" style="position: absolute; top: 0; left: 0; pointer-events: none;">
+      <svg width="${totalWidth}" height="520" style="position: absolute; top: 0; left: 0; pointer-events: none;">
         <defs>
           <filter id="beaconGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="4" result="blur" />
+            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
             <feMerge>
               <feMergeNode in="blur" />
               <feMergeNode in="SourceGraphic" />
@@ -165,81 +180,55 @@ const MetroMap = {
           </filter>
         </defs>
 
-        <!-- ================= BACKGROUND GUIDE TRACKS ================= -->
-        <!-- Track 1: CS & Code Independence -->
-        <line x1="${startX}" y1="${trackCS}" x2="${startX + totalTrackLength}" y2="${trackCS}" 
-              stroke="rgba(122, 162, 247, 0.2)" stroke-width="3" stroke-linecap="round" />
+        <!-- Subtle Vertical Phase Dividers -->
+        ${phases
+          .map(
+            (p) =>
+              `<line x1="${p.x - 40}" y1="36" x2="${p.x - 40}" y2="480" stroke="rgba(255,255,255,0.04)" stroke-dasharray="3 4" stroke-width="1" />`
+          )
+          .join("")}
 
-        <!-- Track 2: Academics & GPA -->
-        <line x1="${startX}" y1="${trackAca}" x2="${startX + totalTrackLength}" y2="${trackAca}" 
-              stroke="rgba(224, 175, 104, 0.2)" stroke-width="3" stroke-linecap="round" />
+        <!-- SIGG Express Branch Line (Terracotta) -->
+        <path d="M ${siggStartX - 40} ${spineY} 
+                 L ${siggStartX} ${siggTrackY} 
+                 L ${siggEndX} ${siggTrackY} 
+                 L ${siggEndX + 40} ${spineY}" 
+              fill="none" stroke="rgba(208, 135, 112, 0.4)" stroke-width="3" stroke-linejoin="round" />
 
-        <!-- Track 3: TUM Central Trunk (Projected Track Bed) -->
-        <line x1="${startX}" y1="${trackTrunk}" x2="${startX + totalTrackLength}" y2="${trackTrunk}" 
-              stroke="rgba(255, 255, 255, 0.18)" stroke-width="7" stroke-linecap="round" />
+        <!-- THE MAIN TRANSIT SPINE (Unvisited Track Bed) -->
+        <line x1="${startX}" y1="${spineY}" x2="${startX + totalTrackLength}" y2="${spineY}" 
+              stroke="rgba(255, 255, 255, 0.12)" stroke-width="6" stroke-linecap="round" />
 
-        <!-- Track 4: SIGG GPW Branch (Oct '26 to Apr '27 Finals) -->
-        <path d="M ${siggStartX - 30} ${trackTrunk} 
-                 L ${siggStartX} ${trackSIGG} 
-                 L ${siggEndX} ${trackSIGG} 
-                 L ${siggEndX + 30} ${trackTrunk}" 
-              fill="none" stroke="rgba(247, 118, 142, 0.25)" stroke-width="3" stroke-linejoin="round" />
-
-        <!-- Track 5: German Goethe Ladder -->
-        <line x1="${startX}" y1="${trackGerman}" x2="${startX + totalTrackLength}" y2="${trackGerman}" 
-              stroke="rgba(115, 218, 202, 0.2)" stroke-width="3" stroke-linecap="round" />
-
-        <!-- ================= ACTIVE ILLUMINATED TRACKS (Filled up to today) ================= -->
+        <!-- ACTIVE ILLUMINATED SPINE (Progress Filled to Today) -->
         ${
           currentX > startX
             ? `
-          <!-- Illuminated Central Trunk -->
-          <line x1="${startX}" y1="${trackTrunk}" x2="${currentX}" y2="${trackTrunk}" 
-                stroke="#ffffff" stroke-width="7" stroke-linecap="round" filter="url(#beaconGlow)" />
-
-          <!-- Illuminated CS Branch -->
-          <line x1="${startX}" y1="${trackCS}" x2="${currentX}" y2="${trackCS}" 
-                stroke="#7aa2f7" stroke-width="3" stroke-linecap="round" />
-
-          <!-- Illuminated Academics Branch -->
-          <line x1="${startX}" y1="${trackAca}" x2="${currentX}" y2="${trackAca}" 
-                stroke="#e0af68" stroke-width="3" stroke-linecap="round" />
-
-          <!-- Illuminated German Branch -->
-          <line x1="${startX}" y1="${trackGerman}" x2="${currentX}" y2="${trackGerman}" 
-                stroke="#73daca" stroke-width="3" stroke-linecap="round" />
+          <line x1="${startX}" y1="${spineY}" x2="${currentX}" y2="${spineY}" 
+                stroke="#ffffff" stroke-width="6" stroke-linecap="round" filter="url(#beaconGlow)" />
         `
             : ""
         }
 
-        <!-- ================= STATION INTERCHANGE CONNECTORS & TICKS ================= -->
+        <!-- Vertical Connectors between Spine and Station Cards -->
         ${stations
           .map((station, idx) => {
             const posX = startX + idx * spacing;
-            const isMajor = station.is_major;
             const isEven = idx % 2 === 0;
-
-            // Vertical capsule or transfer connector
-            const topY = trackCS - 4;
-            const bottomY = station.branches?.includes("sigg") ? trackSIGG + 4 : trackGerman + 4;
+            // Even: card above spine (bottom at spineY - 45). Odd: card below spine (top at spineY + 45)
+            const y1 = isEven ? spineY - 45 : spineY + 12;
+            const y2 = isEven ? spineY - 12 : spineY + 45;
 
             return `
-              <!-- Interchange capsule connecting active tracks -->
-              <line x1="${posX}" y1="${topY}" x2="${posX}" y2="${bottomY}" 
-                    stroke="${isMajor ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.18)"}" 
-                    stroke-width="${isMajor ? "4" : "2"}" stroke-linecap="round" />
-
-              <!-- Label Leader Tick -->
-              <line x1="${posX}" y1="${isEven ? topY : bottomY}" x2="${posX}" y2="${isEven ? topY - 20 : bottomY + 20}" 
-                    stroke="rgba(255,255,255,0.3)" stroke-width="1.5" />
+              <line x1="${posX}" y1="${y1}" x2="${posX}" y2="${y2}" 
+                    stroke="rgba(255, 255, 255, 0.22)" stroke-width="1.5" stroke-dasharray="2 3" />
             `;
           })
           .join("")}
       </svg>
     `;
 
-    // 4. Build HTML Station Nodes & 35° Angled Typography
-    let nodesHtml = stations
+    // 5. Build HTML Station Cards & Nodes (Alternating Top & Bottom)
+    let cardsHtml = stations
       .map((station, idx) => {
         const posX = startX + idx * spacing;
         const isMajor = station.is_major;
@@ -247,53 +236,79 @@ const MetroMap = {
         const status = station.status || "upcoming";
         const isPassed = posX <= currentX;
 
-        // Visual style for station center dot
-        let dotStyle = "";
-        let dotContent = "";
+        // Station card position:
+        // Even: Top row (top = spineY - 170)
+        // Odd: Bottom row (top = spineY + 45)
+        const cardTop = isEven ? spineY - 165 : spineY + 45;
+        const cardLeft = posX - 105; // Center 210px card on node
+
+        // Node disc style on the spine
+        let nodeContent = "";
+        let nodeStyle = "background: #101216; border: 2.5px solid rgba(255,255,255,0.4);";
         if (status === "completed" || (isPassed && !isPreLaunch)) {
-          dotStyle = "background: #ffffff; border-color: #ffffff;";
-          dotContent = `<span style="color: #08090a; font-size: 10px; font-weight: 800; line-height: 1;">✓</span>`;
+          nodeStyle = "background: #ffffff; border: 2.5px solid #ffffff;";
+          nodeContent = `<span style="color: #08090a; font-size: 10px; font-weight: 800; line-height: 1;">✓</span>`;
         } else if (status === "active") {
-          dotStyle = "background: #ffffff; border-color: #ffffff; box-shadow: 0 0 16px rgba(255,255,255,0.9);";
+          nodeStyle = "background: #ffffff; border: 2.5px solid #ffffff; box-shadow: 0 0 14px rgba(255,255,255,0.9);";
         }
 
+        const size = isMajor ? 24 : 18;
+
+        // Stream tags
+        const branches = station.branches || [];
+        const chipsHtml = branches
+          .slice(0, 3)
+          .map((b) => {
+            let cls = "chip-tag";
+            if (b === "code") cls += " code";
+            if (b === "sigg") cls += " sigg";
+            if (b === "german") cls += " german";
+            if (b === "academics") cls += " academics";
+            return `<span class="${cls}">${b}</span>`;
+          })
+          .join("");
+
         return `
-          <!-- Station Click Target on Trunk Track -->
+          <!-- Station Node On The Spine -->
           <div 
-            class="station-node-v2" 
-            style="left: ${posX}px; top: ${trackTrunk}px; transform: translate(-50%, -50%);"
+            class="spine-node-point" 
+            style="left: ${posX}px; top: ${spineY}px;"
             onclick="MetroMap.selectStation('${station.id}')"
             title="${this.escapeHtml(station.name)} (${station.month_label})"
           >
-            <!-- Central Trunk Station Disc -->
             <div 
-              style="width: ${isMajor ? "22px" : "16px"}; height: ${isMajor ? "22px" : "16px"}; border-radius: 50%; border: 3px solid #ffffff; background: #101216; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; ${dotStyle}"
+              style="width: ${size}px; height: ${size}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; transition: all 0.2s ease; ${nodeStyle}"
             >
-              ${dotContent}
+              ${nodeContent}
             </div>
+          </div>
 
-            <!-- Alternating Angled Typography (Prevents any overlap) -->
-            <div class="${isEven ? "station-label-angled-up" : "station-label-angled-down"}">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span class="key-pill" style="font-size: 9px; font-weight: 700; ${isMajor ? "border-color: rgba(255,255,255,0.4); color: #ffffff;" : ""}">
-                  ${station.month_label}
-                </span>
-                ${isMajor ? '<span style="font-size: 8px; text-transform: uppercase; color: var(--accent-gold-dim); font-weight: 700; letter-spacing: 0.5px;">MAJOR</span>' : ""}
-              </div>
-              <div style="font-size: 12px; font-weight: 600; color: ${isMajor ? "#ffffff" : "var(--text-primary)"}; margin-top: 3px;">
-                ${this.escapeHtml(station.name)}
-              </div>
+          <!-- Clean Horizontal Station Card -->
+          <div 
+            class="metro-spine-card ${isMajor ? "major" : ""} ${status === "active" ? "active-card" : ""} ${status === "completed" ? "completed-card" : ""}" 
+            style="left: ${cardLeft}px; top: ${cardTop}px;"
+            onclick="MetroMap.selectStation('${station.id}')"
+          >
+            <div class="card-header-row">
+              <span class="card-month-tag">${station.month_label}</span>
+              ${isMajor ? '<span class="key-pill" style="border-color: rgba(197, 160, 89, 0.4); color: var(--accent-gold-dim); font-size: 8px;">MAJOR</span>' : ""}
+            </div>
+            <div class="card-title-text" title="${this.escapeHtml(station.name)}">
+              ${this.escapeHtml(station.name)}
+            </div>
+            <div class="card-chips-row">
+              ${chipsHtml}
             </div>
           </div>
         `;
       })
       .join("");
 
-    // 5. Build Real-Time Day Beacon Indicator (Moving Train on Trunk Line)
+    // 6. Build Real-Time Day Beacon (Compass Pulse on Spine)
     const beaconHtml = `
-      <div class="day-beacon-wrap" style="left: ${currentX}px; top: ${trackTrunk}px;">
+      <div class="day-beacon-wrap" style="left: ${currentX}px; top: ${spineY}px;">
         <!-- Overhead Floating HUD Flag -->
-        <div class="day-beacon-hud">
+        <div class="day-beacon-hud" style="bottom: 30px;">
           <span class="beacon-tag">${beaconTitle}</span>
           <span class="beacon-sub">${beaconSub}</span>
         </div>
@@ -303,7 +318,7 @@ const MetroMap = {
       </div>
     `;
 
-    canvasWrap.innerHTML = svgHtml + nodesHtml + beaconHtml;
+    canvasWrap.innerHTML = phaseHeadersHtml + svgHtml + cardsHtml + beaconHtml;
   },
 
   selectStation(stationId) {
@@ -330,10 +345,10 @@ const MetroMap = {
       deliverablesList.innerHTML = Object.entries(station.deliverables)
         .map(([key, val]) => {
           let lineBadgeColor = "var(--text-secondary)";
-          if (key.toLowerCase().includes("code")) lineBadgeColor = "#7aa2f7";
-          if (key.toLowerCase().includes("academic")) lineBadgeColor = "#e0af68";
-          if (key.toLowerCase().includes("sigg")) lineBadgeColor = "#f7768e";
-          if (key.toLowerCase().includes("german")) lineBadgeColor = "#73daca";
+          if (key.toLowerCase().includes("code")) lineBadgeColor = "#8ba3c7";
+          if (key.toLowerCase().includes("academic")) lineBadgeColor = "#c5a059";
+          if (key.toLowerCase().includes("sigg")) lineBadgeColor = "#d08770";
+          if (key.toLowerCase().includes("german")) lineBadgeColor = "#98b0a1";
 
           return `
             <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px; margin-bottom: 6px;">
@@ -354,7 +369,9 @@ const MetroMap = {
 
   closeDrawer() {
     const drawer = document.getElementById("stationDrawer");
-    if (drawer) drawer.classList.remove("open");
+    if (!drawer) return;
+
+    drawer.classList.remove("open");
     this.selectedStation = null;
   },
 
