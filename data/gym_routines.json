@@ -1,0 +1,100 @@
+{
+  "routines": {
+    "tuesday": {
+      "name": "Day 1: Tuesday — Posterior Chain & Horizontal Power",
+      "focus": "Hamstrings, upper back thickness, neutral chest pressing, rotational core stability.",
+      "exercises": [
+        {
+          "name": "Trap Bar Deadlift (or Hex Bar)",
+          "sets": 3,
+          "reps": "5",
+          "rest": "2–3 min",
+          "notes": "Lower lumbar and knee shear than conventional deadlifts; builds pure hip drive and grip."
+        },
+        {
+          "name": "Neutral-Grip Dumbbell Bench Press",
+          "sets": 3,
+          "reps": "6–8",
+          "rest": "90 sec",
+          "notes": "Palms face each other. Eliminates internal rotation and saves anterior shoulder capsules."
+        },
+        {
+          "name": "Chest-Supported Dumbbell / Machine Row",
+          "sets": 3,
+          "reps": "8–10",
+          "rest": "90 sec",
+          "notes": "Takes lower back out of the equation while building rhomboids and mid-traps."
+        },
+        {
+          "name": "Dumbbell Romanian Deadlift (RDL)",
+          "sets": 3,
+          "reps": "8–10",
+          "rest": "90 sec",
+          "notes": "Hamstring and glute focus. Controlled eccentric (3 sec down)."
+        },
+        {
+          "name": "Face Pulls (Cable or Band)",
+          "sets": 3,
+          "reps": "15",
+          "rest": "60 sec",
+          "notes": "Non-negotiable for boxers: external rotators and rear delts to keep shoulders healthy."
+        },
+        {
+          "name": "Hanging Leg Raises / Captain's Chair",
+          "sets": 3,
+          "reps": "10–12",
+          "rest": "60 sec",
+          "notes": "Decompresses the spine while building anti-extension core strength."
+        }
+      ]
+    },
+    "thursday": {
+      "name": "Day 2: Thursday — Unilateral Balance & Vertical Pull",
+      "focus": "Single-leg stability, lat strength, controlled upper chest, and shoulder joint integrity.",
+      "exercises": [
+        {
+          "name": "Bulgarian Split Squat (Dumbbells at sides)",
+          "sets": 3,
+          "reps": "6–8 / leg",
+          "rest": "90 sec",
+          "notes": "Builds single-leg power and hip stability without loading spine with heavy barbell."
+        },
+        {
+          "name": "Weighted or Bodyweight Pull-Ups / Chin-Ups",
+          "sets": 3,
+          "reps": "6–8",
+          "rest": "2 min",
+          "notes": "Lat width and pulling power. Use neutral grip if elbows/shoulders feel tight."
+        },
+        {
+          "name": "Low-Incline Dumbbell Press (30° Angle)",
+          "sets": 3,
+          "reps": "8–10",
+          "rest": "90 sec",
+          "notes": "Keep elbows tucked at 45°. Targets upper chest with minimal front-delt impingement."
+        },
+        {
+          "name": "Single-Arm Dumbbell Row",
+          "sets": 3,
+          "reps": "8–10 / arm",
+          "rest": "60 sec",
+          "notes": "Core anti-rotation + strong lat engagement."
+        },
+        {
+          "name": "Dumbbell Lateral Raises",
+          "sets": 3,
+          "reps": "12–15",
+          "rest": "60 sec",
+          "notes": "Strict form, slight forward lean, lead with elbows. Builds side-delt width cleanly."
+        },
+        {
+          "name": "Cable Pallof Press",
+          "sets": 3,
+          "reps": "12 / side",
+          "rest": "45 sec",
+          "notes": "Anti-rotational core strength directly transfers to punch stability."
+        }
+      ]
+    }
+  }
+}

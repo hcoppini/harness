@@ -35,7 +35,20 @@ def get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
 
 
 def init_db(db_path: Optional[Path] = None) -> None:
-    """Initializes all database tables with necessary schema migrations."""
+    """Initializes all database tables and ensures JSON data templates are present."""
+    # Ensure JSON templates exist if running frozen
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            bundled_data = Path(meipass) / "data"
+            if bundled_data.exists():
+                import shutil
+                DATA_DIR.mkdir(parents=True, exist_ok=True)
+                for json_file in bundled_data.glob("*.json"):
+                    dest = DATA_DIR / json_file.name
+                    if not dest.exists():
+                        shutil.copy2(json_file, dest)
+
     conn = get_connection(db_path)
     cursor = conn.cursor()
 

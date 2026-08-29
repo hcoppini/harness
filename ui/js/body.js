@@ -1,9 +1,11 @@
 /**
- * Body / Life Layer: Machine maintenance, weigh-in, training, and routine tracking.
+ * Body Layer: Machine maintenance, mass progress, structured gym protocols, and weigh-in logging.
  */
 
 const Body = {
   summary: null,
+  gymConfigs: null,
+  activeGymTab: "tuesday",
 
   async init() {
     this.bindEvents();
@@ -28,74 +30,97 @@ const Body = {
         await this.handleLogWorkout();
       });
     }
+
+    // Gym tabs
+    const tabTue = document.getElementById("tabGymTuesday");
+    const tabThu = document.getElementById("tabGymThursday");
+    if (tabTue) {
+      tabTue.addEventListener("click", () => {
+        tabTue.classList.add("active");
+        tabThu?.classList.remove("active");
+        this.activeGymTab = "tuesday";
+        this.renderGymProtocol();
+      });
+    }
+    if (tabThu) {
+      tabThu.addEventListener("click", () => {
+        tabThu.classList.add("active");
+        tabTue?.classList.remove("active");
+        this.activeGymTab = "thursday";
+        this.renderGymProtocol();
+      });
+    }
   },
 
   async load() {
     try {
       if (!window.pywebview || !window.pywebview.api) return;
       this.summary = await window.pywebview.api.get_body_summary();
-      this.render();
+      const configs = await window.pywebview.api.get_all_configs();
+      this.gymConfigs = configs.gym_routines?.routines || null;
+
+      this.renderSummary();
+      this.renderGymProtocol();
     } catch (err) {
-      console.error("Error loading body data:", err);
+      console.error("Error loading Body data:", err);
     }
   },
 
-  render() {
+  renderSummary() {
     if (!this.summary) return;
 
-    // Weight progress
     const weightEl = document.getElementById("currentWeightDisplay");
     const barFill = document.getElementById("weightProgressBar");
+
     if (weightEl) weightEl.textContent = this.summary.current_weight.toFixed(1);
-    if (barFill) barFill.style.width = Math.min(100, Math.max(2, this.summary.progress_percentage)) + "%";
-
-    // Weekly metrics
-    const boxingEl = document.getElementById("boxingCountDisplay");
-    const gymEl = document.getElementById("gymCountDisplay");
-    const runEl = document.getElementById("runCountDisplay");
-
-    if (boxingEl) {
-      boxingEl.textContent = `${this.summary.weekly_counts.boxing} / ${this.summary.weekly_targets.boxing}`;
+    if (barFill) {
+      const pct = Math.min(100, Math.max(3, this.summary.progress_percentage));
+      barFill.style.width = `${pct}%`;
     }
-    if (gymEl) {
-      gymEl.textContent = `${this.summary.weekly_counts.gym} / ${this.summary.weekly_targets.gym}`;
-    }
-    if (runEl) {
-      runEl.textContent = `${this.summary.weekly_counts.running} / ${this.summary.weekly_targets.running}`;
+  },
+
+  renderGymProtocol() {
+    const container = document.getElementById("gymRoutineDisplay");
+    if (!container || !this.gymConfigs) return;
+
+    const routine = this.gymConfigs[this.activeGymTab];
+    if (!routine) {
+      container.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary);">No routine configured.</div>`;
+      return;
     }
 
-    // Recent workouts
-    const listEl = document.getElementById("recentWorkoutsList");
-    if (listEl && this.summary.recent_workouts) {
-      if (this.summary.recent_workouts.length === 0) {
-        listEl.innerHTML = `<div style="font-size: 12px; color: var(--text-dim); padding: 12px 0;">No workouts logged yet this week.</div>`;
-      } else {
-        listEl.innerHTML = this.summary.recent_workouts
-          .map((w) => {
-            const typeColors = {
-              boxing: "var(--accent-gold)",
-              gym: "var(--accent-cyan)",
-              running: "var(--accent-green)",
-            };
-            const col = typeColors[w.workout_type] || "var(--text-main)";
-
+    const exercises = routine.exercises || [];
+    container.innerHTML = `
+      <div style="margin-bottom: 12px;">
+        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary);">${this.escapeHtml(routine.name)}</div>
+        <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">${this.escapeHtml(routine.focus)}</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 8px;">
+        ${exercises
+          .map((ex, idx) => {
             return `
-              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-primary); border: 1px solid var(--border-dim); padding: 8px 12px; border-radius: 4px; font-size: 12px;">
-                <div>
-                  <span style="font-weight: 700; text-transform: uppercase; color: ${col}; font-family: var(--font-mono); margin-right: 8px;">
-                    ${w.workout_type}
+              <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                  <span style="font-weight: 500; font-size: 12px; color: var(--text-primary);">
+                    ${idx + 1}. ${this.escapeHtml(ex.name)}
                   </span>
-                  <span style="color: var(--text-main);">${this.escapeHtml(w.details)}</span>
+                  <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);">
+                    ${ex.sets} &times; ${ex.reps} (${ex.rest} rest)
+                  </span>
                 </div>
-                <div style="font-family: var(--font-mono); color: var(--text-dim); font-size: 11px;">
-                  Intensity: ${w.intensity}/10 | ${w.date}
-                </div>
+                ${
+                  ex.notes
+                    ? `<div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px; line-height: 1.3;">
+                         ${this.escapeHtml(ex.notes)}
+                       </div>`
+                    : ""
+                }
               </div>
             `;
           })
-          .join("");
-      }
-    }
+          .join("")}
+      </div>
+    `;
   },
 
   async handleLogMetric() {
@@ -103,35 +128,32 @@ const Body = {
     const calories = document.getElementById("logCaloriesMet")?.checked || false;
     const protein = document.getElementById("logProteinMet")?.checked || false;
 
-    const val = parseFloat(input.value);
+    const val = parseFloat(input?.value);
     if (!val || val <= 0) return;
 
     try {
       await window.pywebview.api.log_body_metric(val, calories, protein);
-      input.value = "";
+      if (input) input.value = "";
       await this.load();
       window.HarnessApp.showToast("Weigh-in recorded");
     } catch (err) {
-      console.error("Error saving weigh-in:", err);
+      console.error("Error logging weigh-in:", err);
     }
   },
 
   async handleLogWorkout() {
     const typeSelect = document.getElementById("logWorkoutType");
     const detailsInput = document.getElementById("logWorkoutDetails");
-    const intensityInput = document.getElementById("logWorkoutIntensity");
 
-    const wType = typeSelect.value;
-    const details = detailsInput.value.trim();
-    const intensity = parseInt(intensityInput.value, 10) || 7;
-
+    const wType = typeSelect?.value || "gym";
+    const details = detailsInput?.value.trim() || "";
     if (!details) return;
 
     try {
-      await window.pywebview.api.log_workout(wType, details, intensity);
-      detailsInput.value = "";
+      await window.pywebview.api.log_workout(wType, details, 8);
+      if (detailsInput) detailsInput.value = "";
       await this.load();
-      window.HarnessApp.showToast("Workout session logged");
+      window.HarnessApp.showToast("Training session logged");
     } catch (err) {
       console.error("Error logging workout:", err);
     }

@@ -1,9 +1,57 @@
 """Service for managing daily execution tasks, rollover logic, and scratchpad."""
 
+import json
 import sqlite3
 from datetime import datetime
+from pathlib import Path
 from typing import List, Dict, Any, Optional
-from app.db import get_connection
+from app.db import get_connection, DATA_DIR
+
+
+def get_schedule_for_date(date_str: Optional[str] = None) -> Dict[str, Any]:
+    """Determines Schedule A, B, or C based on the day of the week."""
+    target_dt = datetime.strptime(date_str, "%Y-%m-%d") if date_str else datetime.now()
+    weekday = target_dt.strftime("%A")  # Monday, Tuesday, etc.
+
+    schedules_file = DATA_DIR / "schedules.json"
+    if not schedules_file.exists():
+        return {"name": "Standard Day", "blocks": [], "weekday": weekday}
+
+    try:
+        with open(schedules_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        schedules = data.get("schedules", {})
+
+        for key, sched in schedules.items():
+            if weekday in sched.get("days", []):
+                result = dict(sched)
+                result["key"] = key
+                result["weekday"] = weekday
+                return result
+
+        return {"name": f"{weekday} Routine", "blocks": [], "weekday": weekday}
+    except Exception as e:
+        return {"name": f"{weekday} Routine", "blocks": [], "weekday": weekday, "error": str(e)}
+
+
+def get_gym_routine_for_date(date_str: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    """Returns today's gym routine if Tuesday or Thursday."""
+    target_dt = datetime.strptime(date_str, "%Y-%m-%d") if date_str else datetime.now()
+    weekday = target_dt.strftime("%A").lower()
+
+    if weekday not in ["tuesday", "thursday"]:
+        return None
+
+    gym_file = DATA_DIR / "gym_routines.json"
+    if not gym_file.exists():
+        return None
+
+    try:
+        with open(gym_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return data.get("routines", {}).get(weekday)
+    except Exception:
+        return None
 
 
 def get_today_tasks(date_str: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> List[Dict[str, Any]]:

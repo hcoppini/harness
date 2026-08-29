@@ -20,12 +20,16 @@ class HarnessAPI:
 
     # --- Layer 1: TODAY ---
     def get_today(self, date_str: Optional[str] = None) -> Dict[str, Any]:
-        """Returns today's tasks, daily log (scratchpad/sleep), and rollover status."""
+        """Returns today's tasks, daily log, auto-resolved schedule (A/B/C), and gym routine."""
         tasks = today_service.get_today_tasks(date_str)
         log = today_service.get_daily_log(date_str)
+        schedule = today_service.get_schedule_for_date(date_str)
+        gym_routine = today_service.get_gym_routine_for_date(date_str)
         return {
             "tasks": tasks,
             "log": log,
+            "schedule": schedule,
+            "gym_routine": gym_routine,
         }
 
     def add_task(self, title: str, category: str = "personal", is_tum: bool = False, date_str: Optional[str] = None) -> Dict[str, Any]:
@@ -78,6 +82,18 @@ class HarnessAPI:
 
     def update_language_status(self, level: str, status: str) -> bool:
         return tum_service.update_language_status(level, status)
+
+    def get_metro_roadmap(self) -> Dict[str, Any]:
+        return tum_service.get_metro_roadmap()
+
+    def update_station_status(self, station_id: str, status: str) -> bool:
+        return tum_service.update_station_status(station_id, status)
+
+    def get_all_configs(self) -> Dict[str, Any]:
+        return tum_service.get_all_configs()
+
+    def import_config(self, config_type: str, json_content: str) -> bool:
+        return tum_service.import_config(config_type, json_content)
 
     # --- Layer 3: PROJECTS ---
     def get_projects(self) -> List[Dict[str, Any]]:

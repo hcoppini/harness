@@ -1,11 +1,10 @@
 /**
- * Knowledge / Memory Layer: First-principles algorithm notes, book insights, and reflections.
+ * Knowledge Layer: First-principles algorithm ledger and evening reflection audit.
  */
 
 const Knowledge = {
   items: [],
   selectedItem: null,
-  activeFilter: null,
   reflectionDebounce: null,
 
   async init() {
@@ -14,18 +13,10 @@ const Knowledge = {
   },
 
   bindEvents() {
-    // New Note Button
-    const btnNew = document.getElementById("btnNewNote");
-    if (btnNew) {
-      btnNew.addEventListener("click", () => this.showEditForm(null));
-    }
+    // New Note
+    document.getElementById("btnNewNote")?.addEventListener("click", () => this.showEditForm(null));
 
-    // Filter Buttons
-    document.getElementById("filterAllNotes")?.addEventListener("click", () => this.setFilter(null));
-    document.getElementById("filterAlgoNotes")?.addEventListener("click", () => this.setFilter("algorithm"));
-    document.getElementById("filterModelsNotes")?.addEventListener("click", () => this.setFilter("mental_model"));
-
-    // Edit form buttons
+    // Edit & Delete
     document.getElementById("btnEditNote")?.addEventListener("click", () => {
       if (this.selectedItem) this.showEditForm(this.selectedItem);
     });
@@ -36,9 +27,7 @@ const Knowledge = {
       }
     });
 
-    document.getElementById("btnCancelEditNote")?.addEventListener("click", () => {
-      this.hideEditForm();
-    });
+    document.getElementById("btnCancelEditNote")?.addEventListener("click", () => this.hideEditForm());
 
     document.getElementById("noteEditForm")?.addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -47,15 +36,8 @@ const Knowledge = {
 
     // Reflection inputs auto-save
     ["reflectionWorked", "reflectionSlipped", "reflectionTomorrow"].forEach((id) => {
-      document.getElementById(id)?.addEventListener("input", () => {
-        this.debounceSaveReflection();
-      });
+      document.getElementById(id)?.addEventListener("input", () => this.debounceSaveReflection());
     });
-  },
-
-  setFilter(category) {
-    this.activeFilter = category;
-    this.renderList();
   },
 
   async load() {
@@ -67,7 +49,7 @@ const Knowledge = {
         this.selectItem(this.items[0]);
       }
     } catch (err) {
-      console.error("Error loading knowledge items:", err);
+      console.error("Error loading knowledge notes:", err);
     }
   },
 
@@ -75,28 +57,26 @@ const Knowledge = {
     const container = document.getElementById("knowledgeListContainer");
     if (!container) return;
 
-    const filtered = this.activeFilter ? this.items.filter((i) => i.category === this.activeFilter) : this.items;
-
-    if (filtered.length === 0) {
-      container.innerHTML = `<div style="padding: 16px; font-size: 12px; color: var(--text-dim);">No notes found.</div>`;
+    if (this.items.length === 0) {
+      container.innerHTML = `<div style="padding: 14px; font-size: 11px; color: var(--text-tertiary);">No notes saved.</div>`;
       return;
     }
 
-    container.innerHTML = filtered
+    container.innerHTML = this.items
       .map((item) => {
         const isSelected = this.selectedItem && this.selectedItem.id === item.id;
         return `
-          <button 
-            class="knowledge-item-btn ${isSelected ? "active" : ""}" 
+          <div 
+            style="padding: 10px 12px; border-bottom: 1px solid var(--border-hairline); cursor: pointer; background: ${isSelected ? "var(--bg-surface-active)" : "transparent"}; transition: background 0.15s ease;"
             onclick="Knowledge.selectItemById(${item.id})"
           >
-            <div style="font-weight: 700; font-size: 13px; color: var(--text-main); margin-bottom: 2px;">
+            <div style="font-weight: 500; font-size: 12px; color: var(--text-primary); margin-bottom: 2px;">
               ${this.escapeHtml(item.title)}
             </div>
-            <div style="font-size: 11px; font-family: var(--font-mono); color: var(--text-dim);">
+            <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); text-transform: uppercase;">
               ${item.category} ${item.tags ? `&bull; ${this.escapeHtml(item.tags)}` : ""}
             </div>
-          </button>
+          </div>
         `;
       })
       .join("");
@@ -133,14 +113,10 @@ const Knowledge = {
     if (item) {
       document.getElementById("editNoteId").value = item.id;
       document.getElementById("editNoteTitle").value = item.title;
-      document.getElementById("editNoteCategory").value = item.category;
-      document.getElementById("editNoteTags").value = item.tags || "";
       document.getElementById("editNoteContent").value = item.content;
     } else {
       document.getElementById("editNoteId").value = "";
       document.getElementById("editNoteTitle").value = "";
-      document.getElementById("editNoteCategory").value = "algorithm";
-      document.getElementById("editNoteTags").value = "";
       document.getElementById("editNoteContent").value = "";
     }
   },
@@ -153,8 +129,6 @@ const Knowledge = {
   async handleSaveNote() {
     const idVal = document.getElementById("editNoteId").value;
     const title = document.getElementById("editNoteTitle").value.trim();
-    const category = document.getElementById("editNoteCategory").value;
-    const tags = document.getElementById("editNoteTags").value.trim();
     const content = document.getElementById("editNoteContent").value.trim();
 
     if (!title || !content) return;
@@ -162,15 +136,13 @@ const Knowledge = {
     try {
       const saved = await window.pywebview.api.save_knowledge_item(
         title,
-        category,
+        "algorithm",
         content,
-        tags,
+        "first-principles",
         idVal ? parseInt(idVal, 10) : null
       );
       await this.load();
-      if (saved && saved.id) {
-        this.selectItemById(saved.id);
-      }
+      if (saved && saved.id) this.selectItemById(saved.id);
       window.HarnessApp.showToast("Note saved");
     } catch (err) {
       console.error("Error saving note:", err);
@@ -190,14 +162,14 @@ const Knowledge = {
 
   debounceSaveReflection() {
     clearTimeout(this.reflectionDebounce);
-    const indicator = document.getElementById("reflectionSaveIndicator");
-    if (indicator) indicator.textContent = "Saving...";
+    const pill = document.getElementById("reflectionSavePill");
+    if (pill) pill.textContent = "Saving...";
 
     this.reflectionDebounce = setTimeout(async () => {
       if (window.Today) {
         await window.Today.saveDailyLog();
       }
-      if (indicator) indicator.textContent = "Saved";
+      if (pill) pill.textContent = "Saved";
     }, 400);
   },
 

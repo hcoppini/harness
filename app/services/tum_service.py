@@ -1,8 +1,8 @@
-"""Service for TUM Heilbronn roadmapping: 4-semester grades, Matura targets, German ladder."""
-
+import json
 import sqlite3
+from pathlib import Path
 from typing import List, Dict, Any, Optional
-from app.db import get_connection
+from app.db import get_connection, DATA_DIR
 
 DEFAULT_SUBJECTS = [
     ("Matematyka", 6.0),
@@ -249,3 +249,89 @@ def update_language_status(
         conn.close()
 
     return updated
+
+
+def get_metro_roadmap() -> Dict[str, Any]:
+    """Returns the complete 2-year metro roadmap dataset from data/metro_roadmap.json."""
+    roadmap_file = DATA_DIR / "metro_roadmap.json"
+    if not roadmap_file.exists():
+        return {"title": "TUM Roadmap", "stations": []}
+
+    try:
+        with open(roadmap_file, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception as e:
+        return {"title": "TUM Roadmap", "stations": [], "error": str(e)}
+
+
+def update_station_status(station_id: str, status: str) -> bool:
+    """Updates the status of a specific metro station in metro_roadmap.json."""
+    roadmap_file = DATA_DIR / "metro_roadmap.json"
+    if not roadmap_file.exists():
+        return False
+
+    try:
+        with open(roadmap_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        found = False
+        for s in data.get("stations", []):
+            if s.get("id") == station_id:
+                s["status"] = status
+                found = True
+                break
+
+        if found:
+            with open(roadmap_file, "w", encoding="utf-8") as f:
+                json.dump(data, f, indent=2, ensure_ascii=False)
+            return True
+        return False
+    except Exception:
+        return False
+
+
+def get_all_configs() -> Dict[str, Any]:
+    """Returns all structured JSON configs (schedules, gym routines, roadmap)."""
+    res = {
+        "schedules": {},
+        "gym_routines": {},
+        "metro_roadmap": {},
+    }
+    try:
+        s_file = DATA_DIR / "schedules.json"
+        if s_file.exists():
+            with open(s_file, "r", encoding="utf-8") as f:
+                res["schedules"] = json.load(f)
+
+        g_file = DATA_DIR / "gym_routines.json"
+        if g_file.exists():
+            with open(g_file, "r", encoding="utf-8") as f:
+                res["gym_routines"] = json.load(f)
+
+        m_file = DATA_DIR / "metro_roadmap.json"
+        if m_file.exists():
+            with open(m_file, "r", encoding="utf-8") as f:
+                res["metro_roadmap"] = json.load(f)
+    except Exception:
+        pass
+    return res
+
+
+def import_config(config_type: str, json_content: str) -> bool:
+    """Imports or updates a configuration file (schedules, gym_routines, or metro_roadmap)."""
+    filename_map = {
+        "schedules": DATA_DIR / "schedules.json",
+        "gym_routines": DATA_DIR / "gym_routines.json",
+        "metro_roadmap": DATA_DIR / "metro_roadmap.json",
+    }
+    target = filename_map.get(config_type)
+    if not target:
+        return False
+
+    try:
+        parsed = json.loads(json_content)
+        with open(target, "w", encoding="utf-8") as f:
+            json.dump(parsed, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception:
+        return False

@@ -1,26 +1,23 @@
 /**
- * Master Application Controller & Keyboard Router for Harness.
+ * Master Application Controller, Keyboard Router, and JSON Hub for Harness.
  */
 
 window.HarnessApp = {
   currentView: "today",
+  activeJsonTab: "schedules",
+  allConfigs: null,
 
   init() {
     this.bindNavigation();
     this.bindKeybindings();
+    this.bindJsonModal();
     this.startClock();
 
     // Listen for PyWebView ready event
     window.addEventListener("pywebviewready", async () => {
-      console.log("PyWebView API bridge connected");
       await this.initAllLayers();
-      const statusText = document.getElementById("appStatusText");
-      if (statusText) {
-        statusText.textContent = "Harness Engine Connected (Local SQLite WAL)";
-      }
     });
 
-    // Fallback if pywebview is already attached or in browser test mode
     if (window.pywebview && window.pywebview.api) {
       this.initAllLayers();
     }
@@ -47,7 +44,7 @@ window.HarnessApp = {
   switchView(viewName) {
     if (!viewName || viewName === this.currentView) return;
 
-    // Update nav tab styling
+    // Update nav tab pills
     document.querySelectorAll("#navTabs .nav-tab").forEach((tab) => {
       if (tab.getAttribute("data-view") === viewName) {
         tab.classList.add("active");
@@ -67,9 +64,12 @@ window.HarnessApp = {
 
     this.currentView = viewName;
 
-    // Refresh view data upon focus
+    // Refresh view data on activation
     if (viewName === "today" && window.Today) window.Today.load();
-    if (viewName === "tum" && window.Tum) window.Tum.load();
+    if (viewName === "tum" && window.Tum) {
+      window.Tum.load();
+      if (window.MetroMap) window.MetroMap.load();
+    }
     if (viewName === "projects" && window.Projects) window.Projects.load();
     if (viewName === "body" && window.Body) window.Body.load();
     if (viewName === "knowledge" && window.Knowledge) window.Knowledge.load();
@@ -80,15 +80,14 @@ window.HarnessApp = {
       const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
       const isInput = activeTag === "input" || activeTag === "textarea" || activeTag === "select";
 
-      // If user is actively typing in a form field, don't trigger global navigation shortcuts
       if (isInput) {
         if (e.key === "Escape") {
           document.activeElement.blur();
+          this.closeJsonModal();
         }
         return;
       }
 
-      // View switching hotkeys [1 - 5]
       if (e.key === "1") {
         e.preventDefault();
         this.switchView("today");
@@ -106,23 +105,138 @@ window.HarnessApp = {
         this.switchView("knowledge");
       }
 
-      // Action hotkeys: [N] for new task, [R] for rollover
       if (e.key === "n" || e.key === "N") {
         e.preventDefault();
         this.switchView("today");
-        const taskInput = document.getElementById("taskTitleInput");
-        if (taskInput) {
-          taskInput.focus();
-        }
+        const quickInput = document.getElementById("quickTaskInput");
+        if (quickInput) quickInput.focus();
       }
 
       if (e.key === "r" || e.key === "R") {
         e.preventDefault();
-        if (window.Today) {
-          window.Today.handleRollover();
-        }
+        if (window.Today) window.Today.handleRollover();
+      }
+
+      if (e.key === "Escape") {
+        this.closeJsonModal();
+        if (window.MetroMap) window.MetroMap.closeDrawer();
       }
     });
+  },
+
+  bindJsonModal() {
+    const btnOpen = document.getElementById("btnOpenJsonModal");
+    const btnClose = document.getElementById("btnCloseJsonModal");
+    const modal = document.getElementById("jsonModal");
+
+    if (btnOpen) {
+      btnOpen.addEventListener("click", async () => {
+        await this.openJsonModal();
+      });
+    }
+
+    if (btnClose) {
+      btnClose.addEventListener("click", () => this.closeJsonModal());
+    }
+
+    // Modal background click closes modal
+    if (modal) {
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) this.closeJsonModal();
+      });
+    }
+
+    // Tab buttons inside JSON modal
+    const tabSched = document.getElementById("btnJsonTabSchedules");
+    const tabGym = document.getElementById("btnJsonTabGym");
+    const tabRoadmap = document.getElementById("btnJsonTabRoadmap");
+
+    if (tabSched) {
+      tabSched.addEventListener("click", () => this.switchJsonTab("schedules"));
+    }
+    if (tabGym) {
+      tabGym.addEventListener("click", () => this.switchJsonTab("gym_routines"));
+    }
+    if (tabRoadmap) {
+      tabRoadmap.addEventListener("click", () => this.switchJsonTab("metro_roadmap"));
+    }
+
+    // Save button
+    const btnSave = document.getElementById("btnSaveJsonConfig");
+    if (btnSave) {
+      btnSave.addEventListener("click", async () => {
+        await this.saveJsonConfig();
+      });
+    }
+  },
+
+  async openJsonModal() {
+    const modal = document.getElementById("jsonModal");
+    if (!modal) return;
+
+    try {
+      if (window.pywebview && window.pywebview.api) {
+        this.allConfigs = await window.pywebview.api.get_all_configs();
+        this.switchJsonTab(this.activeJsonTab || "schedules");
+      }
+      modal.classList.add("open");
+    } catch (err) {
+      console.error("Error opening JSON modal:", err);
+    }
+  },
+
+  closeJsonModal() {
+    const modal = document.getElementById("jsonModal");
+    if (modal) modal.classList.remove("open");
+  },
+
+  switchJsonTab(tabName) {
+    this.activeJsonTab = tabName;
+    const tabSched = document.getElementById("btnJsonTabSchedules");
+    const tabGym = document.getElementById("btnJsonTabGym");
+    const tabRoadmap = document.getElementById("btnJsonTabRoadmap");
+    const textarea = document.getElementById("jsonConfigTextarea");
+
+    [tabSched, tabGym, tabRoadmap].forEach((btn) => btn?.classList.remove("active"));
+
+    if (tabName === "schedules" && tabSched) tabSched.classList.add("active");
+    if (tabName === "gym_routines" && tabGym) tabGym.classList.add("active");
+    if (tabName === "metro_roadmap" && tabRoadmap) tabRoadmap.classList.add("active");
+
+    if (textarea && this.allConfigs) {
+      const data = this.allConfigs[tabName] || {};
+      textarea.value = JSON.stringify(data, null, 2);
+    }
+  },
+
+  async saveJsonConfig() {
+    const textarea = document.getElementById("jsonConfigTextarea");
+    const statusEl = document.getElementById("jsonImportStatus");
+    if (!textarea) return;
+
+    const raw = textarea.value.trim();
+    try {
+      JSON.parse(raw); // Validate JSON format
+    } catch (e) {
+      if (statusEl) statusEl.textContent = `JSON Parse Error: ${e.message}`;
+      return;
+    }
+
+    try {
+      const success = await window.pywebview.api.import_config(this.activeJsonTab, raw);
+      if (success) {
+        if (statusEl) statusEl.textContent = "Saved & Applied.";
+        this.showToast("Configuration saved");
+        await this.initAllLayers();
+        setTimeout(() => {
+          if (statusEl) statusEl.textContent = "";
+        }, 2000);
+      } else {
+        if (statusEl) statusEl.textContent = "Failed to write file.";
+      }
+    } catch (err) {
+      if (statusEl) statusEl.textContent = `Error: ${err}`;
+    }
   },
 
   startClock() {
@@ -136,7 +250,6 @@ window.HarnessApp = {
           weekday: "short",
           month: "short",
           day: "numeric",
-          year: "numeric",
         });
       }
       if (timeEl) {
@@ -152,20 +265,30 @@ window.HarnessApp = {
     setInterval(updateTime, 1000);
   },
 
-  showToast(message, durationMs = 2400) {
+  showToast(message, durationMs = 2200) {
     const container = document.getElementById("toastContainer");
     if (!container) return;
 
     const toast = document.createElement("div");
-    toast.className = "toast";
+    toast.style.cssText = `
+      background: var(--bg-surface-elevated);
+      border: 1px solid var(--border-subtle);
+      padding: 8px 14px;
+      border-radius: var(--radius-sm);
+      font-size: 11px;
+      font-family: var(--font-mono);
+      color: var(--text-primary);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
+      animation: slideIn 0.18s ease-out;
+    `;
     toast.textContent = message;
     container.appendChild(toast);
 
     setTimeout(() => {
       toast.style.opacity = "0";
-      toast.style.transform = "translateX(20px)";
-      toast.style.transition = "all 0.2s ease";
-      setTimeout(() => toast.remove(), 200);
+      toast.style.transform = "translateX(10px)";
+      toast.style.transition = "all 0.15s ease";
+      setTimeout(() => toast.remove(), 150);
     }, durationMs);
   },
 };

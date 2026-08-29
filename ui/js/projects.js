@@ -25,54 +25,41 @@ const Projects = {
 
     container.innerHTML = this.list
       .map((p) => {
-        const isSigg = p.name.includes("SIGG");
-        const isCodeInd = p.name.includes("Independence");
-
         return `
-          <div class="project-card" data-id="${p.id}">
+          <div class="project-card">
             <div>
-              <div class="project-top">
-                <div class="project-name">${this.escapeHtml(p.name)}</div>
-                <span class="badge ${p.status === "active" ? "badge-tum" : "badge-cat"}">${p.status}</span>
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div class="project-title">${this.escapeHtml(p.name)}</div>
+                <span class="key-pill" style="color: var(--text-primary); text-transform: uppercase;">${p.status}</span>
               </div>
               <div class="project-desc">${this.escapeHtml(p.description)}</div>
 
               ${
                 p.deadline
-                  ? `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-cyan); margin-top: 8px;">
-                       Target / Deadline: ${p.deadline}
+                  ? `<div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary); margin-top: 6px;">
+                       TARGET: ${this.escapeHtml(p.deadline)}
                      </div>`
                   : ""
               }
             </div>
 
-            <div style="display: flex; flex-direction: column; gap: 10px;">
-              <!-- Current Milestone -->
-              <div class="project-box">
-                <div class="project-box-label">Current Milestone</div>
-                <div class="project-box-val">${this.escapeHtml(p.current_milestone || "Define milestone")}</div>
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <div class="project-meta-box">
+                <div class="meta-box-label">CURRENT MILESTONE</div>
+                <div class="meta-box-val">${this.escapeHtml(p.current_milestone || "Define milestone")}</div>
               </div>
 
-              <!-- Immediate Next Action -->
-              <div class="project-box" style="border-left: 3px solid var(--accent-cyan);">
-                <div class="project-box-label">Immediate Next Action</div>
-                <div class="project-box-val" style="color: var(--accent-cyan);">${this.escapeHtml(p.next_action || "Set next action")}</div>
+              <div class="project-meta-box" style="border-left: 2px solid var(--accent-white);">
+                <div class="meta-box-label">IMMEDIATE NEXT ACTION</div>
+                <div class="meta-box-val" style="color: var(--text-primary); font-weight: 600;">
+                  ${this.escapeHtml(p.next_action || "Set next action")}
+                </div>
               </div>
-
-              ${
-                p.notes
-                  ? `<div style="font-size: 11px; color: var(--text-dim); line-height: 1.4;">
-                       <strong>Key Directive:</strong> ${this.escapeHtml(p.notes)}
-                     </div>`
-                  : ""
-              }
             </div>
 
-            <!-- Actions Bar -->
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-dim); padding-top: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-hairline); padding-top: 10px;">
               <button 
-                class="btn btn-primary" 
-                style="font-size: 11px; padding: 5px 10px;"
+                class="btn-ghost-icon" 
                 onclick="Projects.editNextAction(${p.id}, '${this.escapeJs(p.next_action)}')"
               >
                 Update Next Action
@@ -81,8 +68,7 @@ const Projects = {
               ${
                 p.local_path
                   ? `<button 
-                       class="btn" 
-                       style="font-size: 11px; padding: 5px 10px;" 
+                       class="btn-ghost-icon" 
                        title="${p.local_path}"
                        onclick="Projects.openFolder('${this.escapeJs(p.local_path)}')"
                      >
@@ -117,7 +103,7 @@ const Projects = {
     try {
       await window.pywebview.api.update_project(projectId, null, null, newVal.trim());
       await this.load();
-      window.HarnessApp.showToast("Project next action updated");
+      window.HarnessApp.showToast("Next action updated");
     } catch (err) {
       console.error("Error updating project action:", err);
     }

@@ -60,3 +60,25 @@ def test_german_ladder_transition(test_db):
     b1_status = [l for l in new_overview["language"] if l["level"] == "B1"][0]["status"]
     assert a2_status == "completed"
     assert b1_status == "in_progress"
+
+
+def test_metro_roadmap():
+    roadmap = tum_service.get_metro_roadmap()
+    assert "TUM" in roadmap["title"]
+    assert len(roadmap["stations"]) >= 20
+
+    # First station is Sep '26
+    first_station = roadmap["stations"][0]
+    assert first_station["id"] == "sep-2026"
+    assert "Pure Syntax" in first_station["name"]
+    assert "Academics" in first_station["deliverables"]
+
+    # Test status update
+    updated = tum_service.update_station_status("sep-2026", "active")
+    assert updated is True
+
+    # Test get all configs
+    configs = tum_service.get_all_configs()
+    assert "schedules" in configs
+    assert "gym_routines" in configs
+    assert "metro_roadmap" in configs

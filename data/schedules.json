@@ -1,0 +1,158 @@
+{
+  "schedules": {
+    "A": {
+      "name": "Schedule A: Boxing & Precision",
+      "days": ["Monday", "Wednesday", "Friday"],
+      "description": "High physical output day. Hard cognitive work cutoff at 17:15 before transit.",
+      "blocks": [
+        {
+          "time": "06:45 – 07:30",
+          "focus": "Launch",
+          "activity": "Breakfast, bag packed, commute to school",
+          "type": "routine"
+        },
+        {
+          "time": "07:30 – 15:00",
+          "focus": "Liceum",
+          "activity": "High classroom focus. Knock out minor homework during breaks",
+          "type": "school"
+        },
+        {
+          "time": "15:30 – 16:15",
+          "focus": "Home & Fuel",
+          "activity": "Return home, daily household chores, pre-workout meal",
+          "type": "chore"
+        },
+        {
+          "time": "16:15 – 17:15",
+          "focus": "TUM Deep Focus (60m)",
+          "activity": "High-priority Math Rozszerzona problem sets or raw code logic (No AI)",
+          "type": "deep_work"
+        },
+        {
+          "time": "17:20 – 20:30",
+          "focus": "Boxing Block",
+          "activity": "Transit, technical boxing training, sparring, transit home",
+          "type": "training"
+        },
+        {
+          "time": "20:30 – 21:45",
+          "focus": "Nutrition & Shower",
+          "activity": "Heavy dinner, 140-150g protein target, hot shower",
+          "type": "nutrition"
+        },
+        {
+          "time": "21:45 – 22:45",
+          "focus": "Guilt-Free Decompression",
+          "activity": "Relax, casual reading, unwind",
+          "type": "rest"
+        },
+        {
+          "time": "22:45 – 06:45",
+          "focus": "Sleep (8 hrs)",
+          "activity": "Total physical and CNS recovery",
+          "type": "sleep"
+        }
+      ]
+    },
+    "B": {
+      "name": "Schedule B: TUM Sprint & Gym",
+      "days": ["Tuesday", "Thursday"],
+      "description": "Primary academic compound day with 2 hours of focused TUM deep work and a 50-minute structured lift.",
+      "blocks": [
+        {
+          "time": "07:30 – 15:00",
+          "focus": "Liceum",
+          "activity": "Classroom engagement; finish minor homework",
+          "type": "school"
+        },
+        {
+          "time": "15:30 – 16:15",
+          "focus": "Home & Chores",
+          "activity": "Return home, complete daily chores immediately",
+          "type": "chore"
+        },
+        {
+          "time": "16:15 – 18:15",
+          "focus": "TUM Deep Sprint (2 hrs)",
+          "activity": "60m Math Rozszerzona past CKE + 60m CS Matura unassisted raw coding",
+          "type": "deep_work"
+        },
+        {
+          "time": "18:30 – 19:30",
+          "focus": "Gym (50–60 min)",
+          "activity": "Structured hypertrophy & power session",
+          "type": "training"
+        },
+        {
+          "time": "19:45 – 20:30",
+          "focus": "Dinner & German",
+          "activity": "Nutritious dinner + 20 min active German input (Nicos Weg / Anki)",
+          "type": "study"
+        },
+        {
+          "time": "20:30 – 22:45",
+          "focus": "Free Time (2h 15m)",
+          "activity": "Completely free evening to unwind and recharge",
+          "type": "rest"
+        },
+        {
+          "time": "22:45 – 06:45",
+          "focus": "Sleep (8 hrs)",
+          "activity": "Rest & hypertrophy recovery",
+          "type": "sleep"
+        }
+      ]
+    },
+    "C_SAT": {
+      "name": "Schedule C: Saturday Run & TUM Peak",
+      "days": ["Saturday"],
+      "description": "Peak morning energy. 5k recovery run followed by a 2-hour timed exam simulation. Afternoon and night completely open.",
+      "blocks": [
+        {
+          "time": "09:30 – 10:15",
+          "focus": "Running",
+          "activity": "5k Zone 2 Recovery Run (Pace target: ~4:45)",
+          "type": "training"
+        },
+        {
+          "time": "11:00 – 13:00",
+          "focus": "TUM Deep Work (2 hrs)",
+          "activity": "Timed exam sheets or startup/coding project work at peak mental energy",
+          "type": "deep_work"
+        },
+        {
+          "time": "13:00 onwards",
+          "focus": "100% Free Time",
+          "activity": "Guilt-free afternoon and night completely open",
+          "type": "rest"
+        }
+      ]
+    },
+    "C_SUN": {
+      "name": "Schedule C: Sunday CNS Reset",
+      "days": ["Sunday"],
+      "description": "Zero workouts. Full recovery of central nervous system and mental reset for the upcoming week.",
+      "blocks": [
+        {
+          "time": "All Day",
+          "focus": "Total Rest & Recovery",
+          "activity": "Zero workouts. Relax, spend time outdoors, recharge",
+          "type": "rest"
+        },
+        {
+          "time": "18:00 – 19:00",
+          "focus": "Weekly Prep",
+          "activity": "Verify the upcoming week in Harness, pack gym/boxing bags",
+          "type": "routine"
+        },
+        {
+          "time": "22:30",
+          "focus": "Lights Out",
+          "activity": "Full sleep to attack Monday strong",
+          "type": "sleep"
+        }
+      ]
+    }
+  }
+}

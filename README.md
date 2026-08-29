@@ -1,22 +1,22 @@
-# HARNESS // Personal Execution OS
+# HARNESS // Executive OS (Version 2.0)
 
 > **"Harness exists to turn intention into execution. Long-term goals are meaningless if they never influence today's actions."**
 
-Harness is a standalone desktop execution system designed for **Heitor** (16, Liceum Class 3 in Poland). It bridges long-term objectives—entering **TUM Campus Heilbronn (B.Sc. Management and Data Science)**, scoring 90%+ on Rozszerzona Matura (Maths, Computer Science, Bilingual English), climbing the German language ladder (A2 $\to$ B1 $\to$ B2), winning the **SIGG 2025/2026 GPW contest**, building to 80kg mass, and gaining 100% code independence—directly into daily, non-negotiable execution reps.
+Harness is an executive desktop OS designed for **Heitor** (16, Liceum Class 3 in Poland). It bridges your long-term ambitions—entering **TUM Campus Heilbronn (B.Sc. Management and Data Science)**, scoring 90%+ on Rozszerzona Matura (Maths, Computer Science, Bilingual English), climbing the German ladder ($A2 \to B1 \to B2$), winning the **SIGG 2025/2026 GPW contest**, building to 80kg mass, and gaining 100% code independence—directly into daily, frictionless execution.
 
 ---
 
-## The 5 Core Layers
+## 5 Core Layers
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                           HARNESS                           │
+│                       HARNESS 2.0                           │
 ├─────────────────────────────────────────────────────────────┤
-│ 1. TODAY      │ Brutally simple: daily checks, 1 TUM action,│
-│               │ rollover mechanics, sleep/wake, scratchpad. │
+│ 1. TODAY      │ Automated day routines (Sched A/B/C),       │
+│               │ embedded gym protocols, zero input fatigue. │
 ├───────────────┼─────────────────────────────────────────────┤
-│ 2. TUM        │ Reactive roadmap: 4-semester grades (>80%), │
-│               │ Matura targets, German ladder (A2 -> B2).   │
+│ 2. TUM METRO  │ Horizontal draggable subway timeline        │
+│               │ (24 stations: Sep '26 -> Jul '28 direct).   │
 ├───────────────┼─────────────────────────────────────────────┤
 │ 3. PROJECTS   │ Active builds (SIGG Scanner, Harness, etc.) │
 │               │ Milestones, immediate next actions.         │
@@ -25,28 +25,34 @@ Harness is a standalone desktop execution system designed for **Heitor** (16, Li
 │               │ Running, Sleep. Informs, never guilt-trips. │
 ├───────────────┼─────────────────────────────────────────────┤
 │ 5. KNOWLEDGE  │ Intellectual ledger: unassisted algorithms, │
-│               │ mental models, daily reflection audit.      │
+│               │ daily reflection audit, and JSON data hub.  │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-### Layer 1: TODAY (Execution)
-- **Zero bloat**: No 18 color-coded distraction graphs.
-- **The TUM Imperative**: Exactly 1 high-leverage action tied directly to TUM every single day.
-- **Rollover Mechanics**: Incomplete tasks carry over cleanly with `Rolled 1x` flags—no guilt trips, no disappearing into the void.
-- **Transient Scratchpad**: Auto-saving notes area for rapid thought capture without context switching.
+### Layer 1: TODAY (Zero-Friction Automated Execution)
+- **Zero Input Fatigue**: You don't type out 10 tasks each morning. The app detects the day of the week and loads your pre-calibrated schedule:
+  - **Mon, Wed, Fri (Schedule A)**: Boxing Days (Hard cognitive work cutoff at 17:15).
+  - **Tue, Thu (Schedule B)**: TUM Deep Work Sprint (60m Math R + 60m CS raw coding + 50m lift).
+  - **Saturday (Schedule C)**: 5k Recovery Run + 2h timed exam paper + afternoon free.
+  - **Sunday (Schedule C)**: Full CNS Reset.
+- **Embedded Workout Card**: On Tuesdays and Thursdays, the exact 6-exercise gym routine is pre-loaded with checkable sets.
+- **Quick One-Off Task Bar**: Hit `N` to focus, type, and press `Enter` to add ad-hoc items.
 
-### Layer 2: TUM (Direction & Reactive Dependency Tree)
-- **4-Semester Liceum Grade Tracker**: Tracks all subjects across Semesters 1 to 4. Automatically flags any subject dropping below 4.0 (<80%).
-- **Matura Benchmarks**: Tracks target vs. actual mock percentages for Rozszerzona Matematyka (target 90%+), Informatyka (target 90%+), and Bilingual English (target 95%+).
-- **German Language Ladder**: Step-by-step progression from A1 $\to$ A2 $\to$ B1 (June 2026) $\to$ B2 (Feb 2027).
+### Layer 2: TUM METRO ROADMAP (Horizontal Draggable Subway Line)
+- **Hold & Drag Timeline**: Interactive horizontal canvas spanning 24 stations from **Sep '26 ("Pure Syntax")** to **Jul '28 ("TUM Heilbronn Direct Offer")**.
+- **Clickable Station Nodes**: Click any station to inspect deliverables across all streams: Academics, Code, SIGG, German, Physical, and TUM Admissions.
 
-### Layer 3: PROJECTS (Building & Shipping)
-- Pre-seeded with your 4 active fronts:
-  1. **SIGG 2025/2026** (`c:\Users\heito\Desktop\polish_stocks_day_trade-main`): Stage 1 prep, momentum filters, 1-click workspace folder launch.
-  2. **Code Independence & Matura CS**: Daily deliberate practice without AI assistance.
-  3. **Harness**: Self-hosted desktop hub.
-  4. **Financial Agency & SME Outreach** (`c:\Users\heito\Desktop\grodt_v1`): Automated client acquisition.
-- Direct **"Open Folder &rarr;"** button launches project directories in Windows File Explorer.
+### Layer 4: BODY / LIFE (Structured Gym Protocols)
+- **Tuesday**: *Posterior Chain & Horizontal Power* (Trap Bar Deadlift, Neutral DB Bench, DB Rows, RDL, Face Pulls, Leg Raises).
+- **Thursday**: *Unilateral Balance & Vertical Pull* (Bulgarian Split Squats, Pull-Ups, Incline Press, Single-Arm Row, Lateral Raises, Pallof Press).
+- **Mass Goal**: Linear progress gauge from 68.0 kg to 80.0 kg.
+
+### Layer 5: KNOWLEDGE & STANDARDIZED JSON HUB
+- Standardized second-brain data models in `data/`:
+  - `schedules.json`: Routines A, B, and C.
+  - `gym_routines.json`: Workout protocols.
+  - `metro_roadmap.json`: The 24-station 2-year timeline.
+- Accessible via the **JSON Hub** button in the header.
 
 ### Layer 4: BODY / LIFE (Machine Maintenance)
 - **Hypertrophy Progress**: Visual progress bar tracking transition from 68.0 kg (17% BF) $\to$ 80.0 kg (11–13% BF).

@@ -91,3 +91,19 @@ def test_daily_log_scratchpad(test_db):
     assert "pure recursion" in updated["scratchpad"]
     assert updated["wake_time"] == "06:30"
     assert updated["reflection_worked"] == "Completed all math sets."
+
+
+def test_schedule_and_gym_resolution():
+    # 2026-08-31 is a Monday -> Schedule A
+    sched_mon = today_service.get_schedule_for_date("2026-08-31")
+    assert "Boxing" in sched_mon["name"]
+    assert len(sched_mon["blocks"]) >= 5
+
+    # 2026-09-01 is a Tuesday -> Schedule B & Tuesday Gym Routine
+    sched_tue = today_service.get_schedule_for_date("2026-09-01")
+    assert "TUM Sprint & Gym" in sched_tue["name"]
+
+    gym_tue = today_service.get_gym_routine_for_date("2026-09-01")
+    assert gym_tue is not None
+    assert "Posterior Chain" in gym_tue["name"]
+    assert len(gym_tue["exercises"]) == 6
