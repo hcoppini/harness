@@ -80,10 +80,20 @@ def init_db(db_path: Optional[Path] = None) -> None:
             reflection_worked TEXT DEFAULT '',
             reflection_slipped TEXT DEFAULT '',
             reflection_tomorrow TEXT DEFAULT '',
+            completed_blocks TEXT DEFAULT '',
+            completed_exercises TEXT DEFAULT '',
             updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
     )
+
+    # Migrations for existing DB instances
+    cursor.execute("PRAGMA table_info(daily_logs)")
+    dl_cols = [row[1] for row in cursor.fetchall()]
+    if "completed_blocks" not in dl_cols:
+        cursor.execute("ALTER TABLE daily_logs ADD COLUMN completed_blocks TEXT DEFAULT ''")
+    if "completed_exercises" not in dl_cols:
+        cursor.execute("ALTER TABLE daily_logs ADD COLUMN completed_exercises TEXT DEFAULT ''")
 
     # 3. TUM Roadmap & Grades
     cursor.execute(

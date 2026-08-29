@@ -7,28 +7,51 @@ window.HarnessApp = {
   activeJsonTab: "schedules",
   allConfigs: null,
 
+  initialized: false,
+
   init() {
     this.bindNavigation();
     this.bindKeybindings();
     this.bindJsonModal();
     this.startClock();
 
-    // Listen for PyWebView ready event
-    window.addEventListener("pywebviewready", async () => {
-      await this.initAllLayers();
-    });
+    const startBridge = async () => {
+      if (this.initialized) return;
+      if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.get_today === "function") {
+        this.initialized = true;
+        console.log("PyWebView API bridge connected, initializing layers...");
+        await this.initAllLayers();
+      }
+    };
 
-    if (window.pywebview && window.pywebview.api) {
-      this.initAllLayers();
-    }
+    // 1. Listen for pywebviewready event
+    window.addEventListener("pywebviewready", startBridge);
+
+    // 2. Poll as bulletproof fallback if event already fired or delayed
+    let attempts = 0;
+    const interval = setInterval(async () => {
+      attempts++;
+      if (this.initialized || attempts > 60) {
+        clearInterval(interval);
+        return;
+      }
+      if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.get_today === "function") {
+        clearInterval(interval);
+        await startBridge();
+      }
+    }, 100);
   },
 
   async initAllLayers() {
-    if (window.Today) await window.Today.init();
-    if (window.Tum) await window.Tum.init();
-    if (window.Projects) await window.Projects.init();
-    if (window.Body) await window.Body.init();
-    if (window.Knowledge) await window.Knowledge.init();
+    try {
+      if (window.Today) await window.Today.init();
+      if (window.Tum) await window.Tum.init();
+      if (window.Projects) await window.Projects.init();
+      if (window.Body) await window.Body.init();
+      if (window.Knowledge) await window.Knowledge.init();
+    } catch (err) {
+      console.error("Error initializing layers:", err);
+    }
   },
 
   bindNavigation() {

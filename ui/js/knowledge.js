@@ -183,3 +183,5 @@ const Knowledge = {
       .replace(/'/g, "&#039;");
   },
 };
+
+window.Knowledge = Knowledge;

@@ -42,6 +42,14 @@ const MetroMap = {
       container.scrollLeft = this.scrollLeft - walk;
     });
 
+    // Horizontal wheel navigation
+    container.addEventListener("wheel", (e) => {
+      if (e.deltaY !== 0) {
+        e.preventDefault();
+        container.scrollLeft += e.deltaY;
+      }
+    }, { passive: false });
+
     // Close drawer button
     const closeBtn = document.getElementById("closeStationDrawerBtn");
     if (closeBtn) {
@@ -228,3 +236,5 @@ const MetroMap = {
       .replace(/'/g, "&#039;");
   },
 };
+
+window.MetroMap = MetroMap;

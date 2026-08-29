@@ -231,8 +231,8 @@ def get_daily_log(date_str: Optional[str] = None, conn: Optional[sqlite3.Connect
     if not row:
         cursor.execute(
             """
-            INSERT INTO daily_logs (date, scratchpad, wake_time, sleep_time, reflection_worked, reflection_slipped, reflection_tomorrow)
-            VALUES (?, '', '', '', '', '', '')
+            INSERT INTO daily_logs (date, scratchpad, wake_time, sleep_time, reflection_worked, reflection_slipped, reflection_tomorrow, completed_blocks, completed_exercises)
+            VALUES (?, '', '', '', '', '', '', '', '')
             """,
             (target_date,),
         )
@@ -245,6 +245,8 @@ def get_daily_log(date_str: Optional[str] = None, conn: Optional[sqlite3.Connect
             "reflection_worked": "",
             "reflection_slipped": "",
             "reflection_tomorrow": "",
+            "completed_blocks": "",
+            "completed_exercises": "",
         }
     else:
         log_data = {
@@ -255,6 +257,8 @@ def get_daily_log(date_str: Optional[str] = None, conn: Optional[sqlite3.Connect
             "reflection_worked": row["reflection_worked"] or "",
             "reflection_slipped": row["reflection_slipped"] or "",
             "reflection_tomorrow": row["reflection_tomorrow"] or "",
+            "completed_blocks": row["completed_blocks"] or "" if "completed_blocks" in row.keys() else "",
+            "completed_exercises": row["completed_exercises"] or "" if "completed_exercises" in row.keys() else "",
         }
 
     if close_conn:
@@ -271,6 +275,8 @@ def update_daily_log(
     reflection_worked: Optional[str] = None,
     reflection_slipped: Optional[str] = None,
     reflection_tomorrow: Optional[str] = None,
+    completed_blocks: Optional[str] = None,
+    completed_exercises: Optional[str] = None,
     conn: Optional[sqlite3.Connection] = None,
 ) -> Dict[str, Any]:
     """Updates daily log fields."""
@@ -303,6 +309,12 @@ def update_daily_log(
     if reflection_tomorrow is not None:
         updates.append("reflection_tomorrow = ?")
         values.append(reflection_tomorrow)
+    if completed_blocks is not None:
+        updates.append("completed_blocks = ?")
+        values.append(completed_blocks)
+    if completed_exercises is not None:
+        updates.append("completed_exercises = ?")
+        values.append(completed_exercises)
 
     if updates:
         values.append(target_date)

@@ -109,3 +109,5 @@ const Tum = {
     }
   },
 };
+
+window.Tum = Tum;

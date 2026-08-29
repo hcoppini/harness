@@ -53,6 +53,8 @@ class HarnessAPI:
         reflection_worked: Optional[str] = None,
         reflection_slipped: Optional[str] = None,
         reflection_tomorrow: Optional[str] = None,
+        completed_blocks: Optional[str] = None,
+        completed_exercises: Optional[str] = None,
     ) -> Dict[str, Any]:
         return today_service.update_daily_log(
             date_str=date_str,
@@ -62,6 +64,8 @@ class HarnessAPI:
             reflection_worked=reflection_worked,
             reflection_slipped=reflection_slipped,
             reflection_tomorrow=reflection_tomorrow,
+            completed_blocks=completed_blocks,
+            completed_exercises=completed_exercises,
         )
 
     # --- Layer 2: TUM ---

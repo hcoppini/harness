@@ -1,11 +1,15 @@
 /**
- * Today Layer: Automated schedule, routine blocks, gym lift, quick tasks, and scratchpad.
+ * Section 1: TODAY (Zero-Friction Daily Execution Engine)
+ * Automatically loads Schedule A/B/C, pre-loads structured gym routines,
+ * persists block & exercise checkmarks, handles quick tasks, scratchpad, and sleep times.
  */
 
 const Today = {
   tasks: [],
   schedule: null,
   gymRoutine: null,
+  completedBlocks: new Set(),
+  completedExercises: new Set(),
   debounceTimer: null,
 
   async init() {
@@ -52,11 +56,24 @@ const Today = {
       this.schedule = data.schedule || null;
       this.gymRoutine = data.gym_routine || null;
 
-      this.renderSchedule();
-      this.renderGymCard();
-      this.renderTasks();
-
+      // Parse persisted completed blocks & exercises
       if (data.log) {
+        const blocksStr = data.log.completed_blocks || "";
+        this.completedBlocks = new Set(
+          blocksStr
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
+        );
+
+        const exStr = data.log.completed_exercises || "";
+        this.completedExercises = new Set(
+          exStr
+            .split(",")
+            .map((s) => s.trim())
+            .filter((s) => s.length > 0)
+        );
+
         const scratchpad = document.getElementById("scratchpadTextarea");
         const wakeInput = document.getElementById("wakeTimeInput");
         const sleepInput = document.getElementById("sleepTimeInput");
@@ -71,6 +88,10 @@ const Today = {
         if (refSlipped) refSlipped.value = data.log.reflection_slipped || "";
         if (refTomorrow) refTomorrow.value = data.log.reflection_tomorrow || "";
       }
+
+      this.renderSchedule();
+      this.renderGymCard();
+      this.renderTasks();
     } catch (err) {
       console.error("Error loading Today data:", err);
     }
@@ -92,12 +113,17 @@ const Today = {
     blocksContainer.innerHTML = blocks
       .map((block, idx) => {
         const isDeepWork = block.type === "deep_work";
+        const isChecked = this.completedBlocks.has(String(idx));
         return `
           <div class="routine-block ${isDeepWork ? "deep-work" : ""}">
-            <div class="check-dot" onclick="this.classList.toggle('checked')"></div>
+            <div 
+              class="check-dot ${isChecked ? "checked" : ""}" 
+              onclick="Today.toggleRoutineBlock(${idx})"
+              title="Click to check off routine block"
+            ></div>
             <div class="routine-time">${block.time}</div>
             <div class="routine-info">
-              <div class="routine-focus">${this.escapeHtml(block.focus)}</div>
+              <div class="routine-focus" style="${isChecked ? "text-decoration: line-through; color: var(--text-tertiary);" : ""}">${this.escapeHtml(block.focus)}</div>
               <div class="routine-activity">${this.escapeHtml(block.activity)}</div>
             </div>
             ${isDeepWork ? '<span class="key-pill" style="color: #ffffff; border-color: rgba(255,255,255,0.3);">TUM Focus</span>' : ""}
@@ -105,6 +131,29 @@ const Today = {
         `;
       })
       .join("");
+  },
+
+  async toggleRoutineBlock(idx) {
+    const key = String(idx);
+    if (this.completedBlocks.has(key)) {
+      this.completedBlocks.delete(key);
+    } else {
+      this.completedBlocks.add(key);
+    }
+    this.renderSchedule();
+
+    const strVal = Array.from(this.completedBlocks).join(",");
+    try {
+      if (window.pywebview && window.pywebview.api) {
+        await window.pywebview.api.update_daily_log(
+          null, null, null, null, null, null, null,
+          strVal,
+          null
+        );
+      }
+    } catch (err) {
+      console.error("Error persisting completed block:", err);
+    }
   },
 
   renderGymCard() {
@@ -124,12 +173,19 @@ const Today = {
 
     const exercises = this.gymRoutine.exercises || [];
     exercisesContainer.innerHTML = exercises
-      .map((ex) => {
+      .map((ex, idx) => {
+        const isChecked = this.completedExercises.has(String(idx));
         return `
           <div class="lift-exercise-row">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <div class="check-dot" onclick="this.classList.toggle('checked')"></div>
-              <span style="font-weight: 500; color: var(--text-primary);">${this.escapeHtml(ex.name)}</span>
+              <div 
+                class="check-dot ${isChecked ? "checked" : ""}" 
+                onclick="Today.toggleGymExercise(${idx})"
+                title="Mark exercise complete"
+              ></div>
+              <span style="font-weight: 500; color: ${isChecked ? "var(--text-tertiary); text-decoration: line-through;" : "var(--text-primary);"}">
+                ${this.escapeHtml(ex.name)}
+              </span>
             </div>
             <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);">
               ${ex.sets} &times; ${ex.reps} (${ex.rest} rest)
@@ -138,6 +194,29 @@ const Today = {
         `;
       })
       .join("");
+  },
+
+  async toggleGymExercise(idx) {
+    const key = String(idx);
+    if (this.completedExercises.has(key)) {
+      this.completedExercises.delete(key);
+    } else {
+      this.completedExercises.add(key);
+    }
+    this.renderGymCard();
+
+    const strVal = Array.from(this.completedExercises).join(",");
+    try {
+      if (window.pywebview && window.pywebview.api) {
+        await window.pywebview.api.update_daily_log(
+          null, null, null, null, null, null, null,
+          null,
+          strVal
+        );
+      }
+    } catch (err) {
+      console.error("Error persisting completed exercise:", err);
+    }
   },
 
   renderTasks() {
@@ -235,7 +314,15 @@ const Today = {
 
     try {
       if (window.pywebview && window.pywebview.api) {
-        await window.pywebview.api.update_daily_log(null, scratchpad, wakeTime, sleepTime, refWorked, refSlipped, refTomorrow);
+        await window.pywebview.api.update_daily_log(
+          null,
+          scratchpad,
+          wakeTime,
+          sleepTime,
+          refWorked,
+          refSlipped,
+          refTomorrow
+        );
       }
     } catch (err) {
       console.error("Error saving daily log:", err);
@@ -252,3 +339,5 @@ const Today = {
       .replace(/'/g, "&#039;");
   },
 };
+
+window.Today = Today;

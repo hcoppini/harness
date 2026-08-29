@@ -169,3 +169,5 @@ const Body = {
       .replace(/'/g, "&#039;");
   },
 };
+
+window.Body = Body;

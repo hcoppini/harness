@@ -124,3 +124,5 @@ const Projects = {
     return str.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   },
 };
+
+window.Projects = Projects;
