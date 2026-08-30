@@ -93,6 +93,9 @@ class HarnessAPI:
     def update_station_status(self, station_id: str, status: str) -> bool:
         return tum_service.update_station_status(station_id, status)
 
+    def toggle_station_deliverable(self, station_id: str, deliverable_key: str) -> Dict[str, Any]:
+        return tum_service.toggle_station_deliverable(station_id, deliverable_key)
+
     def get_all_configs(self) -> Dict[str, Any]:
         return tum_service.get_all_configs()
 

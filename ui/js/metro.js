@@ -268,6 +268,21 @@ const MetroMap = {
           })
           .join("");
 
+        // Station card checklist progress
+        const delivEntries = Object.keys(station.deliverables || {});
+        const totalDelivs = delivEntries.length;
+        const completedDelivs = (station.completed_deliverables || []).length;
+        let checklistBadge = "";
+        if (totalDelivs > 0) {
+          if (completedDelivs >= totalDelivs) {
+            checklistBadge = `<span class="card-checklist-badge complete">✓ ALL ${totalDelivs}</span>`;
+          } else if (completedDelivs > 0) {
+            checklistBadge = `<span class="card-checklist-badge">${completedDelivs}/${totalDelivs} ✓</span>`;
+          } else {
+            checklistBadge = `<span class="card-checklist-badge">${completedDelivs}/${totalDelivs}</span>`;
+          }
+        }
+
         return `
           <!-- Station Node On The Spine -->
           <div 
@@ -285,12 +300,15 @@ const MetroMap = {
 
           <!-- Clean Horizontal Station Card -->
           <div 
-            class="metro-spine-card ${isMajor ? "major" : ""} ${status === "active" ? "active-card" : ""} ${status === "completed" ? "completed-card" : ""}" 
+            class="metro-spine-card ${isMajor ? "major" : ""} ${status === "completed" ? "completed-card" : ""} ${status === "active" ? "active-card" : ""}" 
             style="left: ${cardLeft}px; top: ${cardTop}px;"
             onclick="MetroMap.selectStation('${station.id}')"
           >
             <div class="card-header-row">
-              <span class="card-month-tag">${station.month_label}</span>
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="card-month-tag">${station.month_label}</span>
+                ${checklistBadge}
+              </div>
               ${isMajor ? '<span class="key-pill" style="border-color: rgba(197, 160, 89, 0.4); color: var(--accent-gold-dim); font-size: 8px;">MAJOR</span>' : ""}
             </div>
             <div class="card-title-text" title="${this.escapeHtml(station.name)}">
@@ -339,10 +357,29 @@ const MetroMap = {
     document.getElementById("drawerStationNextAction").textContent = station.next_action || "--";
     document.getElementById("drawerStationStatus").value = station.status || "upcoming";
 
-    // Deliverables breakdown
+    // Deliverables interactive checklist breakdown
     const deliverablesList = document.getElementById("drawerDeliverablesList");
     if (deliverablesList && station.deliverables) {
-      deliverablesList.innerHTML = Object.entries(station.deliverables)
+      const allEntries = Object.entries(station.deliverables);
+      const totalDelivs = allEntries.length;
+      const completedList = station.completed_deliverables || [];
+      const completedCount = completedList.length;
+      const progressPercent = totalDelivs > 0 ? Math.round((completedCount / totalDelivs) * 100) : 0;
+      const isAllComplete = totalDelivs > 0 && completedCount >= totalDelivs;
+
+      const progressHeader = `
+        <div class="deliverables-progress-box">
+          <div class="deliverables-progress-header">
+            <span>Deliverables Checklist (${completedCount}/${totalDelivs})</span>
+            <span style="${isAllComplete ? "color: #ffffff; font-weight: 700;" : ""}">${isAllComplete ? "STATION COMPLETED ✓" : `${progressPercent}%`}</span>
+          </div>
+          <div class="deliverables-progress-track">
+            <div class="deliverables-progress-fill" style="width: ${progressPercent}%; ${isAllComplete ? "background: #ffffff; box-shadow: 0 0 8px rgba(255,255,255,0.6);" : ""}"></div>
+          </div>
+        </div>
+      `;
+
+      const itemsHtml = allEntries
         .map(([key, val]) => {
           let lineBadgeColor = "var(--text-secondary)";
           if (key.toLowerCase().includes("code")) lineBadgeColor = "#8ba3c7";
@@ -350,18 +387,29 @@ const MetroMap = {
           if (key.toLowerCase().includes("sigg")) lineBadgeColor = "#d08770";
           if (key.toLowerCase().includes("german")) lineBadgeColor = "#98b0a1";
 
+          const isChecked = completedList.includes(key);
+
           return `
-            <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px; margin-bottom: 6px;">
-              <div style="font-family: var(--font-mono); font-size: 10px; text-transform: uppercase; color: ${lineBadgeColor}; font-weight: 700; margin-bottom: 2px;">
-                ${key} LINE
-              </div>
-              <div style="font-size: 12px; color: var(--text-primary); line-height: 1.4;">
-                ${this.escapeHtml(val)}
+            <div 
+              class="deliverable-item ${isChecked ? "checked" : ""}" 
+              onclick="MetroMap.toggleDeliverable('${station.id}', '${this.escapeHtml(key)}')"
+              title="Click to toggle deliverable completion"
+            >
+              <div class="deliverable-check-dot"></div>
+              <div class="deliverable-content">
+                <div class="deliverable-line-badge" style="color: ${lineBadgeColor};">
+                  ${key} LINE
+                </div>
+                <div class="deliverable-desc">
+                  ${this.escapeHtml(val)}
+                </div>
               </div>
             </div>
           `;
         })
         .join("");
+
+      deliverablesList.innerHTML = progressHeader + itemsHtml;
     }
 
     drawer.classList.add("open");
@@ -373,6 +421,35 @@ const MetroMap = {
 
     drawer.classList.remove("open");
     this.selectedStation = null;
+  },
+
+  async toggleDeliverable(stationId, deliverableKey) {
+    try {
+      if (!window.pywebview || !window.pywebview.api) return;
+      const res = await window.pywebview.api.toggle_station_deliverable(stationId, deliverableKey);
+      if (res && res.success) {
+        const st = this.data.stations.find((s) => s.id === stationId);
+        if (st) {
+          st.completed_deliverables = res.completed_deliverables;
+          st.status = res.station_status;
+          this.selectedStation = st;
+        }
+
+        // Live re-render
+        this.render();
+        if (this.selectedStation && this.selectedStation.id === stationId) {
+          this.openDrawer(this.selectedStation);
+        }
+
+        if (res.station_completed) {
+          window.HarnessApp.showToast(`Station Completed: ${st.name}! All deliverables met.`);
+        } else if (res.is_checked) {
+          window.HarnessApp.showToast(`Checked: ${deliverableKey} (${res.completed_count}/${res.total_count})`);
+        }
+      }
+    } catch (err) {
+      console.error("Error toggling deliverable:", err);
+    }
   },
 
   async updateStatus(stationId, newStatus) {

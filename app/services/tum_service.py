@@ -290,6 +290,66 @@ def update_station_status(station_id: str, status: str) -> bool:
         return False
 
 
+def toggle_station_deliverable(station_id: str, deliverable_key: str) -> Dict[str, Any]:
+    """Toggles a deliverable checkbox for a station.
+    When all deliverables for a station are checked, automatically marks the station as 'completed'.
+    When any deliverable is unchecked, reverts status from 'completed' to 'active'.
+    """
+    roadmap_file = DATA_DIR / "metro_roadmap.json"
+    if not roadmap_file.exists():
+        return {"success": False, "error": "Roadmap file not found"}
+
+    try:
+        with open(roadmap_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        target_station = None
+        for s in data.get("stations", []):
+            if s.get("id") == station_id:
+                target_station = s
+                break
+
+        if not target_station:
+            return {"success": False, "error": f"Station {station_id} not found"}
+
+        completed_list = target_station.get("completed_deliverables", [])
+        if deliverable_key in completed_list:
+            completed_list.remove(deliverable_key)
+            is_checked = False
+        else:
+            completed_list.append(deliverable_key)
+            is_checked = True
+
+        target_station["completed_deliverables"] = completed_list
+
+        all_keys = list(target_station.get("deliverables", {}).keys())
+        total_count = len(all_keys)
+        completed_count = len(completed_list)
+
+        # Automatic station completion trigger
+        if total_count > 0 and completed_count >= total_count:
+            target_station["status"] = "completed"
+        elif target_station.get("status") == "completed":
+            target_station["status"] = "active"
+
+        with open(roadmap_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        return {
+            "success": True,
+            "station_id": station_id,
+            "deliverable_key": deliverable_key,
+            "is_checked": is_checked,
+            "completed_deliverables": completed_list,
+            "completed_count": completed_count,
+            "total_count": total_count,
+            "station_status": target_station["status"],
+            "station_completed": target_station["status"] == "completed",
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def get_all_configs() -> Dict[str, Any]:
     """Returns all structured JSON configs (schedules, gym routines, roadmap)."""
     res = {

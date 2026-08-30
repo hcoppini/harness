@@ -26,7 +26,8 @@
         "German": "20 min/day active input (Nicos Weg A2 module). Target: 100 new vocabulary items in Anki.",
         "Physical": "Weight 68.5 kg, daily protein floor at 140g."
       },
-      "next_action": "Complete first 5 HackerRank problems without AI and trace variables by hand."
+      "next_action": "Complete first 5 HackerRank problems without AI and trace variables by hand.",
+      "completed_deliverables": []
     },
     {
       "id": "oct-2026",

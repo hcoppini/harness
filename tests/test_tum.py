@@ -77,6 +77,37 @@ def test_metro_roadmap():
     updated = tum_service.update_station_status("sep-2026", "active")
     assert updated is True
 
+    # Test deliverable toggling checklist
+    deliv_keys = list(first_station["deliverables"].keys())
+    assert len(deliv_keys) > 0
+
+    # Toggle one on
+    res = tum_service.toggle_station_deliverable("sep-2026", deliv_keys[0])
+    assert res["success"] is True
+    assert res["is_checked"] is True
+    assert deliv_keys[0] in res["completed_deliverables"]
+
+    # Toggle all deliverables on to verify automatic completion
+    for k in deliv_keys[1:]:
+        res = tum_service.toggle_station_deliverable("sep-2026", k)
+        assert res["success"] is True
+
+    assert res["station_completed"] is True
+    assert res["station_status"] == "completed"
+
+    # Toggle one off to verify reversion
+    res_off = tum_service.toggle_station_deliverable("sep-2026", deliv_keys[0])
+    assert res_off["is_checked"] is False
+    assert res_off["station_completed"] is False
+    assert res_off["station_status"] == "active"
+
+    # Reset all checked for clean state
+    current_roadmap = tum_service.get_metro_roadmap()
+    current_sep = [s for s in current_roadmap["stations"] if s["id"] == "sep-2026"][0]
+    for k in list(current_sep.get("completed_deliverables", [])):
+        tum_service.toggle_station_deliverable("sep-2026", k)
+    tum_service.update_station_status("sep-2026", "active")
+
     # Test get all configs
     configs = tum_service.get_all_configs()
     assert "schedules" in configs
