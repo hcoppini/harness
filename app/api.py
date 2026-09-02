@@ -29,7 +29,7 @@ class HarnessAPI:
     def get_school_plan(self, date_str: Optional[str] = None, force_refresh: bool = False) -> Dict[str, Any]:
         """Returns today's school schedule from TM1 / staff.edu.pl."""
         if force_refresh:
-            return school_service.fetch_school_plan(force_refresh=True)
+            school_service.fetch_school_plan(force_refresh=True)
         lessons = school_service.get_lessons_for_date(date_str)
         return {"lessons": lessons, "date": date_str}
 

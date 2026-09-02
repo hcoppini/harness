@@ -103,7 +103,7 @@ def get_easy_links() -> List[Dict[str, Any]]:
         return DEFAULT_EASY_LINKS
 
 
-def parse_optivum_html(html_content: str) -> Dict[str, List[Dict[str, Any]]]:
+def parse_optivum_html(html_content: str, second_language: str = "j.niemiecki") -> Dict[str, List[Dict[str, Any]]]:
     """Parses Vulcan Optivum timetable HTML into a structured dictionary keyed by Polish weekday."""
     soup = BeautifulSoup(html_content, "html.parser")
     table = soup.find("table", class_="tabela")
@@ -132,27 +132,57 @@ def parse_optivum_html(html_content: str) -> Dict[str, List[Dict[str, Any]]]:
                 break
             day_name = days[day_idx]
 
-            # Parse subject, teacher, room
-            text = cell.get_text(separator=" ", strip=True)
-            if not text or text == " ":
+            raw_text = cell.get_text(separator=" ", strip=True)
+            if not raw_text or raw_text == " ":
                 continue
 
-            subj_el = cell.find("span", class_="p")
-            subject = subj_el.get_text(strip=True) if subj_el else text
+            parts = [p.strip() for p in cell.decode_contents().split("<br>") if p.strip() and p.strip() != "&nbsp;"]
+            if not parts:
+                continue
 
-            teacher_el = cell.find("a", class_="n") or cell.find("span", class_="n")
-            teacher = teacher_el.get_text(strip=True) if teacher_el else ""
+            entry_list = []
+            for part in parts:
+                part_soup = BeautifulSoup(part, "html.parser")
+                p_tag = part_soup.find("span", class_="p")
+                n_tag = part_soup.find("a", class_="n") or part_soup.find("span", class_="n")
+                s_tag = part_soup.find("a", class_="s") or part_soup.find("span", class_="s")
 
-            room_el = cell.find("a", class_="s") or cell.find("span", class_="s")
-            room = room_el.get_text(strip=True) if room_el else ""
+                subj = p_tag.get_text(strip=True) if p_tag else part_soup.get_text(strip=True)
+                teacher = n_tag.get_text(strip=True) if n_tag else ""
+                room = s_tag.get_text(strip=True) if s_tag else ""
 
-            schedule[day_name].append({
-                "nr": nr,
-                "time": time_slot,
-                "subject": subject,
-                "teacher": teacher,
-                "room": room,
-            })
+                # Handle inter-branch language division (#o2 -> German preference)
+                if "hiszpa" in subj.lower() or "#o2" in part:
+                    subj = second_language
+                    if not teacher:
+                        teacher = "Ba / ED"
+                    if not room:
+                        room = "315 / 417"
+
+                # Clean internal Optivum hashtag flags from subject
+                subj = re.sub(r"#[a-zA-Z0-9]+", "", subj).strip()
+
+                entry_list.append({"subject": subj, "teacher": teacher, "room": room})
+
+            if len(entry_list) == 1:
+                schedule[day_name].append({
+                    "nr": nr,
+                    "time": time_slot,
+                    "subject": entry_list[0]["subject"],
+                    "teacher": entry_list[0]["teacher"],
+                    "room": entry_list[0]["room"],
+                })
+            else:
+                subjs = " / ".join([e["subject"] for e in entry_list if e["subject"]])
+                teachers = " / ".join([e["teacher"] for e in entry_list if e["teacher"]])
+                rooms = " / ".join([e["room"] for e in entry_list if e["room"]])
+                schedule[day_name].append({
+                    "nr": nr,
+                    "time": time_slot,
+                    "subject": subjs,
+                    "teacher": teachers,
+                    "room": rooms,
+                })
 
     return schedule
 
