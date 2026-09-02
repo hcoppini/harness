@@ -20,5 +20,12 @@ Harness.exe
 .coverage
 htmlcov/
 
+# Windows
+*.lnk
+desktop.ini
+Thumbs.db
+[Dd]esktop.ini
+
 # Local database (optional, can track or keep local)
 # data/harness.db
+

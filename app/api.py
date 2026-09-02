@@ -3,11 +3,13 @@
 from typing import Dict, Any, List, Optional
 from app.db import init_db
 from app.services import (
+    dashboard_service,
     today_service,
     tum_service,
     project_service,
     body_service,
     knowledge_service,
+    school_service,
 )
 
 
@@ -17,6 +19,76 @@ class HarnessAPI:
     def __init__(self):
         # Ensure database and tables are ready
         init_db()
+
+    # --- Layer 0: DASHBOARD ---
+    def get_dashboard(self) -> Dict[str, Any]:
+        """Returns heatmap matrix, upcoming 7-day forecast, and executive KPI summary."""
+        return dashboard_service.get_dashboard_summary()
+
+    # --- School, Homework & Quick Links ---
+    def get_school_plan(self, date_str: Optional[str] = None, force_refresh: bool = False) -> Dict[str, Any]:
+        """Returns today's school schedule from TM1 / staff.edu.pl."""
+        if force_refresh:
+            return school_service.fetch_school_plan(force_refresh=True)
+        lessons = school_service.get_lessons_for_date(date_str)
+        return {"lessons": lessons, "date": date_str}
+
+    def get_easy_links(self) -> List[Dict[str, Any]]:
+        """Returns curated high-signal links."""
+        return school_service.get_easy_links()
+
+    def open_external_url(self, url: str) -> bool:
+        """Opens safe HTTP/HTTPS URL in default Windows browser."""
+        return school_service.open_external_url(url)
+
+    def get_upcoming_homework(self) -> List[Dict[str, Any]]:
+        from app.services import homework_service
+        return homework_service.get_upcoming_homework()
+
+    def get_homework_for_date(self, date_str: Optional[str] = None) -> List[Dict[str, Any]]:
+        from app.services import homework_service
+        return homework_service.get_homework_for_date(date_str)
+
+    def add_homework(
+        self,
+        subject: str,
+        title: str,
+        due_date: str,
+        priority: int = 1,
+        notes: str = "",
+        source: str = "manual",
+    ) -> Dict[str, Any]:
+        from app.services import homework_service
+        return homework_service.add_homework(subject, title, due_date, priority, notes, source)
+
+    def toggle_homework(self, hw_id: int) -> Dict[str, Any]:
+        from app.services import homework_service
+        return homework_service.toggle_homework(hw_id)
+
+    def delete_homework(self, hw_id: int) -> bool:
+        from app.services import homework_service
+        return homework_service.delete_homework(hw_id)
+
+    def get_upcoming_exams(self) -> List[Dict[str, Any]]:
+        from app.services import homework_service
+        return homework_service.get_upcoming_exams()
+
+    def add_exam(self, subject: str, title: str, exam_date: str, scope: str = "") -> Dict[str, Any]:
+        from app.services import homework_service
+        return homework_service.add_exam(subject, title, exam_date, scope)
+
+    def toggle_exam(self, exam_id: int, result_percentage: Optional[float] = None) -> bool:
+        from app.services import homework_service
+        return homework_service.toggle_exam(exam_id, result_percentage)
+
+    def delete_exam(self, exam_id: int) -> bool:
+        from app.services import homework_service
+        return homework_service.delete_exam(exam_id)
+
+    def import_school_data(self, json_str: str) -> bool:
+        from app.services import homework_service
+        return homework_service.import_school_data_json(json_str)
+
 
     # --- Layer 1: TODAY ---
     def get_today(self, date_str: Optional[str] = None) -> Dict[str, Any]:
@@ -148,6 +220,16 @@ class HarnessAPI:
 
     def open_project_folder(self, local_path: str) -> bool:
         return project_service.open_local_path(local_path)
+
+    def open_in_vscode(self, local_path: str) -> bool:
+        return project_service.open_in_vscode(local_path)
+
+    def open_terminal(self, local_path: str) -> bool:
+        return project_service.open_terminal(local_path)
+
+    def get_git_repos_summary(self) -> List[Dict[str, Any]]:
+        from app.services import github_service
+        return github_service.get_all_active_repos_summary()
 
     # --- Layer 4: BODY / LIFE ---
     def get_body_summary(self) -> Dict[str, Any]:

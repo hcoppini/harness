@@ -3,7 +3,7 @@ title HARNESS // Building Standalone Executable...
 cd /d "%~dp0"
 
 echo [1/3] Running test suite...
-"C:\Users\heito\AppData\Local\Microsoft\WindowsApps\python.exe" -m pytest tests/ -v
+py -3.11 -m pytest tests/ -v
 if %ERRORLEVEL% NEQ 0 (
     echo [ERROR] Tests failed. Aborting build.
     pause
@@ -11,7 +11,7 @@ if %ERRORLEVEL% NEQ 0 (
 )
 
 echo [2/3] Compiling standalone Harness.exe with PyInstaller...
-"C:\Users\heito\AppData\Local\Microsoft\WindowsApps\python.exe" -m PyInstaller --name "Harness" --onefile --windowed --noconsole --add-data "ui;ui" --add-data "data;data" --clean -y main.py
+py -3.11 -m PyInstaller --name "Harness" --onefile --windowed --noconsole --add-data "ui;ui" --add-data "data;data" --clean -y main.py
 
 if exist "dist\Harness.exe" (
     copy /y "dist\Harness.exe" "Harness.exe" >nul

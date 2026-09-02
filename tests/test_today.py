@@ -101,9 +101,29 @@ def test_schedule_and_gym_resolution():
 
     # 2026-09-01 is a Tuesday -> Schedule B & Tuesday Gym Routine
     sched_tue = today_service.get_schedule_for_date("2026-09-01")
-    assert "TUM Sprint & Gym" in sched_tue["name"]
+    assert "Gym & TUM Sprint" in sched_tue["name"]
 
     gym_tue = today_service.get_gym_routine_for_date("2026-09-01")
     assert gym_tue is not None
     assert "Posterior Chain" in gym_tue["name"]
     assert len(gym_tue["exercises"]) == 6
+
+
+def test_get_tasks_for_different_dates(test_db):
+    date1 = "2026-09-02"
+    date2 = "2026-09-03"
+
+    t1 = today_service.add_task("Math test prep", "study", True, date1, conn=test_db)
+    t2 = today_service.add_task("English vocabulary", "study", False, date2, conn=test_db)
+
+    tasks1 = today_service.get_today_tasks(date1, conn=test_db)
+    tasks2 = today_service.get_today_tasks(date2, conn=test_db)
+
+    assert len(tasks1) == 1
+    assert tasks1[0]["id"] == t1["id"]
+    assert tasks1[0]["title"] == "Math test prep"
+
+    assert len(tasks2) == 1
+    assert tasks2[0]["id"] == t2["id"]
+    assert tasks2[0]["title"] == "English vocabulary"
+

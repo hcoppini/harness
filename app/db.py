@@ -195,8 +195,41 @@ def init_db(db_path: Optional[Path] = None) -> None:
         """
     )
 
+    # 7. School Homework & Exams (Phase 3)
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS homework_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            title TEXT NOT NULL,
+            due_date TEXT NOT NULL,                    -- YYYY-MM-DD
+            completed INTEGER NOT NULL DEFAULT 0,
+            source TEXT DEFAULT 'manual',              -- manual, vulcan, librus
+            priority INTEGER DEFAULT 1,                -- 1: normal, 2: high, 3: urgent
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS school_exams (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            title TEXT NOT NULL,
+            exam_date TEXT NOT NULL,                   -- YYYY-MM-DD
+            scope TEXT DEFAULT '',
+            completed INTEGER NOT NULL DEFAULT 0,
+            result_percentage REAL DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    )
+
     conn.commit()
     conn.close()
+
 
 
 if __name__ == "__main__":

@@ -19,7 +19,11 @@
 
     <!-- Navigation Pills -->
     <nav class="nav-tabs" id="navTabs">
-      <button class="nav-tab active" data-view="today">
+      <button class="nav-tab active" data-view="dashboard">
+        <span>Dashboard</span>
+        <span class="key-pill">0</span>
+      </button>
+      <button class="nav-tab" data-view="today">
         <span>Today</span>
         <span class="key-pill">1</span>
       </button>
@@ -55,9 +59,167 @@
   <main class="main-content">
 
     <!-- ====================================================================
+         0. DASHBOARD LAYER (Executive Home Page, Heatmap & Upcoming Forecast)
+         ==================================================================== -->
+    <section id="view-dashboard" class="view-section active">
+      <!-- Section Header -->
+      <div class="section-header">
+        <div>
+          <h1 class="section-headline">EXECUTIVE DASHBOARD</h1>
+          <p class="section-caption">High-signal pulse: daily execution heatmap, 7-day schedule forecast, and core trajectory stats.</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <div class="streak-pill" id="dashboardStreakPill" title="Consecutive days with execution activity">
+            <span class="streak-flame">🔥</span>
+            <span id="streakCountVal">0</span>
+            <span style="color: var(--text-tertiary);">day streak</span>
+          </div>
+          <button id="btnRefreshDashboard" class="btn-ghost-icon" title="Refresh Dashboard Data">
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="dashboard-layout">
+        <!-- 1. GITHUB-STYLE DAILY EXECUTION HEATMAP CARD -->
+        <div class="monotone-card heatmap-card">
+          <div class="heatmap-header-row">
+            <div>
+              <span class="heatmap-title" id="heatmapContributionsCount">Daily Execution Pulse</span>
+              <span class="heatmap-subtitle">Tied directly to checked boxes • 100% completed = Brightest Purple</span>
+            </div>
+            <div class="heatmap-legend">
+              <span class="legend-label">0%</span>
+              <div class="legend-square lvl-0" title="0 checked"></div>
+              <div class="legend-square lvl-1" title="> 0 checked"></div>
+              <div class="legend-square lvl-2" title="≥ 40% checked"></div>
+              <div class="legend-square lvl-3" title="≥ 75% checked"></div>
+              <div class="legend-square lvl-4" title="100% checked (All boxes done!)"></div>
+              <span class="legend-label">100%</span>
+            </div>
+          </div>
+
+          <!-- Scrollable Heatmap Viewport -->
+          <div class="heatmap-scroll-wrap" id="heatmapScrollWrap">
+            <div class="heatmap-container" id="heatmapContainer">
+              <!-- Rendered dynamically by dashboard.js -->
+            </div>
+          </div>
+
+          <!-- Heatmap Floating Tooltip -->
+          <div id="heatmapTooltip" class="heatmap-tooltip"></div>
+        </div>
+
+        <!-- 2. UPCOMING 7-DAY SCHEDULE FORECAST -->
+        <div class="monotone-card upcoming-card">
+          <div class="card-label-row" style="margin-bottom: 12px;">
+            <div>
+              <span class="card-label">Upcoming Week Forecast (7 Days)</span>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); margin-left: 8px;">
+                Look ahead: routines, training cutoffs, and scheduled reps
+              </span>
+            </div>
+            <button id="btnJumpToTodayFromDash" class="btn-ghost-icon">
+              <span>Go to Today</span>
+              <span class="key-pill">1</span>
+            </button>
+          </div>
+
+          <div class="upcoming-reel" id="upcomingReelContainer">
+            <!-- Rendered dynamically by dashboard.js -->
+          </div>
+        </div>
+
+        <!-- 3. TRI-PILLAR EXECUTIVE METRICS ROW -->
+        <div class="dashboard-pillars-grid">
+          <!-- Pillar A: TUM Heilbronn -->
+          <div class="monotone-card pillar-card">
+            <div class="card-label-row">
+              <span class="card-label">TUM Heilbronn // Metro Track</span>
+              <button class="btn-ghost-icon" onclick="window.HarnessApp.switchView('tum')">
+                <span>View Metro</span>
+                <span class="key-pill">2</span>
+              </button>
+            </div>
+            <div style="margin-top: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <span id="dashActiveStationMonth" style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-gold-dim); font-weight: 600;">SEP '26</span>
+                <span id="dashGermanLevel" class="chip-tag german" style="font-size: 10px;">A2 Active</span>
+              </div>
+              <h3 id="dashActiveStationName" style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">Pure Syntax</h3>
+              <p id="dashStationNextAction" style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; line-height: 1.4;">
+                Loading station next action...
+              </p>
+
+              <div class="pillar-mini-kpis" style="margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-hairline); display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+                <div>
+                  <div style="font-size: 10px; font-family: var(--font-mono); color: var(--text-tertiary);">OVERALL GPA</div>
+                  <div id="dashOverallGpa" style="font-size: 14px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); margin-top: 2px;">--</div>
+                </div>
+                <div>
+                  <div style="font-size: 10px; font-family: var(--font-mono); color: var(--text-tertiary);">MATURA MOCK AVG</div>
+                  <div id="dashMaturaAvg" style="font-size: 14px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); margin-top: 2px;">--%</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pillar B: Body & Machine Maintenance -->
+          <div class="monotone-card pillar-card">
+            <div class="card-label-row">
+              <span class="card-label">Machine Maintenance // Body</span>
+              <button class="btn-ghost-icon" onclick="window.HarnessApp.switchView('body')">
+                <span>View Body</span>
+                <span class="key-pill">4</span>
+              </button>
+            </div>
+            <div style="margin-top: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">HYPERTROPHY TRAJECTORY</span>
+                <span id="dashWeightVal" style="font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--text-primary);">68.0 / 80.0 kg</span>
+              </div>
+              <div class="progress-bar-track" style="margin-top: 6px; margin-bottom: 12px;">
+                <div class="progress-bar-fill" id="dashWeightProgressFill" style="width: 0%;"></div>
+              </div>
+
+              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; text-align: center;">
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 6px 4px;">
+                  <div style="font-size: 9px; font-family: var(--font-mono); color: var(--text-tertiary);">BOXING</div>
+                  <div id="dashBoxingCount" style="font-size: 13px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); margin-top: 2px;">0/3</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 6px 4px;">
+                  <div style="font-size: 9px; font-family: var(--font-mono); color: var(--text-tertiary);">GYM LIFT</div>
+                  <div id="dashGymCount" style="font-size: 13px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); margin-top: 2px;">0/4</div>
+                </div>
+                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 6px 4px;">
+                  <div style="font-size: 9px; font-family: var(--font-mono); color: var(--text-tertiary);">RUNNING</div>
+                  <div id="dashRunCount" style="font-size: 13px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); margin-top: 2px;">0/2</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Pillar C: Active Builds & Next Actions -->
+          <div class="monotone-card pillar-card">
+            <div class="card-label-row">
+              <span class="card-label">Active Builds &amp; Actions</span>
+              <button class="btn-ghost-icon" onclick="window.HarnessApp.switchView('projects')">
+                <span>View Projects</span>
+                <span class="key-pill">3</span>
+              </button>
+            </div>
+            <div id="dashProjectsList" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
+              <!-- Rendered dynamically by dashboard.js -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
          1. TODAY LAYER (Zero-Friction Automated Execution)
          ==================================================================== -->
-    <section id="view-today" class="view-section active">
+    <section id="view-today" class="view-section">
       <div class="section-header">
         <div>
           <h1 class="section-headline">DAILY EXECUTION</h1>
@@ -117,12 +279,9 @@
           <div id="customTaskList">
             <!-- Dynamic task items -->
           </div>
-        </div>
 
-        <!-- Right: Auto-saving Scratchpad & Routine Log -->
-        <div>
           <!-- Scratchpad Card -->
-          <div class="monotone-card">
+          <div class="monotone-card" style="margin-top: 16px;">
             <div class="card-label-row">
               <span class="card-label">Scratchpad</span>
               <span id="scratchpadSavePill" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Auto-saving</span>
@@ -132,6 +291,7 @@
               class="scratchpad-input" 
               placeholder="Transient thoughts, code logic, or quick math scratchpad..."
               spellcheck="false"
+              style="height: 90px;"
             ></textarea>
           </div>
 
@@ -153,8 +313,86 @@
             </div>
           </div>
         </div>
+
+        <!-- Right: Mini-Calendar, School Lessons, Homework, Quick Links -->
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Mini-Calendar Date Navigator Card -->
+          <div class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">Navigator // Mini-Calendar</span>
+              <button id="btnTodayReset" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">Today</button>
+            </div>
+            <div id="miniCalendarWrap">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <button id="btnPrevMonth" class="btn-ghost-icon" style="padding: 2px 6px;">&lt;</button>
+                <span id="calMonthYearLabel" style="font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-primary);">Month Year</span>
+                <button id="btnNextMonth" class="btn-ghost-icon" style="padding: 2px 6px;">&gt;</button>
+              </div>
+              <div id="miniCalendarGrid" class="mini-calendar-grid">
+                <!-- Days rendered dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- School Timetable Card (TM1 / Optivum 3la) -->
+          <div class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">School // TM1 Timetable</span>
+              <div style="display: flex; gap: 6px;">
+                <button id="btnRefreshSchoolPlan" class="btn-ghost-icon" title="Sync live schedule from TM1" style="padding: 2px 6px;">
+                  Sync
+                </button>
+                <button id="btnOpenTM1Web" class="btn-ghost-icon" title="Open Optivum plan in browser" style="padding: 2px 6px;">
+                  Web
+                </button>
+              </div>
+            </div>
+            <div id="schoolLessonsList" style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+              <!-- Lessons rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Homework & Exam Radar Card (Phase 3) -->
+          <div class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">Homework &amp; Exam Radar</span>
+              <div style="display: flex; gap: 4px;">
+                <button id="btnAddHomeworkBtn" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ HW</button>
+                <button id="btnAddExamBtn" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ Exam</button>
+              </div>
+            </div>
+            
+            <!-- Pending Homework Section -->
+            <div style="margin-top: 6px;">
+              <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; margin-bottom: 4px;">Due Homework</div>
+              <div id="homeworkItemsList" style="display: flex; flex-direction: column; gap: 4px;">
+                <!-- Homework items rendered dynamically -->
+              </div>
+            </div>
+
+            <!-- Upcoming Tests & Exams Section -->
+            <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border-hairline);">
+              <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; margin-bottom: 4px;">Upcoming Tests / Mocks</div>
+              <div id="upcomingExamsList" style="display: flex; flex-direction: column; gap: 4px;">
+                <!-- Exam items rendered dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Launch Links Card -->
+          <div class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">Quick Links // Hub</span>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">1-Click</span>
+            </div>
+            <div id="easyLinksContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px;">
+              <!-- Easy links rendered dynamically -->
+            </div>
+          </div>
+        </div>
       </div>
     </section>
+
 
     <!-- ====================================================================
          2. TUM LAYER (Interactive Horizontal Draggable Metro Map)
@@ -500,7 +738,7 @@
       <span style="margin-left: 8px;">Local SQLite (WAL)</span>
     </div>
     <div>
-      <span style="margin-right: 12px;">[1-5] Layers</span>
+      <span style="margin-right: 12px;">[0-5] Layers</span>
       <span style="margin-right: 12px;">[N] Quick Task</span>
       <span>[R] Rollover</span>
     </div>
@@ -511,11 +749,14 @@
 
   <!-- App Script Modules -->
   <script src="js/metro.js"></script>
+  <script src="js/dashboard.js"></script>
   <script src="js/today.js"></script>
   <script src="js/tum.js"></script>
   <script src="js/projects.js"></script>
   <script src="js/body.js"></script>
   <script src="js/knowledge.js"></script>
+  <script src="js/focus_timer.js"></script>
+  <script src="js/command_palette.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>

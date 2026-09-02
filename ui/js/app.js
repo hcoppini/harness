@@ -3,7 +3,7 @@
  */
 
 window.HarnessApp = {
-  currentView: "today",
+  currentView: "dashboard",
   activeJsonTab: "schedules",
   allConfigs: null,
 
@@ -44,6 +44,9 @@ window.HarnessApp = {
 
   async initAllLayers() {
     try {
+      if (window.FocusTimer) window.FocusTimer.init();
+      if (window.CommandPalette) window.CommandPalette.init();
+      if (window.Dashboard) await window.Dashboard.init();
       if (window.Today) await window.Today.init();
       if (window.Tum) await window.Tum.init();
       if (window.Projects) await window.Projects.init();
@@ -88,6 +91,7 @@ window.HarnessApp = {
     this.currentView = viewName;
 
     // Refresh view data on activation
+    if (viewName === "dashboard" && window.Dashboard) window.Dashboard.load();
     if (viewName === "today" && window.Today) window.Today.load();
     if (viewName === "tum" && window.Tum) {
       window.Tum.load();
@@ -111,7 +115,10 @@ window.HarnessApp = {
         return;
       }
 
-      if (e.key === "1") {
+      if (e.key === "0" || e.key === "`") {
+        e.preventDefault();
+        this.switchView("dashboard");
+      } else if (e.key === "1") {
         e.preventDefault();
         this.switchView("today");
       } else if (e.key === "2") {

@@ -1,5 +1,6 @@
 /**
  * Projects Layer: Active software and competition builds.
+ * Integrated with VS Code, Terminal workspace launcher, and Git status.
  */
 
 const Projects = {
@@ -25,12 +26,24 @@ const Projects = {
 
     container.innerHTML = this.list
       .map((p) => {
+        const git = p.git || {};
+        const isGit = git.is_git;
+
         return `
           <div class="project-card">
             <div>
               <div style="display: flex; justify-content: space-between; align-items: baseline;">
                 <div class="project-title">${this.escapeHtml(p.name)}</div>
-                <span class="key-pill" style="color: var(--text-primary); text-transform: uppercase;">${p.status}</span>
+                <div style="display: flex; gap: 6px; align-items: center;">
+                  ${
+                    isGit && git.branch
+                      ? `<span class="chip-tag code" style="font-size: 10px; padding: 2px 6px;">
+                           ⌥ ${this.escapeHtml(git.branch)}
+                         </span>`
+                      : ""
+                  }
+                  <span class="key-pill" style="color: var(--text-primary); text-transform: uppercase;">${p.status}</span>
+                </div>
               </div>
               <div class="project-desc">${this.escapeHtml(p.description)}</div>
 
@@ -41,6 +54,30 @@ const Projects = {
                      </div>`
                   : ""
               }
+
+              <!-- Live Git Info Banner -->
+              ${
+                isGit
+                  ? `
+                  <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 6px 8px; margin-top: 10px; display: flex; justify-content: space-between; align-items: center;">
+                    <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 75%;">
+                      ${
+                        git.last_commit
+                          ? `<span style="color: var(--accent-purple-light); font-weight: 600;">[GIT]</span> ${this.escapeHtml(git.last_commit)}`
+                          : `<span style="color: var(--text-tertiary);">Git repository initialized</span>`
+                      }
+                    </div>
+                    <div style="font-family: var(--font-mono); font-size: 10px;">
+                      ${
+                        git.uncommitted_changes > 0
+                          ? `<span style="color: var(--accent-purple-light); font-weight: 600;">* ${git.uncommitted_changes} uncommitted</span>`
+                          : `<span style="color: var(--text-tertiary);">clean</span>`
+                      }
+                    </div>
+                  </div>
+                  `
+                  : ""
+              }
             </div>
 
             <div style="display: flex; flex-direction: column; gap: 8px;">
@@ -49,7 +86,7 @@ const Projects = {
                 <div class="meta-box-val">${this.escapeHtml(p.current_milestone || "Define milestone")}</div>
               </div>
 
-              <div class="project-meta-box" style="border-left: 2px solid var(--accent-white);">
+              <div class="project-meta-box" style="border-left: 2px solid var(--accent-purple);">
                 <div class="meta-box-label">IMMEDIATE NEXT ACTION</div>
                 <div class="meta-box-val" style="color: var(--text-primary); font-weight: 600;">
                   ${this.escapeHtml(p.next_action || "Set next action")}
@@ -57,30 +94,91 @@ const Projects = {
               </div>
             </div>
 
-            <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-hairline); padding-top: 10px;">
-              <button 
-                class="btn-ghost-icon" 
-                onclick="Projects.editNextAction(${p.id}, '${this.escapeJs(p.next_action)}')"
-              >
-                Update Next Action
-              </button>
+            <!-- Workspace Dev Launchpad Actions -->
+            <div style="display: flex; flex-direction: column; gap: 8px; border-top: 1px solid var(--border-hairline); padding-top: 10px;">
+              <div style="display: flex; justify-content: space-between; align-items: center;">
+                <button 
+                  class="btn-ghost-icon" 
+                  onclick="Projects.editNextAction(${p.id}, '${this.escapeJs(p.next_action)}')"
+                >
+                  Update Action
+                </button>
 
-              ${
-                p.local_path
-                  ? `<button 
-                       class="btn-ghost-icon" 
-                       title="${p.local_path}"
-                       onclick="Projects.openFolder('${this.escapeJs(p.local_path)}')"
-                     >
-                       Open Folder &rarr;
-                     </button>`
-                  : ""
-              }
+                <div style="display: flex; gap: 6px;">
+                  ${
+                    p.local_path
+                      ? `
+                        <button 
+                          class="btn-ghost-icon" 
+                          title="Open workspace in VS Code"
+                          onclick="Projects.openVsCode('${this.escapeJs(p.local_path)}')"
+                          style="color: var(--accent-purple-light); font-weight: 600;"
+                        >
+                          VS Code
+                        </button>
+                        <button 
+                          class="btn-ghost-icon" 
+                          title="Open terminal in workspace"
+                          onclick="Projects.openTerminal('${this.escapeJs(p.local_path)}')"
+                        >
+                          Term
+                        </button>
+                        <button 
+                          class="btn-ghost-icon" 
+                          title="Open folder in File Explorer"
+                          onclick="Projects.openFolder('${this.escapeJs(p.local_path)}')"
+                        >
+                          Dir
+                        </button>
+                      `
+                      : ""
+                  }
+                  ${
+                    p.github_url
+                      ? `
+                        <button 
+                          class="btn-ghost-icon" 
+                          title="Open GitHub repository"
+                          onclick="Projects.openExternal('${this.escapeJs(p.github_url)}')"
+                        >
+                          GitHub &rarr;
+                        </button>
+                      `
+                      : ""
+                  }
+                </div>
+              </div>
             </div>
           </div>
         `;
       })
       .join("");
+  },
+
+  async openVsCode(path) {
+    try {
+      const opened = await window.pywebview.api.open_in_vscode(path);
+      if (opened) {
+        window.HarnessApp.showToast("Launching VS Code workspace");
+      } else {
+        window.HarnessApp.showToast("Could not launch VS Code for this path");
+      }
+    } catch (err) {
+      console.error("Error opening in VS Code:", err);
+    }
+  },
+
+  async openTerminal(path) {
+    try {
+      const opened = await window.pywebview.api.open_terminal(path);
+      if (opened) {
+        window.HarnessApp.showToast("Opening Terminal");
+      } else {
+        window.HarnessApp.showToast("Could not launch Terminal");
+      }
+    } catch (err) {
+      console.error("Error opening terminal:", err);
+    }
   },
 
   async openFolder(path) {
@@ -93,6 +191,17 @@ const Projects = {
       }
     } catch (err) {
       console.error("Error opening folder:", err);
+    }
+  },
+
+  async openExternal(url) {
+    try {
+      const opened = await window.pywebview.api.open_external_url(url);
+      if (opened) {
+        window.HarnessApp.showToast("Opening external link in browser");
+      }
+    } catch (err) {
+      console.error("Error opening external URL:", err);
     }
   },
 

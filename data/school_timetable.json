@@ -1,0 +1,254 @@
+{
+  "source_url": "http://planlekcji2.staff.edu.pl/plany/o5.html",
+  "fetched_at": "2026-09-01T06:55:16.575683",
+  "schedule": {
+    "Poniedziałek": [
+      {
+        "nr": 1,
+        "time": "8:00- 8:45",
+        "subject": "j.polski",
+        "teacher": "AM",
+        "room": "200"
+      },
+      {
+        "nr": 2,
+        "time": "8:50- 9:35",
+        "subject": "j.polski",
+        "teacher": "AM",
+        "room": "200"
+      },
+      {
+        "nr": 3,
+        "time": "9:40-10:25",
+        "subject": "biologia",
+        "teacher": "SA",
+        "room": "404"
+      },
+      {
+        "nr": 4,
+        "time": "10:30-11:15",
+        "subject": "informatyka-1/2",
+        "teacher": "MR",
+        "room": "17"
+      },
+      {
+        "nr": 5,
+        "time": "11:35-12:20",
+        "subject": "informatyka-1/2",
+        "teacher": "MR",
+        "room": "17"
+      },
+      {
+        "nr": 6,
+        "time": "12:40-13:25",
+        "subject": "matematyka",
+        "teacher": "ML",
+        "room": "411"
+      },
+      {
+        "nr": 7,
+        "time": "13:30-14:15",
+        "subject": "geografia",
+        "teacher": "WG",
+        "room": "311"
+      }
+    ],
+    "Wtorek": [
+      {
+        "nr": 1,
+        "time": "8:00- 8:45",
+        "subject": "fizyka",
+        "teacher": "MD",
+        "room": "407"
+      },
+      {
+        "nr": 2,
+        "time": "8:50- 9:35",
+        "subject": "wf-1/2",
+        "teacher": "MŁ",
+        "room": "d"
+      },
+      {
+        "nr": 3,
+        "time": "9:40-10:25",
+        "subject": "matematyka",
+        "teacher": "ML",
+        "room": "411"
+      },
+      {
+        "nr": 4,
+        "time": "10:30-11:15",
+        "subject": "matematyka",
+        "teacher": "ML",
+        "room": "411"
+      },
+      {
+        "nr": 5,
+        "time": "11:35-12:20",
+        "subject": "zaj.rozw.uzd",
+        "teacher": "ML",
+        "room": "411"
+      },
+      {
+        "nr": 6,
+        "time": "12:40-13:25",
+        "subject": "chemia",
+        "teacher": "EB",
+        "room": "406"
+      },
+      {
+        "nr": 7,
+        "time": "13:30-14:15",
+        "subject": "j.polski",
+        "teacher": "AM",
+        "room": "200"
+      },
+      {
+        "nr": 8,
+        "time": "14:20-15:05",
+        "subject": "e_zdrow",
+        "teacher": "",
+        "room": "303"
+      }
+    ],
+    "Środa": [
+      {
+        "nr": 1,
+        "time": "8:00- 8:45",
+        "subject": "wf-1/2",
+        "teacher": "MŁ",
+        "room": "c"
+      },
+      {
+        "nr": 2,
+        "time": "8:50- 9:35",
+        "subject": "wf-1/2",
+        "teacher": "MŁ",
+        "room": "c"
+      },
+      {
+        "nr": 3,
+        "time": "9:40-10:25",
+        "subject": "j.hiszpański-1/2",
+        "teacher": "DM",
+        "room": "303a"
+      },
+      {
+        "nr": 4,
+        "time": "10:30-11:15",
+        "subject": "j.hiszpański-1/2",
+        "teacher": "DM",
+        "room": "303a"
+      },
+      {
+        "nr": 5,
+        "time": "11:35-12:20",
+        "subject": "j.angielski",
+        "teacher": "",
+        "room": ""
+      },
+      {
+        "nr": 6,
+        "time": "12:40-13:25",
+        "subject": "j.angielski",
+        "teacher": "",
+        "room": ""
+      }
+    ],
+    "Czwartek": [
+      {
+        "nr": 1,
+        "time": "8:00- 8:45",
+        "subject": "j.angielski",
+        "teacher": "",
+        "room": ""
+      },
+      {
+        "nr": 2,
+        "time": "8:50- 9:35",
+        "subject": "informatyka-1/2",
+        "teacher": "MR",
+        "room": "17"
+      },
+      {
+        "nr": 3,
+        "time": "9:40-10:25",
+        "subject": "informatyka-1/2",
+        "teacher": "MR",
+        "room": "17"
+      },
+      {
+        "nr": 4,
+        "time": "10:30-11:15",
+        "subject": "j.polski",
+        "teacher": "AM",
+        "room": "200"
+      },
+      {
+        "nr": 5,
+        "time": "11:35-12:20",
+        "subject": "historia",
+        "teacher": "SD",
+        "room": "313"
+      },
+      {
+        "nr": 6,
+        "time": "12:40-13:25",
+        "subject": "fizyka",
+        "teacher": "MD",
+        "room": "407"
+      },
+      {
+        "nr": 7,
+        "time": "13:30-14:15",
+        "subject": "religia",
+        "teacher": "",
+        "room": "207"
+      }
+    ],
+    "Piątek": [
+      {
+        "nr": 1,
+        "time": "8:00- 8:45",
+        "subject": "j.angielski",
+        "teacher": "",
+        "room": ""
+      },
+      {
+        "nr": 2,
+        "time": "8:50- 9:35",
+        "subject": "j.angielski",
+        "teacher": "",
+        "room": ""
+      },
+      {
+        "nr": 3,
+        "time": "9:40-10:25",
+        "subject": "zaj.wych.",
+        "teacher": "SA",
+        "room": "404"
+      },
+      {
+        "nr": 4,
+        "time": "10:30-11:15",
+        "subject": "matematyka",
+        "teacher": "ML",
+        "room": "411"
+      },
+      {
+        "nr": 5,
+        "time": "11:35-12:20",
+        "subject": "matematyka",
+        "teacher": "ML",
+        "room": "411"
+      },
+      {
+        "nr": 6,
+        "time": "12:40-13:25",
+        "subject": "historia",
+        "teacher": "SD",
+        "room": "313"
+      }
+    ]
+  }
+}

@@ -80,8 +80,8 @@ def seed_projects_if_empty(conn: sqlite3.Connection) -> None:
         conn.commit()
 
 
-def get_all_projects(conn: Optional[sqlite3.Connection] = None) -> List[Dict[str, Any]]:
-    """Returns all projects."""
+def get_all_projects(conn: Optional[sqlite3.Connection] = None, include_git: bool = True) -> List[Dict[str, Any]]:
+    """Returns all projects, optionally enriched with live git repository status."""
     close_conn = False
     if conn is None:
         conn = get_connection()
@@ -91,21 +91,32 @@ def get_all_projects(conn: Optional[sqlite3.Connection] = None) -> List[Dict[str
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM projects ORDER BY status ASC, id ASC")
     rows = cursor.fetchall()
-    projects = [
-        {
+
+    from app.services import github_service
+
+    projects = []
+    for r in rows:
+        local_path = r["local_path"] or ""
+        git_info = {}
+        if include_git and local_path:
+            try:
+                git_info = github_service.get_repo_git_status(local_path)
+            except Exception:
+                pass
+
+        projects.append({
             "id": r["id"],
             "name": r["name"],
             "description": r["description"] or "",
             "status": r["status"],
-            "local_path": r["local_path"] or "",
+            "local_path": local_path,
             "github_url": r["github_url"] or "",
             "current_milestone": r["current_milestone"] or "",
             "next_action": r["next_action"] or "",
             "deadline": r["deadline"] or "",
             "notes": r["notes"] or "",
-        }
-        for r in rows
-    ]
+            "git": git_info,
+        })
 
     if close_conn:
         conn.close()
@@ -195,9 +206,16 @@ def add_project(
     }
 
 
+def validate_launch_path(path_str: str) -> bool:
+    """Validates that a local folder exists and is a valid directory."""
+    if not path_str or not isinstance(path_str, str):
+        return False
+    return os.path.exists(path_str) and os.path.isdir(path_str)
+
+
 def open_local_path(path_str: str) -> bool:
     """Opens a file path or directory in Windows File Explorer."""
-    if not path_str or not os.path.exists(path_str):
+    if not validate_launch_path(path_str):
         return False
     try:
         os.startfile(path_str)
@@ -208,3 +226,34 @@ def open_local_path(path_str: str) -> bool:
             return True
         except Exception:
             return False
+
+
+def open_in_vscode(path_str: str) -> bool:
+    """Launches VS Code in the specified directory."""
+    if not validate_launch_path(path_str):
+        return False
+    try:
+        subprocess.Popen(["code", os.path.normpath(path_str)], shell=True)
+        return True
+    except Exception:
+        return False
+
+
+def open_terminal(path_str: str) -> bool:
+    """Opens PowerShell or Windows Terminal in the specified directory."""
+    if not validate_launch_path(path_str):
+        return False
+    norm_path = os.path.normpath(path_str)
+    # Attempt to open Windows Terminal if available, otherwise launch PowerShell
+    try:
+        subprocess.Popen(["wt", "-d", norm_path], shell=True)
+        return True
+    except Exception:
+        pass
+
+    try:
+        subprocess.Popen(["start", "powershell", "-NoExit", "-Command", f"Set-Location -LiteralPath '{norm_path}'"], shell=True)
+        return True
+    except Exception:
+        return False
+
