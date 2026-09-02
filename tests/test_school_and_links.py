@@ -9,7 +9,7 @@ from app.services import school_service, project_service
 def test_school_optivum_parser_offline_mock():
     mock_html = """
     <html>
-    <span class="tytulnapis">3la</span>
+    <span class="tytulnapis">3lb</span>
     <table class="tabela">
       <tr>
         <th>Nr</th><th>Godz</th><th>Poniedziałek</th><th>Wtorek</th><th>Środa</th><th>Czwartek</th><th>Piątek</th>

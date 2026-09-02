@@ -41,7 +41,7 @@ Harness is an executive desktop OS designed for **Heitor** (16, Liceum Class 3 i
 ### Layer 1: TODAY (Zero-Friction Automated Execution)
 - **Executive Palette**: High-contrast, solid monochrome Obsidian Black (`#08090a`), Clean White (`#fafafa`), and solid Electric/Royal Purple (`#9333ea`) accents with zero noisy neon gradients.
 - **Interactive Mini-Calendar**: Click any date in the calendar to inspect that exact day's routines, completed tasks, and reflection logs. Instant 1-click jump back to "Today".
-- **TM1 School Timetable Bridge**: Live parser for Technikum Mechatroniczne nr 1 / LXXX LO (Optivum 3la) pulling daily lesson numbers, subjects, teachers, and rooms directly into the daily execution ledger.
+- **TM1 School Timetable Bridge**: Live parser for Technikum Mechatroniczne nr 1 / LXXX LO (Optivum 3lb) pulling daily lesson numbers, subjects, teachers, and rooms directly into the daily execution ledger.
 - **Homework & Exam Radar**: Track daily homework due dates with priority tags and upcoming sprawdziany/kartkówki with real-time countdown days.
 - **Quick Links Hub**: 1-click launchpad for essential portals (TM1, Vulcan UONET+, SIGG Platform, TUM Heilbronn, CKE Matura).
 - **Focus Mode & Deep Work Timer HUD**: Embedded sprint timer in the top header (`T`) with presets for **60m Math R**, **60m CS Code**, **25m Sprint**, and **50m Lift** with auto-completion log and synthesized Web Audio chime.

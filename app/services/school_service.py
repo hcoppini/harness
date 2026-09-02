@@ -12,7 +12,7 @@ from typing import Dict, Any, List, Optional
 from bs4 import BeautifulSoup
 from app.db import DATA_DIR
 
-DEFAULT_PLAN_URL = "http://planlekcji2.staff.edu.pl/plany/o5.html" # 3la
+DEFAULT_PLAN_URL = "http://planlekcji2.staff.edu.pl/plany/o6.html" # 3lb
 CACHED_PLAN_FILE = DATA_DIR / "school_timetable.json"
 
 POLISH_WEEKDAYS = {
@@ -37,8 +37,8 @@ DEFAULT_EASY_LINKS = [
     {
         "name": "TM1 Live Plan (Optivum)",
         "category": "school",
-        "url": "http://planlekcji2.staff.edu.pl/plany/o5.html",
-        "desc": "Liceum 3la Live Timetable",
+        "url": "http://planlekcji2.staff.edu.pl/plany/o6.html",
+        "desc": "Liceum 3lb Live Timetable",
     },
     {
         "name": "Vulcan UONET+ E-Dziennik",

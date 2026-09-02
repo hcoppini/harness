@@ -1,107 +1,100 @@
 {
-  "source_url": "http://planlekcji2.staff.edu.pl/plany/o5.html",
-  "fetched_at": "2026-09-01T06:55:16.575683",
+  "source_url": "http://planlekcji2.staff.edu.pl/plany/o6.html",
+  "fetched_at": "2026-09-02T22:35:34.217376",
   "schedule": {
     "Poniedziałek": [
       {
         "nr": 1,
         "time": "8:00- 8:45",
-        "subject": "j.polski",
-        "teacher": "AM",
-        "room": "200"
+        "subject": "informatyka-2/2",
+        "teacher": "KM",
+        "room": "304"
       },
       {
         "nr": 2,
         "time": "8:50- 9:35",
-        "subject": "j.polski",
-        "teacher": "AM",
-        "room": "200"
+        "subject": "wf-1/2",
+        "teacher": "Tn",
+        "room": "304"
       },
       {
         "nr": 3,
         "time": "9:40-10:25",
-        "subject": "biologia",
-        "teacher": "SA",
-        "room": "404"
+        "subject": "chemia",
+        "teacher": "EB",
+        "room": "406"
       },
       {
         "nr": 4,
         "time": "10:30-11:15",
-        "subject": "informatyka-1/2",
-        "teacher": "MR",
-        "room": "17"
+        "subject": "j.polski",
+        "teacher": "ŁD",
+        "room": "123"
       },
       {
         "nr": 5,
         "time": "11:35-12:20",
-        "subject": "informatyka-1/2",
-        "teacher": "MR",
-        "room": "17"
+        "subject": "matematyka",
+        "teacher": "SM",
+        "room": "213"
       },
       {
         "nr": 6,
         "time": "12:40-13:25",
-        "subject": "matematyka",
-        "teacher": "ML",
-        "room": "411"
-      },
-      {
-        "nr": 7,
-        "time": "13:30-14:15",
-        "subject": "geografia",
-        "teacher": "WG",
-        "room": "311"
+        "subject": "informatyka-1/2",
+        "teacher": "KM",
+        "room": "301"
       }
     ],
     "Wtorek": [
       {
         "nr": 1,
         "time": "8:00- 8:45",
-        "subject": "fizyka",
-        "teacher": "MD",
-        "room": "407"
+        "subject": "zaj.rozw.uzd",
+        "teacher": "SM",
+        "room": "213"
       },
       {
         "nr": 2,
         "time": "8:50- 9:35",
-        "subject": "wf-1/2",
-        "teacher": "MŁ",
-        "room": "d"
+        "subject": "matematyka",
+        "teacher": "SM",
+        "room": "213"
       },
       {
         "nr": 3,
         "time": "9:40-10:25",
-        "subject": "matematyka",
-        "teacher": "ML",
-        "room": "411"
+        "subject": "j.hiszpański",
+        "teacher": "",
+        "room": ""
       },
       {
         "nr": 4,
         "time": "10:30-11:15",
-        "subject": "matematyka",
-        "teacher": "ML",
-        "room": "411"
+        "subject": "informatyka-1/2",
+        "teacher": "KM",
+        "room": "304"
       },
       {
         "nr": 5,
         "time": "11:35-12:20",
-        "subject": "zaj.rozw.uzd",
-        "teacher": "ML",
-        "room": "411"
+        "subject": "historia",
+        "teacher": "SD",
+        "room": "313"
       },
       {
         "nr": 6,
         "time": "12:40-13:25",
-        "subject": "chemia",
-        "teacher": "EB",
-        "room": "406"
+        "subject": "wf-1/2",
+        "teacher": "Tn",
+        "room": "304"
       },
       {
         "nr": 7,
         "time": "13:30-14:15",
-        "subject": "j.polski",
-        "teacher": "AM",
-        "room": "200"
+        "subject": "wf-1/2",
+        "teacher": "Tn",
+        "room": "304"
       },
       {
         "nr": 8,
@@ -115,30 +108,30 @@
       {
         "nr": 1,
         "time": "8:00- 8:45",
-        "subject": "wf-1/2",
-        "teacher": "MŁ",
-        "room": "c"
+        "subject": "historia",
+        "teacher": "SD",
+        "room": "313"
       },
       {
         "nr": 2,
         "time": "8:50- 9:35",
-        "subject": "wf-1/2",
-        "teacher": "MŁ",
-        "room": "c"
+        "subject": "zaj.wych.",
+        "teacher": "EB",
+        "room": "406"
       },
       {
         "nr": 3,
         "time": "9:40-10:25",
-        "subject": "j.hiszpański-1/2",
-        "teacher": "DM",
-        "room": "303a"
+        "subject": "matematyka",
+        "teacher": "SM",
+        "room": "213"
       },
       {
         "nr": 4,
         "time": "10:30-11:15",
-        "subject": "j.hiszpański-1/2",
-        "teacher": "DM",
-        "room": "303a"
+        "subject": "matematyka",
+        "teacher": "SM",
+        "room": "213"
       },
       {
         "nr": 5,
@@ -153,6 +146,20 @@
         "subject": "j.angielski",
         "teacher": "",
         "room": ""
+      },
+      {
+        "nr": 7,
+        "time": "13:30-14:15",
+        "subject": "j.polski",
+        "teacher": "ŁD",
+        "room": "123"
+      },
+      {
+        "nr": 8,
+        "time": "14:20-15:05",
+        "subject": "j.polski",
+        "teacher": "ŁD",
+        "room": "123"
       }
     ],
     "Czwartek": [
@@ -166,37 +173,37 @@
       {
         "nr": 2,
         "time": "8:50- 9:35",
-        "subject": "informatyka-1/2",
-        "teacher": "MR",
-        "room": "17"
+        "subject": "j.hiszpański",
+        "teacher": "",
+        "room": ""
       },
       {
         "nr": 3,
         "time": "9:40-10:25",
-        "subject": "informatyka-1/2",
-        "teacher": "MR",
-        "room": "17"
+        "subject": "fizyka",
+        "teacher": "MD",
+        "room": "407"
       },
       {
         "nr": 4,
         "time": "10:30-11:15",
-        "subject": "j.polski",
-        "teacher": "AM",
-        "room": "200"
+        "subject": "informatyka-1/2",
+        "teacher": "KM",
+        "room": "127"
       },
       {
         "nr": 5,
         "time": "11:35-12:20",
-        "subject": "historia",
-        "teacher": "SD",
-        "room": "313"
+        "subject": "informatyka-1/2",
+        "teacher": "KM",
+        "room": "127"
       },
       {
         "nr": 6,
         "time": "12:40-13:25",
-        "subject": "fizyka",
-        "teacher": "MD",
-        "room": "407"
+        "subject": "biologia",
+        "teacher": "SA",
+        "room": "404"
       },
       {
         "nr": 7,
@@ -224,30 +231,30 @@
       {
         "nr": 3,
         "time": "9:40-10:25",
-        "subject": "zaj.wych.",
-        "teacher": "SA",
-        "room": "404"
+        "subject": "geografia",
+        "teacher": "WG",
+        "room": "311"
       },
       {
         "nr": 4,
         "time": "10:30-11:15",
         "subject": "matematyka",
-        "teacher": "ML",
-        "room": "411"
+        "teacher": "SM",
+        "room": "213"
       },
       {
         "nr": 5,
         "time": "11:35-12:20",
-        "subject": "matematyka",
-        "teacher": "ML",
-        "room": "411"
+        "subject": "fizyka",
+        "teacher": "MD",
+        "room": "407"
       },
       {
         "nr": 6,
         "time": "12:40-13:25",
-        "subject": "historia",
-        "teacher": "SD",
-        "room": "313"
+        "subject": "j.polski",
+        "teacher": "ŁD",
+        "room": "123"
       }
     ]
   }

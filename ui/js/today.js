@@ -110,7 +110,7 @@ const Today = {
     if (btnOpenTM1Web) {
       btnOpenTM1Web.addEventListener("click", async () => {
         if (window.pywebview && window.pywebview.api) {
-          await window.pywebview.api.open_external_url("http://planlekcji2.staff.edu.pl/plany/o5.html");
+          await window.pywebview.api.open_external_url("http://planlekcji2.staff.edu.pl/plany/o6.html");
         }
       });
     }
