@@ -25,6 +25,11 @@ window.HarnessApp = {
 
     window.addEventListener("pywebviewready", startBridge);
 
+    // If bridge is already available (e.g. browser polyfill), start immediately
+    if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.get_today === "function") {
+      startBridge();
+    }
+
     let attempts = 0;
     const interval = setInterval(async () => {
       attempts++;

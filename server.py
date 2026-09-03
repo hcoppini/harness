@@ -92,6 +92,39 @@ def health_check():
         "timestamp": datetime.now().isoformat()
     })
 
+# --------------------------------------------------------------------------
+# Universal RPC Bridge (For Web Browsers & Cloud Deployments)
+# --------------------------------------------------------------------------
+@app.route("/api/rpc/<method_name>", methods=["GET", "POST"])
+def rpc_dispatcher(method_name):
+    """
+    Universal RPC dispatcher that dynamically invokes HarnessAPI methods.
+    Allows web browsers on Render/Railway/localhost to use the exact same
+    API contract as desktop PyWebView.
+    """
+    if not hasattr(api, method_name) or method_name.startswith("_"):
+        return jsonify({"error": f"Method '{method_name}' not found on HarnessAPI", "status": "error"}), 404
+
+    if request.method == "POST":
+        payload = request.get_json(silent=True) or {}
+        args = payload.get("args", [])
+        kwargs = payload.get("kwargs", {})
+    else:
+        args = []
+        kwargs = dict(request.args)
+
+    if not isinstance(args, list):
+        args = [args]
+    if not isinstance(kwargs, dict):
+        kwargs = {}
+
+    try:
+        method = getattr(api, method_name)
+        result = method(*args, **kwargs)
+        return jsonify({"result": result, "status": "ok"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e), "status": "error"}), 500
+
 # --- Layer 0: Dashboard ---
 @app.route("/api/dashboard", methods=["GET"])
 def get_dashboard():

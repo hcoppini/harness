@@ -9,7 +9,10 @@ import webbrowser
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, List, Optional
-from bs4 import BeautifulSoup
+try:
+    from bs4 import BeautifulSoup
+except ImportError:
+    BeautifulSoup = None
 from app.db import DATA_DIR
 
 DEFAULT_PLAN_URL = "https://planlekcji.staff.edu.pl/plany/o6.html"  # 3lb
@@ -153,6 +156,8 @@ def delete_easy_link(index: int) -> bool:
 
 def parse_optivum_html(html_content: str) -> Dict[str, List[Dict[str, Any]]]:
     """Parses Vulcan Optivum timetable HTML into a structured dictionary keyed by Polish weekday."""
+    if not BeautifulSoup:
+        return {}
     soup = BeautifulSoup(html_content, "html.parser")
     table = soup.find("table", class_="tabela")
     if not table:
