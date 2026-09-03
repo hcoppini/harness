@@ -1,16 +1,17 @@
 /**
- * Section 2: TUM METRO ROADMAP // Singular Main Spine + Stream Highlighters (Version 3.2)
+ * Section 2: TUM METRO ROADMAP // Schematic Height-Varying Stream Lines (Version 3.3)
  *
  * Architecture:
  * - One singular central main line for all major milestones.
- * - Colored highlighter lines weaving through all stations participating in each stream:
- *     - Academics (Lavender // #c4b5fd)
- *     - Code Sprint (Sky Blue // #7dd3fc)
- *     - SIGG GPW (Orange // #fdba74)
- *     - German (Emerald // #6ee7b7)
- *     - Physical (Rose // #fda4af)
- * - Interactive filter highlights specific stream lines while anchoring to the main spine.
- * - Interactive slide-over station drawer with deliverable tracking.
+ * - Distinct stream highlighter lines with elegant height breaks, 45° chamfered transitions,
+ *   and schematic elevation shifts for maximum visibility and visual rhythm:
+ *     - Academics (Lavender // #c4b5fd): Top elevation (Y=165 to Y=185), ramping to major exams.
+ *     - Code Sprint (Sky Blue // #7dd3fc): Upper-mid elevation (Y=200 to Y=220), stepping with algorithm sprints.
+ *     - SIGG GPW (Orange // #fdba74): Central dynamic lane (Y=235 to Y=265), peaking at Stage 1/2 & Finals.
+ *     - German (Emerald // #6ee7b7): Lower-mid elevation (Y=285 to Y=305), climbing to A2/B1/B2 certifications.
+ *     - Physical (Rose // #fda4af): Bottom elevation (Y=325 to Y=345), charting hypertrophy steps.
+ * - Stations feature clean junction pins connecting stream lines to the main spine.
+ * - Interactive filter highlights specific stream lines while keeping full system context.
  */
 
 const MetroMap = {
@@ -22,13 +23,55 @@ const MetroMap = {
   activeStreamFilter: "all",
   currentBeaconX: 0,
 
-  // Stream Highlighter Color Tokens
+  // Stream Definitions with Dynamic Elevation Offsets
   streams: [
-    { id: "academics", name: "Academics", code: "AC", color: "#c4b5fd", strokeWidth: 3, offset: -16 },
-    { id: "code", name: "Code Sprint", code: "CD", color: "#7dd3fc", strokeWidth: 3, offset: -8 },
-    { id: "sigg", name: "SIGG GPW", code: "SG", color: "#fdba74", strokeWidth: 3.5, offset: 0 },
-    { id: "german", name: "German Ladder", code: "DE", color: "#6ee7b7", strokeWidth: 3, offset: 8 },
-    { id: "physical", name: "Physical / Mass", code: "PH", color: "#fda4af", strokeWidth: 3, offset: 16 },
+    {
+      id: "academics",
+      name: "Academics",
+      code: "AC",
+      color: "#c4b5fd",
+      strokeWidth: 2.5,
+      baseY: 175,
+      // Dynamic height adjustments per station index (creates clean breaks in height)
+      heightOffsets: [0, -10, 5, -10, 0, 5, -10, 0, -5, -15, 10, 10, -5, -15, -10, -15, -5, -10, -10, -15, -20, -15, 0],
+    },
+    {
+      id: "code",
+      name: "Code Sprint",
+      code: "CD",
+      color: "#7dd3fc",
+      strokeWidth: 2.5,
+      baseY: 210,
+      heightOffsets: [-5, 5, -10, -5, 0, 10, -10, 10, -10, 5, -15, -10, -5, -10, -5, -5, -10, -10, -5, 10, -15, 5, 0],
+    },
+    {
+      id: "sigg",
+      name: "SIGG GPW",
+      code: "SG",
+      color: "#fdba74",
+      strokeWidth: 3.0,
+      baseY: 250,
+      // Peaking and ramping during active trading competition months (Sep '26 - May '27)
+      heightOffsets: [0, -15, -20, -15, -20, -25, -20, -25, -30, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+    },
+    {
+      id: "german",
+      name: "German Ladder",
+      code: "DE",
+      color: "#6ee7b7",
+      strokeWidth: 2.5,
+      baseY: 295,
+      heightOffsets: [0, 5, 10, -5, 10, -5, 10, 10, 10, -5, -15, -25, -5, 10, -10, 10, 10, -10, -10, -15, 10, -25, 0],
+    },
+    {
+      id: "physical",
+      name: "Physical / Mass",
+      code: "PH",
+      color: "#fda4af",
+      strokeWidth: 2.5,
+      baseY: 335,
+      heightOffsets: [0, 10, -10, 10, 10, 10, 10, -10, 10, -10, -15, -20, -5, 10, 10, -10, 10, 10, 10, -15, 10, 10, 0],
+    },
   ],
 
   async init() {
@@ -186,44 +229,76 @@ const MetroMap = {
       })
       .join("");
 
-    // Generate Stream Highlighter Lines (SVG Paths)
-    let streamHighlighterPaths = this.streams
-      .map((stream) => {
-        // Collect all stations that have this stream
-        const matchingIndices = [];
-        stations.forEach((st, idx) => {
-          if ((st.branches || []).includes(stream.id)) {
-            matchingIndices.push(idx);
+    // Generate Height-Varying Stream Lines with 45° Chamfered Schematic Paths
+    let streamPathsHtml = "";
+    let streamPinsHtml = "";
+
+    this.streams.forEach((stream) => {
+      const activeIndices = [];
+      stations.forEach((st, idx) => {
+        if ((st.branches || []).includes(stream.id)) {
+          activeIndices.push(idx);
+        }
+      });
+
+      if (activeIndices.length < 2) return;
+
+      const isFiltered = this.activeStreamFilter !== "all" && this.activeStreamFilter !== stream.id;
+      const opacity = isFiltered ? 0.06 : (this.activeStreamFilter === stream.id ? 0.95 : 0.6);
+      const strokeWidth = this.activeStreamFilter === stream.id ? 4 : stream.strokeWidth;
+
+      // Construct SVG path with 45° chamfers across stations
+      let d = "";
+      for (let i = 0; i < activeIndices.length; i++) {
+        const idx = activeIndices[i];
+        const px = startX + idx * spacing;
+        const offset = stream.heightOffsets[idx] || 0;
+        const py = stream.baseY + offset;
+
+        if (i === 0) {
+          d += `M ${px} ${py}`;
+        } else {
+          const prevIdx = activeIndices[i - 1];
+          const prevPx = startX + prevIdx * spacing;
+          const prevOffset = stream.heightOffsets[prevIdx] || 0;
+          const prevPy = stream.baseY + prevOffset;
+
+          // 45° chamfered segment
+          if (Math.abs(py - prevPy) > 2) {
+            const midX = (prevPx + px) / 2;
+            const chamfer = Math.min(25, Math.abs(py - prevPy));
+            const sign = py > prevPy ? 1 : -1;
+
+            d += ` L ${midX - chamfer} ${prevPy} L ${midX + chamfer} ${py} L ${px} ${py}`;
+          } else {
+            d += ` L ${px} ${py}`;
           }
-        });
+        }
 
-        if (matchingIndices.length < 2) return "";
-
-        // Build continuous polyline coordinates through all matching stations
-        const points = matchingIndices.map((idx) => {
-          const px = startX + idx * spacing;
-          const py = spineY + stream.offset;
-          return `${px},${py}`;
-        });
-
-        const isFiltered = this.activeStreamFilter !== "all" && this.activeStreamFilter !== stream.id;
-        const opacity = isFiltered ? 0.08 : (this.activeStreamFilter === stream.id ? 0.95 : 0.65);
-        const strokeWidth = this.activeStreamFilter === stream.id ? 4.5 : stream.strokeWidth;
-
-        return `
-          <!-- Stream Highlighter Path: ${stream.name} -->
-          <polyline 
-            points="${points.join(" ")}" 
-            fill="none" 
-            stroke="${stream.color}" 
-            stroke-width="${strokeWidth}" 
-            stroke-linecap="round" 
-            stroke-linejoin="round"
-            opacity="${opacity}" 
-          />
+        // Add small stream station pin/dot connecting stream track to station node
+        const isMatch = this.activeStreamFilter === "all" || this.activeStreamFilter === stream.id;
+        const pinOpacity = isMatch ? 0.85 : 0.15;
+        streamPinsHtml += `
+          <!-- Stream Junction Pin -->
+          <line x1="${px}" y1="${py}" x2="${px}" y2="${spineY}" 
+                stroke="${stream.color}" stroke-width="1" stroke-dasharray="2 3" opacity="${pinOpacity}" />
+          <circle cx="${px}" cy="${py}" r="3" fill="${stream.color}" opacity="${pinOpacity}" />
         `;
-      })
-      .join("");
+      }
+
+      streamPathsHtml += `
+        <!-- Stream Highlighter Line: ${stream.name} -->
+        <path 
+          d="${d}" 
+          fill="none" 
+          stroke="${stream.color}" 
+          stroke-width="${strokeWidth}" 
+          stroke-linecap="round" 
+          stroke-linejoin="round"
+          opacity="${opacity}" 
+        />
+      `;
+    });
 
     // SVG Base Lines (Main Spine & Grid)
     let svgHtml = `
@@ -236,14 +311,17 @@ const MetroMap = {
           )
           .join("")}
 
-        <!-- Stream Highlighter Paths -->
-        ${streamHighlighterPaths}
+        <!-- Stream Junction Pin Connectors -->
+        ${streamPinsHtml}
+
+        <!-- Height-Varying Stream Lines -->
+        ${streamPathsHtml}
 
         <!-- Singular Central Main Spine Line -->
         <line x1="${startX - 20}" y1="${spineY}" x2="${startX + totalTrackLength + 30}" y2="${spineY}" 
-              stroke="#27272a" stroke-width="6" stroke-linecap="round" />
+              stroke="#27272a" stroke-width="5" stroke-linecap="round" />
 
-        <!-- Main Spine Completed / Reached Fill -->
+        <!-- Main Spine Reached / Completed Fill -->
         ${
           currentX > startX
             ? `<line x1="${startX - 20}" y1="${spineY}" x2="${currentX}" y2="${spineY}" stroke="var(--accent-lavender)" stroke-width="4" stroke-linecap="round" />`
