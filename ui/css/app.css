@@ -1066,6 +1066,44 @@ body {
   transform: translate(-50%, -50%) scale(1.18);
 }
 
+.station-node-disc {
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.station-node-disc:hover {
+  transform: translate(-50%, -50%) scale(1.4) !important;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8) !important;
+  z-index: 40 !important;
+}
+
+.metro-station-pill {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: all 0.18s var(--ease-fluid);
+  z-index: 22;
+  box-shadow: var(--shadow-card);
+}
+
+.metro-station-pill:hover {
+  border-color: var(--accent-purple-light);
+  background: var(--bg-surface-hover);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+  z-index: 35;
+}
+
+.metro-station-pill.active-card {
+  border-color: var(--accent-purple-light);
+  box-shadow: 0 0 14px var(--accent-purple-glow);
+}
+
+.metro-station-pill.completed-card {
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
 .metro-spine-card {
   position: absolute;
   width: 210px;
@@ -1111,6 +1149,7 @@ body {
 .chip-tag.sigg { color: var(--stream-sigg); border-color: rgba(249, 115, 22, 0.3); }
 .chip-tag.german { color: var(--stream-german); border-color: rgba(52, 211, 153, 0.3); }
 .chip-tag.academics { color: var(--stream-academic); border-color: rgba(167, 139, 250, 0.3); }
+
 
 /* Station Slide-over Drawer */
 .station-drawer {
