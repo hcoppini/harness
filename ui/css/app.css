@@ -496,11 +496,11 @@ body {
   border-radius: 2px;
 }
 
-.lvl-0 { background-color: #121215; border: 1px solid rgba(255,255,255,0.03); }
-.lvl-1 { background-color: #3b2856; }
-.lvl-2 { background-color: #6b3ba8; }
-.lvl-3 { background-color: #9d5fe8; }
-.lvl-4 { background-color: #d8b4fe; }
+.lvl-0 { background-color: #161b22; border: 1px solid rgba(255,255,255,0.04); }
+.lvl-1 { background-color: #0e4429; }
+.lvl-2 { background-color: #006d32; }
+.lvl-3 { background-color: #26a641; }
+.lvl-4 { background-color: #39d353; box-shadow: 0 0 6px rgba(57, 211, 83, 0.35); }
 
 .heatmap-scroll-wrap {
   overflow-x: auto;

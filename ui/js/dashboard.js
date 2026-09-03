@@ -195,6 +195,13 @@ window.Dashboard = {
     html += `</div></div>`;
     container.innerHTML = html;
 
+    const scrollWrap = document.getElementById("heatmapScrollWrap");
+    if (scrollWrap) {
+      setTimeout(() => {
+        scrollWrap.scrollLeft = scrollWrap.scrollWidth;
+      }, 50);
+    }
+
     this.attachHeatmapTooltips();
   },
 

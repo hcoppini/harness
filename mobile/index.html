@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>HARNESS // Executive OS</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Harness">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/mobile/app.css">
+</head>
+<body>
+
+  <!-- Top Mobile Header -->
+  <header class="mobile-header">
+    <div class="mobile-brand">
+      <div class="brand-dot"></div>
+      <span class="brand-name">HARNESS</span>
+    </div>
+    <div class="sync-status-badge">
+      <div class="sync-dot"></div>
+      <span id="syncText">SYNCED</span>
+    </div>
+  </header>
+
+  <!-- Mobile Toast Notification -->
+  <div id="mobileToast" class="mobile-toast">Saved</div>
+
+  <!-- Main Views Container -->
+  <main id="mobileMain">
+
+    <!-- ====================================================================
+         VIEW 0: COCKPIT / DASHBOARD
+         ==================================================================== -->
+    <section id="view-cockpit" class="mobile-view active">
+      <!-- Streak & Velocity Card -->
+      <div class="mobile-card">
+        <div class="card-title-row">
+          <span class="card-title">Velocity &amp; Streak</span>
+          <span id="mStreakPill" style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-gold); font-weight: 700;">0d Streak</span>
+        </div>
+        <div style="display: flex; align-items: baseline; justify-content: space-between; margin-bottom: 8px;">
+          <div style="font-size: 28px; font-weight: 800;" id="mVelocityPct">0%</div>
+          <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary);" id="mRoutineName">Schedule</div>
+        </div>
+        <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.08); border-radius: 3px; overflow: hidden;">
+          <div id="mVelocityBar" style="width: 0%; height: 100%; background: var(--accent-white); border-radius: 3px; transition: width 0.3s ease;"></div>
+        </div>
+      </div>
+
+      <!-- GitHub-Style Green Heatmap -->
+      <div class="mobile-card">
+        <div class="card-title-row">
+          <span class="card-title">Daily Execution Pulse</span>
+          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);" id="mHeatmapTotal">-- boxes</span>
+        </div>
+        <div class="mobile-heatmap-grid" id="mHeatmapGrid">
+          <!-- Populated by mobile/app.js -->
+        </div>
+      </div>
+
+      <!-- Tomorrow's Upcoming Forecast -->
+      <div class="mobile-card">
+        <div class="card-title-row">
+          <span class="card-title">Upcoming Tomorrow</span>
+          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);" id="mTomorrowDate">--</span>
+        </div>
+        <div id="mTomorrowFocus" style="font-size: 13px; font-weight: 600; margin-bottom: 4px;">Loading forecast...</div>
+        <div id="mTomorrowDetails" style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">--</div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 1: TODAY (Routine & Quick Tasks)
+         ==================================================================== -->
+    <section id="view-today" class="mobile-view">
+      <!-- Quick Task Input -->
+      <form class="quick-input-box" id="mQuickTaskForm" onsubmit="MobileApp.handleAddTask(event)">
+        <input type="text" id="mTaskInput" placeholder="+ Add one-off task..." autocomplete="off">
+        <button type="submit">Add</button>
+      </form>
+
+      <!-- Today's Schedule Checklist -->
+      <div class="mobile-card">
+        <div class="card-title-row">
+          <span class="card-title" id="mScheduleHeader">Daily Routine</span>
+          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);" id="mScheduleProgress">0/0</span>
+        </div>
+        <div id="mRoutineList">
+          <!-- Populated by mobile/app.js -->
+        </div>
+      </div>
+
+      <!-- Tasks Checklist -->
+      <div class="mobile-card">
+        <div class="card-title-row">
+          <span class="card-title">Active Tasks</span>
+          <button style="background: transparent; border: none; color: var(--text-secondary); font-size: 10px; font-family: var(--font-mono); cursor: pointer;" onclick="MobileApp.rolloverTasks()">Rollover</button>
+        </div>
+        <div id="mTaskList">
+          <!-- Populated by mobile/app.js -->
+        </div>
+      </div>
+
+      <!-- Scratchpad -->
+      <div class="mobile-card">
+        <div class="card-title-row">
+          <span class="card-title">Scratchpad</span>
+          <span style="font-size: 9px; color: var(--text-tertiary);">Auto-saves</span>
+        </div>
+        <textarea id="mScratchpad" style="width: 100%; height: 90px; background: transparent; border: none; color: var(--text-primary); font-family: var(--font-mono); font-size: 12px; line-height: 1.4; outline: none; resize: none;" placeholder="Quick transient thoughts, math equations, trade notes..."></textarea>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 2: METRO ROADMAP
+         ==================================================================== -->
+    <section id="view-metro" class="mobile-view">
+      <div class="mobile-card" style="margin-bottom: 12px;">
+        <div class="card-title-row">
+          <span class="card-title">TUM Heilbronn Roadmap</span>
+          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-gold);">2026 - 2028</span>
+        </div>
+        <div style="font-size: 11px; color: var(--text-secondary);">Tap any checkpoint to review and check off stream deliverables.</div>
+      </div>
+
+      <div id="mMetroList">
+        <!-- Populated by mobile/app.js -->
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         VIEW 3: BODY / GYM
+         ==================================================================== -->
+    <section id="view-body" class="mobile-view">
+      <!-- Gym Routine Card -->
+      <div class="mobile-card">
+        <div class="card-title-row">
+          <span class="card-title" id="mGymHeader">Gym Protocol</span>
+          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary);" id="mGymDayTag">Tue / Thu</span>
+        </div>
+        <div id="mGymExerciseList">
+          <!-- Populated by mobile/app.js -->
+        </div>
+      </div>
+
+      <!-- Daily Weigh-In -->
+      <div class="mobile-card">
+        <div class="card-title-row">
+          <span class="card-title">Morning Weigh-In</span>
+          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary);">Goal: 80.0 kg</span>
+        </div>
+        <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+          <input type="number" step="0.1" id="mWeightInput" placeholder="Weight (kg)" style="flex: 1; background: var(--bg-surface-elevated); border: 1px solid var(--border-subtle); color: var(--text-primary); padding: 8px 10px; border-radius: 4px; outline: none;">
+          <button style="background: var(--accent-white); color: #000; border: none; padding: 0 16px; border-radius: 4px; font-weight: 700; font-size: 12px;" onclick="MobileApp.saveWeight()">Save</button>
+        </div>
+        <div style="display: flex; gap: 12px; font-size: 12px;">
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="checkbox" id="mCalSurplus"> Cal Surplus (+300)
+          </label>
+          <label style="display: flex; align-items: center; gap: 6px; cursor: pointer;">
+            <input type="checkbox" id="mProteinMet"> Protein (140g+)
+          </label>
+        </div>
+      </div>
+
+      <!-- Quick Workout Logger -->
+      <div class="mobile-card">
+        <div class="card-title-row">
+          <span class="card-title">Log Training Session</span>
+        </div>
+        <div style="display: flex; gap: 6px; margin-bottom: 8px;">
+          <button class="nav-item active" style="flex: 1; border: 1px solid var(--border-subtle); padding: 6px;" onclick="MobileApp.logWorkout('Gym')">Gym</button>
+          <button class="nav-item" style="flex: 1; border: 1px solid var(--border-subtle); padding: 6px;" onclick="MobileApp.logWorkout('Boxing')">Boxing</button>
+          <button class="nav-item" style="flex: 1; border: 1px solid var(--border-subtle); padding: 6px;" onclick="MobileApp.logWorkout('Running')">Run</button>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- Bottom iOS Navigation Bar -->
+  <nav class="bottom-nav">
+    <button class="nav-item active" data-view="cockpit" onclick="MobileApp.switchTab('cockpit')">
+      <span class="nav-icon">◈</span>
+      <span>Cockpit</span>
+    </button>
+    <button class="nav-item" data-view="today" onclick="MobileApp.switchTab('today')">
+      <span class="nav-icon">◻</span>
+      <span>Today</span>
+    </button>
+    <button class="nav-item" data-view="metro" onclick="MobileApp.switchTab('metro')">
+      <span class="nav-icon">◎</span>
+      <span>Metro</span>
+    </button>
+    <button class="nav-item" data-view="body" onclick="MobileApp.switchTab('body')">
+      <span class="nav-icon">▲</span>
+      <span>Gym</span>
+    </button>
+  </nav>
+
+  <!-- Mobile JavaScript Controller -->
+  <script src="/mobile/app.js"></script>
+</body>
+</html>
