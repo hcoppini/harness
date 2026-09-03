@@ -1,6 +1,6 @@
 {
   "source_url": "http://planlekcji2.staff.edu.pl/plany/o6.html",
-  "fetched_at": "2026-09-02T22:40:22.142884",
+  "fetched_at": "2026-09-03T07:01:57.447576",
   "schedule": {
     "Poniedziałek": [
       {
@@ -8,42 +8,89 @@
         "time": "8:00- 8:45",
         "subject": "informatyka-2/2",
         "teacher": "KM",
-        "room": "304"
+        "room": "304",
+        "entries": [
+          {
+            "subject": "informatyka-2/2",
+            "teacher": "KM",
+            "room": "304"
+          }
+        ]
       },
       {
         "nr": 2,
         "time": "8:50- 9:35",
-        "subject": "wf-1/2",
-        "teacher": "Tn",
-        "room": "304"
+        "subject": "wf-1/2 / informatyka-2/2",
+        "teacher": "Tn / KM",
+        "room": "416 / 304",
+        "entries": [
+          {
+            "subject": "wf-1/2",
+            "teacher": "Tn",
+            "room": "416"
+          },
+          {
+            "subject": "informatyka-2/2",
+            "teacher": "KM",
+            "room": "304"
+          }
+        ]
       },
       {
         "nr": 3,
         "time": "9:40-10:25",
         "subject": "chemia",
         "teacher": "EB",
-        "room": "406"
+        "room": "406",
+        "entries": [
+          {
+            "subject": "chemia",
+            "teacher": "EB",
+            "room": "406"
+          }
+        ]
       },
       {
         "nr": 4,
         "time": "10:30-11:15",
         "subject": "j.polski",
         "teacher": "ŁD",
-        "room": "123"
+        "room": "123",
+        "entries": [
+          {
+            "subject": "j.polski",
+            "teacher": "ŁD",
+            "room": "123"
+          }
+        ]
       },
       {
         "nr": 5,
         "time": "11:35-12:20",
         "subject": "matematyka",
         "teacher": "SM",
-        "room": "213"
+        "room": "213",
+        "entries": [
+          {
+            "subject": "matematyka",
+            "teacher": "SM",
+            "room": "213"
+          }
+        ]
       },
       {
         "nr": 6,
         "time": "12:40-13:25",
         "subject": "informatyka-1/2",
         "teacher": "KM",
-        "room": "301"
+        "room": "301",
+        "entries": [
+          {
+            "subject": "informatyka-1/2",
+            "teacher": "KM",
+            "room": "301"
+          }
+        ]
       }
     ],
     "Wtorek": [
@@ -52,56 +99,127 @@
         "time": "8:00- 8:45",
         "subject": "zaj.rozw.uzd",
         "teacher": "SM",
-        "room": "213"
+        "room": "213",
+        "entries": [
+          {
+            "subject": "zaj.rozw.uzd",
+            "teacher": "SM",
+            "room": "213"
+          }
+        ]
       },
       {
         "nr": 2,
         "time": "8:50- 9:35",
         "subject": "matematyka",
         "teacher": "SM",
-        "room": "213"
+        "room": "213",
+        "entries": [
+          {
+            "subject": "matematyka",
+            "teacher": "SM",
+            "room": "213"
+          }
+        ]
       },
       {
         "nr": 3,
         "time": "9:40-10:25",
-        "subject": "j.niemiecki",
-        "teacher": "Ba / ED",
-        "room": "315 / 417"
+        "subject": "j.hiszpański",
+        "teacher": "",
+        "room": "",
+        "entries": [
+          {
+            "subject": "j.hiszpański",
+            "teacher": "",
+            "room": ""
+          }
+        ]
       },
       {
         "nr": 4,
         "time": "10:30-11:15",
-        "subject": "informatyka-1/2",
-        "teacher": "KM",
-        "room": "304"
+        "subject": "informatyka-1/2 / wf-2/2",
+        "teacher": "KM / RW",
+        "room": "304 / b",
+        "entries": [
+          {
+            "subject": "informatyka-1/2",
+            "teacher": "KM",
+            "room": "304"
+          },
+          {
+            "subject": "wf-2/2",
+            "teacher": "RW",
+            "room": "b"
+          }
+        ]
       },
       {
         "nr": 5,
         "time": "11:35-12:20",
         "subject": "historia",
         "teacher": "SD",
-        "room": "313"
+        "room": "313",
+        "entries": [
+          {
+            "subject": "historia",
+            "teacher": "SD",
+            "room": "313"
+          }
+        ]
       },
       {
         "nr": 6,
         "time": "12:40-13:25",
-        "subject": "wf-1/2",
-        "teacher": "Tn",
-        "room": "304"
+        "subject": "wf-1/2 / informatyka-2/2",
+        "teacher": "Tn / KM",
+        "room": "c / 304",
+        "entries": [
+          {
+            "subject": "wf-1/2",
+            "teacher": "Tn",
+            "room": "c"
+          },
+          {
+            "subject": "informatyka-2/2",
+            "teacher": "KM",
+            "room": "304"
+          }
+        ]
       },
       {
         "nr": 7,
         "time": "13:30-14:15",
-        "subject": "wf-1/2",
-        "teacher": "Tn",
-        "room": "304"
+        "subject": "wf-1/2 / informatyka-2/2",
+        "teacher": "Tn / KM",
+        "room": "c / 304",
+        "entries": [
+          {
+            "subject": "wf-1/2",
+            "teacher": "Tn",
+            "room": "c"
+          },
+          {
+            "subject": "informatyka-2/2",
+            "teacher": "KM",
+            "room": "304"
+          }
+        ]
       },
       {
         "nr": 8,
         "time": "14:20-15:05",
         "subject": "e_zdrow",
         "teacher": "",
-        "room": "303"
+        "room": "303",
+        "entries": [
+          {
+            "subject": "e_zdrow",
+            "teacher": "",
+            "room": "303"
+          }
+        ]
       }
     ],
     "Środa": [
@@ -110,56 +228,112 @@
         "time": "8:00- 8:45",
         "subject": "historia",
         "teacher": "SD",
-        "room": "313"
+        "room": "313",
+        "entries": [
+          {
+            "subject": "historia",
+            "teacher": "SD",
+            "room": "313"
+          }
+        ]
       },
       {
         "nr": 2,
         "time": "8:50- 9:35",
         "subject": "zaj.wych.",
         "teacher": "EB",
-        "room": "406"
+        "room": "406",
+        "entries": [
+          {
+            "subject": "zaj.wych.",
+            "teacher": "EB",
+            "room": "406"
+          }
+        ]
       },
       {
         "nr": 3,
         "time": "9:40-10:25",
         "subject": "matematyka",
         "teacher": "SM",
-        "room": "213"
+        "room": "213",
+        "entries": [
+          {
+            "subject": "matematyka",
+            "teacher": "SM",
+            "room": "213"
+          }
+        ]
       },
       {
         "nr": 4,
         "time": "10:30-11:15",
         "subject": "matematyka",
         "teacher": "SM",
-        "room": "213"
+        "room": "213",
+        "entries": [
+          {
+            "subject": "matematyka",
+            "teacher": "SM",
+            "room": "213"
+          }
+        ]
       },
       {
         "nr": 5,
         "time": "11:35-12:20",
         "subject": "j.angielski",
         "teacher": "",
-        "room": ""
+        "room": "",
+        "entries": [
+          {
+            "subject": "j.angielski",
+            "teacher": "",
+            "room": ""
+          }
+        ]
       },
       {
         "nr": 6,
         "time": "12:40-13:25",
         "subject": "j.angielski",
         "teacher": "",
-        "room": ""
+        "room": "",
+        "entries": [
+          {
+            "subject": "j.angielski",
+            "teacher": "",
+            "room": ""
+          }
+        ]
       },
       {
         "nr": 7,
         "time": "13:30-14:15",
         "subject": "j.polski",
         "teacher": "ŁD",
-        "room": "123"
+        "room": "123",
+        "entries": [
+          {
+            "subject": "j.polski",
+            "teacher": "ŁD",
+            "room": "123"
+          }
+        ]
       },
       {
         "nr": 8,
         "time": "14:20-15:05",
         "subject": "j.polski",
         "teacher": "ŁD",
-        "room": "123"
+        "room": "123",
+        "entries": [
+          {
+            "subject": "j.polski",
+            "teacher": "ŁD",
+            "room": "123"
+          }
+        ]
       }
     ],
     "Czwartek": [
@@ -168,49 +342,108 @@
         "time": "8:00- 8:45",
         "subject": "j.angielski",
         "teacher": "",
-        "room": ""
+        "room": "",
+        "entries": [
+          {
+            "subject": "j.angielski",
+            "teacher": "",
+            "room": ""
+          }
+        ]
       },
       {
         "nr": 2,
         "time": "8:50- 9:35",
-        "subject": "j.niemiecki",
-        "teacher": "Ba / ED",
-        "room": "315 / 417"
+        "subject": "j.hiszpański",
+        "teacher": "",
+        "room": "",
+        "entries": [
+          {
+            "subject": "j.hiszpański",
+            "teacher": "",
+            "room": ""
+          }
+        ]
       },
       {
         "nr": 3,
         "time": "9:40-10:25",
         "subject": "fizyka",
         "teacher": "MD",
-        "room": "407"
+        "room": "407",
+        "entries": [
+          {
+            "subject": "fizyka",
+            "teacher": "MD",
+            "room": "407"
+          }
+        ]
       },
       {
         "nr": 4,
         "time": "10:30-11:15",
-        "subject": "informatyka-1/2",
-        "teacher": "KM",
-        "room": "127"
+        "subject": "informatyka-1/2 / wf-2/2",
+        "teacher": "KM / RW",
+        "room": "127 / b",
+        "entries": [
+          {
+            "subject": "informatyka-1/2",
+            "teacher": "KM",
+            "room": "127"
+          },
+          {
+            "subject": "wf-2/2",
+            "teacher": "RW",
+            "room": "b"
+          }
+        ]
       },
       {
         "nr": 5,
         "time": "11:35-12:20",
-        "subject": "informatyka-1/2",
-        "teacher": "KM",
-        "room": "127"
+        "subject": "informatyka-1/2 / wf-2/2",
+        "teacher": "KM / RW",
+        "room": "127 / b",
+        "entries": [
+          {
+            "subject": "informatyka-1/2",
+            "teacher": "KM",
+            "room": "127"
+          },
+          {
+            "subject": "wf-2/2",
+            "teacher": "RW",
+            "room": "b"
+          }
+        ]
       },
       {
         "nr": 6,
         "time": "12:40-13:25",
         "subject": "biologia",
         "teacher": "SA",
-        "room": "404"
+        "room": "404",
+        "entries": [
+          {
+            "subject": "biologia",
+            "teacher": "SA",
+            "room": "404"
+          }
+        ]
       },
       {
         "nr": 7,
         "time": "13:30-14:15",
         "subject": "religia",
         "teacher": "",
-        "room": "207"
+        "room": "207",
+        "entries": [
+          {
+            "subject": "religia",
+            "teacher": "",
+            "room": "207"
+          }
+        ]
       }
     ],
     "Piątek": [
@@ -219,42 +452,84 @@
         "time": "8:00- 8:45",
         "subject": "j.angielski",
         "teacher": "",
-        "room": ""
+        "room": "",
+        "entries": [
+          {
+            "subject": "j.angielski",
+            "teacher": "",
+            "room": ""
+          }
+        ]
       },
       {
         "nr": 2,
         "time": "8:50- 9:35",
         "subject": "j.angielski",
         "teacher": "",
-        "room": ""
+        "room": "",
+        "entries": [
+          {
+            "subject": "j.angielski",
+            "teacher": "",
+            "room": ""
+          }
+        ]
       },
       {
         "nr": 3,
         "time": "9:40-10:25",
         "subject": "geografia",
         "teacher": "WG",
-        "room": "311"
+        "room": "311",
+        "entries": [
+          {
+            "subject": "geografia",
+            "teacher": "WG",
+            "room": "311"
+          }
+        ]
       },
       {
         "nr": 4,
         "time": "10:30-11:15",
         "subject": "matematyka",
         "teacher": "SM",
-        "room": "213"
+        "room": "213",
+        "entries": [
+          {
+            "subject": "matematyka",
+            "teacher": "SM",
+            "room": "213"
+          }
+        ]
       },
       {
         "nr": 5,
         "time": "11:35-12:20",
         "subject": "fizyka",
         "teacher": "MD",
-        "room": "407"
+        "room": "407",
+        "entries": [
+          {
+            "subject": "fizyka",
+            "teacher": "MD",
+            "room": "407"
+          }
+        ]
       },
       {
         "nr": 6,
         "time": "12:40-13:25",
         "subject": "j.polski",
         "teacher": "ŁD",
-        "room": "123"
+        "room": "123",
+        "entries": [
+          {
+            "subject": "j.polski",
+            "teacher": "ŁD",
+            "room": "123"
+          }
+        ]
       }
     ]
   }

@@ -10,14 +10,13 @@
 
   <!-- Top App Header -->
   <header class="app-header">
-    <div class="brand-wrap">
+    <div class="brand-wrap" onclick="window.HarnessApp.switchView('dashboard')">
       <div class="brand-symbol"></div>
       <span class="brand-title">HARNESS</span>
-      <span class="brand-divider">/</span>
-      <span class="brand-tag">Execution Hub</span>
+      <span class="brand-tag">Executive OS</span>
     </div>
 
-    <!-- Navigation Pills -->
+    <!-- Navigation Tabs -->
     <nav class="nav-tabs" id="navTabs">
       <button class="nav-tab active" data-view="dashboard">
         <span>Dashboard</span>
@@ -45,34 +44,35 @@
       </button>
     </nav>
 
-    <!-- Header Right Status & JSON Data -->
+    <!-- Header Right Controls -->
     <div class="header-right">
-      <button id="btnOpenJsonModal" class="btn-ghost-icon" title="View & Edit Standardized JSON Data Model">
+      <button id="btnOpenJsonModal" class="btn-ghost-icon" title="Standardized JSON Configuration">
         <span>JSON Hub</span>
       </button>
-      <span id="currentDatePill">--</span>
-      <span id="currentTimePill" style="color: var(--text-primary); font-weight: 600;">--:--</span>
+      <div style="display: flex; align-items: baseline; gap: 8px; font-family: var(--font-mono); font-size: 11px;">
+        <span id="currentDatePill" style="color: var(--text-tertiary);">--</span>
+        <span id="currentTimePill" style="color: var(--text-primary); font-weight: 600;">--:--</span>
+      </div>
     </div>
   </header>
 
-  <!-- Main Viewport Container -->
+  <!-- Main Viewport -->
   <main class="main-content">
 
     <!-- ====================================================================
-         0. DASHBOARD LAYER (Executive Home Page, Heatmap & Upcoming Forecast)
+         0. DASHBOARD LAYER (Executive Cockpit, Trajectory Gauges, Heatmap)
          ==================================================================== -->
     <section id="view-dashboard" class="view-section active">
-      <!-- Section Header -->
       <div class="section-header">
         <div>
-          <h1 class="section-headline">EXECUTIVE DASHBOARD</h1>
-          <p class="section-caption">High-signal pulse: daily execution heatmap, 7-day schedule forecast, and core trajectory stats.</p>
+          <h1 class="section-headline">Executive Cockpit</h1>
+          <p class="section-caption">High-signal trajectory: daily execution velocity, TUM Heilbronn readiness, and habit consistency.</p>
         </div>
         <div style="display: flex; gap: 8px;">
-          <div class="streak-pill" id="dashboardStreakPill" title="Consecutive days with execution activity">
-            <span class="streak-flame">🔥</span>
+          <div class="streak-pill" id="dashboardStreakPill" title="Consecutive days with execution activity" style="display: inline-flex; align-items: center; gap: 6px; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 5px 10px; font-size: 11px; font-weight: 600;">
+            <span>🔥</span>
             <span id="streakCountVal">0</span>
-            <span style="color: var(--text-tertiary);">day streak</span>
+            <span style="color: var(--text-tertiary); font-weight: 400;">day streak</span>
           </div>
           <button id="btnRefreshDashboard" class="btn-ghost-icon" title="Refresh Dashboard Data">
             <span>Refresh</span>
@@ -81,41 +81,111 @@
       </div>
 
       <div class="dashboard-layout">
-        <!-- 1. GITHUB-STYLE DAILY EXECUTION HEATMAP CARD -->
+        <!-- 1. TOP EXECUTIVE COCKPIT GAUGES -->
+        <div class="executive-cockpit-grid">
+          <!-- Gauge 1: Today's Execution Velocity -->
+          <div class="cockpit-card" onclick="window.HarnessApp.switchView('today')" style="cursor: pointer;">
+            <div class="cockpit-header">
+              <span class="cockpit-title">Today's Velocity</span>
+              <span class="cockpit-icon">⚡</span>
+            </div>
+            <div>
+              <div class="cockpit-value" id="dashTodayProgressVal">0%</div>
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="dashTodayProgressBar" style="width: 0%;"></div>
+              </div>
+            </div>
+            <div class="cockpit-subtitle" id="dashTodayRoutineLabel">
+              Loading routine...
+            </div>
+          </div>
+
+          <!-- Gauge 2: TUM Heilbronn Admissions Readiness -->
+          <div class="cockpit-card" onclick="window.HarnessApp.switchView('tum')" style="cursor: pointer;">
+            <div class="cockpit-header">
+              <span class="cockpit-title">TUM Admissions</span>
+              <span class="chip-tag german" id="dashGermanLevel" style="font-size: 9px;">A2 Active</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div>
+                <div style="font-size: 10px; font-weight: 600; color: var(--text-tertiary);">GPA STANDING</div>
+                <div class="cockpit-value" id="dashOverallGpa" style="font-size: 18px; margin-top: 2px;">--</div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 10px; font-weight: 600; color: var(--text-tertiary);">MATURA MOCKS</div>
+                <div class="cockpit-value" id="dashMaturaAvg" style="font-size: 18px; margin-top: 2px;">--%</div>
+              </div>
+            </div>
+            <div class="cockpit-subtitle" id="dashActiveStationName">
+              Station: Pure Syntax
+            </div>
+          </div>
+
+          <!-- Gauge 3: Body / Mass & Workouts -->
+          <div class="cockpit-card" onclick="window.HarnessApp.switchView('body')" style="cursor: pointer;">
+            <div class="cockpit-header">
+              <span class="cockpit-title">Physique &amp; Mass</span>
+              <span class="cockpit-icon">🏋️</span>
+            </div>
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div class="cockpit-value" id="dashWeightVal" style="font-size: 18px;">68.0 kg</div>
+                <span style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">Goal: 80.0 kg</span>
+              </div>
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="dashWeightProgressFill" style="width: 0%;"></div>
+              </div>
+            </div>
+            <div class="cockpit-subtitle" id="dashWorkoutsSummaryText">
+              Boxing 0/3 • Gym 0/4 • Run 0/2
+            </div>
+          </div>
+
+          <!-- Gauge 4: Active Builds & Next Action -->
+          <div class="cockpit-card" onclick="window.HarnessApp.switchView('projects')" style="cursor: pointer;">
+            <div class="cockpit-header">
+              <span class="cockpit-title">Active Sprints</span>
+              <span class="cockpit-icon">🚀</span>
+            </div>
+            <div class="cockpit-value" id="dashProjectsCount">4 Builds</div>
+            <div class="cockpit-subtitle" id="dashTopProjectNextAction" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              Review next immediate milestone
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. DAILY EXECUTION HEATMAP -->
         <div class="monotone-card heatmap-card">
           <div class="heatmap-header-row">
             <div>
               <span class="heatmap-title" id="heatmapContributionsCount">Daily Execution Pulse</span>
-              <span class="heatmap-subtitle">Tied directly to checked boxes • 100% completed = Brightest Purple</span>
+              <span class="heatmap-subtitle">Tied directly to completed routine blocks, gym exercises, and custom tasks</span>
             </div>
             <div class="heatmap-legend">
-              <span class="legend-label">0%</span>
+              <span>0%</span>
               <div class="legend-square lvl-0" title="0 checked"></div>
               <div class="legend-square lvl-1" title="> 0 checked"></div>
-              <div class="legend-square lvl-2" title="≥ 40% checked"></div>
-              <div class="legend-square lvl-3" title="≥ 75% checked"></div>
+              <div class="legend-square lvl-2" title=">= 40% checked"></div>
+              <div class="legend-square lvl-3" title=">= 75% checked"></div>
               <div class="legend-square lvl-4" title="100% checked (All boxes done!)"></div>
-              <span class="legend-label">100%</span>
+              <span>100%</span>
             </div>
           </div>
 
-          <!-- Scrollable Heatmap Viewport -->
           <div class="heatmap-scroll-wrap" id="heatmapScrollWrap">
             <div class="heatmap-container" id="heatmapContainer">
-              <!-- Rendered dynamically by dashboard.js -->
+              <!-- Rendered by dashboard.js -->
             </div>
           </div>
-
-          <!-- Heatmap Floating Tooltip -->
           <div id="heatmapTooltip" class="heatmap-tooltip"></div>
         </div>
 
-        <!-- 2. UPCOMING 7-DAY SCHEDULE FORECAST -->
-        <div class="monotone-card upcoming-card">
-          <div class="card-label-row" style="margin-bottom: 12px;">
+        <!-- 3. UPCOMING 7-DAY FORECAST -->
+        <div class="monotone-card">
+          <div class="card-label-row">
             <div>
-              <span class="card-label">Upcoming Week Forecast (7 Days)</span>
-              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); margin-left: 8px;">
+              <span class="card-label">7-Day Schedule Forecast</span>
+              <span style="font-size: 11px; color: var(--text-tertiary); margin-left: 8px;">
                 Look ahead: routines, training cutoffs, and scheduled reps
               </span>
             </div>
@@ -126,107 +196,49 @@
           </div>
 
           <div class="upcoming-reel" id="upcomingReelContainer">
-            <!-- Rendered dynamically by dashboard.js -->
+            <!-- Rendered by dashboard.js -->
           </div>
         </div>
 
-        <!-- 3. TRI-PILLAR EXECUTIVE METRICS ROW -->
-        <div class="dashboard-pillars-grid">
-          <!-- Pillar A: TUM Heilbronn -->
-          <div class="monotone-card pillar-card">
+        <!-- 4. PRIORITY RADAR ROW (Homework & Upcoming Exams) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <!-- Due Homework -->
+          <div class="monotone-card" style="margin-bottom: 0;">
             <div class="card-label-row">
-              <span class="card-label">TUM Heilbronn // Metro Track</span>
-              <button class="btn-ghost-icon" onclick="window.HarnessApp.switchView('tum')">
-                <span>View Metro</span>
-                <span class="key-pill">2</span>
-              </button>
+              <span class="card-label">Priority Homework</span>
+              <button class="btn-ghost-icon" onclick="window.Today.openAddHomeworkModal()">+ Add</button>
             </div>
-            <div style="margin-top: 10px;">
-              <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <span id="dashActiveStationMonth" style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-gold-dim); font-weight: 600;">SEP '26</span>
-                <span id="dashGermanLevel" class="chip-tag german" style="font-size: 10px;">A2 Active</span>
-              </div>
-              <h3 id="dashActiveStationName" style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">Pure Syntax</h3>
-              <p id="dashStationNextAction" style="font-size: 11px; color: var(--text-secondary); margin-top: 6px; line-height: 1.4;">
-                Loading station next action...
-              </p>
-
-              <div class="pillar-mini-kpis" style="margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border-hairline); display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-                <div>
-                  <div style="font-size: 10px; font-family: var(--font-mono); color: var(--text-tertiary);">OVERALL GPA</div>
-                  <div id="dashOverallGpa" style="font-size: 14px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); margin-top: 2px;">--</div>
-                </div>
-                <div>
-                  <div style="font-size: 10px; font-family: var(--font-mono); color: var(--text-tertiary);">MATURA MOCK AVG</div>
-                  <div id="dashMaturaAvg" style="font-size: 14px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); margin-top: 2px;">--%</div>
-                </div>
-              </div>
+            <div id="dashHomeworkList" style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
+              <!-- Rendered by dashboard.js -->
             </div>
           </div>
 
-          <!-- Pillar B: Body & Machine Maintenance -->
-          <div class="monotone-card pillar-card">
+          <!-- Upcoming Tests & Exams -->
+          <div class="monotone-card" style="margin-bottom: 0;">
             <div class="card-label-row">
-              <span class="card-label">Machine Maintenance // Body</span>
-              <button class="btn-ghost-icon" onclick="window.HarnessApp.switchView('body')">
-                <span>View Body</span>
-                <span class="key-pill">4</span>
-              </button>
+              <span class="card-label">Upcoming Tests &amp; Mocks</span>
+              <button class="btn-ghost-icon" onclick="window.Today.openAddExamModal()">+ Add</button>
             </div>
-            <div style="margin-top: 10px;">
-              <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">HYPERTROPHY TRAJECTORY</span>
-                <span id="dashWeightVal" style="font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--text-primary);">68.0 / 80.0 kg</span>
-              </div>
-              <div class="progress-bar-track" style="margin-top: 6px; margin-bottom: 12px;">
-                <div class="progress-bar-fill" id="dashWeightProgressFill" style="width: 0%;"></div>
-              </div>
-
-              <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; text-align: center;">
-                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 6px 4px;">
-                  <div style="font-size: 9px; font-family: var(--font-mono); color: var(--text-tertiary);">BOXING</div>
-                  <div id="dashBoxingCount" style="font-size: 13px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); margin-top: 2px;">0/3</div>
-                </div>
-                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 6px 4px;">
-                  <div style="font-size: 9px; font-family: var(--font-mono); color: var(--text-tertiary);">GYM LIFT</div>
-                  <div id="dashGymCount" style="font-size: 13px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); margin-top: 2px;">0/4</div>
-                </div>
-                <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 6px 4px;">
-                  <div style="font-size: 9px; font-family: var(--font-mono); color: var(--text-tertiary);">RUNNING</div>
-                  <div id="dashRunCount" style="font-size: 13px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary); margin-top: 2px;">0/2</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- Pillar C: Active Builds & Next Actions -->
-          <div class="monotone-card pillar-card">
-            <div class="card-label-row">
-              <span class="card-label">Active Builds &amp; Actions</span>
-              <button class="btn-ghost-icon" onclick="window.HarnessApp.switchView('projects')">
-                <span>View Projects</span>
-                <span class="key-pill">3</span>
-              </button>
-            </div>
-            <div id="dashProjectsList" style="margin-top: 10px; display: flex; flex-direction: column; gap: 8px;">
-              <!-- Rendered dynamically by dashboard.js -->
+            <div id="dashExamsList" style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
+              <!-- Rendered by dashboard.js -->
             </div>
           </div>
         </div>
       </div>
     </section>
 
+
     <!-- ====================================================================
-         1. TODAY LAYER (Zero-Friction Automated Execution)
+         1. TODAY LAYER (Daily Routine, Mini-Calendar, Timetable)
          ==================================================================== -->
     <section id="view-today" class="view-section">
       <div class="section-header">
         <div>
-          <h1 class="section-headline">DAILY EXECUTION</h1>
-          <p class="section-caption">Routines are pre-calibrated. Eliminate input fatigue. Do the reps.</p>
+          <h1 class="section-headline">Daily Execution</h1>
+          <p class="section-caption">Routines are pre-calibrated. Zero input fatigue. Check the boxes.</p>
         </div>
         <div style="display: flex; gap: 8px;">
-          <button id="btnRollover" class="btn-ghost-icon" title="Carry forward yesterday's uncompleted tasks (R)">
+          <button id="btnRollover" class="btn-ghost-icon" title="Carry forward pending tasks from prior days (R)">
             <span>Carry Over</span>
             <span class="key-pill">R</span>
           </button>
@@ -234,7 +246,7 @@
       </div>
 
       <div class="today-layout">
-        <!-- Left: Automated Schedule & Tasks -->
+        <!-- Left Column: Automated Routine & Tasks -->
         <div>
           <!-- Schedule Banner -->
           <div class="schedule-banner">
@@ -247,51 +259,51 @@
             <span id="scheduleDescription" style="font-size: 11px; color: var(--text-secondary);"></span>
           </div>
 
-          <!-- Pre-loaded Day Blocks -->
+          <!-- Pre-loaded Day Routine Blocks -->
           <div id="routineBlocksContainer" class="routine-timeline">
             <!-- Dynamic schedule time blocks -->
           </div>
 
-          <!-- Dynamic Today Gym Card (Shown on Tue/Thu) -->
-          <div id="todayLiftCard" class="today-lift-card" style="display: none;">
-            <div class="lift-header">
-              <span id="todayLiftTitle" class="lift-title">TODAY'S LIFT</span>
-              <span style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);">Structured Protocol</span>
+          <!-- Tue/Thu Structured Gym Card -->
+          <div id="todayLiftCard" class="monotone-card" style="display: none; border-color: rgba(139, 92, 246, 0.3);">
+            <div class="card-label-row">
+              <span id="todayLiftTitle" class="card-label" style="color: var(--accent-purple-light);">Structured Gym Protocol</span>
+              <span style="font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono);">Hypertrophy</span>
             </div>
-            <div id="todayLiftExercises">
+            <div id="todayLiftExercises" style="display: flex; flex-direction: column; gap: 6px;">
               <!-- Rendered dynamically -->
             </div>
           </div>
 
-          <!-- Minimal Quick Task Bar -->
+          <!-- Quick Task Bar -->
           <form id="quickTaskForm" class="quick-task-bar">
-            <span style="color: var(--text-tertiary); font-size: 13px; padding-left: 6px;">+</span>
+            <span style="color: var(--accent-purple-light); font-weight: 700; padding-left: 4px;">+</span>
             <input 
               type="text" 
               id="quickTaskInput" 
               class="quick-task-input" 
-              placeholder="Add one-off task (Press 'N' to focus, Enter to add)..."
+              placeholder="Add task for this day (Press 'N' to focus, Enter to add)..."
               autocomplete="off"
             />
           </form>
 
-          <!-- Custom Tasks List -->
+          <!-- Custom Tasks Checklist -->
           <div id="customTaskList">
             <!-- Dynamic task items -->
           </div>
 
           <!-- Scratchpad Card -->
-          <div class="monotone-card" style="margin-top: 16px;">
+          <div class="monotone-card" style="margin-top: 14px;">
             <div class="card-label-row">
               <span class="card-label">Scratchpad</span>
               <span id="scratchpadSavePill" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Auto-saving</span>
             </div>
             <textarea 
               id="scratchpadTextarea" 
-              class="scratchpad-input" 
+              class="form-textarea" 
               placeholder="Transient thoughts, code logic, or quick math scratchpad..."
               spellcheck="false"
-              style="height: 90px;"
+              style="width: 100%; height: 90px;"
             ></textarea>
           </div>
 
@@ -299,34 +311,34 @@
           <div class="monotone-card">
             <div class="card-label-row">
               <span class="card-label">Sleep Target</span>
-              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">8 hrs floor</span>
+              <span style="font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono);">8 hrs floor</span>
             </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; font-size: 11px;">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
               <div>
-                <label style="color: var(--text-tertiary); display: block; margin-bottom: 2px;">WAKE</label>
-                <input type="text" id="wakeTimeInput" class="btn-ghost-icon" style="width: 100%; font-family: var(--font-mono);" placeholder="06:45" />
+                <label style="font-size: 10px; font-weight: 600; color: var(--text-tertiary); display: block; margin-bottom: 4px;">WAKE TIME</label>
+                <input type="text" id="wakeTimeInput" class="form-input" style="width: 100%; font-family: var(--font-mono); padding: 6px 10px;" placeholder="06:45" />
               </div>
               <div>
-                <label style="color: var(--text-tertiary); display: block; margin-bottom: 2px;">BEDTIME</label>
-                <input type="text" id="sleepTimeInput" class="btn-ghost-icon" style="width: 100%; font-family: var(--font-mono);" placeholder="22:45" />
+                <label style="font-size: 10px; font-weight: 600; color: var(--text-tertiary); display: block; margin-bottom: 4px;">BEDTIME</label>
+                <input type="text" id="sleepTimeInput" class="form-input" style="width: 100%; font-family: var(--font-mono); padding: 6px 10px;" placeholder="22:45" />
               </div>
             </div>
           </div>
         </div>
 
-        <!-- Right: Mini-Calendar, School Lessons, Homework, Quick Links -->
+        <!-- Right Column: Mini-Calendar, Timetable, Radar, Links -->
         <div style="display: flex; flex-direction: column; gap: 14px;">
-          <!-- Mini-Calendar Date Navigator Card -->
+          <!-- Mini-Calendar Date Navigator -->
           <div class="monotone-card">
             <div class="card-label-row">
-              <span class="card-label">Navigator // Mini-Calendar</span>
-              <button id="btnTodayReset" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">Today</button>
+              <span class="card-label">Calendar Navigator</span>
+              <button id="btnTodayReset" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 8px;">Today</button>
             </div>
             <div id="miniCalendarWrap">
               <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                <button id="btnPrevMonth" class="btn-ghost-icon" style="padding: 2px 6px;">&lt;</button>
-                <span id="calMonthYearLabel" style="font-family: var(--font-mono); font-size: 12px; font-weight: 600; color: var(--text-primary);">Month Year</span>
-                <button id="btnNextMonth" class="btn-ghost-icon" style="padding: 2px 6px;">&gt;</button>
+                <button id="btnPrevMonth" class="btn-ghost-icon" style="padding: 2px 8px;">&larr;</button>
+                <span id="calMonthYearLabel" style="font-weight: 600; font-size: 12px; color: var(--text-primary);">Month Year</span>
+                <button id="btnNextMonth" class="btn-ghost-icon" style="padding: 2px 8px;">&rarr;</button>
               </div>
               <div id="miniCalendarGrid" class="mini-calendar-grid">
                 <!-- Days rendered dynamically -->
@@ -334,45 +346,39 @@
             </div>
           </div>
 
-          <!-- School Timetable Card (TM1 / Optivum 3lb) -->
+          <!-- School Timetable Widget (TM1 / Optivum 3lb) -->
           <div class="monotone-card">
             <div class="card-label-row">
-              <span class="card-label">School // TM1 Timetable</span>
-              <div style="display: flex; gap: 6px;">
-                <button id="btnRefreshSchoolPlan" class="btn-ghost-icon" title="Sync live schedule from TM1" style="padding: 2px 6px;">
-                  Sync
-                </button>
-                <button id="btnOpenTM1Web" class="btn-ghost-icon" title="Open Optivum plan in browser" style="padding: 2px 6px;">
-                  Web
-                </button>
+              <span class="card-label">TM1 School Timetable</span>
+              <div style="display: flex; gap: 4px;">
+                <button id="btnRefreshSchoolPlan" class="btn-ghost-icon" title="Sync live schedule" style="font-size: 10px; padding: 2px 6px;">Sync</button>
+                <button id="btnOpenTM1Web" class="btn-ghost-icon" title="Open Optivum plan" style="font-size: 10px; padding: 2px 6px;">Web &rarr;</button>
               </div>
             </div>
-            <div id="schoolLessonsList" style="display: flex; flex-direction: column; gap: 6px; margin-top: 4px;">
+            <div id="schoolLessonsList" style="display: flex; flex-direction: column; gap: 5px; margin-top: 4px;">
               <!-- Lessons rendered dynamically -->
             </div>
           </div>
 
-          <!-- Homework & Exam Radar Card (Phase 3) -->
+          <!-- Homework & Exam Radar Card -->
           <div class="monotone-card">
             <div class="card-label-row">
-              <span class="card-label">Homework &amp; Exam Radar</span>
+              <span class="card-label">Homework &amp; Exams</span>
               <div style="display: flex; gap: 4px;">
                 <button id="btnAddHomeworkBtn" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ HW</button>
                 <button id="btnAddExamBtn" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ Exam</button>
               </div>
             </div>
             
-            <!-- Pending Homework Section -->
             <div style="margin-top: 6px;">
-              <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; margin-bottom: 4px;">Due Homework</div>
+              <div style="font-size: 10px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; margin-bottom: 4px;">Pending Homework</div>
               <div id="homeworkItemsList" style="display: flex; flex-direction: column; gap: 4px;">
                 <!-- Homework items rendered dynamically -->
               </div>
             </div>
 
-            <!-- Upcoming Tests & Exams Section -->
             <div style="margin-top: 12px; padding-top: 8px; border-top: 1px solid var(--border-hairline);">
-              <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); text-transform: uppercase; margin-bottom: 4px;">Upcoming Tests / Mocks</div>
+              <div style="font-size: 10px; font-weight: 600; color: var(--text-tertiary); text-transform: uppercase; margin-bottom: 4px;">Upcoming Tests &amp; Mocks</div>
               <div id="upcomingExamsList" style="display: flex; flex-direction: column; gap: 4px;">
                 <!-- Exam items rendered dynamically -->
               </div>
@@ -382,8 +388,8 @@
           <!-- Quick Launch Links Card -->
           <div class="monotone-card">
             <div class="card-label-row">
-              <span class="card-label">Quick Links // Hub</span>
-              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">1-Click</span>
+              <span class="card-label">Quick Links Launchpad</span>
+              <button id="btnAddNewLinkModal" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ Add Link</button>
             </div>
             <div id="easyLinksContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px;">
               <!-- Easy links rendered dynamically -->
@@ -395,47 +401,36 @@
 
 
     <!-- ====================================================================
-         2. TUM LAYER (Interactive Horizontal Draggable Metro Map)
+         2. TUM METRO ROADMAP LAYER (Interactive Timeline)
          ==================================================================== -->
     <section id="view-tum" class="view-section">
       <div class="section-header" style="margin-bottom: 12px; padding-bottom: 10px;">
         <div>
-          <h1 class="section-headline">TUM METRO ROADMAP</h1>
-          <p class="section-caption">Hold &amp; drag timeline. Click any station node to open requirements &amp; progress ledger.</p>
+          <h1 class="section-headline">TUM Metro Roadmap (2026 – 2028)</h1>
+          <p class="section-caption">Interactive trajectory toward TUM Heilbronn (B.Sc. Management &amp; Data Science). Click stations to track deliverables.</p>
         </div>
         <div style="display: flex; gap: 8px;">
-          <button id="btnJumpCurrentStation" class="btn-ghost-icon">Jump to Today</button>
-          <button id="btnToggleGradesView" class="btn-ghost-icon">View Grades Table</button>
+          <button id="btnJumpCurrentStation" class="btn-ghost-icon">Jump to Active Station</button>
+          <button id="btnToggleGradesView" class="btn-ghost-icon">View Grades Ledger</button>
         </div>
       </div>
 
-      <!-- Metro Viewport Container -->
+      <!-- Metro Viewport -->
       <div class="metro-viewport">
-        <!-- Metro Toolbar & Branch Legend -->
+        <!-- Metro Toolbar & Stream Filters -->
         <div class="metro-toolbar">
-          <div class="metro-legend">
-            <div class="legend-item">
-              <div class="legend-line" style="background: #ffffff; height: 4px;"></div>
-              <span style="color: var(--text-primary); font-weight: 600;">TUM Mainline Spine</span>
-            </div>
-            <div class="legend-item">
-              <div class="legend-line" style="background: #d08770; height: 3px;"></div>
-              <span>SIGG GPW Express Branch</span>
-            </div>
-            <div class="legend-item">
-              <span class="chip-tag code">CODE</span>
-              <span>Informatyka</span>
-            </div>
-            <div class="legend-item">
-              <span class="chip-tag academics">ACA</span>
-              <span>Matura &amp; GPA</span>
-            </div>
-            <div class="legend-item">
-              <span class="chip-tag german">DEU</span>
-              <span>German Goethe</span>
-            </div>
+          <div class="metro-filters">
+            <span style="font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-right: 4px;">Filter Stream:</span>
+            <button class="metro-filter-btn active" data-stream="all">All Streams</button>
+            <button class="metro-filter-btn" data-stream="academics">Academics</button>
+            <button class="metro-filter-btn" data-stream="code">Code</button>
+            <button class="metro-filter-btn" data-stream="sigg">SIGG GPW</button>
+            <button class="metro-filter-btn" data-stream="german">German</button>
+            <button class="metro-filter-btn" data-stream="physical">Physical</button>
           </div>
-          <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Scroll wheel or drag &bull; Real-time day position</div>
+          <div style="font-size: 11px; color: var(--text-tertiary); font-family: var(--font-mono);">
+            Scroll or drag track • Real-time day position
+          </div>
         </div>
 
         <!-- Draggable Horizontal Track Container -->
@@ -450,7 +445,7 @@
           <button id="closeStationDrawerBtn" class="drawer-close-btn">&times;</button>
           
           <div style="margin-top: 10px; margin-bottom: 16px;">
-            <div id="drawerStationMonth" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); text-transform: uppercase;">
+            <div id="drawerStationMonth" style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-purple-light); font-weight: 600;">
               SEP '26 // PHASE 1
             </div>
             <h2 id="drawerStationTitle" style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">
@@ -458,11 +453,9 @@
             </h2>
           </div>
 
-          <div style="margin-bottom: 18px;">
-            <label style="font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; color: var(--text-tertiary); display: block; margin-bottom: 4px;">
-              STATION STATUS
-            </label>
-            <select id="drawerStationStatus" class="btn-ghost-icon" style="width: 100%; font-family: var(--font-mono);">
+          <div style="margin-bottom: 16px;">
+            <label class="form-label">STATION STATUS</label>
+            <select id="drawerStationStatus" class="form-input" style="width: 100%;">
               <option value="upcoming">Upcoming</option>
               <option value="active">Active Station</option>
               <option value="completed">Completed / Reached</option>
@@ -470,8 +463,8 @@
           </div>
 
           <!-- Objective Box -->
-          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px 12px; margin-bottom: 18px;">
-            <div style="font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 4px;">
+          <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 16px;">
+            <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 4px;">
               CORE OBJECTIVE
             </div>
             <div id="drawerStationObjective" style="font-size: 12px; color: var(--text-primary); line-height: 1.5;">
@@ -479,10 +472,10 @@
             </div>
           </div>
 
-          <!-- Deliverables Breakdown -->
-          <div style="margin-bottom: 18px;">
-            <div style="font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px;">
-              STATION DELIVERABLES BY STREAM
+          <!-- Deliverables Checklist -->
+          <div style="margin-bottom: 16px;">
+            <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 8px;">
+              DELIVERABLES BREAKDOWN
             </div>
             <div id="drawerDeliverablesList">
               <!-- Rendered dynamically -->
@@ -491,7 +484,7 @@
 
           <!-- Next Action Box -->
           <div style="border-top: 1px solid var(--border-hairline); padding-top: 14px;">
-            <div style="font-size: 10px; font-family: var(--font-mono); text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 4px;">
+            <div style="font-size: 10px; font-weight: 600; text-transform: uppercase; color: var(--text-tertiary); margin-bottom: 4px;">
               IMMEDIATE NEXT ACTION
             </div>
             <div id="drawerStationNextAction" style="font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.4;">
@@ -501,7 +494,7 @@
         </div>
       </div>
 
-      <!-- Collapsible Traditional 4-Semester Grade Tracker (Hidden by default) -->
+      <!-- Collapsible 4-Semester Grade Ledger -->
       <div id="gradesTableDrawer" class="monotone-card" style="display: none; margin-top: 16px;">
         <div class="card-label-row">
           <span class="card-label">4-Semester Liceum Grade Ledger</span>
@@ -514,7 +507,7 @@
         </div>
         <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
           <thead>
-            <tr style="border-bottom: 1px solid var(--border-hairline); text-align: left; color: var(--text-tertiary); font-family: var(--font-mono); font-size: 10px;">
+            <tr style="border-bottom: 1px solid var(--border-hairline); text-align: left; color: var(--text-tertiary); font-size: 10px; font-weight: 600;">
               <th style="padding: 6px 0;">SUBJECT</th>
               <th>TARGET</th>
               <th>ACTUAL (1-6)</th>
@@ -528,60 +521,71 @@
       </div>
     </section>
 
+
     <!-- ====================================================================
-         3. PROJECTS LAYER (Active Builds & Competition Engine)
+         3. PROJECTS LAYER (Builds, Workspaces & Competitions)
          ==================================================================== -->
     <section id="view-projects" class="view-section">
       <div class="section-header">
         <div>
-          <h1 class="section-headline">ACTIVE PROJECTS</h1>
-          <p class="section-caption">Every build has a live milestone and a concrete immediate action.</p>
+          <h1 class="section-headline">Active Projects &amp; Workspaces</h1>
+          <p class="section-caption">Every build maintains a concrete milestone, live Git status, and direct IDE launcher.</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <div style="display: flex; gap: 4px;" id="projectStatusFilters">
+            <button class="btn-ghost-icon active" data-filter="all">All</button>
+            <button class="btn-ghost-icon" data-filter="active">Active</button>
+            <button class="btn-ghost-icon" data-filter="completed">Completed</button>
+            <button class="btn-ghost-icon" data-filter="paused">Paused</button>
+          </div>
+          <button id="btnAddNewProject" class="btn-primary">+ New Project</button>
         </div>
       </div>
 
       <div id="projectsContainer" class="projects-grid">
-        <!-- Rendered dynamically -->
+        <!-- Rendered dynamically by projects.js -->
       </div>
     </section>
 
+
     <!-- ====================================================================
-         4. BODY / LIFE LAYER (Machine Maintenance & Gym Routines)
+         4. BODY / LIFE LAYER (Machine Maintenance & Gym)
          ==================================================================== -->
     <section id="view-body" class="view-section">
       <div class="section-header">
         <div>
-          <h1 class="section-headline">MACHINE MAINTENANCE</h1>
-          <p class="section-caption">Consistent stimulus and recovery. Informs, never guilt-trips.</p>
+          <h1 class="section-headline">Machine Maintenance</h1>
+          <p class="section-caption">Physical foundation: Hypertrophy progression to 80kg, Boxing sparring, and Recovery.</p>
         </div>
       </div>
 
-      <div class="body-layout">
-        <!-- Left: Weight Progress & Structured Gym Protocols -->
+      <div class="today-layout">
+        <!-- Left: Mass Progress & Gym Protocols -->
         <div>
-          <!-- Mass Goal Track -->
-          <div class="monotone-card" style="margin-bottom: 20px;">
+          <!-- Mass Target Card -->
+          <div class="monotone-card">
             <div class="card-label-row">
               <span class="card-label">Hypertrophy Target</span>
-              <span style="font-family: var(--font-mono); font-size: 12px; color: var(--text-primary);">
+              <span style="font-size: 13px; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono);">
                 <span id="currentWeightDisplay">68.0</span> kg &rarr; 80.0 kg
               </span>
             </div>
-            <div style="width: 100%; height: 4px; background: var(--bg-canvas); border-radius: 2px; overflow: hidden; margin: 8px 0; border: 1px solid var(--border-hairline);">
-              <div id="weightProgressBar" style="width: 5%; height: 100%; background: #ffffff; transition: width 0.3s ease;"></div>
+            <div class="progress-bar-track" style="margin: 10px 0;">
+              <div id="weightProgressBar" class="progress-bar-fill" style="width: 5%;"></div>
             </div>
             <div style="display: flex; justify-content: space-between; font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono);">
-              <span>Base: 68.0 kg (17% BF)</span>
-              <span>Goal: 80.0 kg (11-13% BF)</span>
+              <span>Base: 68.0 kg</span>
+              <span>Target: 80.0 kg (Lean Mass)</span>
             </div>
           </div>
 
-          <!-- Structured Gym Routine Protocols -->
+          <!-- Structured Gym Protocols -->
           <div class="monotone-card">
             <div class="card-label-row">
               <span class="card-label">Structured Gym Protocols</span>
-              <div class="gym-routine-tabs">
-                <button class="gym-routine-tab active" id="tabGymTuesday">Tuesday (Posterior)</button>
-                <button class="gym-routine-tab" id="tabGymThursday">Thursday (Vertical Pull)</button>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn-ghost-icon active" id="tabGymTuesday">Tuesday (Posterior)</button>
+                <button class="btn-ghost-icon" id="tabGymThursday">Thursday (Vertical Pull)</button>
               </div>
             </div>
             <div id="gymRoutineDisplay">
@@ -592,61 +596,67 @@
 
         <!-- Right: Daily Weigh-in & Workout Log -->
         <div>
-          <!-- Weigh-in Form -->
+          <!-- Daily Weigh-in Form -->
           <form id="bodyMetricForm" class="monotone-card">
             <div class="card-label-row">
               <span class="card-label">Daily Weigh-in</span>
             </div>
-            <div style="margin-bottom: 12px;">
-              <input type="number" step="0.1" id="logWeightInput" class="btn-ghost-icon" style="width: 100%; font-family: var(--font-mono); font-size: 13px;" placeholder="Morning Weight (kg)..." required />
+            <div class="form-group">
+              <label class="form-label">MORNING WEIGHT (KG)</label>
+              <input type="number" step="0.1" id="logWeightInput" class="form-input" placeholder="e.g. 68.5" required />
             </div>
-            <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: 11px;">
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; font-size: 12px;">
               <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                <input type="checkbox" id="logCaloriesMet" style="accent-color: #fff;" />
-                <span>Calorie surplus met</span>
+                <input type="checkbox" id="logCaloriesMet" style="accent-color: var(--accent-purple);" />
+                <span>Calorie surplus achieved</span>
               </label>
               <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                <input type="checkbox" id="logProteinMet" style="accent-color: #fff;" />
-                <span>Protein target met (140-150g floor)</span>
+                <input type="checkbox" id="logProteinMet" style="accent-color: var(--accent-purple);" />
+                <span>Protein target met (140g floor)</span>
               </label>
             </div>
-            <button type="submit" class="btn-ghost-icon" style="width: 100%; justify-content: center;">Save Weigh-in</button>
+            <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Record Weigh-in</button>
           </form>
 
-          <!-- Quick Workout Log -->
+          <!-- Training Session Log -->
           <form id="workoutLogForm" class="monotone-card">
             <div class="card-label-row">
               <span class="card-label">Log Training Session</span>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 8px; margin-bottom: 12px;">
-              <select id="logWorkoutType" class="btn-ghost-icon" style="width: 100%;">
-                <option value="boxing">Boxing (Sparring / Bag)</option>
-                <option value="gym">Gym (Hypertrophy)</option>
+            <div class="form-group">
+              <label class="form-label">DISCIPLINE</label>
+              <select id="logWorkoutType" class="form-input">
+                <option value="boxing">Boxing (Sparring / Heavy Bag)</option>
+                <option value="gym">Gym (Hypertrophy / Sets)</option>
                 <option value="running">Running (Zone 2 / Tempo)</option>
               </select>
-              <input type="text" id="logWorkoutDetails" class="btn-ghost-icon" placeholder="Details (e.g. 5 rounds sparring)..." required />
             </div>
-            <button type="submit" class="btn-ghost-icon" style="width: 100%; justify-content: center;">Log Workout</button>
+            <div class="form-group">
+              <label class="form-label">SESSION DETAILS</label>
+              <input type="text" id="logWorkoutDetails" class="form-input" placeholder="e.g. 5 rounds sparring + footwork" required />
+            </div>
+            <button type="submit" class="btn-ghost-icon" style="width: 100%; justify-content: center; padding: 8px;">Log Session</button>
           </form>
         </div>
       </div>
     </section>
 
+
     <!-- ====================================================================
-         5. KNOWLEDGE / LOG LAYER (First-Principles & Reflection)
+         5. KNOWLEDGE LAYER (Algorithm Ledger & Reflection)
          ==================================================================== -->
     <section id="view-knowledge" class="view-section">
       <div class="section-header">
         <div>
-          <h1 class="section-headline">KNOWLEDGE &amp; REFLECTION</h1>
-          <p class="section-caption">First-principles algorithm ledger and evening reflection audit.</p>
+          <h1 class="section-headline">Knowledge &amp; Reflection</h1>
+          <p class="section-caption">Unassisted algorithm ledger, first-principles notes, and evening audit.</p>
         </div>
-        <button id="btnNewNote" class="btn-ghost-icon">+ New Note</button>
+        <button id="btnNewNote" class="btn-primary">+ New Note</button>
       </div>
 
-      <div class="knowledge-layout">
+      <div style="display: grid; grid-template-columns: 280px 1fr; gap: 20px; height: calc(100vh - 160px);">
         <!-- Notes Sidebar -->
-        <div style="background: var(--bg-surface); border: 1px solid var(--border-hairline); border-radius: var(--radius-md); overflow-y: auto;">
+        <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-md); overflow-y: auto;">
           <div id="knowledgeListContainer">
             <!-- Dynamic note items -->
           </div>
@@ -658,25 +668,25 @@
             <div id="noteDisplayView">
               <div class="card-label-row">
                 <div>
-                  <h2 id="noteTitle" style="font-size: 15px; font-weight: 600; color: var(--text-primary);">Select a note</h2>
+                  <h2 id="noteTitle" style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Select a note</h2>
                   <div id="noteMeta" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); margin-top: 2px;"></div>
                 </div>
                 <div style="display: flex; gap: 6px;">
                   <button id="btnEditNote" class="btn-ghost-icon" style="display: none;">Edit</button>
-                  <button id="btnDeleteNote" class="btn-ghost-icon" style="display: none;">Delete</button>
+                  <button id="btnDeleteNote" class="btn-ghost-icon" style="display: none; color: #ef4444;">Delete</button>
                 </div>
               </div>
-              <div id="noteContentView" style="font-size: 12px; line-height: 1.7; white-space: pre-wrap; margin-top: 14px;"></div>
+              <div id="noteContentView" style="font-size: 13px; line-height: 1.7; white-space: pre-wrap; margin-top: 14px; color: var(--text-secondary);"></div>
             </div>
 
             <!-- Note Edit Form -->
             <form id="noteEditForm" style="display: none; flex-direction: column; gap: 10px;">
               <input type="hidden" id="editNoteId" />
-              <input type="text" id="editNoteTitle" class="btn-ghost-icon" placeholder="Note Title..." required />
-              <textarea id="editNoteContent" class="scratchpad-input" style="height: 200px; border: 1px solid var(--border-hairline); padding: 8px; border-radius: 4px;" placeholder="Content..." required></textarea>
+              <input type="text" id="editNoteTitle" class="form-input" placeholder="Note Title..." required />
+              <textarea id="editNoteContent" class="form-textarea" style="height: 200px;" placeholder="Write first-principles algorithms or key concepts..." required></textarea>
               <div style="display: flex; justify-content: flex-end; gap: 6px;">
                 <button type="button" id="btnCancelEditNote" class="btn-ghost-icon">Cancel</button>
-                <button type="submit" class="btn-ghost-icon" style="color: var(--text-primary);">Save</button>
+                <button type="submit" class="btn-primary">Save Note</button>
               </div>
             </form>
           </div>
@@ -687,10 +697,10 @@
               <span class="card-label">Evening Reflection Audit</span>
               <span id="reflectionSavePill" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Auto-saving</span>
             </div>
-            <div style="display: flex; flex-direction: column; gap: 6px;">
-              <input type="text" id="reflectionWorked" class="btn-ghost-icon" placeholder="1. What worked today?" />
-              <input type="text" id="reflectionSlipped" class="btn-ghost-icon" placeholder="2. Where did I slip / lose focus?" />
-              <input type="text" id="reflectionTomorrow" class="btn-ghost-icon" placeholder="3. What single adjustment tomorrow?" />
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <input type="text" id="reflectionWorked" class="form-input" placeholder="1. What worked today?" />
+              <input type="text" id="reflectionSlipped" class="form-input" placeholder="2. Where did I slip / lose focus?" />
+              <input type="text" id="reflectionTomorrow" class="form-input" placeholder="3. What single adjustment tomorrow?" />
             </div>
           </div>
         </div>
@@ -700,13 +710,181 @@
   </main>
 
   <!-- ====================================================================
-       JSON DATA HUB MODAL (Standardized Second-Brain Engine)
+       NATIVE IN-APP MODALS
        ==================================================================== -->
+
+  <!-- 1. Add / Edit Project Modal -->
+  <div id="projectModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="card-label-row" style="margin-bottom: 16px;">
+        <h2 id="projectModalTitle" style="font-size: 16px; font-weight: 700; color: var(--text-primary);">New Project Build</h2>
+        <button class="drawer-close-btn" onclick="window.Projects.closeModal()">&times;</button>
+      </div>
+      <form id="projectForm">
+        <input type="hidden" id="projFormId" />
+        <div class="form-group">
+          <label class="form-label">PROJECT NAME</label>
+          <input type="text" id="projFormName" class="form-input" placeholder="e.g. SIGG Scanner, Matura CS" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">DESCRIPTION / PURPOSE</label>
+          <input type="text" id="projFormDesc" class="form-input" placeholder="Brief high-signal summary..." />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">STATUS</label>
+            <select id="projFormStatus" class="form-input">
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+              <option value="paused">Paused</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">DEADLINE / TARGET</label>
+            <input type="text" id="projFormDeadline" class="form-input" placeholder="e.g. 2026-10-15 or Daily" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">CURRENT MILESTONE</label>
+          <input type="text" id="projFormMilestone" class="form-input" placeholder="What milestone is active?" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">IMMEDIATE NEXT ACTION</label>
+          <input type="text" id="projFormNextAction" class="form-input" placeholder="Concrete next physical step to execute..." required />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">LOCAL DIRECTORY PATH</label>
+            <input type="text" id="projFormLocalPath" class="form-input" placeholder="c:\Users\heito\..." />
+          </div>
+          <div class="form-group">
+            <label class="form-label">GITHUB REPO URL</label>
+            <input type="text" id="projFormGithubUrl" class="form-input" placeholder="https://github.com/..." />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">NOTES &amp; RULES</label>
+          <textarea id="projFormNotes" class="form-textarea" placeholder="Key rules, architectural notes, context..."></textarea>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+          <button type="button" class="btn-ghost-icon" onclick="window.Projects.closeModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Save Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. Add / Edit Quick Link Modal -->
+  <div id="quickLinkModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="card-label-row" style="margin-bottom: 16px;">
+        <h2 id="linkModalTitle" style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Add Quick Link</h2>
+        <button class="drawer-close-btn" onclick="window.Today.closeLinkModal()">&times;</button>
+      </div>
+      <form id="quickLinkForm">
+        <input type="hidden" id="linkFormIndex" />
+        <div class="form-group">
+          <label class="form-label">PORTAL / TITLE</label>
+          <input type="text" id="linkFormName" class="form-input" placeholder="e.g. Vulcan UONET+, GitHub, TUM" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">URL (HTTPS://)</label>
+          <input type="url" id="linkFormUrl" class="form-input" placeholder="https://..." required />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group">
+            <label class="form-label">CATEGORY</label>
+            <select id="linkFormCategory" class="form-input">
+              <option value="school">School (TM1/Vulcan)</option>
+              <option value="contest">Contest (SIGG/GPW)</option>
+              <option value="university">University (TUM)</option>
+              <option value="academics">Academics (CKE)</option>
+              <option value="dev">Development / Code</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">DESCRIPTION</label>
+            <input type="text" id="linkFormDesc" class="form-input" placeholder="Brief note..." />
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 16px;">
+          <button type="button" id="btnDeleteLink" class="btn-ghost-icon" style="color: #ef4444; display: none;">Delete</button>
+          <div style="display: flex; gap: 8px; margin-left: auto;">
+            <button type="button" class="btn-ghost-icon" onclick="window.Today.closeLinkModal()">Cancel</button>
+            <button type="submit" class="btn-primary">Save Bookmark</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. Add Homework Modal -->
+  <div id="addHomeworkModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="card-label-row" style="margin-bottom: 16px;">
+        <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Add Homework Assignment</h2>
+        <button class="drawer-close-btn" onclick="window.Today.closeHomeworkModal()">&times;</button>
+      </div>
+      <form id="homeworkModalForm">
+        <div class="form-group">
+          <label class="form-label">SUBJECT</label>
+          <input type="text" id="hwFormSubject" class="form-input" placeholder="e.g. Matematyka, Informatyka, Fizyka" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">ASSIGNMENT DETAILS</label>
+          <input type="text" id="hwFormTitle" class="form-input" placeholder="e.g. Zadania 14-22 ze zbioru Kłaczkowa" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">DUE DATE</label>
+          <input type="date" id="hwFormDueDate" class="form-input" required />
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+          <button type="button" class="btn-ghost-icon" onclick="window.Today.closeHomeworkModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Save Assignment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. Add Exam / Test Modal -->
+  <div id="addExamModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="card-label-row" style="margin-bottom: 16px;">
+        <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Schedule Exam / Test</h2>
+        <button class="drawer-close-btn" onclick="window.Today.closeExamModal()">&times;</button>
+      </div>
+      <form id="examModalForm">
+        <div class="form-group">
+          <label class="form-label">SUBJECT</label>
+          <input type="text" id="examFormSubject" class="form-input" placeholder="e.g. Matematyka R, Informatyka" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">TEST TITLE</label>
+          <input type="text" id="examFormTitle" class="form-input" placeholder="e.g. Sprawdzian: Ciągi liczbowe i granice" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">EXAM DATE</label>
+          <input type="date" id="examFormDate" class="form-input" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">SCOPE &amp; TOPICS</label>
+          <input type="text" id="examFormScope" class="form-input" placeholder="e.g. Rozdziały 3-4, arkusz próbny" />
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px;">
+          <button type="button" class="btn-ghost-icon" onclick="window.Today.closeExamModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Schedule Exam</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 5. JSON Hub Modal -->
   <div id="jsonModal" class="modal-overlay">
     <div class="modal-card">
       <div class="card-label-row" style="margin-bottom: 14px;">
         <div>
-          <h2 style="font-size: 15px; font-weight: 600; color: var(--text-primary);">STANDARDIZED JSON HUB</h2>
+          <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Standardized JSON Hub</h2>
           <p style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
             Second-brain configuration: routines, gym workouts, and 2-year metro roadmap.
           </p>
@@ -720,26 +898,27 @@
         <button class="btn-ghost-icon" id="btnJsonTabRoadmap">Metro Roadmap</button>
       </div>
 
-      <textarea id="jsonConfigTextarea" class="json-config-view" spellcheck="false"></textarea>
+      <textarea id="jsonConfigTextarea" class="form-textarea" style="height: 280px; font-family: var(--font-mono); font-size: 11px;" spellcheck="false"></textarea>
 
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
         <span id="jsonImportStatus" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);"></span>
-        <div style="display: flex; gap: 8px;">
-          <button id="btnSaveJsonConfig" class="btn-ghost-icon" style="color: var(--text-primary); font-weight: 600;">Save &amp; Apply JSON</button>
-        </div>
+        <button id="btnSaveJsonConfig" class="btn-primary">Save &amp; Apply JSON</button>
       </div>
     </div>
   </div>
 
   <!-- Bottom App Status Bar -->
   <footer class="app-footer">
-    <div>
-      <span style="color: var(--text-primary);">HARNESS OS</span>
-      <span style="margin-left: 8px;">Local SQLite (WAL)</span>
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-weight: 600; color: var(--text-primary);">HARNESS 3.0</span>
+      <span style="color: var(--text-muted);">&bull;</span>
+      <span>SQLite WAL Storage</span>
     </div>
-    <div>
-      <span style="margin-right: 12px;">[0-5] Layers</span>
-      <span style="margin-right: 12px;">[N] Quick Task</span>
+    <div style="display: flex; align-items: center; gap: 14px; font-family: var(--font-mono); font-size: 10px;">
+      <span>[0-5] Layers</span>
+      <span>[Ctrl+K] Command Palette</span>
+      <span>[T] Focus Timer</span>
+      <span>[N] New Task</span>
       <span>[R] Rollover</span>
     </div>
   </footer>

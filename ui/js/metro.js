@@ -1,11 +1,9 @@
 /**
- * Section 2: TUM ROADMAP & HORIZON TRANSIT ENGINE (Version 3.0)
- * - Single dominant solid mainline spine (The TUM Trunk Line).
- * - Real-Time Day Beacon: Daily moving indicator that advances smoothly day after day.
- * - Alternating horizontal cards: Even above, odd below (Zero overlap, 100% legibility).
- * - Distinct SIGG GPW 45° branch line from Oct '26 to Apr '27.
- * - Five visual Phase Zones across the top header.
- * - Smooth drag, mouse-wheel scrolling, auto-centering on Today, and station slide-over ledger.
+ * Section 2: TUM METRO ROADMAP & TIMELINE ENGINE (Version 3.0)
+ * - Single horizontal timeline spine with clear station nodes.
+ * - Interactive Stream Filter bar (All, Academics, Code, SIGG, German, Physical).
+ * - Real-Time Day Beacon indicator.
+ * - Slide-over drawer with deliverables checklist and progress tracker.
  */
 
 const MetroMap = {
@@ -14,6 +12,7 @@ const MetroMap = {
   startX: 0,
   scrollLeft: 0,
   selectedStation: null,
+  activeStreamFilter: "all",
   currentBeaconX: 0,
 
   async init() {
@@ -27,7 +26,7 @@ const MetroMap = {
 
     // Mouse drag scrolling
     container.addEventListener("mousedown", (e) => {
-      if (e.target.closest(".metro-spine-card") || e.target.closest(".station-drawer")) return;
+      if (e.target.closest(".metro-spine-card") || e.target.closest(".station-drawer") || e.target.closest("button")) return;
       this.isDragging = true;
       container.classList.add("grabbing");
       this.startX = e.pageX - container.offsetLeft;
@@ -75,12 +74,22 @@ const MetroMap = {
       });
     }
 
-    // Jump to today's beacon
+    // Jump to active station / beacon
     const btnJump = document.getElementById("btnJumpCurrentStation");
     if (btnJump) {
-      btnJump.textContent = "Jump to Today";
       btnJump.addEventListener("click", () => this.scrollToBeacon());
     }
+
+    // Stream Filter Buttons
+    const filterBtns = document.querySelectorAll(".metro-filter-btn");
+    filterBtns.forEach((btn) => {
+      btn.addEventListener("click", () => {
+        filterBtns.forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        this.activeStreamFilter = btn.getAttribute("data-stream") || "all";
+        this.render();
+      });
+    });
   },
 
   async load() {
@@ -88,7 +97,7 @@ const MetroMap = {
       if (!window.pywebview || !window.pywebview.api) return;
       this.data = await window.pywebview.api.get_metro_roadmap();
       this.render();
-      setTimeout(() => this.scrollToBeacon(), 150);
+      setTimeout(() => this.scrollToBeacon(), 200);
     } catch (err) {
       console.error("Error loading Metro Roadmap:", err);
     }
@@ -101,18 +110,18 @@ const MetroMap = {
     if (!canvasWrap) return;
 
     const stations = this.data.stations;
-    const spacing = 260; // Generous horizontal breathing room between stations
-    const startX = 220;
-    const spineY = 255;  // Single dominant horizontal centerline
+    const spacing = 250;
+    const startX = 180;
+    const spineY = 240;
     const totalTrackLength = (stations.length - 1) * spacing;
     const totalWidth = startX + totalTrackLength + 360;
 
     canvasWrap.style.minWidth = `${totalWidth}px`;
-    canvasWrap.style.height = "520px";
+    canvasWrap.style.height = "480px";
 
-    // 1. Real-Time Day Progress Calculation (Advances day by day)
-    const startDate = new Date(2026, 8, 1);  // Sep 1, 2026
-    const endDate = new Date(2028, 6, 31);    // Jul 31, 2028
+    // Date calculations
+    const startDate = new Date(2026, 8, 1);
+    const endDate = new Date(2028, 6, 31);
     const now = new Date();
 
     let currentX = startX;
@@ -124,9 +133,9 @@ const MetroMap = {
       isPreLaunch = true;
       const msDiff = startDate.getTime() - now.getTime();
       const daysUntil = Math.max(1, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
-      currentX = startX - 70;
-      beaconTitle = `DEPARTURE GATE // SEP 1, 2026`;
-      beaconSub = `${daysUntil} day(s) to Kickoff • Station 1: Pure Syntax`;
+      currentX = startX - 40;
+      beaconTitle = "LAUNCH GATE // SEP 1, 2026";
+      beaconSub = `${daysUntil}d to kickoff • Pure Syntax`;
     } else {
       const totalMs = endDate.getTime() - startDate.getTime();
       const elapsedMs = Math.min(totalMs, Math.max(0, now.getTime() - startDate.getTime()));
@@ -135,20 +144,14 @@ const MetroMap = {
       const elapsedDays = Math.min(totalDays, Math.round(elapsedMs / (1000 * 60 * 60 * 24)));
 
       currentX = startX + progressRatio * totalTrackLength;
-
       const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-      beaconTitle = `● TODAY • DAY ${elapsedDays + 1} OF ${totalDays}`;
-      beaconSub = `${dateStr} • Real-time timeline position`;
+      beaconTitle = `TODAY • DAY ${elapsedDays + 1} OF ${totalDays}`;
+      beaconSub = dateStr;
     }
 
     this.currentBeaconX = currentX;
 
-    // 2. SIGG Branch Coordinates (Oct '26 station 1 to Apr '27 station 7)
-    const siggStartX = startX + 1 * spacing;
-    const siggEndX = startX + 7 * spacing;
-    const siggTrackY = spineY + 65;
-
-    // 3. Phase Boundaries (Subtle Architectural Markers)
+    // Phases
     const phases = [
       { name: "Phase 1: Year 3 Liceum", x: startX, width: 4.8 * spacing },
       { name: "Phase 2: SIGG Finals & Year 3 Lock", x: startX + 5 * spacing, width: 4.8 * spacing },
@@ -160,74 +163,60 @@ const MetroMap = {
     let phaseHeadersHtml = phases
       .map((p) => {
         return `
-          <div class="phase-zone-label" style="left: ${p.x - 40}px;">
+          <div style="position: absolute; top: 12px; left: ${p.x - 30}px; font-family: var(--font-mono); font-size: 10px; font-weight: 700; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: 0.8px; padding-left: 8px; border-left: 2px solid var(--border-subtle); pointer-events: none;">
             ${p.name}
           </div>
         `;
       })
       .join("");
 
-    // 4. Build SVG Graphic Tracks (One Solid Spine + SIGG Express Bypass)
+    // SVG Track Line
     let svgHtml = `
-      <svg width="${totalWidth}" height="520" style="position: absolute; top: 0; left: 0; pointer-events: none;">
+      <svg width="${totalWidth}" height="480" style="position: absolute; top: 0; left: 0; pointer-events: none;">
         <defs>
-          <filter id="beaconGlow" x="-50%" y="-50%" width="200%" height="200%">
-            <feGaussianBlur in="SourceGraphic" stdDeviation="5" result="blur" />
-            <feMerge>
-              <feMergeNode in="blur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
+          <linearGradient id="trackGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="#8b5cf6" />
+            <stop offset="100%" stop-color="#a78bfa" />
+          </linearGradient>
         </defs>
 
-        <!-- Subtle Vertical Phase Dividers -->
+        <!-- Phase Dividers -->
         ${phases
           .map(
             (p) =>
-              `<line x1="${p.x - 40}" y1="36" x2="${p.x - 40}" y2="480" stroke="rgba(255,255,255,0.04)" stroke-dasharray="3 4" stroke-width="1" />`
+              `<line x1="${p.x - 30}" y1="36" x2="${p.x - 30}" y2="440" stroke="rgba(255,255,255,0.04)" stroke-dasharray="3 4" stroke-width="1" />`
           )
           .join("")}
 
-        <!-- SIGG Express Branch Line (Terracotta) -->
-        <path d="M ${siggStartX - 40} ${spineY} 
-                 L ${siggStartX} ${siggTrackY} 
-                 L ${siggEndX} ${siggTrackY} 
-                 L ${siggEndX + 40} ${spineY}" 
-              fill="none" stroke="rgba(208, 135, 112, 0.4)" stroke-width="3" stroke-linejoin="round" />
-
-        <!-- THE MAIN TRANSIT SPINE (Unvisited Track Bed) -->
+        <!-- Base Track Line -->
         <line x1="${startX}" y1="${spineY}" x2="${startX + totalTrackLength}" y2="${spineY}" 
-              stroke="rgba(255, 255, 255, 0.12)" stroke-width="6" stroke-linecap="round" />
+              stroke="rgba(255, 255, 255, 0.12)" stroke-width="4" stroke-linecap="round" />
 
-        <!-- ACTIVE ILLUMINATED SPINE (Progress Filled to Today) -->
+        <!-- Progress Filled Track -->
         ${
           currentX > startX
-            ? `
-          <line x1="${startX}" y1="${spineY}" x2="${currentX}" y2="${spineY}" 
-                stroke="#ffffff" stroke-width="6" stroke-linecap="round" filter="url(#beaconGlow)" />
-        `
+            ? `<line x1="${startX}" y1="${spineY}" x2="${currentX}" y2="${spineY}" stroke="url(#trackGrad)" stroke-width="4" stroke-linecap="round" />`
             : ""
         }
 
-        <!-- Vertical Connectors between Spine and Station Cards -->
+        <!-- Connectors from Spine to Cards -->
         ${stations
           .map((station, idx) => {
             const posX = startX + idx * spacing;
             const isEven = idx % 2 === 0;
-            // Even: card above spine (bottom at spineY - 45). Odd: card below spine (top at spineY + 45)
-            const y1 = isEven ? spineY - 45 : spineY + 12;
-            const y2 = isEven ? spineY - 12 : spineY + 45;
+            const y1 = isEven ? spineY - 40 : spineY + 10;
+            const y2 = isEven ? spineY - 10 : spineY + 40;
 
             return `
               <line x1="${posX}" y1="${y1}" x2="${posX}" y2="${y2}" 
-                    stroke="rgba(255, 255, 255, 0.22)" stroke-width="1.5" stroke-dasharray="2 3" />
+                    stroke="rgba(255, 255, 255, 0.2)" stroke-width="1.5" stroke-dasharray="2 2" />
             `;
           })
           .join("")}
       </svg>
     `;
 
-    // 5. Build HTML Station Cards & Nodes (Alternating Top & Bottom)
+    // Station Nodes and Cards
     let cardsHtml = stations
       .map((station, idx) => {
         const posX = startX + idx * spacing;
@@ -236,23 +225,28 @@ const MetroMap = {
         const status = station.status || "upcoming";
         const isPassed = posX <= currentX;
 
-        // Station card position:
-        // Even: Top row (top = spineY - 170)
-        // Odd: Bottom row (top = spineY + 45)
-        const cardTop = isEven ? spineY - 165 : spineY + 45;
-        const cardLeft = posX - 105; // Center 210px card on node
+        // Card position: Even on top, Odd on bottom
+        const cardTop = isEven ? spineY - 160 : spineY + 40;
+        const cardLeft = posX - 105;
 
-        // Node disc style on the spine
-        let nodeContent = "";
-        let nodeStyle = "background: #101216; border: 2.5px solid rgba(255,255,255,0.4);";
-        if (status === "completed" || (isPassed && !isPreLaunch)) {
-          nodeStyle = "background: #ffffff; border: 2.5px solid #ffffff;";
-          nodeContent = `<span style="color: #08090a; font-size: 10px; font-weight: 800; line-height: 1;">✓</span>`;
-        } else if (status === "active") {
-          nodeStyle = "background: #ffffff; border: 2.5px solid #ffffff; box-shadow: 0 0 14px rgba(255,255,255,0.9);";
+        // Stream Filter match
+        let isFilteredMatch = true;
+        if (this.activeStreamFilter !== "all") {
+          const branches = station.branches || [];
+          isFilteredMatch = branches.includes(this.activeStreamFilter);
         }
 
-        const size = isMajor ? 24 : 18;
+        // Node disc style
+        let nodeContent = "";
+        let nodeStyle = "background: var(--bg-surface); border: 2px solid var(--border-medium);";
+        if (status === "completed" || (isPassed && !isPreLaunch)) {
+          nodeStyle = "background: var(--accent-purple); border: 2px solid #ffffff;";
+          nodeContent = `<span style="color: #ffffff; font-size: 10px; font-weight: 800; line-height: 1;">✓</span>`;
+        } else if (status === "active") {
+          nodeStyle = "background: #ffffff; border: 2px solid var(--accent-purple); box-shadow: 0 0 14px var(--accent-purple-glow);";
+        }
+
+        const size = isMajor ? 22 : 16;
 
         // Stream tags
         const branches = station.branches || [];
@@ -268,26 +262,26 @@ const MetroMap = {
           })
           .join("");
 
-        // Station card checklist progress
+        // Deliverables progress
         const delivEntries = Object.keys(station.deliverables || {});
         const totalDelivs = delivEntries.length;
         const completedDelivs = (station.completed_deliverables || []).length;
         let checklistBadge = "";
         if (totalDelivs > 0) {
           if (completedDelivs >= totalDelivs) {
-            checklistBadge = `<span class="card-checklist-badge complete">✓ ALL ${totalDelivs}</span>`;
-          } else if (completedDelivs > 0) {
-            checklistBadge = `<span class="card-checklist-badge">${completedDelivs}/${totalDelivs} ✓</span>`;
+            checklistBadge = `<span class="chip-tag" style="background: var(--status-success-bg); color: var(--status-success); border-color: rgba(16,185,129,0.3);">✓ All ${totalDelivs}</span>`;
           } else {
-            checklistBadge = `<span class="card-checklist-badge">${completedDelivs}/${totalDelivs}</span>`;
+            checklistBadge = `<span class="chip-tag" style="color: var(--text-secondary);">${completedDelivs}/${totalDelivs}</span>`;
           }
         }
+
+        const opacityStyle = isFilteredMatch ? "opacity: 1;" : "opacity: 0.35;";
 
         return `
           <!-- Station Node On The Spine -->
           <div 
-            class="spine-node-point" 
-            style="left: ${posX}px; top: ${spineY}px;"
+            class="station-node-point" 
+            style="left: ${posX}px; top: ${spineY}px; ${opacityStyle}"
             onclick="MetroMap.selectStation('${station.id}')"
             title="${this.escapeHtml(station.name)} (${station.month_label})"
           >
@@ -298,23 +292,20 @@ const MetroMap = {
             </div>
           </div>
 
-          <!-- Clean Horizontal Station Card -->
+          <!-- Station Card -->
           <div 
             class="metro-spine-card ${isMajor ? "major" : ""} ${status === "completed" ? "completed-card" : ""} ${status === "active" ? "active-card" : ""}" 
-            style="left: ${cardLeft}px; top: ${cardTop}px;"
+            style="left: ${cardLeft}px; top: ${cardTop}px; ${opacityStyle}"
             onclick="MetroMap.selectStation('${station.id}')"
           >
-            <div class="card-header-row">
-              <div style="display: flex; align-items: center; gap: 6px;">
-                <span class="card-month-tag">${station.month_label}</span>
-                ${checklistBadge}
-              </div>
-              ${isMajor ? '<span class="key-pill" style="border-color: rgba(197, 160, 89, 0.4); color: var(--accent-gold-dim); font-size: 8px;">MAJOR</span>' : ""}
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+              <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--accent-purple-light);">${station.month_label}</span>
+              ${checklistBadge}
             </div>
-            <div class="card-title-text" title="${this.escapeHtml(station.name)}">
+            <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px;" title="${this.escapeHtml(station.name)}">
               ${this.escapeHtml(station.name)}
             </div>
-            <div class="card-chips-row">
+            <div style="display: flex; gap: 4px; flex-wrap: wrap;">
               ${chipsHtml}
             </div>
           </div>
@@ -322,17 +313,14 @@ const MetroMap = {
       })
       .join("");
 
-    // 6. Build Real-Time Day Beacon (Compass Pulse on Spine)
+    // Real-Time Beacon Pulse
     const beaconHtml = `
-      <div class="day-beacon-wrap" style="left: ${currentX}px; top: ${spineY}px;">
-        <!-- Overhead Floating HUD Flag -->
-        <div class="day-beacon-hud" style="bottom: 30px;">
-          <span class="beacon-tag">${beaconTitle}</span>
-          <span class="beacon-sub">${beaconSub}</span>
+      <div style="position: absolute; left: ${currentX}px; top: ${spineY}px; transform: translate(-50%, -50%); pointer-events: none; z-index: 45;">
+        <div style="position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--bg-surface-elevated); border: 1px solid var(--accent-purple); border-radius: var(--radius-sm); padding: 4px 10px; white-space: nowrap; box-shadow: var(--shadow-dropdown); text-align: center;">
+          <div style="font-size: 9px; font-weight: 700; color: var(--accent-purple-light); font-family: var(--font-mono);">${beaconTitle}</div>
+          <div style="font-size: 9px; color: var(--text-tertiary); font-family: var(--font-mono);">${beaconSub}</div>
         </div>
-
-        <!-- Glowing Core Pulse -->
-        <div class="day-beacon-core"></div>
+        <div style="width: 14px; height: 14px; background: #ffffff; border-radius: 50%; border: 3px solid var(--accent-purple); box-shadow: 0 0 12px var(--accent-purple-glow);"></div>
       </div>
     `;
 
@@ -357,7 +345,7 @@ const MetroMap = {
     document.getElementById("drawerStationNextAction").textContent = station.next_action || "--";
     document.getElementById("drawerStationStatus").value = station.status || "upcoming";
 
-    // Deliverables interactive checklist breakdown
+    // Deliverables breakdown
     const deliverablesList = document.getElementById("drawerDeliverablesList");
     if (deliverablesList && station.deliverables) {
       const allEntries = Object.entries(station.deliverables);
@@ -368,13 +356,13 @@ const MetroMap = {
       const isAllComplete = totalDelivs > 0 && completedCount >= totalDelivs;
 
       const progressHeader = `
-        <div class="deliverables-progress-box">
-          <div class="deliverables-progress-header">
-            <span>Deliverables Checklist (${completedCount}/${totalDelivs})</span>
-            <span style="${isAllComplete ? "color: #ffffff; font-weight: 700;" : ""}">${isAllComplete ? "STATION COMPLETED ✓" : `${progressPercent}%`}</span>
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; font-size: 11px; font-weight: 600;">
+            <span style="color: var(--text-secondary);">Deliverables Progress (${completedCount}/${totalDelivs})</span>
+            <span style="color: ${isAllComplete ? "var(--status-success)" : "var(--accent-purple-light)"}; font-weight: 700;">${isAllComplete ? "COMPLETED ✓" : `${progressPercent}%`}</span>
           </div>
-          <div class="deliverables-progress-track">
-            <div class="deliverables-progress-fill" style="width: ${progressPercent}%; ${isAllComplete ? "background: #ffffff; box-shadow: 0 0 8px rgba(255,255,255,0.6);" : ""}"></div>
+          <div class="progress-bar-track" style="margin: 0;">
+            <div class="progress-bar-fill" style="width: ${progressPercent}%; ${isAllComplete ? "background: var(--status-success);" : ""}"></div>
           </div>
         </div>
       `;
@@ -382,10 +370,11 @@ const MetroMap = {
       const itemsHtml = allEntries
         .map(([key, val]) => {
           let lineBadgeColor = "var(--text-secondary)";
-          if (key.toLowerCase().includes("code")) lineBadgeColor = "#8ba3c7";
-          if (key.toLowerCase().includes("academic")) lineBadgeColor = "#c5a059";
-          if (key.toLowerCase().includes("sigg")) lineBadgeColor = "#d08770";
-          if (key.toLowerCase().includes("german")) lineBadgeColor = "#98b0a1";
+          if (key.toLowerCase().includes("code")) lineBadgeColor = "var(--stream-code)";
+          if (key.toLowerCase().includes("academic")) lineBadgeColor = "var(--stream-academic)";
+          if (key.toLowerCase().includes("sigg")) lineBadgeColor = "var(--stream-sigg)";
+          if (key.toLowerCase().includes("german")) lineBadgeColor = "var(--stream-german)";
+          if (key.toLowerCase().includes("physical")) lineBadgeColor = "var(--stream-physical)";
 
           const isChecked = completedList.includes(key);
 
@@ -393,14 +382,14 @@ const MetroMap = {
             <div 
               class="deliverable-item ${isChecked ? "checked" : ""}" 
               onclick="MetroMap.toggleDeliverable('${station.id}', '${this.escapeHtml(key)}')"
-              title="Click to toggle deliverable completion"
+              title="Click to toggle deliverable"
             >
-              <div class="deliverable-check-dot"></div>
-              <div class="deliverable-content">
-                <div class="deliverable-line-badge" style="color: ${lineBadgeColor};">
-                  ${key} LINE
+              <div class="check-dot ${isChecked ? "checked" : ""}" style="margin-top: 2px;"></div>
+              <div style="flex: 1;">
+                <div style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; text-transform: uppercase; color: ${lineBadgeColor}; margin-bottom: 2px;">
+                  ${key} STREAM
                 </div>
-                <div class="deliverable-desc">
+                <div class="deliverable-desc" style="font-size: 12px; color: var(--text-primary); line-height: 1.4;">
                   ${this.escapeHtml(val)}
                 </div>
               </div>
@@ -435,7 +424,6 @@ const MetroMap = {
           this.selectedStation = st;
         }
 
-        // Live re-render
         this.render();
         if (this.selectedStation && this.selectedStation.id === stationId) {
           this.openDrawer(this.selectedStation);
@@ -446,6 +434,7 @@ const MetroMap = {
         } else if (res.is_checked) {
           window.HarnessApp.showToast(`Checked: ${deliverableKey} (${res.completed_count}/${res.total_count})`);
         }
+        if (window.Dashboard) window.Dashboard.load();
       }
     } catch (err) {
       console.error("Error toggling deliverable:", err);
@@ -459,6 +448,7 @@ const MetroMap = {
       if (st) st.status = newStatus;
       this.render();
       window.HarnessApp.showToast(`Station status updated to ${newStatus}`);
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error updating station status:", err);
     }
@@ -474,7 +464,7 @@ const MetroMap = {
 
   escapeHtml(str) {
     if (!str) return "";
-    return str
+    return String(str)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")

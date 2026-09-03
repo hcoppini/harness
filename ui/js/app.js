@@ -1,17 +1,17 @@
 /**
- * Master Application Controller, Keyboard Router, and JSON Hub for Harness.
+ * Master Application Controller, Navigation, and JSON Hub (Version 3.0)
  */
 
 window.HarnessApp = {
   currentView: "dashboard",
   activeJsonTab: "schedules",
   allConfigs: null,
-
   initialized: false,
 
   init() {
     this.bindNavigation();
     this.bindKeybindings();
+    this.bindModals();
     this.bindJsonModal();
     this.startClock();
 
@@ -19,15 +19,12 @@ window.HarnessApp = {
       if (this.initialized) return;
       if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.get_today === "function") {
         this.initialized = true;
-        console.log("PyWebView API bridge connected, initializing layers...");
         await this.initAllLayers();
       }
     };
 
-    // 1. Listen for pywebviewready event
     window.addEventListener("pywebviewready", startBridge);
 
-    // 2. Poll as bulletproof fallback if event already fired or delayed
     let attempts = 0;
     const interval = setInterval(async () => {
       attempts++;
@@ -70,7 +67,6 @@ window.HarnessApp = {
   switchView(viewName) {
     if (!viewName || viewName === this.currentView) return;
 
-    // Update nav tab pills
     document.querySelectorAll("#navTabs .nav-tab").forEach((tab) => {
       if (tab.getAttribute("data-view") === viewName) {
         tab.classList.add("active");
@@ -79,7 +75,6 @@ window.HarnessApp = {
       }
     });
 
-    // Update view sections
     document.querySelectorAll(".view-section").forEach((sec) => {
       if (sec.id === `view-${viewName}`) {
         sec.classList.add("active");
@@ -90,7 +85,7 @@ window.HarnessApp = {
 
     this.currentView = viewName;
 
-    // Refresh view data on activation
+    // Refresh view data
     if (viewName === "dashboard" && window.Dashboard) window.Dashboard.load();
     if (viewName === "today" && window.Today) window.Today.load();
     if (viewName === "tum" && window.Tum) {
@@ -102,6 +97,17 @@ window.HarnessApp = {
     if (viewName === "knowledge" && window.Knowledge) window.Knowledge.load();
   },
 
+  bindModals() {
+    // Universal backdrop click to close any modal overlay
+    document.querySelectorAll(".modal-overlay").forEach((modal) => {
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) {
+          modal.classList.remove("open");
+        }
+      });
+    });
+  },
+
   bindKeybindings() {
     window.addEventListener("keydown", (e) => {
       const activeTag = document.activeElement ? document.activeElement.tagName.toLowerCase() : "";
@@ -110,7 +116,7 @@ window.HarnessApp = {
       if (isInput) {
         if (e.key === "Escape") {
           document.activeElement.blur();
-          this.closeJsonModal();
+          this.closeAllModals();
         }
         return;
       }
@@ -148,10 +154,14 @@ window.HarnessApp = {
       }
 
       if (e.key === "Escape") {
-        this.closeJsonModal();
-        if (window.MetroMap) window.MetroMap.closeDrawer();
+        this.closeAllModals();
       }
     });
+  },
+
+  closeAllModals() {
+    document.querySelectorAll(".modal-overlay").forEach((m) => m.classList.remove("open"));
+    if (window.MetroMap) window.MetroMap.closeDrawer();
   },
 
   bindJsonModal() {
@@ -169,14 +179,6 @@ window.HarnessApp = {
       btnClose.addEventListener("click", () => this.closeJsonModal());
     }
 
-    // Modal background click closes modal
-    if (modal) {
-      modal.addEventListener("click", (e) => {
-        if (e.target === modal) this.closeJsonModal();
-      });
-    }
-
-    // Tab buttons inside JSON modal
     const tabSched = document.getElementById("btnJsonTabSchedules");
     const tabGym = document.getElementById("btnJsonTabGym");
     const tabRoadmap = document.getElementById("btnJsonTabRoadmap");
@@ -191,7 +193,6 @@ window.HarnessApp = {
       tabRoadmap.addEventListener("click", () => this.switchJsonTab("metro_roadmap"));
     }
 
-    // Save button
     const btnSave = document.getElementById("btnSaveJsonConfig");
     if (btnSave) {
       btnSave.addEventListener("click", async () => {
@@ -246,9 +247,9 @@ window.HarnessApp = {
 
     const raw = textarea.value.trim();
     try {
-      JSON.parse(raw); // Validate JSON format
+      JSON.parse(raw);
     } catch (e) {
-      if (statusEl) statusEl.textContent = `JSON Parse Error: ${e.message}`;
+      if (statusEl) statusEl.textContent = `JSON Error: ${e.message}`;
       return;
     }
 
@@ -295,21 +296,21 @@ window.HarnessApp = {
     setInterval(updateTime, 1000);
   },
 
-  showToast(message, durationMs = 2200) {
+  showToast(message, durationMs = 2400) {
     const container = document.getElementById("toastContainer");
     if (!container) return;
 
     const toast = document.createElement("div");
     toast.style.cssText = `
       background: var(--bg-surface-elevated);
-      border: 1px solid var(--border-subtle);
+      border: 1px solid var(--border-medium);
       padding: 8px 14px;
       border-radius: var(--radius-sm);
-      font-size: 11px;
-      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
       color: var(--text-primary);
-      box-shadow: 0 4px 14px rgba(0,0,0,0.6);
-      animation: slideIn 0.18s ease-out;
+      box-shadow: var(--shadow-dropdown);
+      animation: fadeIn 0.15s ease-out;
     `;
     toast.textContent = message;
     container.appendChild(toast);

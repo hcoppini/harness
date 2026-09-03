@@ -1,9 +1,10 @@
 /**
- * Layer 0: DASHBOARD CONTROLLER (Executive Home Page)
+ * Layer 0: DASHBOARD CONTROLLER (Executive Cockpit)
  * Features:
- * - GitHub-style daily execution activity heatmap with floating interactive tooltip
- * - Upcoming 7-day forecast reel with Schedule A/B/C and gym routine highlights
- * - Tri-pillar executive KPIs (TUM Heilbronn, Machine Body, Active Projects)
+ * - Top Executive Cockpit Trajectory Gauges
+ * - Daily Execution Activity Heatmap with Tooltips
+ * - Upcoming 7-Day Schedule Forecast
+ * - Priority Radar (Homework & Exams)
  */
 
 window.Dashboard = {
@@ -48,16 +49,77 @@ window.Dashboard = {
   render() {
     if (!this.data) return;
 
-    this.renderHeader();
+    this.renderCockpitGauges();
     this.renderHeatmap();
     this.renderUpcoming();
-    this.renderPillars();
+    this.renderRadar();
   },
 
-  renderHeader() {
+  renderCockpitGauges() {
+    const metrics = this.data.metrics || {};
+    const velocity = this.data.today_velocity || {};
+    const projects = this.data.projects || [];
+
+    // Streak
     const streakVal = document.getElementById("streakCountVal");
     if (streakVal) {
-      streakVal.textContent = this.data.metrics?.current_streak || 0;
+      streakVal.textContent = metrics.current_streak || 0;
+    }
+
+    // Gauge 1: Today's Velocity
+    const todayPctVal = document.getElementById("dashTodayProgressVal");
+    const todayBar = document.getElementById("dashTodayProgressBar");
+    const todayRoutineLabel = document.getElementById("dashTodayRoutineLabel");
+
+    const pct = velocity.percentage || 0;
+    if (todayPctVal) todayPctVal.textContent = `${pct}%`;
+    if (todayBar) todayBar.style.width = `${pct}%`;
+    if (todayRoutineLabel) {
+      todayRoutineLabel.textContent = `${velocity.checked_boxes || 0}/${velocity.total_boxes || 0} boxes completed • ${velocity.schedule_name || "Daily routine"}`;
+    }
+
+    // Gauge 2: TUM Admissions Readiness
+    const gpaEl = document.getElementById("dashOverallGpa");
+    const maturaEl = document.getElementById("dashMaturaAvg");
+    const germanEl = document.getElementById("dashGermanLevel");
+    const stName = document.getElementById("dashActiveStationName");
+
+    if (gpaEl) gpaEl.textContent = (metrics.overall_gpa || 0.0).toFixed(2);
+    if (maturaEl) maturaEl.textContent = `${(metrics.avg_matura_mock || 0.0).toFixed(0)}%`;
+    if (germanEl) germanEl.textContent = metrics.german_stage || "A2 Active";
+    if (stName) {
+      stName.textContent = `Station: ${metrics.active_station?.name || "Pure Syntax"}`;
+    }
+
+    // Gauge 3: Body & Physique
+    const weightVal = document.getElementById("dashWeightVal");
+    const weightFill = document.getElementById("dashWeightProgressFill");
+    const workoutsText = document.getElementById("dashWorkoutsSummaryText");
+
+    const curWeight = metrics.latest_weight || 68.0;
+    const targetWeight = metrics.target_weight || 80.0;
+    if (weightVal) weightVal.textContent = `${curWeight.toFixed(1)} kg`;
+
+    if (weightFill) {
+      const weightPct = Math.max(0, Math.min(100, ((curWeight - 68.0) / (80.0 - 68.0)) * 100));
+      weightFill.style.width = `${weightPct}%`;
+    }
+
+    const wouts = metrics.weekly_workouts || {};
+    const boxCount = wouts.boxing ? `${wouts.boxing.count}/${wouts.boxing.target}` : "0/3";
+    const gymCount = wouts.gym ? `${wouts.gym.count}/${wouts.gym.target}` : "0/4";
+    const runCount = wouts.running ? `${wouts.running.count}/${wouts.running.target}` : "0/2";
+    if (workoutsText) {
+      workoutsText.textContent = `Boxing ${boxCount} • Gym ${gymCount} • Run ${runCount}`;
+    }
+
+    // Gauge 4: Active Builds
+    const projCountEl = document.getElementById("dashProjectsCount");
+    const topProjNext = document.getElementById("dashTopProjectNextAction");
+
+    if (projCountEl) projCountEl.textContent = `${projects.length} Active Builds`;
+    if (topProjNext && projects.length > 0) {
+      topProjNext.textContent = `Next: ${projects[0].next_action || projects[0].current_milestone || "Execute sprint"}`;
     }
   },
 
@@ -65,11 +127,10 @@ window.Dashboard = {
     const heatmap = this.data.heatmap;
     if (!heatmap) return;
 
-    // Header count text: "X checked boxes across active cycle"
     const countEl = document.getElementById("heatmapContributionsCount");
     if (countEl) {
       const count = heatmap.total_contributions || 0;
-      countEl.textContent = `${count} ${count === 1 ? "box" : "boxes"} completed since launch`;
+      countEl.textContent = `${count} ${count === 1 ? "box" : "boxes"} completed since cycle start`;
     }
 
     const container = document.getElementById("heatmapContainer");
@@ -78,7 +139,6 @@ window.Dashboard = {
     const weeks = heatmap.weeks || [];
     const months = heatmap.months || [];
 
-    // Left Day Labels (GitHub style: Mon, Wed, Fri)
     let html = `
       <div class="heatmap-day-labels">
         <span></span>
@@ -93,8 +153,7 @@ window.Dashboard = {
         <div class="heatmap-months-row">
     `;
 
-    // Month headers with collision prevention
-    const colWidth = 18; // 14px cell + 4px gap
+    const colWidth = 18;
     let lastRightPx = -999;
     months.forEach((m) => {
       const leftPx = m.week_index * colWidth;
@@ -106,7 +165,6 @@ window.Dashboard = {
 
     html += `</div><div class="heatmap-weeks-grid">`;
 
-    // Render columns of 7 day cells
     weeks.forEach((week) => {
       html += `<div class="heatmap-week-col">`;
       week.days.forEach((day) => {
@@ -137,7 +195,6 @@ window.Dashboard = {
     html += `</div></div>`;
     container.innerHTML = html;
 
-    // Setup interactive tooltips
     this.attachHeatmapTooltips();
   },
 
@@ -164,7 +221,6 @@ window.Dashboard = {
 
         const count = dayInfo.count || 0;
         const total = dayInfo.total_boxes || 0;
-        const level = dayInfo.level || 0;
         const displayDate = dayInfo.display_date || dateStr;
         const activities = dayInfo.activities || [];
         const isFuture = dayInfo.is_future;
@@ -173,7 +229,7 @@ window.Dashboard = {
         if (isFuture) {
           statusBadge = `<span style="color: var(--text-tertiary); font-size: 10px;">(Upcoming)</span>`;
         } else if (total > 0 && count >= total) {
-          statusBadge = `<span style="color: #c084fc; font-weight: 700; font-size: 11px;">100% (All ${total} Done!)</span>`;
+          statusBadge = `<span style="color: var(--accent-purple-light); font-weight: 700; font-size: 11px;">100% (All ${total} Done!)</span>`;
         } else if (total > 0) {
           const pct = Math.round((count / total) * 100);
           statusBadge = `<span style="color: var(--text-secondary); font-size: 11px;">${count}/${total} (${pct}%)</span>`;
@@ -182,19 +238,21 @@ window.Dashboard = {
         }
 
         let tipContent = `
-          <div class="heatmap-tooltip-date">${displayDate} ${statusBadge}</div>
+          <div style="font-family: var(--font-mono); font-size: 11px; font-weight: 600; color: var(--text-primary); margin-bottom: 4px; border-bottom: 1px solid var(--border-hairline); padding-bottom: 2px;">
+            ${displayDate} ${statusBadge}
+          </div>
         `;
 
         if (activities.length > 0) {
           tipContent += activities
-            .slice(0, 8)
-            .map((act) => `<div class="heatmap-tooltip-action">${this.escapeHtml(act)}</div>`)
+            .slice(0, 6)
+            .map((act) => `<div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">${this.escapeHtml(act)}</div>`)
             .join("");
-          if (activities.length > 8) {
-            tipContent += `<div class="heatmap-tooltip-action" style="color: var(--text-tertiary);">+ ${activities.length - 8} more</div>`;
+          if (activities.length > 6) {
+            tipContent += `<div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">+ ${activities.length - 6} more</div>`;
           }
         } else {
-          tipContent += `<div class="heatmap-tooltip-action" style="color: var(--text-tertiary);">${isFuture ? "Scheduled boxes pending" : "No boxes checked"}</div>`;
+          tipContent += `<div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">${isFuture ? "Scheduled routine pending" : "No activity recorded"}</div>`;
         }
 
         tooltip.innerHTML = tipContent;
@@ -217,7 +275,7 @@ window.Dashboard = {
     let x = e.clientX + offset;
     let y = e.clientY - offset;
 
-    const tooltipWidth = tooltip.offsetWidth || 200;
+    const tooltipWidth = tooltip.offsetWidth || 220;
     const tooltipHeight = tooltip.offsetHeight || 80;
 
     if (x + tooltipWidth > window.innerWidth - 10) {
@@ -248,33 +306,8 @@ window.Dashboard = {
         let gymSnippet = "";
         if (day.gym_routine) {
           gymSnippet = `
-            <div style="margin-top: 6px; font-size: 10px; color: var(--accent-gold-dim); font-family: var(--font-mono);">
+            <div style="margin-top: 4px; font-size: 10px; color: var(--accent-purple-light); font-weight: 500;">
               🏋️ ${this.escapeHtml(day.gym_routine.name.split("—")[1] || day.gym_routine.name)}
-            </div>
-          `;
-        }
-
-        // Render key time blocks directly from the actual routine
-        const blocks = day.blocks || [];
-        let blocksHtml = "";
-        if (blocks.length > 0) {
-          blocksHtml = `
-            <div class="forecast-blocks-list">
-              ${blocks
-                .map((b) => {
-                  const isDeep = b.type === "deep_work";
-                  const isTraining = b.type === "training";
-                  let blockClass = "";
-                  if (isDeep) blockClass = "deep-work";
-                  if (isTraining) blockClass = "training";
-                  return `
-                    <div class="forecast-block-row ${blockClass}">
-                      <span class="forecast-block-time">${this.escapeHtml(b.time)}</span>
-                      <span class="forecast-block-focus">${this.escapeHtml(b.focus)}</span>
-                    </div>
-                  `;
-                })
-                .join("")}
             </div>
           `;
         }
@@ -297,13 +330,12 @@ window.Dashboard = {
                 <div class="forecast-highlight-text">${this.escapeHtml(day.key_highlight)}</div>
                 ${day.cutoff_info ? `<div class="forecast-cutoff-text">${this.escapeHtml(day.cutoff_info)}</div>` : ""}
                 ${gymSnippet}
-                ${blocksHtml}
               </div>
             </div>
 
-            <div class="forecast-footer-info">
-              <span>${day.task_count > 0 ? `${day.task_count} tasks ready` : "Routine ready"}</span>
-              <span style="color: var(--text-tertiary);">${day.is_tomorrow ? "Next day" : `in ${day.days_away}d`}</span>
+            <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--border-hairline); font-size: 10px; color: var(--text-tertiary); display: flex; justify-content: space-between;">
+              <span>${day.task_count > 0 ? `${day.task_count} tasks` : "Routine ready"}</span>
+              <span>${day.is_tomorrow ? "Next day" : `in ${day.days_away}d`}</span>
             </div>
           </div>
         `;
@@ -311,63 +343,64 @@ window.Dashboard = {
       .join("");
   },
 
-  renderPillars() {
-    const metrics = this.data.metrics || {};
+  renderRadar() {
+    const hwContainer = document.getElementById("dashHomeworkList");
+    const examContainer = document.getElementById("dashExamsList");
+    const radar = this.data.radar || {};
 
-    // 1. TUM Metro Pillar
-    const stMonth = document.getElementById("dashActiveStationMonth");
-    const stName = document.getElementById("dashActiveStationName");
-    const stNext = document.getElementById("dashStationNextAction");
-    const germanEl = document.getElementById("dashGermanLevel");
-    const gpaEl = document.getElementById("dashOverallGpa");
-    const maturaEl = document.getElementById("dashMaturaAvg");
+    const hwItems = radar.homework || [];
+    const examItems = radar.exams || [];
 
-    if (metrics.active_station) {
-      if (stMonth) stMonth.textContent = metrics.active_station.month || "ACTIVE";
-      if (stName) stName.textContent = metrics.active_station.name || "Station";
-      if (stNext) stNext.textContent = metrics.active_station.next_action || "Complete station deliverables.";
+    if (hwContainer) {
+      if (hwItems.length === 0) {
+        hwContainer.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 6px 0;">All assignments cleared.</div>`;
+      } else {
+        hwContainer.innerHTML = hwItems
+          .map((h) => {
+            let dueBadge = `${h.due_date}`;
+            if (h.days_left === 0) dueBadge = "Today";
+            else if (h.days_left === 1) dueBadge = "Tomorrow";
+            else if (h.days_left < 0) dueBadge = `${Math.abs(h.days_left)}d overdue`;
+            else dueBadge = `in ${h.days_left}d`;
+
+            const isOverdue = h.days_left < 0;
+
+            return `
+              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 6px 8px;">
+                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 75%;">
+                  <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 600;">[${this.escapeHtml(h.subject)}]</span>
+                  <span style="font-size: 12px; color: var(--text-primary);">${this.escapeHtml(h.title)}</span>
+                </div>
+                <span class="key-pill" style="font-size: 9px; ${isOverdue ? "border-color: #ef4444; color: #ef4444;" : ""}">${dueBadge}</span>
+              </div>
+            `;
+          })
+          .join("");
+      }
     }
-    if (germanEl) germanEl.textContent = metrics.german_stage || "A2";
-    if (gpaEl) gpaEl.textContent = (metrics.overall_gpa || 0.0).toFixed(2);
-    if (maturaEl) maturaEl.textContent = `${(metrics.avg_matura_mock || 0.0).toFixed(0)}%`;
 
-    // 2. Body Pillar
-    const weightVal = document.getElementById("dashWeightVal");
-    const fillEl = document.getElementById("dashWeightProgressFill");
-    const boxingCount = document.getElementById("dashBoxingCount");
-    const gymCount = document.getElementById("dashGymCount");
-    const runCount = document.getElementById("dashRunCount");
+    if (examContainer) {
+      if (examItems.length === 0) {
+        examContainer.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 6px 0;">No upcoming tests scheduled.</div>`;
+      } else {
+        examContainer.innerHTML = examItems
+          .map((e) => {
+            let countdown = `${e.days_left}d left`;
+            if (e.days_left === 0) countdown = "TODAY";
+            else if (e.days_left === 1) countdown = "TOMORROW";
 
-    const curWeight = metrics.latest_weight || 68.0;
-    const targetWeight = metrics.target_weight || 80.0;
-    if (weightVal) weightVal.textContent = `${curWeight.toFixed(1)} / ${targetWeight.toFixed(1)} kg`;
-
-    // Progress bar from 68kg (0%) to 80kg (100%)
-    if (fillEl) {
-      const pct = Math.max(0, Math.min(100, ((curWeight - 68.0) / (80.0 - 68.0)) * 100));
-      fillEl.style.width = `${pct}%`;
-    }
-
-    const wouts = metrics.weekly_workouts || {};
-    if (boxingCount && wouts.boxing) boxingCount.textContent = `${wouts.boxing.count}/${wouts.boxing.target}`;
-    if (gymCount && wouts.gym) gymCount.textContent = `${wouts.gym.count}/${wouts.gym.target}`;
-    if (runCount && wouts.running) runCount.textContent = `${wouts.running.count}/${wouts.running.target}`;
-
-    // 3. Projects Pillar
-    const projList = document.getElementById("dashProjectsList");
-    const projects = this.data.projects || [];
-    if (projList) {
-      projList.innerHTML = projects
-        .slice(0, 3)
-        .map((p) => {
-          return `
-            <div class="dash-project-row">
-              <div class="dash-project-name">${this.escapeHtml(p.name)}</div>
-              <div class="dash-project-next">${this.escapeHtml(p.next_action || p.current_milestone || "Active sprint")}</div>
-            </div>
-          `;
-        })
-        .join("");
+            return `
+              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 6px 8px;">
+                <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 75%;">
+                  <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 600;">[${this.escapeHtml(e.subject)}]</span>
+                  <span style="font-size: 12px; color: var(--text-primary); margin-left: 4px;">${this.escapeHtml(e.title)}</span>
+                </div>
+                <span class="key-pill" style="font-size: 9px; color: var(--accent-purple-light);">${countdown}</span>
+              </div>
+            `;
+          })
+          .join("");
+      }
     }
   },
 

@@ -37,6 +37,18 @@ class HarnessAPI:
         """Returns curated high-signal links."""
         return school_service.get_easy_links()
 
+    def add_easy_link(self, name: str, url: str, category: str = "custom", desc: str = "") -> Dict[str, Any]:
+        """Adds a new quick link."""
+        return school_service.add_easy_link(name, url, category, desc)
+
+    def update_easy_link(self, index: int, name: str, url: str, category: str = "custom", desc: str = "") -> bool:
+        """Updates an existing quick link."""
+        return school_service.update_easy_link(index, name, url, category, desc)
+
+    def delete_easy_link(self, index: int) -> bool:
+        """Deletes a quick link by index."""
+        return school_service.delete_easy_link(index)
+
     def open_external_url(self, url: str) -> bool:
         """Opens safe HTTP/HTTPS URL in default Windows browser."""
         return school_service.open_external_url(url)
@@ -188,6 +200,7 @@ class HarnessAPI:
         next_action: str = "",
         deadline: str = "",
         notes: str = "",
+        status: str = "active",
     ) -> Dict[str, Any]:
         return project_service.add_project(
             name=name,
@@ -198,25 +211,37 @@ class HarnessAPI:
             next_action=next_action,
             deadline=deadline,
             notes=notes,
+            status=status,
         )
 
     def update_project(
         self,
         project_id: int,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
         status: Optional[str] = None,
         current_milestone: Optional[str] = None,
         next_action: Optional[str] = None,
         deadline: Optional[str] = None,
+        local_path: Optional[str] = None,
+        github_url: Optional[str] = None,
         notes: Optional[str] = None,
     ) -> bool:
         return project_service.update_project(
             project_id=project_id,
+            name=name,
+            description=description,
             status=status,
             current_milestone=current_milestone,
             next_action=next_action,
             deadline=deadline,
+            local_path=local_path,
+            github_url=github_url,
             notes=notes,
         )
+
+    def delete_project(self, project_id: int) -> bool:
+        return project_service.delete_project(project_id)
 
     def open_project_folder(self, local_path: str) -> bool:
         return project_service.open_local_path(local_path)

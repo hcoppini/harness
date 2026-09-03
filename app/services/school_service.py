@@ -12,7 +12,7 @@ from typing import Dict, Any, List, Optional
 from bs4 import BeautifulSoup
 from app.db import DATA_DIR
 
-DEFAULT_PLAN_URL = "http://planlekcji2.staff.edu.pl/plany/o6.html" # 3lb
+DEFAULT_PLAN_URL = "http://planlekcji2.staff.edu.pl/plany/o6.html"  # 3lb
 CACHED_PLAN_FILE = DATA_DIR / "school_timetable.json"
 
 POLISH_WEEKDAYS = {
@@ -103,7 +103,55 @@ def get_easy_links() -> List[Dict[str, Any]]:
         return DEFAULT_EASY_LINKS
 
 
-def parse_optivum_html(html_content: str, second_language: str = "j.niemiecki") -> Dict[str, List[Dict[str, Any]]]:
+def save_easy_links(links: List[Dict[str, Any]]) -> bool:
+    """Saves links list to easy_links.json."""
+    links_file = DATA_DIR / "easy_links.json"
+    try:
+        with open(links_file, "w", encoding="utf-8") as f:
+            json.dump({"links": links}, f, indent=2, ensure_ascii=False)
+        return True
+    except Exception:
+        return False
+
+
+def add_easy_link(name: str, url: str, category: str = "custom", desc: str = "") -> Dict[str, Any]:
+    """Adds a new quick link bookmark."""
+    links = get_easy_links()
+    new_link = {
+        "name": name.strip(),
+        "url": url.strip(),
+        "category": category.strip() or "custom",
+        "desc": desc.strip(),
+    }
+    links.append(new_link)
+    save_easy_links(links)
+    return new_link
+
+
+def update_easy_link(index: int, name: str, url: str, category: str = "custom", desc: str = "") -> bool:
+    """Updates an existing quick link by index."""
+    links = get_easy_links()
+    if 0 <= index < len(links):
+        links[index] = {
+            "name": name.strip(),
+            "url": url.strip(),
+            "category": category.strip() or "custom",
+            "desc": desc.strip(),
+        }
+        return save_easy_links(links)
+    return False
+
+
+def delete_easy_link(index: int) -> bool:
+    """Deletes a quick link by index."""
+    links = get_easy_links()
+    if 0 <= index < len(links):
+        links.pop(index)
+        return save_easy_links(links)
+    return False
+
+
+def parse_optivum_html(html_content: str) -> Dict[str, List[Dict[str, Any]]]:
     """Parses Vulcan Optivum timetable HTML into a structured dictionary keyed by Polish weekday."""
     soup = BeautifulSoup(html_content, "html.parser")
     table = soup.find("table", class_="tabela")
@@ -136,7 +184,8 @@ def parse_optivum_html(html_content: str, second_language: str = "j.niemiecki") 
             if not raw_text or raw_text == " ":
                 continue
 
-            parts = [p.strip() for p in cell.decode_contents().split("<br>") if p.strip() and p.strip() != "&nbsp;"]
+            raw_html = cell.decode_contents()
+            parts = [p.strip() for p in re.split(r"<br\s*/?>", raw_html, flags=re.I) if p.strip() and p.strip() != "&nbsp;"]
             if not parts:
                 continue
 
@@ -151,18 +200,15 @@ def parse_optivum_html(html_content: str, second_language: str = "j.niemiecki") 
                 teacher = n_tag.get_text(strip=True) if n_tag else ""
                 room = s_tag.get_text(strip=True) if s_tag else ""
 
-                # Handle inter-branch language division (#o2 -> German preference)
-                if "hiszpa" in subj.lower() or "#o2" in part:
-                    subj = second_language
-                    if not teacher:
-                        teacher = "Ba / ED"
-                    if not room:
-                        room = "315 / 417"
-
-                # Clean internal Optivum hashtag flags from subject
-                subj = re.sub(r"#[a-zA-Z0-9]+", "", subj).strip()
+                # Clean internal Optivum hashtag flags (e.g. #a2, #o2, #zd1, #5r)
+                subj = re.sub(r"#[a-zA-Z0-9_-]+", "", subj).strip()
+                if not subj:
+                    continue
 
                 entry_list.append({"subject": subj, "teacher": teacher, "room": room})
+
+            if not entry_list:
+                continue
 
             if len(entry_list) == 1:
                 schedule[day_name].append({
@@ -171,8 +217,10 @@ def parse_optivum_html(html_content: str, second_language: str = "j.niemiecki") 
                     "subject": entry_list[0]["subject"],
                     "teacher": entry_list[0]["teacher"],
                     "room": entry_list[0]["room"],
+                    "entries": entry_list,
                 })
             else:
+                # Multiple groups in same slot (e.g. informatyka-1/2 vs wf-2/2)
                 subjs = " / ".join([e["subject"] for e in entry_list if e["subject"]])
                 teachers = " / ".join([e["teacher"] for e in entry_list if e["teacher"]])
                 rooms = " / ".join([e["room"] for e in entry_list if e["room"]])
@@ -182,6 +230,7 @@ def parse_optivum_html(html_content: str, second_language: str = "j.niemiecki") 
                     "subject": subjs,
                     "teacher": teachers,
                     "room": rooms,
+                    "entries": entry_list,
                 })
 
     return schedule

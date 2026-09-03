@@ -1,7 +1,7 @@
 /**
- * Section 1: TODAY (Zero-Friction Daily Execution Engine)
- * Automatically loads Schedule A/B/C, pre-loads structured gym routines,
- * persists block & exercise checkmarks, handles quick tasks, scratchpad, and sleep times.
+ * Section 1: TODAY (Daily Execution Engine)
+ * Handles Schedule A/B/C, gym workouts, date navigation, checkbox persistence,
+ * quick tasks, homework/exam radar, and link launchpad.
  */
 
 const Today = {
@@ -16,7 +16,7 @@ const Today = {
   completedExercises: new Set(),
   debounceTimer: null,
 
-  // Calendar Navigation
+  // Calendar Navigation (defaults to today)
   currentDateStr: new Date().toISOString().split("T")[0],
   selectedDateStr: new Date().toISOString().split("T")[0],
   calDisplayYear: new Date().getFullYear(),
@@ -25,7 +25,7 @@ const Today = {
   async init() {
     this.bindEvents();
     this.renderMiniCalendar();
-    await this.load();
+    await this.load(this.selectedDateStr);
     await this.loadSchoolPlan();
     await this.loadEasyLinks();
     await this.loadHomeworkAndExams();
@@ -41,17 +41,54 @@ const Today = {
       });
     }
 
-    // Homework & Exam buttons
+    // Homework & Exam buttons -> Open native modals
     const btnAddHw = document.getElementById("btnAddHomeworkBtn");
     if (btnAddHw) {
-      btnAddHw.addEventListener("click", () => this.addHomeworkPrompt());
+      btnAddHw.addEventListener("click", () => this.openAddHomeworkModal());
     }
 
     const btnAddExam = document.getElementById("btnAddExamBtn");
     if (btnAddExam) {
-      btnAddExam.addEventListener("click", () => this.addExamPrompt());
+      btnAddExam.addEventListener("click", () => this.openAddExamModal());
     }
 
+    // Modal Forms
+    const hwForm = document.getElementById("homeworkModalForm");
+    if (hwForm) {
+      hwForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await this.handleSaveHomework();
+      });
+    }
+
+    const examForm = document.getElementById("examModalForm");
+    if (examForm) {
+      examForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await this.handleSaveExam();
+      });
+    }
+
+    // Quick Link Modal Button & Form
+    const btnAddLink = document.getElementById("btnAddNewLinkModal");
+    if (btnAddLink) {
+      btnAddLink.addEventListener("click", () => this.openAddLinkModal());
+    }
+
+    const linkForm = document.getElementById("quickLinkForm");
+    if (linkForm) {
+      linkForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await this.handleSaveLink();
+      });
+    }
+
+    const btnDelLink = document.getElementById("btnDeleteLink");
+    if (btnDelLink) {
+      btnDelLink.addEventListener("click", async () => {
+        await this.handleDeleteLink();
+      });
+    }
 
     // Rollover button
     const btnRollover = document.getElementById("btnRollover");
@@ -98,7 +135,7 @@ const Today = {
       });
     }
 
-    // School Timetable sync & open
+    // School Timetable sync & web
     const btnRefreshSchool = document.getElementById("btnRefreshSchoolPlan");
     if (btnRefreshSchool) {
       btnRefreshSchool.addEventListener("click", async () => {
@@ -133,6 +170,9 @@ const Today = {
     this.renderMiniCalendar();
     await this.load(dateStr);
     await this.loadSchoolPlan();
+    if (window.Dashboard) {
+      window.Dashboard.load();
+    }
   },
 
   renderMiniCalendar() {
@@ -149,15 +189,13 @@ const Today = {
     const daysHeader = ["Mo", "Tu", "We", "Th", "Fr", "Sa", "Su"];
     let html = daysHeader.map((d) => `<div class="mini-cal-header-day">${d}</div>`).join("");
 
-    // Calculate day offset for first day of month (Monday = 0 ... Sunday = 6)
+    // Calculate day offset (Monday = 0 ... Sunday = 6)
     const firstDay = new Date(this.calDisplayYear, this.calDisplayMonth, 1);
-    let startDay = firstDay.getDay() - 1; // getDay() returns 0 for Sunday
+    let startDay = firstDay.getDay() - 1;
     if (startDay === -1) startDay = 6;
 
-    // Days in current month
     const daysInMonth = new Date(this.calDisplayYear, this.calDisplayMonth + 1, 0).getDate();
 
-    // Leading empty cells
     for (let i = 0; i < startDay; i++) {
       html += `<div class="mini-cal-day empty"></div>`;
     }
@@ -193,9 +231,11 @@ const Today = {
       this.schedule = data.schedule || null;
       this.gymRoutine = data.gym_routine || null;
 
-      // Parse persisted completed blocks & exercises
-      if (data.log) {
+      // Reset and parse completed blocks & exercises for the target date
+      this.completedBlocks.clear();
+      this.completedExercises.clear();
 
+      if (data.log) {
         const blocksStr = data.log.completed_blocks || "";
         this.completedBlocks = new Set(
           blocksStr
@@ -225,6 +265,13 @@ const Today = {
         if (refWorked) refWorked.value = data.log.reflection_worked || "";
         if (refSlipped) refSlipped.value = data.log.reflection_slipped || "";
         if (refTomorrow) refTomorrow.value = data.log.reflection_tomorrow || "";
+      } else {
+        const scratchpad = document.getElementById("scratchpadTextarea");
+        const wakeInput = document.getElementById("wakeTimeInput");
+        const sleepInput = document.getElementById("sleepTimeInput");
+        if (scratchpad) scratchpad.value = "";
+        if (wakeInput) wakeInput.value = "";
+        if (sleepInput) sleepInput.value = "";
       }
 
       this.renderSchedule();
@@ -257,14 +304,14 @@ const Today = {
             <div 
               class="check-dot ${isChecked ? "checked" : ""}" 
               onclick="Today.toggleRoutineBlock(${idx})"
-              title="Click to check off routine block"
+              title="Check off routine block"
             ></div>
             <div class="routine-time">${block.time}</div>
             <div class="routine-info">
               <div class="routine-focus" style="${isChecked ? "text-decoration: line-through; color: var(--text-tertiary);" : ""}">${this.escapeHtml(block.focus)}</div>
               <div class="routine-activity">${this.escapeHtml(block.activity)}</div>
             </div>
-            ${isDeepWork ? '<span class="key-pill" style="color: #ffffff; border-color: rgba(255,255,255,0.3);">TUM Focus</span>' : ""}
+            ${isDeepWork ? '<span class="key-pill" style="color: var(--accent-purple-light); border-color: var(--accent-purple-glow);">TUM Focus</span>' : ""}
           </div>
         `;
       })
@@ -283,12 +330,15 @@ const Today = {
     const strVal = Array.from(this.completedBlocks).join(",");
     try {
       if (window.pywebview && window.pywebview.api) {
+        // ALWAYS pass this.selectedDateStr to ensure the current selected day is updated!
         await window.pywebview.api.update_daily_log(
-          null, null, null, null, null, null, null,
+          this.selectedDateStr,
+          null, null, null, null, null, null,
           strVal,
           null
         );
       }
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error persisting completed block:", err);
     }
@@ -307,14 +357,14 @@ const Today = {
     }
 
     card.style.display = "block";
-    if (titleEl) titleEl.textContent = `LIFT TODAY • ${this.gymRoutine.name}`;
+    if (titleEl) titleEl.textContent = `STRUCTURED LIFT • ${this.gymRoutine.name}`;
 
     const exercises = this.gymRoutine.exercises || [];
     exercisesContainer.innerHTML = exercises
       .map((ex, idx) => {
         const isChecked = this.completedExercises.has(String(idx));
         return `
-          <div class="lift-exercise-row">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <div 
                 class="check-dot ${isChecked ? "checked" : ""}" 
@@ -346,12 +396,15 @@ const Today = {
     const strVal = Array.from(this.completedExercises).join(",");
     try {
       if (window.pywebview && window.pywebview.api) {
+        // ALWAYS pass this.selectedDateStr to ensure the current selected day is updated!
         await window.pywebview.api.update_daily_log(
-          null, null, null, null, null, null, null,
+          this.selectedDateStr,
+          null, null, null, null, null, null,
           null,
           strVal
         );
       }
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error persisting completed exercise:", err);
     }
@@ -375,7 +428,7 @@ const Today = {
             <div class="check-dot ${checkedClass}" onclick="Today.toggleTask(${t.id})"></div>
             <span class="task-label">${this.escapeHtml(t.title)}</span>
             ${t.rollover_count > 0 ? `<span class="key-pill">Rolled ${t.rollover_count}x</span>` : ""}
-            <button class="btn-ghost-icon" style="padding: 2px 6px;" onclick="Today.deleteTask(${t.id})">&times;</button>
+            <button class="btn-ghost-icon" style="padding: 2px 6px; font-size: 10px;" onclick="Today.deleteTask(${t.id})">&times;</button>
           </div>
         `;
       })
@@ -394,6 +447,7 @@ const Today = {
       this.renderTasks();
       input.value = "";
       window.HarnessApp.showToast("Task added");
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error adding quick task:", err);
     }
@@ -405,6 +459,7 @@ const Today = {
       const target = this.tasks.find((t) => t.id === taskId);
       if (target) target.completed = res.completed;
       this.renderTasks();
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error toggling task:", err);
     }
@@ -416,6 +471,7 @@ const Today = {
       this.tasks = this.tasks.filter((t) => t.id !== taskId);
       this.renderTasks();
       window.HarnessApp.showToast("Task removed");
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error deleting task:", err);
     }
@@ -426,6 +482,7 @@ const Today = {
       const count = await window.pywebview.api.rollover_tasks(this.selectedDateStr);
       await this.load();
       window.HarnessApp.showToast(count > 0 ? `Carried forward ${count} pending item(s)` : "No pending items to carry forward");
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error running rollover:", err);
     }
@@ -478,19 +535,19 @@ const Today = {
       this.schoolLessons = lessons;
 
       if (lessons.length === 0) {
-        container.innerHTML = `<div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); padding: 4px 0;">No school lessons scheduled for this day.</div>`;
+        container.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 4px 0;">No school lessons scheduled for this day.</div>`;
         return;
       }
 
       container.innerHTML = lessons
         .map(
           (l) => `
-        <div class="lesson-item">
-          <div class="lesson-left">
-            <span class="lesson-nr">${l.nr}</span>
-            <span class="lesson-subject">${this.escapeHtml(l.subject)}</span>
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 8px; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); font-size: 11px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-family: var(--font-mono); color: var(--text-tertiary); font-size: 10px; width: 14px;">${l.nr}</span>
+            <span style="font-weight: 600; color: var(--text-primary);">${this.escapeHtml(l.subject)}</span>
           </div>
-          <div class="lesson-meta">
+          <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary); display: flex; gap: 6px;">
             <span>${l.time}</span>
             ${l.room ? `<span>s.${this.escapeHtml(l.room)}</span>` : ""}
             ${l.teacher ? `<span>(${this.escapeHtml(l.teacher)})</span>` : ""}
@@ -501,7 +558,6 @@ const Today = {
         .join("");
     } catch (err) {
       console.error("Error loading school plan:", err);
-      container.innerHTML = `<div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Offline cache standby.</div>`;
     }
   },
 
@@ -511,11 +567,10 @@ const Today = {
 
     try {
       if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_easy_links) return;
-      const links = await window.pywebview.api.get_easy_links();
-      this.easyLinks = links || [];
+      this.easyLinks = await window.pywebview.api.get_easy_links() || [];
 
       container.innerHTML = this.easyLinks
-        .map((link) => {
+        .map((link, idx) => {
           let icon = "🔗";
           const lowerName = (link.name || "").toLowerCase();
           if (link.category === "school" || lowerName.includes("tm1")) icon = "🏫";
@@ -523,6 +578,7 @@ const Today = {
           else if (link.category === "contest" || lowerName.includes("sigg")) icon = "📈";
           else if (link.category === "university" || lowerName.includes("tum")) icon = "🎓";
           else if (link.category === "academics" || lowerName.includes("cke")) icon = "📐";
+          else if (link.category === "dev") icon = "💻";
 
           return `
             <div 
@@ -531,10 +587,17 @@ const Today = {
               title="${this.escapeHtml(link.desc || link.url)}"
             >
               <div class="easy-link-content">
-                <span class="easy-link-icon">${icon}</span>
+                <span style="font-size: 13px;">${icon}</span>
                 <span class="easy-link-title">${this.escapeHtml(link.name)}</span>
               </div>
-              <span class="easy-link-arrow">↗</span>
+              <button 
+                class="btn-ghost-icon" 
+                style="padding: 1px 4px; font-size: 9px; opacity: 0.6;" 
+                onclick="event.stopPropagation(); Today.openEditLinkModal(${idx})"
+                title="Edit bookmark"
+              >
+                &bull;&bull;&bull;
+              </button>
             </div>
           `;
         })
@@ -544,7 +607,71 @@ const Today = {
     }
   },
 
+  // --- Native Modals for Links ---
+  openAddLinkModal() {
+    document.getElementById("linkModalTitle").textContent = "Add Quick Link";
+    document.getElementById("linkFormIndex").value = "";
+    document.getElementById("linkFormName").value = "";
+    document.getElementById("linkFormUrl").value = "https://";
+    document.getElementById("linkFormCategory").value = "custom";
+    document.getElementById("linkFormDesc").value = "";
+    document.getElementById("btnDeleteLink").style.display = "none";
+    document.getElementById("quickLinkModal").classList.add("open");
+  },
 
+  openEditLinkModal(index) {
+    const link = this.easyLinks[index];
+    if (!link) return;
+    document.getElementById("linkModalTitle").textContent = "Edit Quick Link";
+    document.getElementById("linkFormIndex").value = index;
+    document.getElementById("linkFormName").value = link.name;
+    document.getElementById("linkFormUrl").value = link.url;
+    document.getElementById("linkFormCategory").value = link.category || "custom";
+    document.getElementById("linkFormDesc").value = link.desc || "";
+    document.getElementById("btnDeleteLink").style.display = "inline-flex";
+    document.getElementById("quickLinkModal").classList.add("open");
+  },
+
+  closeLinkModal() {
+    document.getElementById("quickLinkModal").classList.remove("open");
+  },
+
+  async handleSaveLink() {
+    const idxVal = document.getElementById("linkFormIndex").value;
+    const name = document.getElementById("linkFormName").value.trim();
+    const url = document.getElementById("linkFormUrl").value.trim();
+    const category = document.getElementById("linkFormCategory").value;
+    const desc = document.getElementById("linkFormDesc").value.trim();
+
+    try {
+      if (idxVal !== "") {
+        await window.pywebview.api.update_easy_link(parseInt(idxVal, 10), name, url, category, desc);
+        window.HarnessApp.showToast("Bookmark updated");
+      } else {
+        await window.pywebview.api.add_easy_link(name, url, category, desc);
+        window.HarnessApp.showToast("Bookmark added");
+      }
+      this.closeLinkModal();
+      await this.loadEasyLinks();
+    } catch (err) {
+      console.error("Error saving link:", err);
+    }
+  },
+
+  async handleDeleteLink() {
+    const idxVal = document.getElementById("linkFormIndex").value;
+    if (idxVal === "") return;
+    try {
+      await window.pywebview.api.delete_easy_link(parseInt(idxVal, 10));
+      this.closeLinkModal();
+      await this.loadEasyLinks();
+      window.HarnessApp.showToast("Bookmark removed");
+    } catch (err) {
+      console.error("Error deleting link:", err);
+    }
+  },
+
+  // --- Homework & Exams ---
   async loadHomeworkAndExams() {
     try {
       if (!window.pywebview || !window.pywebview.api) return;
@@ -566,7 +693,7 @@ const Today = {
 
     if (hwContainer) {
       if (this.homeworkList.length === 0) {
-        hwContainer.innerHTML = `<div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">No pending homework due.</div>`;
+        hwContainer.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary);">No pending homework due.</div>`;
       } else {
         hwContainer.innerHTML = this.homeworkList
           .map((h) => {
@@ -579,11 +706,11 @@ const Today = {
             const isOverdue = h.days_left < 0;
 
             return `
-              <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 4px 6px;">
-                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 70%;">
+              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 6px 8px;">
+                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 72%;">
                   <div class="check-dot ${h.completed ? "checked" : ""}" onclick="Today.toggleHomeworkItem(${h.id})"></div>
                   <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 600;">[${this.escapeHtml(h.subject)}]</span>
-                  <span style="font-size: 11px; color: var(--text-primary);">${this.escapeHtml(h.title)}</span>
+                  <span style="font-size: 12px; color: var(--text-primary);">${this.escapeHtml(h.title)}</span>
                 </div>
                 <div style="display: flex; align-items: center; gap: 4px;">
                   <span class="key-pill" style="font-size: 9px; ${isOverdue ? "border-color: #ef4444; color: #ef4444;" : ""}">${dueBadge}</span>
@@ -598,7 +725,7 @@ const Today = {
 
     if (examContainer) {
       if (this.examsList.length === 0) {
-        examContainer.innerHTML = `<div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">No upcoming tests scheduled.</div>`;
+        examContainer.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary);">No upcoming tests scheduled.</div>`;
       } else {
         examContainer.innerHTML = this.examsList
           .map((e) => {
@@ -607,11 +734,11 @@ const Today = {
             else if (e.days_left === 1) countdown = "TOMORROW";
 
             return `
-              <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 4px 6px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 6px 8px;">
                 <div>
-                  <span style="font-size: 10px; font-family: var(--font-mono); color: #e2e8f0; font-weight: 600;">[${this.escapeHtml(e.subject)}]</span>
-                  <span style="font-size: 11px; color: var(--text-primary); margin-left: 4px;">${this.escapeHtml(e.title)}</span>
-                  ${e.scope ? `<div style="font-size: 9px; font-family: var(--font-mono); color: var(--text-tertiary); margin-top: 2px;">Scope: ${this.escapeHtml(e.scope)}</div>` : ""}
+                  <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 600;">[${this.escapeHtml(e.subject)}]</span>
+                  <span style="font-size: 12px; color: var(--text-primary); margin-left: 4px; font-weight: 500;">${this.escapeHtml(e.title)}</span>
+                  ${e.scope ? `<div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">Scope: ${this.escapeHtml(e.scope)}</div>` : ""}
                 </div>
                 <div style="display: flex; align-items: center; gap: 4px;">
                   <span class="key-pill" style="font-size: 9px; color: var(--accent-purple-light);">${countdown}</span>
@@ -629,6 +756,7 @@ const Today = {
     try {
       await window.pywebview.api.toggle_homework(id);
       await this.loadHomeworkAndExams();
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error toggling homework:", err);
     }
@@ -639,6 +767,7 @@ const Today = {
       await window.pywebview.api.delete_homework(id);
       await this.loadHomeworkAndExams();
       window.HarnessApp.showToast("Homework removed");
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error deleting homework:", err);
     }
@@ -649,41 +778,63 @@ const Today = {
       await window.pywebview.api.delete_exam(id);
       await this.loadHomeworkAndExams();
       window.HarnessApp.showToast("Exam removed");
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error deleting exam:", err);
     }
   },
 
-  async addHomeworkPrompt() {
-    const subject = prompt("Subject (e.g. Matematyka, Informatyka, Fizyka):", "Matematyka");
-    if (!subject) return;
-    const title = prompt("Homework assignment details:", "");
-    if (!title) return;
-    const dueDate = prompt("Due date (YYYY-MM-DD):", this.selectedDateStr);
-    if (!dueDate) return;
+  openAddHomeworkModal() {
+    document.getElementById("hwFormSubject").value = "Matematyka";
+    document.getElementById("hwFormTitle").value = "";
+    document.getElementById("hwFormDueDate").value = this.selectedDateStr;
+    document.getElementById("addHomeworkModal").classList.add("open");
+  },
+
+  closeHomeworkModal() {
+    document.getElementById("addHomeworkModal").classList.remove("open");
+  },
+
+  async handleSaveHomework() {
+    const subject = document.getElementById("hwFormSubject").value.trim();
+    const title = document.getElementById("hwFormTitle").value.trim();
+    const dueDate = document.getElementById("hwFormDueDate").value;
 
     try {
-      await window.pywebview.api.add_homework(subject.trim(), title.trim(), dueDate.trim());
+      await window.pywebview.api.add_homework(subject, title, dueDate);
+      this.closeHomeworkModal();
       await this.loadHomeworkAndExams();
       window.HarnessApp.showToast("Homework added");
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error adding homework:", err);
     }
   },
 
-  async addExamPrompt() {
-    const subject = prompt("Subject for test / exam:", "Matematyka");
-    if (!subject) return;
-    const title = prompt("Test title (e.g. Sprawdzian: Ciągi):", "");
-    if (!title) return;
-    const examDate = prompt("Exam date (YYYY-MM-DD):", this.selectedDateStr);
-    if (!examDate) return;
-    const scope = prompt("Topics scope / chapters:", "");
+  openAddExamModal() {
+    document.getElementById("examFormSubject").value = "Matematyka";
+    document.getElementById("examFormTitle").value = "";
+    document.getElementById("examFormDate").value = this.selectedDateStr;
+    document.getElementById("examFormScope").value = "";
+    document.getElementById("addExamModal").classList.add("open");
+  },
+
+  closeExamModal() {
+    document.getElementById("addExamModal").classList.remove("open");
+  },
+
+  async handleSaveExam() {
+    const subject = document.getElementById("examFormSubject").value.trim();
+    const title = document.getElementById("examFormTitle").value.trim();
+    const date = document.getElementById("examFormDate").value;
+    const scope = document.getElementById("examFormScope").value.trim();
 
     try {
-      await window.pywebview.api.add_exam(subject.trim(), title.trim(), examDate.trim(), scope ? scope.trim() : "");
+      await window.pywebview.api.add_exam(subject, title, date, scope);
+      this.closeExamModal();
       await this.loadHomeworkAndExams();
       window.HarnessApp.showToast("Exam scheduled");
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error adding exam:", err);
     }
@@ -691,7 +842,7 @@ const Today = {
 
   escapeHtml(str) {
     if (!str) return "";
-    return str
+    return String(str)
       .replace(/&/g, "&amp;")
       .replace(/</g, "&lt;")
       .replace(/>/g, "&gt;")

@@ -395,6 +395,7 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None) -> Dict[str
         conn = get_connection()
         close_conn = True
 
+    today_str = datetime.now().strftime("%Y-%m-%d")
     heatmap = get_heatmap_data(conn=conn)
     upcoming = get_upcoming_days(days_count=7, conn=conn)
     tum_overview = tum_service.get_tum_overview(conn=conn)
@@ -402,6 +403,29 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None) -> Dict[str
     body_summary = body_service.get_weekly_workout_summary(conn=conn)
     body_history = body_service.get_body_metrics_history(limit=7, conn=conn)
     projects = project_service.get_all_projects(conn=conn)
+
+    # Today's execution metrics
+    today_tasks = today_service.get_today_tasks(today_str, conn=conn)
+    today_sched = today_service.get_schedule_for_date(today_str)
+    today_log = today_service.get_daily_log(today_str, conn=conn)
+    today_gym = today_service.get_gym_routine_for_date(today_str)
+
+    total_today_tasks = len(today_tasks)
+    completed_today_tasks = sum(1 for t in today_tasks if t.get("completed"))
+
+    sched_blocks = today_sched.get("blocks", [])
+    total_routine_blocks = len(sched_blocks)
+    completed_blocks_set = set([b.strip() for b in (today_log.get("completed_blocks") or "").split(",") if b.strip()])
+    completed_routine_blocks = len(completed_blocks_set)
+
+    gym_exercises = today_gym.get("exercises", []) if today_gym else []
+    total_gym_ex = len(gym_exercises)
+    completed_ex_set = set([e.strip() for e in (today_log.get("completed_exercises") or "").split(",") if e.strip()])
+    completed_gym_ex = len(completed_ex_set)
+
+    total_today_boxes = total_routine_blocks + total_gym_ex + total_today_tasks
+    checked_today_boxes = completed_routine_blocks + completed_gym_ex + completed_today_tasks
+    today_pct = Math_round_pct = round((checked_today_boxes / total_today_boxes) * 100) if total_today_boxes > 0 else 0
 
     # Latest weight
     latest_weight = 68.0
@@ -433,9 +457,23 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None) -> Dict[str
         total_m = sum(m.get("current_mock_percentage", 0.0) for m in matura_list)
         avg_mock = round(total_m / len(matura_list), 1)
 
+    # Homework & Exams
+    from app.services import homework_service
+    upcoming_homework = homework_service.get_upcoming_homework(conn=conn, limit=5)
+    upcoming_exams = homework_service.get_upcoming_exams(conn=conn, limit=5)
+
     summary = {
         "heatmap": heatmap,
         "upcoming": upcoming,
+        "today_velocity": {
+            "total_boxes": total_today_boxes,
+            "checked_boxes": checked_today_boxes,
+            "percentage": today_pct,
+            "schedule_name": today_sched.get("name", "Daily Routine"),
+            "schedule_key": today_sched.get("key", "Standard"),
+            "has_gym": bool(today_gym),
+            "pending_tasks_count": total_today_tasks - completed_today_tasks,
+        },
         "metrics": {
             "total_contributions": heatmap.get("total_contributions", 0),
             "current_streak": heatmap.get("current_streak", 0),
@@ -476,13 +514,21 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None) -> Dict[str
             {
                 "id": p["id"],
                 "name": p["name"],
+                "description": p.get("description", ""),
                 "status": p["status"],
                 "current_milestone": p["current_milestone"],
                 "next_action": p["next_action"],
                 "deadline": p["deadline"],
+                "local_path": p.get("local_path", ""),
+                "github_url": p.get("github_url", ""),
+                "git": p.get("git", {}),
             }
             for p in projects
         ],
+        "radar": {
+            "homework": upcoming_homework,
+            "exams": upcoming_exams,
+        },
     }
 
     if close_conn:

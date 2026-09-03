@@ -42,3 +42,40 @@ def test_update_project_milestone_and_next_action(test_db):
     sigg_updated = [p for p in updated_projects if p["id"] == sigg_proj["id"]][0]
     assert sigg_updated["current_milestone"] == "Stage 1 Live Execution"
     assert sigg_updated["next_action"] == "Review top 5 momentum stocks in mWIG40"
+
+
+def test_add_and_delete_project(test_db):
+    new_p = project_service.add_project(
+        name="Algorithmic Trading Bot",
+        description="High frequency trading engine on GPW",
+        local_path=r"c:\test_path",
+        current_milestone="Backtester MVP",
+        next_action="Implement slippage model",
+        deadline="2026-11-01",
+        status="active",
+        conn=test_db,
+    )
+    assert new_p["id"] is not None
+    assert new_p["name"] == "Algorithmic Trading Bot"
+
+    # Update
+    updated = project_service.update_project(
+        project_id=new_p["id"],
+        name="GPW Quant Engine",
+        status="paused",
+        conn=test_db,
+    )
+    assert updated is True
+
+    projects = project_service.get_all_projects(conn=test_db)
+    found = [p for p in projects if p["id"] == new_p["id"]][0]
+    assert found["name"] == "GPW Quant Engine"
+    assert found["status"] == "paused"
+
+    # Delete
+    deleted = project_service.delete_project(new_p["id"], conn=test_db)
+    assert deleted is True
+
+    projects_after = project_service.get_all_projects(conn=test_db)
+    assert not any(p["id"] == new_p["id"] for p in projects_after)
+

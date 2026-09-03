@@ -66,3 +66,40 @@ def test_url_validation():
     assert school_service.is_safe_url("http://planlekcji2.staff.edu.pl/") is True
     assert school_service.is_safe_url("javascript:alert(1)") is False
     assert school_service.is_safe_url("file:///C:/Windows/notepad.exe") is False
+
+
+def test_easy_links_crud():
+    original_links = school_service.get_easy_links()
+    initial_count = len(original_links)
+
+    # Add link
+    new_link = school_service.add_easy_link(
+        name="LeetCode Algorithms",
+        url="https://leetcode.com",
+        category="dev",
+        desc="Daily algorithmic problem solving"
+    )
+    assert new_link["name"] == "LeetCode Algorithms"
+
+    links = school_service.get_easy_links()
+    assert len(links) == initial_count + 1
+    new_idx = len(links) - 1
+
+    # Update link
+    updated = school_service.update_easy_link(
+        index=new_idx,
+        name="LeetCode Practice",
+        url="https://leetcode.com/problemset",
+        category="dev",
+        desc="Daily practice"
+    )
+    assert updated is True
+
+    links_after_update = school_service.get_easy_links()
+    assert links_after_update[new_idx]["name"] == "LeetCode Practice"
+
+    # Delete link
+    deleted = school_service.delete_easy_link(new_idx)
+    assert deleted is True
+    assert len(school_service.get_easy_links()) == initial_count
+

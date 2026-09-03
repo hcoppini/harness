@@ -126,10 +126,14 @@ def get_all_projects(conn: Optional[sqlite3.Connection] = None, include_git: boo
 
 def update_project(
     project_id: int,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
     status: Optional[str] = None,
     current_milestone: Optional[str] = None,
     next_action: Optional[str] = None,
     deadline: Optional[str] = None,
+    local_path: Optional[str] = None,
+    github_url: Optional[str] = None,
     notes: Optional[str] = None,
     conn: Optional[sqlite3.Connection] = None,
 ) -> bool:
@@ -143,14 +147,18 @@ def update_project(
     cursor.execute(
         """
         UPDATE projects
-        SET status = COALESCE(?, status),
+        SET name = COALESCE(?, name),
+            description = COALESCE(?, description),
+            status = COALESCE(?, status),
             current_milestone = COALESCE(?, current_milestone),
             next_action = COALESCE(?, next_action),
             deadline = COALESCE(?, deadline),
+            local_path = COALESCE(?, local_path),
+            github_url = COALESCE(?, github_url),
             notes = COALESCE(?, notes)
         WHERE id = ?
         """,
-        (status, current_milestone, next_action, deadline, notes, project_id),
+        (name, description, status, current_milestone, next_action, deadline, local_path, github_url, notes, project_id),
     )
     conn.commit()
     updated = cursor.rowcount > 0
@@ -159,6 +167,24 @@ def update_project(
         conn.close()
 
     return updated
+
+
+def delete_project(project_id: int, conn: Optional[sqlite3.Connection] = None) -> bool:
+    """Deletes a project from the registry."""
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM projects WHERE id = ?", (project_id,))
+    conn.commit()
+    deleted = cursor.rowcount > 0
+
+    if close_conn:
+        conn.close()
+
+    return deleted
 
 
 def add_project(
@@ -170,6 +196,7 @@ def add_project(
     next_action: str = "",
     deadline: str = "",
     notes: str = "",
+    status: str = "active",
     conn: Optional[sqlite3.Connection] = None,
 ) -> Dict[str, Any]:
     """Adds a new project to the registry."""
@@ -182,9 +209,9 @@ def add_project(
     cursor.execute(
         """
         INSERT INTO projects (name, description, status, local_path, github_url, current_milestone, next_action, deadline, notes)
-        VALUES (?, ?, 'active', ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
-        (name.strip(), description.strip(), local_path, github_url, current_milestone, next_action, deadline, notes),
+        (name.strip(), description.strip(), status or "active", local_path, github_url, current_milestone, next_action, deadline, notes),
     )
     new_id = cursor.lastrowid
     conn.commit()
@@ -196,7 +223,7 @@ def add_project(
         "id": new_id,
         "name": name,
         "description": description,
-        "status": "active",
+        "status": status or "active",
         "local_path": local_path,
         "github_url": github_url,
         "current_milestone": current_milestone,

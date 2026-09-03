@@ -127,3 +127,34 @@ def test_get_tasks_for_different_dates(test_db):
     assert tasks2[0]["id"] == t2["id"]
     assert tasks2[0]["title"] == "English vocabulary"
 
+
+def test_historical_daily_log_isolation(test_db):
+    past_date = "2026-09-01"
+    today_date = "2026-09-03"
+
+    # Update past date daily log (e.g. check routine block 0 and exercise 1)
+    past_updated = today_service.update_daily_log(
+        date_str=past_date,
+        completed_blocks="0,1",
+        completed_exercises="1",
+        scratchpad="Past scratchpad notes",
+        conn=test_db,
+    )
+    assert past_updated["date"] == past_date
+    assert past_updated["completed_blocks"] == "0,1"
+    assert past_updated["completed_exercises"] == "1"
+
+    # Verify today's log is completely unaffected and distinct
+    today_log = today_service.get_daily_log(today_date, conn=test_db)
+    assert today_log["date"] == today_date
+    assert today_log["completed_blocks"] == ""
+    assert today_log["completed_exercises"] == ""
+    assert today_log["scratchpad"] == ""
+
+    # Check that retrieving past date log returns the persisted checks
+    retrieved_past = today_service.get_daily_log(past_date, conn=test_db)
+    assert retrieved_past["completed_blocks"] == "0,1"
+    assert retrieved_past["completed_exercises"] == "1"
+    assert retrieved_past["scratchpad"] == "Past scratchpad notes"
+
+
