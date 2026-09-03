@@ -306,11 +306,12 @@ window.Dashboard = {
         let gymSnippet = "";
         if (day.gym_routine) {
           gymSnippet = `
-            <div style="margin-top: 4px; font-size: 10px; color: var(--accent-purple-light); font-weight: 500;">
-              🏋️ ${this.escapeHtml(day.gym_routine.name.split("—")[1] || day.gym_routine.name)}
+            <div style="margin-top: 4px; font-size: 10px; color: var(--accent-lavender); font-weight: 500; font-family: var(--font-mono);">
+              LIFT: ${this.escapeHtml(day.gym_routine.name.split("—")[1] || day.gym_routine.name)}
             </div>
           `;
         }
+
 
         return `
           <div class="forecast-day-card ${isTomorrow ? "tomorrow-highlight" : ""}">

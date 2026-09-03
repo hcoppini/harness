@@ -571,14 +571,14 @@ const Today = {
 
       container.innerHTML = this.easyLinks
         .map((link, idx) => {
-          let icon = "🔗";
+          let tag = "LINK";
           const lowerName = (link.name || "").toLowerCase();
-          if (link.category === "school" || lowerName.includes("tm1")) icon = "🏫";
-          else if (lowerName.includes("vulcan") || lowerName.includes("uonet")) icon = "📝";
-          else if (link.category === "contest" || lowerName.includes("sigg")) icon = "📈";
-          else if (link.category === "university" || lowerName.includes("tum")) icon = "🎓";
-          else if (link.category === "academics" || lowerName.includes("cke")) icon = "📐";
-          else if (link.category === "dev") icon = "💻";
+          if (link.category === "school" || lowerName.includes("tm1")) tag = "TM1";
+          else if (lowerName.includes("vulcan") || lowerName.includes("uonet")) tag = "VULCAN";
+          else if (link.category === "contest" || lowerName.includes("sigg")) tag = "SIGG";
+          else if (link.category === "university" || lowerName.includes("tum")) tag = "TUM";
+          else if (link.category === "academics" || lowerName.includes("cke")) tag = "CKE";
+          else if (link.category === "dev") tag = "DEV";
 
           return `
             <div 
@@ -587,7 +587,7 @@ const Today = {
               title="${this.escapeHtml(link.desc || link.url)}"
             >
               <div class="easy-link-content">
-                <span style="font-size: 13px;">${icon}</span>
+                <span class="mono-chip lavender" style="font-size: 8px;">${tag}</span>
                 <span class="easy-link-title">${this.escapeHtml(link.name)}</span>
               </div>
               <button 
@@ -602,6 +602,7 @@ const Today = {
           `;
         })
         .join("");
+
     } catch (err) {
       console.error("Error loading easy links:", err);
     }

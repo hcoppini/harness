@@ -31,15 +31,16 @@ const FocusTimer = {
 
     const timerPill = document.createElement("div");
     timerPill.id = "focusTimerPill";
-    timerPill.className = "streak-pill";
+    timerPill.className = "mono-chip lavender";
     timerPill.style.cursor = "pointer";
+    timerPill.style.padding = "4px 8px";
     timerPill.title = "Focus Deep Work Timer (Click to open controls, Space to start/pause)";
     timerPill.innerHTML = `
-      <span style="color: var(--accent-purple-light); font-size: 11px;">⏱</span>
-      <span id="focusTimeDisplay" style="font-family: var(--font-mono); font-weight: 700; color: var(--text-primary);">60:00</span>
-      <span id="focusPresetLabel" style="font-size: 9px; color: var(--text-tertiary); text-transform: uppercase;">Math R</span>
+      <span id="focusTimeDisplay" style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-lavender);">60:00</span>
+      <span id="focusPresetLabel" style="font-size: 8px; color: var(--text-tertiary); text-transform: uppercase;">Math R</span>
     `;
     headerRight.insertBefore(timerPill, headerRight.firstChild);
+
 
     timerPill.addEventListener("click", () => this.toggleDrawer());
 
