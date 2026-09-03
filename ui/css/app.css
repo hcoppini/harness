@@ -955,7 +955,7 @@ body {
   position: relative;
   min-width: 3200px;
   height: 100%;
-  padding: 40px 60px;
+  padding: 0;
 }
 
 .metro-station-node {

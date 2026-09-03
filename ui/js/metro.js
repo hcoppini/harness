@@ -23,54 +23,47 @@ const MetroMap = {
   activeStreamFilter: "all",
   currentBeaconX: 0,
 
-  // Stream Definitions with Dynamic Elevation Offsets
+  // Stream Definitions with Clean Parallel Elevations
   streams: [
     {
       id: "academics",
       name: "Academics",
       code: "AC",
-      color: "#c4b5fd",
-      strokeWidth: 2.5,
-      baseY: 175,
-      // Dynamic height adjustments per station index (creates clean breaks in height)
-      heightOffsets: [0, -10, 5, -10, 0, 5, -10, 0, -5, -15, 10, 10, -5, -15, -10, -15, -5, -10, -10, -15, -20, -15, 0],
+      color: "#c4b5fd", // Lavender
+      strokeWidth: 2.0,
+      baseY: 155,
     },
     {
       id: "code",
       name: "Code Sprint",
       code: "CD",
-      color: "#7dd3fc",
-      strokeWidth: 2.5,
-      baseY: 210,
-      heightOffsets: [-5, 5, -10, -5, 0, 10, -10, 10, -10, 5, -15, -10, -5, -10, -5, -5, -10, -10, -5, 10, -15, 5, 0],
+      color: "#7dd3fc", // Sky Blue
+      strokeWidth: 2.0,
+      baseY: 190,
     },
     {
       id: "sigg",
       name: "SIGG GPW",
       code: "SG",
-      color: "#fdba74",
-      strokeWidth: 3.0,
-      baseY: 250,
-      // Peaking and ramping during active trading competition months (Sep '26 - May '27)
-      heightOffsets: [0, -15, -20, -15, -20, -25, -20, -25, -30, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+      color: "#fdba74", // Orange
+      strokeWidth: 2.5,
+      baseY: 225,
     },
     {
       id: "german",
       name: "German Ladder",
       code: "DE",
-      color: "#6ee7b7",
-      strokeWidth: 2.5,
+      color: "#6ee7b7", // Emerald
+      strokeWidth: 2.0,
       baseY: 295,
-      heightOffsets: [0, 5, 10, -5, 10, -5, 10, 10, 10, -5, -15, -25, -5, 10, -10, 10, 10, -10, -10, -15, 10, -25, 0],
     },
     {
       id: "physical",
       name: "Physical / Mass",
       code: "PH",
-      color: "#fda4af",
-      strokeWidth: 2.5,
-      baseY: 335,
-      heightOffsets: [0, 10, -10, 10, 10, 10, 10, -10, 10, -10, -15, -20, -5, 10, 10, -10, 10, 10, 10, -15, 10, 10, 0],
+      color: "#fda4af", // Rose
+      strokeWidth: 2.0,
+      baseY: 330,
     },
   ],
 
@@ -171,12 +164,12 @@ const MetroMap = {
     const stations = this.data.stations;
     const spacing = 220;
     const startX = 160;
-    const spineY = 250;
+    const spineY = 260;
     const totalTrackLength = (stations.length - 1) * spacing;
     const totalWidth = startX + totalTrackLength + 320;
 
     canvasWrap.style.minWidth = `${totalWidth}px`;
-    canvasWrap.style.height = "520px";
+    canvasWrap.style.height = "540px";
 
     // Date calculations
     const startDate = new Date(2026, 8, 1);
@@ -229,7 +222,7 @@ const MetroMap = {
       })
       .join("");
 
-    // Generate Height-Varying Stream Lines with 45° Chamfered Schematic Paths
+    // Generate Parallel Straight Stream Lines
     let streamPathsHtml = "";
     let streamPinsHtml = "";
 
@@ -241,123 +234,159 @@ const MetroMap = {
         }
       });
 
-      if (activeIndices.length < 2) return;
+      if (activeIndices.length === 0) return;
 
       const isFiltered = this.activeStreamFilter !== "all" && this.activeStreamFilter !== stream.id;
-      const opacity = isFiltered ? 0.06 : (this.activeStreamFilter === stream.id ? 0.95 : 0.6);
-      const strokeWidth = this.activeStreamFilter === stream.id ? 4 : stream.strokeWidth;
+      const opacity = isFiltered ? 0.08 : this.activeStreamFilter === stream.id ? 1.0 : 0.65;
+      const strokeWidth = this.activeStreamFilter === stream.id ? 3.5 : stream.strokeWidth;
 
-      // Construct SVG path with 45° chamfers across stations
-      let d = "";
-      for (let i = 0; i < activeIndices.length; i++) {
-        const idx = activeIndices[i];
-        const px = startX + idx * spacing;
-        const offset = stream.heightOffsets[idx] || 0;
-        const py = stream.baseY + offset;
-
-        if (i === 0) {
-          d += `M ${px} ${py}`;
-        } else {
-          const prevIdx = activeIndices[i - 1];
-          const prevPx = startX + prevIdx * spacing;
-          const prevOffset = stream.heightOffsets[prevIdx] || 0;
-          const prevPy = stream.baseY + prevOffset;
-
-          // 45° chamfered segment
-          if (Math.abs(py - prevPy) > 2) {
-            const midX = (prevPx + px) / 2;
-            const chamfer = Math.min(25, Math.abs(py - prevPy));
-            const sign = py > prevPy ? 1 : -1;
-
-            d += ` L ${midX - chamfer} ${prevPy} L ${midX + chamfer} ${py} L ${px} ${py}`;
-          } else {
-            d += ` L ${px} ${py}`;
-          }
-        }
-
-        // Add small stream station pin/dot connecting stream track to station node
-        const isMatch = this.activeStreamFilter === "all" || this.activeStreamFilter === stream.id;
-        const pinOpacity = isMatch ? 0.85 : 0.15;
-        streamPinsHtml += `
-          <!-- Stream Junction Pin -->
-          <line x1="${px}" y1="${py}" x2="${px}" y2="${spineY}" 
-                stroke="${stream.color}" stroke-width="1" stroke-dasharray="2 3" opacity="${pinOpacity}" />
-          <circle cx="${px}" cy="${py}" r="3" fill="${stream.color}" opacity="${pinOpacity}" />
-        `;
-      }
+      const firstX = startX + activeIndices[0] * spacing;
+      const lastX = startX + activeIndices[activeIndices.length - 1] * spacing;
 
       streamPathsHtml += `
-        <!-- Stream Highlighter Line: ${stream.name} -->
+        <!-- Stream Track: ${stream.name} -->
         <path 
-          d="${d}" 
+          d="M ${firstX - 8} ${stream.baseY} L ${lastX + 8} ${stream.baseY}" 
           fill="none" 
           stroke="${stream.color}" 
           stroke-width="${strokeWidth}" 
           stroke-linecap="round" 
-          stroke-linejoin="round"
           opacity="${opacity}" 
         />
       `;
+
+      // Junction dots on stream lines
+      activeIndices.forEach((idx) => {
+        const px = startX + idx * spacing;
+        const pinOpacity = isFiltered ? 0.12 : 0.9;
+        streamPinsHtml += `
+          <circle cx="${px}" cy="${stream.baseY}" r="3" fill="${stream.color}" opacity="${pinOpacity}" />
+        `;
+      });
     });
 
-    // SVG Base Lines (Main Spine & Grid)
+    // Vertical alignment guide lines, SVG station circles, and stream dots
+    let verticalGuidesHtml = "";
+    let svgStationNodesHtml = "";
+    let svgStreamDotsHtml = "";
+
+    stations.forEach((station, idx) => {
+      const posX = startX + idx * spacing;
+      const isMajor = station.is_major;
+      const isEven = idx % 2 === 0;
+      const status = station.status || "upcoming";
+      const branches = station.branches || [];
+      const isPassed = posX <= currentX;
+
+      // Vertical guide line passing through posX
+      const yTop = isEven ? 152 : 155;
+      const yBottom = isEven ? 330 : 362;
+      verticalGuidesHtml += `
+        <line x1="${posX}" y1="${yTop}" x2="${posX}" y2="${yBottom}" 
+              stroke="rgba(255, 255, 255, 0.12)" stroke-width="1" stroke-dasharray="2 3" />
+      `;
+
+      // Central Station Circle on Main Spine
+      const size = isMajor ? 18 : 14;
+      const r = size / 2;
+      let fill = "#09090b";
+      let stroke = "#52525b";
+      let strokeW = 2;
+      let innerCore = "";
+      let aura = "";
+
+      if (status === "completed" || (isPassed && !isPreLaunch)) {
+        fill = "var(--accent-lavender)";
+        stroke = "#ffffff";
+        strokeW = 2;
+        innerCore = `<circle cx="${posX}" cy="${spineY}" r="2.5" fill="#09090b" />`;
+      } else if (status === "active") {
+        fill = "#ffffff";
+        stroke = "var(--accent-lavender)";
+        strokeW = 2.5;
+        aura = `<circle cx="${posX}" cy="${spineY}" r="${r + 4}" fill="none" stroke="var(--accent-lavender)" stroke-width="1" opacity="0.5" stroke-dasharray="2 2" />`;
+      }
+
+      svgStationNodesHtml += `
+        ${aura}
+        <circle cx="${posX}" cy="${spineY}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" />
+        ${innerCore}
+        <!-- Click target overlay -->
+        <circle cx="${posX}" cy="${spineY}" r="16" fill="transparent" cursor="pointer" onclick="MetroMap.selectStation('${station.id}')" style="pointer-events: all;" />
+      `;
+
+      // Symmetric Stream Indicator Dots below station node (spineY + 16)
+      if (branches.length > 0) {
+        const numDots = branches.length;
+        const dotY = spineY + 16;
+        branches.forEach((b, bIdx) => {
+          const streamObj = this.streams.find((s) => s.id === b);
+          const color = streamObj ? streamObj.color : "#a1a1aa";
+          const dotX = posX - (numDots - 1) * 4 + bIdx * 8;
+          svgStreamDotsHtml += `
+            <circle cx="${dotX}" cy="${dotY}" r="2.5" fill="${color}" title="${b.toUpperCase()}" />
+          `;
+        });
+      }
+    });
+
+    // SVG Layer (Main Spine, Stream Tracks, Vertical Guides, Station Circles & Dots)
     let svgHtml = `
-      <svg width="${totalWidth}" height="520" style="position: absolute; top: 0; left: 0; pointer-events: none;">
+      <svg width="${totalWidth}" height="540" style="position: absolute; top: 0; left: 0; pointer-events: none;">
         <!-- Phase Vertical Grid Lines -->
         ${phases
           .map(
             (p) =>
-              `<line x1="${p.x - 20}" y1="36" x2="${p.x - 20}" y2="480" stroke="rgba(255,255,255,0.03)" stroke-dasharray="3 4" stroke-width="1" />`
+              `<line x1="${p.x - 20}" y1="28" x2="${p.x - 20}" y2="500" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4 4" stroke-width="1" />`
           )
           .join("")}
 
-        <!-- Stream Junction Pin Connectors -->
-        ${streamPinsHtml}
-
-        <!-- Height-Varying Stream Lines -->
+        <!-- Stream Tracks -->
         ${streamPathsHtml}
 
+        <!-- Vertical Guide Lines -->
+        ${verticalGuidesHtml}
+
+        <!-- Stream Junction Dots -->
+        ${streamPinsHtml}
+
         <!-- Singular Central Main Spine Line -->
-        <line x1="${startX - 20}" y1="${spineY}" x2="${startX + totalTrackLength + 30}" y2="${spineY}" 
-              stroke="#27272a" stroke-width="5" stroke-linecap="round" />
+        <line x1="${startX - 40}" y1="${spineY}" x2="${startX + totalTrackLength + 40}" y2="${spineY}" 
+              stroke="#27272a" stroke-width="6" stroke-linecap="round" />
 
         <!-- Main Spine Reached / Completed Fill -->
         ${
           currentX > startX
-            ? `<line x1="${startX - 20}" y1="${spineY}" x2="${currentX}" y2="${spineY}" stroke="var(--accent-lavender)" stroke-width="4" stroke-linecap="round" />`
+            ? `<line x1="${startX - 40}" y1="${spineY}" x2="${currentX}" y2="${spineY}" stroke="var(--accent-lavender)" stroke-width="5" stroke-linecap="round" />`
             : ""
         }
 
-        <!-- Connectors from Spine to Cards -->
-        ${stations
-          .map((station, idx) => {
-            const posX = startX + idx * spacing;
-            const isEven = idx % 2 === 0;
-            const y1 = isEven ? spineY - 35 : spineY + 12;
-            const y2 = isEven ? spineY - 12 : spineY + 35;
+        <!-- Station Circles on Main Spine -->
+        ${svgStationNodesHtml}
 
-            return `
-              <line x1="${posX}" y1="${y1}" x2="${posX}" y2="${y2}" 
-                    stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" stroke-dasharray="2 2" />
-            `;
-          })
-          .join("")}
+        <!-- Symmetrical Branch Dots below Stations -->
+        ${svgStreamDotsHtml}
+
+        <!-- Real-Time Day Beacon Indicator on Spine -->
+        <circle cx="${currentX}" cy="${spineY}" r="7" fill="none" stroke="var(--accent-lavender)" stroke-width="1.5" opacity="0.8">
+          <animate attributeName="r" values="7;13;7" dur="2s" repeatCount="indefinite"/>
+          <animate attributeName="opacity" values="0.8;0.15;0.8" dur="2s" repeatCount="indefinite"/>
+        </circle>
+        <circle cx="${currentX}" cy="${spineY}" r="4" fill="#ffffff" stroke="var(--accent-lavender)" stroke-width="2" />
       </svg>
     `;
 
-    // Station Nodes and Cards
-    let nodesAndCardsHtml = stations
+    // Station Cards (HTML Layer)
+    let cardsHtml = stations
       .map((station, idx) => {
         const posX = startX + idx * spacing;
-        const isMajor = station.is_major;
         const isEven = idx % 2 === 0;
         const status = station.status || "upcoming";
         const branches = station.branches || [];
-        const isPassed = posX <= currentX;
 
-        // Card position: Even on top, Odd on bottom
-        const cardTop = isEven ? spineY - 150 : spineY + 36;
+        // Center card horizontally at posX (width = 170px)
         const cardLeft = posX - 85;
+        const cardTop = isEven ? spineY - 180 : spineY + 105;
 
         // Filter opacity
         let isFilteredMatch = true;
@@ -366,28 +395,7 @@ const MetroMap = {
         }
         const opacityStyle = isFilteredMatch ? "opacity: 1;" : "opacity: 0.25;";
 
-        // Node disc style
-        let nodeContent = "";
-        let nodeStyle = "background: var(--bg-surface); border: 2px solid #52525b;";
-        if (status === "completed" || (isPassed && !isPreLaunch)) {
-          nodeStyle = "background: var(--accent-lavender); border: 2px solid #ffffff;";
-          nodeContent = `<div style="width: 5px; height: 5px; background: #09090b; border-radius: 1px;"></div>`;
-        } else if (status === "active") {
-          nodeStyle = "background: #ffffff; border: 2px solid var(--accent-lavender); box-shadow: 0 0 10px rgba(216,180,254,0.3);";
-        }
-
-        const size = isMajor ? 18 : 14;
-
-        // Stream dots on node
-        const streamDots = branches
-          .map((b) => {
-            const streamObj = this.streams.find((s) => s.id === b);
-            const color = streamObj ? streamObj.color : "#a1a1aa";
-            return `<div style="width: 5px; height: 5px; border-radius: 50%; background: ${color};" title="${b.toUpperCase()}"></div>`;
-          })
-          .join("");
-
-        // Deliverables progress
+        // Deliverables progress badge
         const delivEntries = Object.keys(station.deliverables || {});
         const totalDelivs = delivEntries.length;
         const completedDelivs = (station.completed_deliverables || []).length;
@@ -401,24 +409,7 @@ const MetroMap = {
         }
 
         return `
-          <!-- Central Node On Main Spine -->
-          <div 
-            class="metro-station-node" 
-            style="left: ${posX}px; top: ${spineY}px; ${opacityStyle}"
-            onclick="MetroMap.selectStation('${station.id}')"
-            title="${this.escapeHtml(station.name)} (${station.month_label})"
-          >
-            <div 
-              style="width: ${size}px; height: ${size}px; border-radius: 50%; display: flex; align-items: center; justify-content: center; ${nodeStyle}"
-            >
-              ${nodeContent}
-            </div>
-            <div style="display: flex; gap: 2px; justify-content: center; margin-top: 3px;">
-              ${streamDots}
-            </div>
-          </div>
-
-          <!-- Station Card -->
+          <!-- Station Card Centered at posX -->
           <div 
             class="metro-station-card ${status === "completed" ? "completed-card" : ""} ${status === "active" ? "active-card" : ""}" 
             style="left: ${cardLeft}px; top: ${cardTop}px; ${opacityStyle}"
@@ -445,18 +436,17 @@ const MetroMap = {
       })
       .join("");
 
-    // Real-Time Day Beacon
-    const beaconHtml = `
-      <div style="position: absolute; left: ${currentX}px; top: ${spineY}px; transform: translate(-50%, -50%); pointer-events: none; z-index: 45;">
-        <div style="position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--bg-surface-elevated); border: 1px solid var(--accent-lavender); border-radius: var(--radius-sm); padding: 3px 8px; white-space: nowrap; box-shadow: var(--shadow-dropdown); text-align: center;">
+    // Real-Time Day Beacon Tooltip (HTML Layer)
+    const beaconTooltipHtml = `
+      <div style="position: absolute; left: ${currentX}px; top: ${spineY - 18}px; transform: translate(-50%, -100%); pointer-events: none; z-index: 45;">
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--accent-lavender); border-radius: var(--radius-sm); padding: 4px 8px; white-space: nowrap; box-shadow: var(--shadow-dropdown); text-align: center;">
           <div style="font-size: 9px; font-weight: 700; color: var(--accent-lavender); font-family: var(--font-mono);">${beaconTitle}</div>
           <div style="font-size: 8px; color: var(--text-tertiary); font-family: var(--font-mono);">${beaconSub}</div>
         </div>
-        <div style="width: 10px; height: 10px; background: #ffffff; border-radius: 50%; border: 2px solid var(--accent-lavender);"></div>
       </div>
     `;
 
-    canvasWrap.innerHTML = phaseHeadersHtml + svgHtml + nodesAndCardsHtml + beaconHtml;
+    canvasWrap.innerHTML = phaseHeadersHtml + svgHtml + cardsHtml + beaconTooltipHtml;
   },
 
   selectStation(stationId) {
