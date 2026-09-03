@@ -104,12 +104,12 @@ const MobileApp = {
     if (velBarEl) velBarEl.style.width = `${velPct}%`;
     if (routineNameEl) routineNameEl.textContent = today_velocity?.schedule_name || "Daily routine";
 
-    // Green Heatmap (Recent 20 weeks for mobile screen width)
+    // Purple Heatmap (Recent 22 weeks for mobile screen width)
     const gridEl = document.getElementById("mHeatmapGrid");
     const totalEl = document.getElementById("mHeatmapTotal");
     if (gridEl && heatmap?.weeks) {
       if (totalEl) totalEl.textContent = `${heatmap.total_contributions || 0} boxes completed`;
-      const recentWeeks = heatmap.weeks.slice(-20); // Last 20 weeks for mobile
+      const recentWeeks = heatmap.weeks.slice(-22); // Recent weeks for mobile
 
       gridEl.innerHTML = recentWeeks
         .map((w) => {

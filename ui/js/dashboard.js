@@ -153,14 +153,10 @@ window.Dashboard = {
         <div class="heatmap-months-row">
     `;
 
-    const colWidth = 18;
-    let lastRightPx = -999;
+    const totalWeeks = Math.max(1, weeks.length);
     months.forEach((m) => {
-      const leftPx = m.week_index * colWidth;
-      if (leftPx >= lastRightPx + 28 || lastRightPx === -999) {
-        html += `<span class="heatmap-month-label" style="left: ${leftPx}px;">${m.name}</span>`;
-        lastRightPx = leftPx;
-      }
+      const leftPct = (m.week_index / totalWeeks) * 100;
+      html += `<span class="heatmap-month-label" style="left: ${leftPct.toFixed(2)}%;">${m.name}</span>`;
     });
 
     html += `</div><div class="heatmap-weeks-grid">`;

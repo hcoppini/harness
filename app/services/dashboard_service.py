@@ -27,7 +27,7 @@ def get_app_inception_date(conn: sqlite3.Connection) -> str:
 
 def get_heatmap_data(
     start_date: Optional[str] = "2026-08-30",
-    days: int = 90,
+    days: int = 365,
     weeks: Optional[int] = None,
     end_date: Optional[str] = None,
     conn: Optional[sqlite3.Connection] = None,
@@ -35,11 +35,11 @@ def get_heatmap_data(
 ) -> Dict[str, Any]:
     """
     Builds the daily execution heatmap matrix starting from August 30, 2026 (or custom start_date)
-    and covering the 90-day cycle forward.
+    and covering the 365-day annual cycle forward spanning the full dashboard width.
     Contributions and brightness levels are tied directly to how many boxes
     were checked on that day (routine blocks + tasks + gym exercises).
     Git commits are excluded from checked boxes.
-    100% completion (e.g. 3/3, 8/8) produces Level 4: The Brightest Purple.
+    100% completion (e.g. 3/3, 8/8) produces Level 4: The Brightest Lavender Purple.
     """
     close_conn = False
     if conn is None:

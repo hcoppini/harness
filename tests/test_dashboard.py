@@ -19,12 +19,12 @@ def test_db(tmp_path):
 
 
 def test_heatmap_data_empty_db(test_db):
-    """Verifies that heatmap data starts on August 30, 2026 and covers the 90-day forward cycle."""
+    """Verifies that heatmap data starts on August 30, 2026 and covers the 365-day full-year forward cycle."""
     today_str = "2026-08-30"  # Sunday
     heatmap = dashboard_service.get_heatmap_data(end_date=today_str, conn=test_db, include_git=False)
     
     assert "weeks" in heatmap
-    assert len(heatmap["weeks"]) == 13 or len(heatmap["weeks"]) == 14  # ~90 days in 7-day weeks
+    assert len(heatmap["weeks"]) >= 52  # Full annual cycle (52-53 weeks)
     assert "total_contributions" in heatmap
     assert heatmap["total_contributions"] == 0
     assert heatmap["current_streak"] == 0

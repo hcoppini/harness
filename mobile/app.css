@@ -314,11 +314,11 @@ body {
   border-radius: 2px;
 }
 
-.m-lvl-0 { background: #161b22; }
-.m-lvl-1 { background: #0e4429; }
-.m-lvl-2 { background: #006d32; }
-.m-lvl-3 { background: #26a641; }
-.m-lvl-4 { background: #39d353; box-shadow: 0 0 4px rgba(57, 211, 83, 0.4); }
+.m-lvl-0 { background: #17171d; border: 1px solid rgba(255,255,255,0.04); }
+.m-lvl-1 { background: #3b1d60; }
+.m-lvl-2 { background: #6b21a8; }
+.m-lvl-3 { background: #9333ea; }
+.m-lvl-4 { background: #d8b4fe; box-shadow: 0 0 6px rgba(216, 180, 254, 0.45); }
 
 /* Toast */
 .mobile-toast {
