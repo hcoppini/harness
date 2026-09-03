@@ -23,47 +23,52 @@ const MetroMap = {
   activeStreamFilter: "all",
   currentBeaconX: 0,
 
-  // Stream Definitions with Clean Parallel Elevations
+  // Stream Definitions with Dynamic Elevation Offsets (Jagged Schematic Lines)
   streams: [
     {
       id: "academics",
       name: "Academics",
       code: "AC",
       color: "#c4b5fd", // Lavender
-      strokeWidth: 2.0,
-      baseY: 155,
+      strokeWidth: 2.5,
+      baseY: 175,
+      heightOffsets: [0, -10, 5, -10, 0, 5, -10, 0, -5, -15, 10, 10, -5, -15, -10, -15, -5, -10, -10, -15, -20, -15, 0],
     },
     {
       id: "code",
       name: "Code Sprint",
       code: "CD",
       color: "#7dd3fc", // Sky Blue
-      strokeWidth: 2.0,
-      baseY: 190,
+      strokeWidth: 2.5,
+      baseY: 210,
+      heightOffsets: [-5, 5, -10, -5, 0, 10, -10, 10, -10, 5, -15, -10, -5, -10, -5, -5, -10, -10, -5, 10, -15, 5, 0],
     },
     {
       id: "sigg",
       name: "SIGG GPW",
       code: "SG",
       color: "#fdba74", // Orange
-      strokeWidth: 2.5,
-      baseY: 225,
+      strokeWidth: 3.0,
+      baseY: 250,
+      heightOffsets: [0, -15, -20, -15, -20, -25, -20, -25, -30, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
     },
     {
       id: "german",
       name: "German Ladder",
       code: "DE",
       color: "#6ee7b7", // Emerald
-      strokeWidth: 2.0,
+      strokeWidth: 2.5,
       baseY: 295,
+      heightOffsets: [0, 5, 10, -5, 10, -5, 10, 10, 10, -5, -15, -25, -5, 10, -10, 10, 10, -10, -10, -15, 10, -25, 0],
     },
     {
       id: "physical",
       name: "Physical / Mass",
       code: "PH",
       color: "#fda4af", // Rose
-      strokeWidth: 2.0,
-      baseY: 330,
+      strokeWidth: 2.5,
+      baseY: 335,
+      heightOffsets: [0, 10, -10, 10, 10, 10, 10, -10, 10, -10, -15, -20, -5, 10, 10, -10, 10, 10, 10, -15, 10, 10, 0],
     },
   ],
 
@@ -164,12 +169,12 @@ const MetroMap = {
     const stations = this.data.stations;
     const spacing = 220;
     const startX = 160;
-    const spineY = 260;
+    const spineY = 250;
     const totalTrackLength = (stations.length - 1) * spacing;
     const totalWidth = startX + totalTrackLength + 320;
 
     canvasWrap.style.minWidth = `${totalWidth}px`;
-    canvasWrap.style.height = "540px";
+    canvasWrap.style.height = "520px";
 
     // Date calculations
     const startDate = new Date(2026, 8, 1);
@@ -222,9 +227,9 @@ const MetroMap = {
       })
       .join("");
 
-    // Generate Parallel Straight Stream Lines
+    // Generate Height-Varying Stream Lines with 45° Chamfered Schematic Paths
     let streamPathsHtml = "";
-    let streamPinsHtml = "";
+    let streamJunctionDotsHtml = "";
 
     this.streams.forEach((stream) => {
       const activeIndices = [];
@@ -237,38 +242,61 @@ const MetroMap = {
       if (activeIndices.length === 0) return;
 
       const isFiltered = this.activeStreamFilter !== "all" && this.activeStreamFilter !== stream.id;
-      const opacity = isFiltered ? 0.08 : this.activeStreamFilter === stream.id ? 1.0 : 0.65;
-      const strokeWidth = this.activeStreamFilter === stream.id ? 3.5 : stream.strokeWidth;
+      const opacity = isFiltered ? 0.06 : this.activeStreamFilter === stream.id ? 1.0 : 0.65;
+      const strokeWidth = this.activeStreamFilter === stream.id ? 4 : stream.strokeWidth;
 
-      const firstX = startX + activeIndices[0] * spacing;
-      const lastX = startX + activeIndices[activeIndices.length - 1] * spacing;
+      // Construct SVG path with 45° chamfers across stations
+      let d = "";
+      for (let i = 0; i < activeIndices.length; i++) {
+        const idx = activeIndices[i];
+        const px = startX + idx * spacing;
+        const offset = stream.heightOffsets[idx] || 0;
+        const py = stream.baseY + offset;
+
+        if (i === 0) {
+          d += `M ${px} ${py}`;
+        } else {
+          const prevIdx = activeIndices[i - 1];
+          const prevPx = startX + prevIdx * spacing;
+          const prevOffset = stream.heightOffsets[prevIdx] || 0;
+          const prevPy = stream.baseY + prevOffset;
+
+          // 45° chamfered segment
+          if (Math.abs(py - prevPy) > 2) {
+            const midX = (prevPx + px) / 2;
+            const chamfer = Math.min(25, Math.abs(py - prevPy));
+            d += ` L ${midX - chamfer} ${prevPy} L ${midX + chamfer} ${py} L ${px} ${py}`;
+          } else {
+            d += ` L ${px} ${py}`;
+          }
+        }
+
+        // Stream junction dot at (px, py)
+        const isMatch = this.activeStreamFilter === "all" || this.activeStreamFilter === stream.id;
+        const pinOpacity = isMatch ? 0.85 : 0.15;
+        streamJunctionDotsHtml += `
+          <circle cx="${px}" cy="${py}" r="3" fill="${stream.color}" opacity="${pinOpacity}" />
+        `;
+      }
 
       streamPathsHtml += `
-        <!-- Stream Track: ${stream.name} -->
+        <!-- Stream Highlighter Line: ${stream.name} -->
         <path 
-          d="M ${firstX - 8} ${stream.baseY} L ${lastX + 8} ${stream.baseY}" 
+          d="${d}" 
           fill="none" 
           stroke="${stream.color}" 
           stroke-width="${strokeWidth}" 
           stroke-linecap="round" 
+          stroke-linejoin="round"
           opacity="${opacity}" 
         />
       `;
-
-      // Junction dots on stream lines
-      activeIndices.forEach((idx) => {
-        const px = startX + idx * spacing;
-        const pinOpacity = isFiltered ? 0.12 : 0.9;
-        streamPinsHtml += `
-          <circle cx="${px}" cy="${stream.baseY}" r="3" fill="${stream.color}" opacity="${pinOpacity}" />
-        `;
-      });
     });
 
-    // Vertical alignment guide lines, SVG station circles, and stream dots
-    let verticalGuidesHtml = "";
-    let svgStationNodesHtml = "";
-    let svgStreamDotsHtml = "";
+    // Vertical Tee Pins, Station Circles, and Branch Dots
+    let verticalTeePinsHtml = "";
+    let svgStationCirclesHtml = "";
+    let svgBranchDotsHtml = "";
 
     stations.forEach((station, idx) => {
       const posX = startX + idx * spacing;
@@ -278,15 +306,31 @@ const MetroMap = {
       const branches = station.branches || [];
       const isPassed = posX <= currentX;
 
-      // Vertical guide line passing through posX
-      const yTop = isEven ? 152 : 155;
-      const yBottom = isEven ? 330 : 362;
-      verticalGuidesHtml += `
-        <line x1="${posX}" y1="${yTop}" x2="${posX}" y2="${yBottom}" 
-              stroke="rgba(255, 255, 255, 0.12)" stroke-width="1" stroke-dasharray="2 3" />
+      // Determine active stream Y coordinates at this station for continuous tee pin line
+      const activeYs = [];
+      branches.forEach((b) => {
+        const streamObj = this.streams.find((s) => s.id === b);
+        if (streamObj) {
+          const offset = streamObj.heightOffsets[idx] || 0;
+          activeYs.push(streamObj.baseY + offset);
+        }
+      });
+      activeYs.push(spineY);
+
+      const minY = Math.min(...activeYs);
+      const maxY = Math.max(...activeYs);
+
+      // Vertical Tee Pin line spanning from top card/highest stream to bottom card/lowest stream
+      const pinTop = isEven ? Math.min(minY - 6, spineY - 35) : minY - 6;
+      const pinBottom = isEven ? maxY + 6 : Math.max(maxY + 6, spineY + 35);
+
+      verticalTeePinsHtml += `
+        <!-- Vertical Tee Pin Line centered at posX -->
+        <line x1="${posX}" y1="${pinTop}" x2="${posX}" y2="${pinBottom}" 
+              stroke="rgba(255, 255, 255, 0.15)" stroke-width="1" stroke-dasharray="2 2" />
       `;
 
-      // Central Station Circle on Main Spine
+      // Station Circle Node on Main Spine (posX, spineY)
       const size = isMajor ? 18 : 14;
       const r = size / 2;
       let fill = "#09090b";
@@ -307,67 +351,67 @@ const MetroMap = {
         aura = `<circle cx="${posX}" cy="${spineY}" r="${r + 4}" fill="none" stroke="var(--accent-lavender)" stroke-width="1" opacity="0.5" stroke-dasharray="2 2" />`;
       }
 
-      svgStationNodesHtml += `
+      svgStationCirclesHtml += `
         ${aura}
         <circle cx="${posX}" cy="${spineY}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" />
         ${innerCore}
-        <!-- Click target overlay -->
+        <!-- Click target overlay for station node -->
         <circle cx="${posX}" cy="${spineY}" r="16" fill="transparent" cursor="pointer" onclick="MetroMap.selectStation('${station.id}')" style="pointer-events: all;" />
       `;
 
-      // Symmetric Stream Indicator Dots below station node (spineY + 16)
+      // Branch Indicator Dots symmetrically centered below station node (spineY + 14)
       if (branches.length > 0) {
         const numDots = branches.length;
-        const dotY = spineY + 16;
+        const dotY = spineY + 14;
         branches.forEach((b, bIdx) => {
           const streamObj = this.streams.find((s) => s.id === b);
           const color = streamObj ? streamObj.color : "#a1a1aa";
           const dotX = posX - (numDots - 1) * 4 + bIdx * 8;
-          svgStreamDotsHtml += `
+          svgBranchDotsHtml += `
             <circle cx="${dotX}" cy="${dotY}" r="2.5" fill="${color}" title="${b.toUpperCase()}" />
           `;
         });
       }
     });
 
-    // SVG Layer (Main Spine, Stream Tracks, Vertical Guides, Station Circles & Dots)
+    // SVG Base Lines (Main Spine, Grid, Tee Pins, Jagged Streams, Circles & Dots)
     let svgHtml = `
-      <svg width="${totalWidth}" height="540" style="position: absolute; top: 0; left: 0; pointer-events: none;">
+      <svg width="${totalWidth}" height="520" style="position: absolute; top: 0; left: 0; pointer-events: none;">
         <!-- Phase Vertical Grid Lines -->
         ${phases
           .map(
             (p) =>
-              `<line x1="${p.x - 20}" y1="28" x2="${p.x - 20}" y2="500" stroke="rgba(255,255,255,0.04)" stroke-dasharray="4 4" stroke-width="1" />`
+              `<line x1="${p.x - 20}" y1="36" x2="${p.x - 20}" y2="480" stroke="rgba(255,255,255,0.03)" stroke-dasharray="3 4" stroke-width="1" />`
           )
           .join("")}
 
-        <!-- Stream Tracks -->
+        <!-- Vertical Tee Pin Lines centered at posX -->
+        ${verticalTeePinsHtml}
+
+        <!-- Height-Varying Stream Lines -->
         ${streamPathsHtml}
 
-        <!-- Vertical Guide Lines -->
-        ${verticalGuidesHtml}
-
         <!-- Stream Junction Dots -->
-        ${streamPinsHtml}
+        ${streamJunctionDotsHtml}
 
         <!-- Singular Central Main Spine Line -->
-        <line x1="${startX - 40}" y1="${spineY}" x2="${startX + totalTrackLength + 40}" y2="${spineY}" 
-              stroke="#27272a" stroke-width="6" stroke-linecap="round" />
+        <line x1="${startX - 20}" y1="${spineY}" x2="${startX + totalTrackLength + 30}" y2="${spineY}" 
+              stroke="#27272a" stroke-width="5" stroke-linecap="round" />
 
         <!-- Main Spine Reached / Completed Fill -->
         ${
           currentX > startX
-            ? `<line x1="${startX - 40}" y1="${spineY}" x2="${currentX}" y2="${spineY}" stroke="var(--accent-lavender)" stroke-width="5" stroke-linecap="round" />`
+            ? `<line x1="${startX - 20}" y1="${spineY}" x2="${currentX}" y2="${spineY}" stroke="var(--accent-lavender)" stroke-width="4" stroke-linecap="round" />`
             : ""
         }
 
         <!-- Station Circles on Main Spine -->
-        ${svgStationNodesHtml}
+        ${svgStationCirclesHtml}
 
         <!-- Symmetrical Branch Dots below Stations -->
-        ${svgStreamDotsHtml}
+        ${svgBranchDotsHtml}
 
-        <!-- Real-Time Day Beacon Indicator on Spine -->
+        <!-- Real-Time Day Beacon on Spine -->
         <circle cx="${currentX}" cy="${spineY}" r="7" fill="none" stroke="var(--accent-lavender)" stroke-width="1.5" opacity="0.8">
           <animate attributeName="r" values="7;13;7" dur="2s" repeatCount="indefinite"/>
           <animate attributeName="opacity" values="0.8;0.15;0.8" dur="2s" repeatCount="indefinite"/>
@@ -384,9 +428,9 @@ const MetroMap = {
         const status = station.status || "upcoming";
         const branches = station.branches || [];
 
-        // Center card horizontally at posX (width = 170px)
+        // Card position: Even on top, Odd on bottom (centered horizontally at posX)
+        const cardTop = isEven ? spineY - 150 : spineY + 36;
         const cardLeft = posX - 85;
-        const cardTop = isEven ? spineY - 180 : spineY + 105;
 
         // Filter opacity
         let isFilteredMatch = true;
