@@ -28,4 +28,7 @@ Thumbs.db
 
 # Local database (optional, can track or keep local)
 # data/harness.db
+*.db-wal
+*.db-shm
+
 
