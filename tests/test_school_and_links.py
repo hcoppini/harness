@@ -63,7 +63,7 @@ def test_get_lessons_for_weekday():
 
 def test_url_validation():
     assert school_service.is_safe_url("https://tm1.edu.pl") is True
-    assert school_service.is_safe_url("http://planlekcji2.staff.edu.pl/") is True
+    assert school_service.is_safe_url("https://planlekcji.staff.edu.pl/") is True
     assert school_service.is_safe_url("javascript:alert(1)") is False
     assert school_service.is_safe_url("file:///C:/Windows/notepad.exe") is False
 
