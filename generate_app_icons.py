@@ -3,7 +3,7 @@ from pathlib import Path
 from PIL import Image
 
 BRAIN_DIR = Path(r"C:\Users\heito\.gemini\antigravity\brain\da4ff062-7090-4a3a-8b02-9789d5fd39b7")
-SOURCE_IMG = BRAIN_DIR / "harness_app_icon_1788457362953.jpg"
+SOURCE_IMG = BRAIN_DIR / "lavender_icepick_angled_1788458032280.jpg"
 
 BASE_DIR = Path(__file__).resolve().parent
 MOBILE_DIR = BASE_DIR / "mobile"
