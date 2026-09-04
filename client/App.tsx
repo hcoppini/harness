@@ -9,6 +9,7 @@ import {
   SafeAreaView,
   StatusBar,
   Platform,
+  Dimensions,
 } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import {
@@ -26,13 +27,17 @@ import {
 } from './src/lib/storage';
 import { supabase } from './src/lib/supabase';
 
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const IS_DESKTOP = Platform.OS === 'web' && SCREEN_WIDTH > 768;
+
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'cockpit' | 'today' | 'metro' | 'body'>('today');
+  const [activeTab, setActiveTab] = useState<'cockpit' | 'today' | 'metro' | 'body'>('cockpit');
   const [todayStr] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
-  // State
+  // Data State
   const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
+  const [taskCategory, setTaskCategory] = useState<'TUM' | 'CODE' | 'SIGG' | 'GENERAL'>('TUM');
   const [dailyLog, setDailyLog] = useState<DailyLog>({
     date: todayStr,
     scratchpad: '',
@@ -41,10 +46,11 @@ export default function App() {
   });
   const [metroStations, setMetroStations] = useState<MetroStation[]>([]);
   const [weightInput, setWeightInput] = useState('');
-  const [calSurplus, setCalSurplus] = useState(false);
-  const [proteinMet, setProteinMet] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'Realtime' | 'Offline Ready'>('Offline Ready');
+  const [calSurplus, setCalSurplus] = useState(true);
+  const [proteinMet, setProteinMet] = useState(true);
+  const [syncStatus, setSyncStatus] = useState<'CONNECTED' | 'OFFLINE READY'>('OFFLINE READY');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+  const [selectedDayInfo, setSelectedDayInfo] = useState<string | null>(null);
 
   useEffect(() => {
     loadInitialData();
@@ -55,14 +61,15 @@ export default function App() {
     setTimeout(() => setToastMsg(null), 2000);
   };
 
-  const triggerHaptic = () => {
+  const triggerHaptic = (type: 'light' | 'medium' | 'success' = 'light') => {
     if (Platform.OS !== 'web') {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      if (type === 'success') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      else if (type === 'medium') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+      else Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     }
   };
 
   const loadInitialData = async () => {
-    // 1. Load local data
     const localTasks = await getLocalTasks();
     const localLog = await getLocalDailyLog(todayStr);
     const localMetro = await getLocalMetro();
@@ -71,14 +78,25 @@ export default function App() {
     setDailyLog(localLog);
     setMetroStations(localMetro);
 
-    // 2. If Supabase is connected, subscribe to real-time changes
     if (supabase) {
-      setSyncStatus('Realtime');
+      setSyncStatus('CONNECTED');
       try {
-        const { data: remoteTasks } = await supabase.from('tasks').select('*');
-        if (remoteTasks) {
+        const { data: remoteTasks } = await supabase.from('tasks').select('*').order('id', { ascending: false });
+        if (remoteTasks && remoteTasks.length > 0) {
           setTasks(remoteTasks);
           saveLocalTasks(remoteTasks);
+        }
+
+        const { data: remoteLog } = await supabase.from('daily_logs').select('*').eq('date', todayStr).single();
+        if (remoteLog) {
+          setDailyLog(remoteLog);
+          saveLocalDailyLog(remoteLog);
+        }
+
+        const { data: remoteMetro } = await supabase.from('metro_stations').select('*').order('order_idx', { ascending: true });
+        if (remoteMetro && remoteMetro.length > 0) {
+          setMetroStations(remoteMetro);
+          saveLocalMetro(remoteMetro);
         }
       } catch (err) {
         console.log('Supabase sync notice:', err);
@@ -90,7 +108,7 @@ export default function App() {
   // Routine & Tasks
   // --------------------------------------------------------------------------
   const toggleBlock = async (idx: number) => {
-    triggerHaptic();
+    triggerHaptic('medium');
     const current = new Set(
       dailyLog.completed_blocks.split(',').map((s) => s.trim()).filter(Boolean)
     );
@@ -111,11 +129,11 @@ export default function App() {
     if (supabase) {
       await supabase.from('daily_logs').upsert(updatedLog);
     }
-    showToast('Routine updated');
+    showToast('Block updated');
   };
 
   const toggleExercise = async (idx: number) => {
-    triggerHaptic();
+    triggerHaptic('medium');
     const current = new Set(
       dailyLog.completed_exercises.split(',').map((s) => s.trim()).filter(Boolean)
     );
@@ -141,13 +159,13 @@ export default function App() {
 
   const handleAddTask = async () => {
     if (!newTaskTitle.trim()) return;
-    triggerHaptic();
+    triggerHaptic('success');
 
     const newTask: TaskItem = {
       id: Date.now(),
       title: newTaskTitle.trim(),
-      category: 'General',
-      is_tum: false,
+      category: taskCategory,
+      is_tum: taskCategory === 'TUM',
       completed: false,
       date: todayStr,
     };
@@ -164,7 +182,7 @@ export default function App() {
   };
 
   const toggleTask = async (id: number) => {
-    triggerHaptic();
+    triggerHaptic('medium');
     const updated = tasks.map((t) => (t.id === id ? { ...t, completed: !t.completed } : t));
     setTasks(updated);
     await saveLocalTasks(updated);
@@ -176,7 +194,7 @@ export default function App() {
   };
 
   const deleteTask = async (id: number) => {
-    triggerHaptic();
+    triggerHaptic('light');
     const updated = tasks.filter((t) => t.id !== id);
     setTasks(updated);
     await saveLocalTasks(updated);
@@ -197,7 +215,7 @@ export default function App() {
   // Metro Deliverables Checklist
   // --------------------------------------------------------------------------
   const toggleMetroDeliverable = async (stationId: string, delivKey: string) => {
-    triggerHaptic();
+    triggerHaptic('success');
     const updated = metroStations.map((st) => {
       if (st.id !== stationId) return st;
       const completed = new Set(st.completed_deliverables || []);
@@ -221,23 +239,26 @@ export default function App() {
     setMetroStations(updated);
     await saveLocalMetro(updated);
 
-    if (supabase) {
-      const station = updated.find((s) => s.id === stationId);
-      if (station) {
-        await supabase
-          .from('metro_stations')
-          .update({
-            completed_deliverables: station.completed_deliverables,
-            status: station.status,
-          })
-          .eq('id', stationId);
-      }
+    const activeSt = updated.find((s) => s.id === stationId);
+    if (activeSt && activeSt.status === 'completed') {
+      showToast(`Station Completed: ${activeSt.name}! ✓`);
+    } else {
+      showToast(`Updated ${delivKey}`);
     }
-    showToast('Deliverable updated');
+
+    if (supabase && activeSt) {
+      await supabase
+        .from('metro_stations')
+        .update({
+          completed_deliverables: activeSt.completed_deliverables,
+          status: activeSt.status,
+        })
+        .eq('id', stationId);
+    }
   };
 
   // --------------------------------------------------------------------------
-  // Velocity Calculations
+  // Calculated Metrics
   // --------------------------------------------------------------------------
   const completedBlocksSet = new Set(
     dailyLog.completed_blocks.split(',').map((s) => s.trim()).filter(Boolean)
@@ -247,427 +268,582 @@ export default function App() {
   const velocityPct = totalBlocks > 0 ? Math.round((completedCount / totalBlocks) * 100) : 0;
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#0a0c10" />
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="light-content" backgroundColor="#08090c" />
 
-      {/* Top Header */}
-      <View style={styles.header}>
-        <View style={styles.brandWrap}>
-          {/* 2-Shard Lavender Mark */}
-          <View style={styles.brandIconMark}>
-            <View style={styles.shardHead} />
-            <View style={styles.shardShaft} />
-          </View>
-          <Text style={styles.brandTitle}>HARNESS</Text>
-          <Text style={styles.brandCaption}>/ EXECUTIVE OS</Text>
-        </View>
+      {/* Centered Device Wrapper for Desktop / Tablet */}
+      <View style={styles.viewportContainer}>
 
-        <View style={styles.syncBadge}>
-          <View style={styles.syncDot} />
-          <Text style={styles.syncText}>{syncStatus}</Text>
-        </View>
-      </View>
-
-      {/* Toast Alert */}
-      {toastMsg && (
-        <View style={styles.toast}>
-          <Text style={styles.toastText}>{toastMsg}</Text>
-        </View>
-      )}
-
-      {/* Main Viewport */}
-      <ScrollView style={styles.mainContent} contentContainerStyle={{ paddingBottom: 100 }}>
         {/* ==================================================================
-             VIEW 0: COCKPIT / DASHBOARD
+             TOP LUXURY HEADER
              ================================================================== */}
-        {activeTab === 'cockpit' && (
-          <View>
-            {/* Velocity Card */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardLabel}>TODAY'S VELOCITY</Text>
-                <Text style={styles.goldPill}>3d STREAK</Text>
-              </View>
-              <View style={{ flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginVertical: 8 }}>
-                <Text style={styles.largeValue}>{velocityPct}%</Text>
-                <Text style={styles.monoSubtext}>{completedCount}/{totalBlocks} blocks completed</Text>
-              </View>
-              <View style={styles.progressBarTrack}>
-                <View style={[styles.progressBarFill, { width: `${velocityPct}%` }]} />
-              </View>
+        <View style={styles.header}>
+          <View style={styles.brandRow}>
+            {/* 2-Shard Lavender Ice Pick Icon */}
+            <View style={styles.icePickIconBox}>
+              <View style={styles.shardBlade} />
+              <View style={styles.shardHandle} />
             </View>
+            <View>
+              <Text style={styles.brandTitle}>HARNESS</Text>
+              <Text style={styles.brandSubtitle}>EXECUTIVE OS</Text>
+            </View>
+          </View>
 
-            {/* Purple Execution Heatmap */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardLabel}>DAILY EXECUTION PULSE</Text>
-                <Text style={styles.monoSubtext}>52-Week Luminescence</Text>
-              </View>
-              <Text style={{ fontSize: 11, color: '#9aa0a6', marginBottom: 12 }}>
-                Density scale directly mapped to completed routine blocks &amp; gym protocols.
-              </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <View style={{ flexDirection: 'row', gap: 3 }}>
-                  {Array.from({ length: 52 }).map((_, wIdx) => (
-                    <View key={wIdx} style={{ flexDirection: 'column', gap: 3 }}>
-                      {Array.from({ length: 7 }).map((_, dIdx) => {
-                        const isRecent = wIdx >= 48;
-                        let level = 0;
-                        if (isRecent && dIdx === 1) level = 4;
-                        else if (isRecent && dIdx === 3) level = 3;
-                        else if (isRecent && dIdx === 5) level = 2;
-                        else if (isRecent) level = 1;
+          {/* Sync Badge */}
+          <View style={styles.syncBadge}>
+            <View style={styles.syncDot} />
+            <Text style={styles.syncText}>{syncStatus}</Text>
+          </View>
+        </View>
 
-                        const colors = ['#17171d', '#3b1d60', '#6b21a8', '#9333ea', '#d8b4fe'];
-                        return (
-                          <View
-                            key={dIdx}
-                            style={{
-                              width: 10,
-                              height: 10,
-                              borderRadius: 2,
-                              backgroundColor: colors[level],
-                            }}
-                          />
-                        );
-                      })}
+        {/* Toast Alert */}
+        {toastMsg && (
+          <View style={styles.toast}>
+            <Text style={styles.toastText}>{toastMsg}</Text>
+          </View>
+        )}
+
+        {/* ==================================================================
+             MAIN SCROLLABLE VIEWPORT
+             ================================================================== */}
+        <ScrollView
+          style={styles.contentScroll}
+          contentContainerStyle={{ paddingBottom: 110 }}
+          showsVerticalScrollIndicator={false}
+        >
+
+          {/* ================================================================
+               LAYER 0: COCKPIT / DASHBOARD
+               ================================================================ */}
+          {activeTab === 'cockpit' && (
+            <View>
+              {/* Top 2x2 Executive Trajectory Grid */}
+              <View style={styles.cockpitGrid}>
+                {/* Gauge 1: Today's Execution Velocity */}
+                <TouchableOpacity
+                  style={styles.gaugeCard}
+                  onPress={() => setActiveTab('today')}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.gaugeHeader}>
+                    <Text style={styles.gaugeLabel}>TODAY'S VELOCITY</Text>
+                    <View style={styles.pillLavender}>
+                      <Text style={styles.pillLavenderText}>SCHEDULE A</Text>
                     </View>
-                  ))}
+                  </View>
+                  <Text style={styles.gaugeValueBig}>{velocityPct}%</Text>
+                  <View style={styles.progressTrack}>
+                    <View style={[styles.progressFill, { width: `${velocityPct}%` }]} />
+                  </View>
+                  <Text style={styles.gaugeSubtext}>{completedCount}/{totalBlocks} blocks done</Text>
+                </TouchableOpacity>
+
+                {/* Gauge 2: TUM Heilbronn Readiness */}
+                <TouchableOpacity
+                  style={styles.gaugeCard}
+                  onPress={() => setActiveTab('metro')}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.gaugeHeader}>
+                    <Text style={styles.gaugeLabel}>TUM ADMISSIONS</Text>
+                    <View style={styles.pillGold}>
+                      <Text style={styles.pillGoldText}>GERMAN A2</Text>
+                    </View>
+                  </View>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
+                    <Text style={styles.gaugeValueMedium}>GPA 4.85</Text>
+                    <Text style={styles.gaugeValueMedium}>92% MOCK</Text>
+                  </View>
+                  <Text style={[styles.gaugeSubtext, { marginTop: 12 }]} numberOfLines={1}>
+                    Active: Pure Syntax Launch
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Gauge 3: Body / Hypertrophy */}
+                <TouchableOpacity
+                  style={styles.gaugeCard}
+                  onPress={() => setActiveTab('body')}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.gaugeHeader}>
+                    <Text style={styles.gaugeLabel}>PHYSIQUE &amp; MASS</Text>
+                    <Text style={styles.monoSubLabel}>80.0 kg Goal</Text>
+                  </View>
+                  <Text style={styles.gaugeValueBig}>68.5 <Text style={{ fontSize: 13, color: '#9aa0a6' }}>kg</Text></Text>
+                  <Text style={styles.gaugeSubtext}>Gym 4/4 • Boxing 3/3</Text>
+                </TouchableOpacity>
+
+                {/* Gauge 4: Active Sprint */}
+                <View style={styles.gaugeCard}>
+                  <View style={styles.gaugeHeader}>
+                    <Text style={styles.gaugeLabel}>ACTIVE SPRINT</Text>
+                    <View style={styles.pillLavender}>
+                      <Text style={styles.pillLavenderText}>SIGG 24</Text>
+                    </View>
+                  </View>
+                  <Text style={styles.gaugeValueMedium} numberOfLines={1}>GPW Scanner</Text>
+                  <Text style={[styles.gaugeSubtext, { marginTop: 8 }]} numberOfLines={2}>
+                    Next: Backtest intraday momentum spikes
+                  </Text>
                 </View>
-              </ScrollView>
-            </View>
-
-            {/* Upcoming Forecast */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardLabel}>UPCOMING TOMORROW</Text>
-                <Text style={styles.monoSubtext}>Schedule B</Text>
               </View>
-              <Text style={{ fontSize: 14, fontWeight: '700', color: '#f0f2f5', marginTop: 4 }}>
-                Liceum CS / Math Rozszerzenie + Library Deep Work
-              </Text>
-              <Text style={{ fontSize: 12, color: '#9aa0a6', marginTop: 4 }}>
-                Lift: Upper Hypertrophy • 140g+ Target Protein
-              </Text>
-            </View>
-          </View>
-        )}
 
-        {/* ==================================================================
-             VIEW 1: TODAY (Routine & Quick Tasks)
-             ================================================================== */}
-        {activeTab === 'today' && (
-          <View>
-            {/* Quick Task Input */}
-            <View style={styles.quickInputRow}>
-              <TextInput
-                style={styles.textInput}
-                placeholder="+ Add one-off task..."
-                placeholderTextColor="#5f6368"
-                value={newTaskTitle}
-                onChangeText={setNewTaskTitle}
-                onSubmitEditing={handleAddTask}
-              />
-              <TouchableOpacity style={styles.addBtn} onPress={handleAddTask}>
-                <Text style={styles.addBtnText}>Add</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Daily Schedule Checklist */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardLabel}>{DEFAULT_SCHEDULE.name}</Text>
-                <Text style={styles.monoSubtext}>{completedCount}/{totalBlocks}</Text>
-              </View>
-              {DEFAULT_SCHEDULE.blocks.map((b, idx) => {
-                const isDone = completedBlocksSet.has(String(idx));
-                return (
-                  <TouchableOpacity
-                    key={idx}
-                    style={[styles.routineRow, isDone && styles.routineRowDone]}
-                    onPress={() => toggleBlock(idx)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.checkCircle, isDone && styles.checkCircleChecked]}>
-                      {isDone && <Text style={styles.checkMark}>✓</Text>}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.routineTime}>{b.time} • {b.cutoff}</Text>
-                      <Text style={[styles.routineFocus, isDone && styles.textCrossed]}>
-                        {b.focus}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
-            </View>
-
-            {/* Tasks Checklist */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardLabel}>ACTIVE TASKS ({tasks.length})</Text>
-              </View>
-              {tasks.length === 0 ? (
-                <Text style={{ fontSize: 12, color: '#5f6368', paddingVertical: 8 }}>
-                  No active tasks. Tap + above to add one.
-                </Text>
-              ) : (
-                tasks.map((t) => (
-                  <View key={t.id} style={styles.routineRow}>
-                    <TouchableOpacity
-                      style={[styles.checkCircle, t.completed && styles.checkCircleChecked]}
-                      onPress={() => toggleTask(t.id)}
-                    >
-                      {t.completed && <Text style={styles.checkMark}>✓</Text>}
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                      style={{ flex: 1 }}
-                      onPress={() => toggleTask(t.id)}
-                    >
-                      <Text style={[styles.routineFocus, t.completed && styles.textCrossed]}>
-                        {t.title}
-                      </Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity onPress={() => deleteTask(t.id)} style={{ padding: 4 }}>
-                      <Text style={{ color: '#5f6368', fontSize: 13, fontWeight: '700' }}>✕</Text>
-                    </TouchableOpacity>
+              {/* GitHub-Style Execution Heatmap Card */}
+              <View style={styles.card}>
+                <View style={styles.cardHeaderRow}>
+                  <View>
+                    <Text style={styles.cardSectionTitle}>Daily Execution Pulse</Text>
+                    <Text style={styles.cardSectionSubtitle}>Historical habit density: routines, gym, and tasks</Text>
                   </View>
-                ))
-              )}
-            </View>
-
-            {/* Scratchpad */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardLabel}>SCRATCHPAD</Text>
-                <Text style={{ fontSize: 9, color: '#5f6368' }}>Auto-saved</Text>
-              </View>
-              <TextInput
-                style={styles.scratchpadInput}
-                placeholder="Transient ideas, math notes, trade setups..."
-                placeholderTextColor="#5f6368"
-                multiline
-                value={dailyLog.scratchpad}
-                onChangeText={handleScratchpadChange}
-              />
-            </View>
-          </View>
-        )}
-
-        {/* ==================================================================
-             VIEW 2: METRO ROADMAP
-             ================================================================== */}
-        {activeTab === 'metro' && (
-          <View>
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardLabel}>TUM HEILBRONN ROADMAP</Text>
-                <Text style={{ color: '#c5a059', fontFamily: 'monospace', fontSize: 10, fontWeight: '700' }}>2026 - 2028</Text>
-              </View>
-              <Text style={{ fontSize: 12, color: '#9aa0a6' }}>
-                Tap any station deliverable to check off requirements and complete the station.
-              </Text>
-            </View>
-
-            {metroStations.map((st) => {
-              const isDone = st.status === 'completed';
-              const delivEntries = Object.entries(st.deliverables || {});
-              const completedDelivs = new Set(st.completed_deliverables || []);
-
-              return (
-                <View key={st.id} style={[styles.card, st.is_major && styles.cardMajor]}>
-                  <View style={styles.cardHeaderRow}>
-                    <Text style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: '700', color: st.is_major ? '#c5a059' : '#9aa0a6' }}>
-                      {st.month_label} • {st.phase.split(':')[0]}
-                    </Text>
-                    <Text style={{ fontFamily: 'monospace', fontSize: 10, color: isDone ? '#39d353' : '#5f6368', fontWeight: '700' }}>
-                      {isDone ? 'COMPLETED ✓' : `${completedDelivs.size}/${delivEntries.length} MET`}
-                    </Text>
-                  </View>
-
-                  <Text style={{ fontSize: 14, fontWeight: '700', color: '#f0f2f5', marginVertical: 4 }}>
-                    {st.name}
-                  </Text>
-                  <Text style={{ fontSize: 12, color: '#9aa0a6', marginBottom: 10 }}>
-                    {st.objective}
-                  </Text>
-
-                  {/* Deliverables Checklist */}
-                  <View style={{ borderTopWidth: 1, borderTopColor: 'rgba(255,255,255,0.06)', paddingTop: 8 }}>
-                    {delivEntries.map(([key, val]) => {
-                      const isChecked = completedDelivs.has(key);
-                      return (
-                        <TouchableOpacity
-                          key={key}
-                          style={styles.routineRow}
-                          onPress={() => toggleMetroDeliverable(st.id, key)}
-                          activeOpacity={0.7}
-                        >
-                          <View style={[styles.checkCircle, isChecked && styles.checkCircleChecked]}>
-                            {isChecked && <Text style={styles.checkMark}>✓</Text>}
-                          </View>
-                          <View style={{ flex: 1 }}>
-                            <Text style={{ fontFamily: 'monospace', fontSize: 9, fontWeight: '700', color: '#5f6368', textTransform: 'uppercase' }}>
-                              {key} LINE
-                            </Text>
-                            <Text style={[styles.routineFocus, isChecked && styles.textCrossed, { fontSize: 12 }]}>
-                              {val}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      );
-                    })}
+                  <View style={styles.heatmapLegend}>
+                    <Text style={styles.legendText}>Less</Text>
+                    <View style={[styles.legendBox, { backgroundColor: '#161b22' }]} />
+                    <View style={[styles.legendBox, { backgroundColor: '#0e4429' }]} />
+                    <View style={[styles.legendBox, { backgroundColor: '#006d32' }]} />
+                    <View style={[styles.legendBox, { backgroundColor: '#26a641' }]} />
+                    <View style={[styles.legendBox, { backgroundColor: '#39d353' }]} />
+                    <Text style={styles.legendText}>More</Text>
                   </View>
                 </View>
-              );
-            })}
-          </View>
-        )}
 
-        {/* ==================================================================
-             VIEW 3: BODY / GYM
-             ================================================================== */}
-        {activeTab === 'body' && (
-          <View>
-            {/* Gym Protocol */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardLabel}>{DEFAULT_GYM_PROTOCOL.name}</Text>
-                <Text style={styles.monoSubtext}>{DEFAULT_GYM_PROTOCOL.day}</Text>
+                {/* Scrollable 52-Week Green Grid */}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
+                  <View style={{ flexDirection: 'row', gap: 3 }}>
+                    {Array.from({ length: 28 }).map((_, wIdx) => (
+                      <View key={wIdx} style={{ flexDirection: 'column', gap: 3 }}>
+                        {Array.from({ length: 7 }).map((_, dIdx) => {
+                          const isRecent = wIdx >= 24;
+                          let level = 0;
+                          if (isRecent && (dIdx === 1 || dIdx === 3)) level = 4;
+                          else if (isRecent && dIdx === 5) level = 3;
+                          else if (isRecent && dIdx === 2) level = 2;
+                          else if (wIdx >= 20) level = 1;
+
+                          const greenColors = ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'];
+                          return (
+                            <TouchableOpacity
+                              key={dIdx}
+                              style={[
+                                styles.heatCell,
+                                { backgroundColor: greenColors[level] },
+                                level === 4 && styles.heatCellGlow,
+                              ]}
+                              onPress={() => {
+                                triggerHaptic('light');
+                                setSelectedDayInfo(`Week ${wIdx + 1}, Day ${dIdx + 1}: ${level > 0 ? `${level * 2} blocks completed` : 'Rest day'}`);
+                              }}
+                              activeOpacity={0.7}
+                            />
+                          );
+                        })}
+                      </View>
+                    ))}
+                  </View>
+                </ScrollView>
+                {selectedDayInfo && (
+                  <Text style={styles.dayInfoPill}>{selectedDayInfo}</Text>
+                )}
               </View>
-              {DEFAULT_GYM_PROTOCOL.exercises.map((ex, idx) => {
-                const isDone = new Set(
-                  dailyLog.completed_exercises.split(',').map((s) => s.trim()).filter(Boolean)
-                ).has(String(idx));
 
-                return (
-                  <TouchableOpacity
-                    key={idx}
-                    style={styles.routineRow}
-                    onPress={() => toggleExercise(idx)}
-                    activeOpacity={0.7}
-                  >
-                    <View style={[styles.checkCircle, isDone && styles.checkCircleChecked]}>
-                      {isDone && <Text style={styles.checkMark}>✓</Text>}
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles.routineTime}>{ex.sets_reps} • {ex.rest}</Text>
-                      <Text style={[styles.routineFocus, isDone && styles.textCrossed]}>
-                        {ex.name}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                );
-              })}
+              {/* Tomorrow's Strategic Forecast Card */}
+              <View style={styles.card}>
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.cardSectionTitle}>Upcoming Tomorrow</Text>
+                  <View style={styles.pillLavender}>
+                    <Text style={styles.pillLavenderText}>SCHEDULE A</Text>
+                  </View>
+                </View>
+                <View style={styles.forecastBox}>
+                  <Text style={styles.forecastTitle}>Liceum + SGH Library TUM Deep Work</Text>
+                  <Text style={styles.forecastDetail}>
+                    • 14:45 - 17:30: Pure C++/Python Syntax fluency &amp; German B1 Anki
+                  </Text>
+                  <Text style={styles.forecastDetail}>
+                    • 18:00 - 19:30: Upper Hypertrophy Protocol • 140g+ Target Protein
+                  </Text>
+                </View>
+              </View>
             </View>
+          )}
 
-            {/* Weigh-in */}
-            <View style={styles.card}>
-              <View style={styles.cardHeaderRow}>
-                <Text style={styles.cardLabel}>BODY MASS TRACKER</Text>
-                <Text style={styles.monoSubtext}>Target: 80.0 kg</Text>
-              </View>
-              <View style={{ flexDirection: 'row', gap: 8, marginVertical: 10 }}>
+          {/* ================================================================
+               LAYER 1: TODAY (Routine Blocks & Tasks)
+               ================================================================ */}
+          {activeTab === 'today' && (
+            <View>
+              {/* Quick Task Creation Input */}
+              <View style={styles.quickTaskBox}>
                 <TextInput
-                  style={[styles.textInput, { flex: 1 }]}
-                  placeholder="Morning Weight (e.g. 68.5)"
+                  style={styles.quickTaskInput}
+                  placeholder="+ Add one-off task..."
                   placeholderTextColor="#5f6368"
-                  keyboardType="decimal-pad"
-                  value={weightInput}
-                  onChangeText={setWeightInput}
+                  value={newTaskTitle}
+                  onChangeText={setNewTaskTitle}
+                  onSubmitEditing={handleAddTask}
                 />
-                <TouchableOpacity
-                  style={styles.addBtn}
-                  onPress={() => {
-                    if (weightInput) {
-                      showToast(`Weigh-in saved: ${weightInput} kg`);
-                      setWeightInput('');
-                    }
-                  }}
-                >
-                  <Text style={styles.addBtnText}>Save</Text>
-                </TouchableOpacity>
+                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
+                  <TouchableOpacity
+                    style={[styles.catBadge, taskCategory === 'TUM' && styles.catBadgeActive]}
+                    onPress={() => setTaskCategory('TUM')}
+                  >
+                    <Text style={[styles.catBadgeText, taskCategory === 'TUM' && styles.catBadgeTextActive]}>TUM</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.quickAddBtn}
+                    onPress={handleAddTask}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.quickAddBtnText}>Add</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-              <View style={{ flexDirection: 'row', gap: 16 }}>
-                <TouchableOpacity
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-                  onPress={() => setCalSurplus(!calSurplus)}
-                >
-                  <View style={[styles.checkCircle, calSurplus && styles.checkCircleChecked]}>
-                    {calSurplus && <Text style={styles.checkMark}>✓</Text>}
-                  </View>
-                  <Text style={{ color: '#f0f2f5', fontSize: 12 }}>+300 Cal Surplus</Text>
-                </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}
-                  onPress={() => setProteinMet(!proteinMet)}
-                >
-                  <View style={[styles.checkCircle, proteinMet && styles.checkCircleChecked]}>
-                    {proteinMet && <Text style={styles.checkMark}>✓</Text>}
+              {/* Daily Schedule Routine Blocks */}
+              <View style={styles.card}>
+                <View style={styles.cardHeaderRow}>
+                  <View>
+                    <Text style={styles.cardSectionTitle}>{DEFAULT_SCHEDULE.name}</Text>
+                    <Text style={styles.cardSectionSubtitle}>Strict time boxes &amp; exit cutoffs</Text>
                   </View>
-                  <Text style={{ color: '#f0f2f5', fontSize: 12 }}>140g+ Protein Met</Text>
-                </TouchableOpacity>
+                  <Text style={styles.routineCountText}>{completedCount}/{totalBlocks} Done</Text>
+                </View>
+
+                {DEFAULT_SCHEDULE.blocks.map((b, idx) => {
+                  const isDone = completedBlocksSet.has(String(idx));
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      style={[styles.routineRow, isDone && styles.routineRowDone]}
+                      onPress={() => toggleBlock(idx)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.checkBtn, isDone && styles.checkBtnChecked]}>
+                        {isDone && <Text style={styles.checkBtnIcon}>✓</Text>}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                          <Text style={styles.routineTimePill}>{b.time}</Text>
+                          <Text style={styles.routineCutoffTag}>{b.cutoff}</Text>
+                        </View>
+                        <Text style={[styles.routineName, isDone && styles.textCrossed]}>
+                          {b.focus}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Active Tasks Checklist */}
+              <View style={styles.card}>
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.cardSectionTitle}>Active Tasks ({tasks.length})</Text>
+                </View>
+
+                {tasks.length === 0 ? (
+                  <Text style={styles.emptyNotice}>No active tasks. Tap + above to add one.</Text>
+                ) : (
+                  tasks.map((t) => (
+                    <View key={t.id} style={styles.taskRow}>
+                      <TouchableOpacity
+                        style={[styles.checkBtn, t.completed && styles.checkBtnChecked]}
+                        onPress={() => toggleTask(t.id)}
+                      >
+                        {t.completed && <Text style={styles.checkBtnIcon}>✓</Text>}
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={{ flex: 1 }}
+                        onPress={() => toggleTask(t.id)}
+                      >
+                        <Text style={[styles.taskTitle, t.completed && styles.textCrossed]}>
+                          {t.title}
+                        </Text>
+                        <Text style={styles.taskCategoryPill}>{t.category}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity onPress={() => deleteTask(t.id)} style={{ padding: 6 }}>
+                        <Text style={{ color: '#5f6368', fontSize: 13, fontWeight: '700' }}>✕</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ))
+                )}
+              </View>
+
+              {/* Daily Scratchpad Buffer */}
+              <View style={styles.card}>
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.cardSectionTitle}>Daily Scratchpad Buffer</Text>
+                  <Text style={styles.monoSubLabel}>Auto-saved</Text>
+                </View>
+                <TextInput
+                  style={styles.scratchpadArea}
+                  placeholder="Transient thoughts, math equations, trade setups..."
+                  placeholderTextColor="#5f6368"
+                  multiline
+                  value={dailyLog.scratchpad}
+                  onChangeText={handleScratchpadChange}
+                />
               </View>
             </View>
-          </View>
-        )}
-      </ScrollView>
+          )}
 
-      {/* Bottom Navigation Bar */}
-      <View style={styles.bottomNav}>
-        <TouchableOpacity
-          style={[styles.navItem, activeTab === 'cockpit' && styles.navItemActive]}
-          onPress={() => {
-            triggerHaptic();
-            setActiveTab('cockpit');
-          }}
-        >
-          <Text style={[styles.navIcon, activeTab === 'cockpit' && styles.navIconActive]}>◈</Text>
-          <Text style={[styles.navLabel, activeTab === 'cockpit' && styles.navLabelActive]}>Cockpit</Text>
-        </TouchableOpacity>
+          {/* ================================================================
+               LAYER 2: METRO ROADMAP (Vertical Railway Track)
+               ================================================================ */}
+          {activeTab === 'metro' && (
+            <View>
+              {/* Header Banner */}
+              <View style={styles.card}>
+                <View style={styles.cardHeaderRow}>
+                  <View>
+                    <Text style={styles.cardSectionTitle}>TUM HEILBRONN METRO LINE</Text>
+                    <Text style={styles.cardSectionSubtitle}>Vertical checkpoint spine (2026 - 2028)</Text>
+                  </View>
+                  <View style={styles.pillGold}>
+                    <Text style={styles.pillGoldText}>ADMISSIONS</Text>
+                  </View>
+                </View>
+                <Text style={{ fontSize: 12, color: '#9aa0a6', marginTop: 4 }}>
+                  Tap any stream deliverable below to check off requirements. Stations auto-complete once all deliverables are met.
+                </Text>
+              </View>
 
-        <TouchableOpacity
-          style={[styles.navItem, activeTab === 'today' && styles.navItemActive]}
-          onPress={() => {
-            triggerHaptic();
-            setActiveTab('today');
-          }}
-        >
-          <Text style={[styles.navIcon, activeTab === 'today' && styles.navIconActive]}>◻</Text>
-          <Text style={[styles.navLabel, activeTab === 'today' && styles.navLabelActive]}>Today</Text>
-        </TouchableOpacity>
+              {/* Vertical Spine & Station Tree */}
+              <View style={styles.metroVerticalWrapper}>
+                {/* Continuous Vertical Rail Track */}
+                <View style={styles.metroRailLine} />
 
-        <TouchableOpacity
-          style={[styles.navItem, activeTab === 'metro' && styles.navItemActive]}
-          onPress={() => {
-            triggerHaptic();
-            setActiveTab('metro');
-          }}
-        >
-          <Text style={[styles.navIcon, activeTab === 'metro' && styles.navIconActive]}>◎</Text>
-          <Text style={[styles.navLabel, activeTab === 'metro' && styles.navLabelActive]}>Metro</Text>
-        </TouchableOpacity>
+                {metroStations.map((st, sIdx) => {
+                  const isDone = st.status === 'completed';
+                  const delivEntries = Object.entries(st.deliverables || {});
+                  const completedDelivs = new Set(st.completed_deliverables || []);
+                  const isLast = sIdx === metroStations.length - 1;
 
-        <TouchableOpacity
-          style={[styles.navItem, activeTab === 'body' && styles.navItemActive]}
-          onPress={() => {
-            triggerHaptic();
-            setActiveTab('body');
-          }}
-        >
-          <Text style={[styles.navIcon, activeTab === 'body' && styles.navIconActive]}>▲</Text>
-          <Text style={[styles.navLabel, activeTab === 'body' && styles.navLabelActive]}>Gym</Text>
-        </TouchableOpacity>
+                  return (
+                    <View key={st.id} style={styles.metroStationRow}>
+                      {/* Metro Node Interchange Disc on the Vertical Rail */}
+                      <View style={[styles.metroRailNode, isDone && styles.metroRailNodeDone, st.is_major && styles.metroRailNodeMajor]}>
+                        {isDone ? (
+                          <Text style={styles.metroNodeCheck}>✓</Text>
+                        ) : (
+                          <View style={styles.metroNodeInnerDot} />
+                        )}
+                      </View>
+
+                      {/* Station Content Card */}
+                      <View style={[styles.metroCard, isDone && styles.metroCardDone, st.is_major && styles.metroCardMajor]}>
+                        <View style={styles.cardHeaderRow}>
+                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                            <Text style={[styles.stationMonthTag, st.is_major && { color: '#c5a059' }]}>
+                              {st.month_label}
+                            </Text>
+                            <Text style={styles.stationPhaseTag}>
+                              {st.phase.split(':')[0]}
+                            </Text>
+                          </View>
+                          <Text style={[styles.stationStatusBadge, isDone && { color: '#39d353' }]}>
+                            {isDone ? 'COMPLETED ✓' : `${completedDelivs.size}/${delivEntries.length} MET`}
+                          </Text>
+                        </View>
+
+                        <Text style={styles.stationName}>{st.name}</Text>
+                        <Text style={styles.stationObjective}>{st.objective}</Text>
+
+                        {/* Deliverables Checklist Box */}
+                        <View style={styles.deliverablesLedger}>
+                          {delivEntries.map(([streamKey, desc]) => {
+                            const isChecked = completedDelivs.has(streamKey);
+                            return (
+                              <TouchableOpacity
+                                key={streamKey}
+                                style={[styles.deliverableItem, isChecked && styles.deliverableItemDone]}
+                                onPress={() => toggleMetroDeliverable(st.id, streamKey)}
+                                activeOpacity={0.7}
+                              >
+                                <View style={[styles.checkBtnSmall, isChecked && styles.checkBtnSmallChecked]}>
+                                  {isChecked && <Text style={styles.checkBtnSmallIcon}>✓</Text>}
+                                </View>
+                                <View style={{ flex: 1 }}>
+                                  <Text style={styles.streamBadgeText}>{streamKey} LINE</Text>
+                                  <Text style={[styles.deliverableText, isChecked && styles.textCrossed]}>
+                                    {desc}
+                                  </Text>
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+
+          {/* ================================================================
+               LAYER 3: GYM & PHYSIQUE
+               ================================================================ */}
+          {activeTab === 'body' && (
+            <View>
+              {/* Gym Protocol Routine */}
+              <View style={styles.card}>
+                <View style={styles.cardHeaderRow}>
+                  <View>
+                    <Text style={styles.cardSectionTitle}>{DEFAULT_GYM_PROTOCOL.name}</Text>
+                    <Text style={styles.cardSectionSubtitle}>{DEFAULT_GYM_PROTOCOL.day} • {DEFAULT_GYM_PROTOCOL.focus}</Text>
+                  </View>
+                  <View style={styles.pillLavender}>
+                    <Text style={styles.pillLavenderText}>UPPER</Text>
+                  </View>
+                </View>
+
+                {DEFAULT_GYM_PROTOCOL.exercises.map((ex, idx) => {
+                  const isDone = new Set(
+                    dailyLog.completed_exercises.split(',').map((s) => s.trim()).filter(Boolean)
+                  ).has(String(idx));
+
+                  return (
+                    <TouchableOpacity
+                      key={idx}
+                      style={[styles.routineRow, isDone && styles.routineRowDone]}
+                      onPress={() => toggleExercise(idx)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.checkBtn, isDone && styles.checkBtnChecked]}>
+                        {isDone && <Text style={styles.checkBtnIcon}>✓</Text>}
+                      </View>
+                      <View style={{ flex: 1 }}>
+                        <Text style={styles.routineTimePill}>{ex.sets_reps} • {ex.rest}</Text>
+                        <Text style={[styles.routineName, isDone && styles.textCrossed]}>
+                          {ex.name}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Weigh-in Card */}
+              <View style={styles.card}>
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.cardSectionTitle}>Body Mass &amp; Nutrition</Text>
+                  <Text style={styles.monoSubLabel}>Goal: 80.0 kg</Text>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 8, marginVertical: 10 }}>
+                  <TextInput
+                    style={[styles.quickTaskInput, { flex: 1 }]}
+                    placeholder="Morning Weight (kg)"
+                    placeholderTextColor="#5f6368"
+                    keyboardType="decimal-pad"
+                    value={weightInput}
+                    onChangeText={setWeightInput}
+                  />
+                  <TouchableOpacity
+                    style={styles.quickAddBtn}
+                    onPress={() => {
+                      if (weightInput) {
+                        showToast(`Logged: ${weightInput} kg`);
+                        setWeightInput('');
+                      }
+                    }}
+                  >
+                    <Text style={styles.quickAddBtnText}>Log</Text>
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flexDirection: 'row', gap: 16 }}>
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                    onPress={() => setCalSurplus(!calSurplus)}
+                  >
+                    <View style={[styles.checkBtnSmall, calSurplus && styles.checkBtnSmallChecked]}>
+                      {calSurplus && <Text style={styles.checkBtnSmallIcon}>✓</Text>}
+                    </View>
+                    <Text style={{ color: '#f0f2f5', fontSize: 12 }}>+300 Cal Surplus</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                    onPress={() => setProteinMet(!proteinMet)}
+                  >
+                    <View style={[styles.checkBtnSmall, proteinMet && styles.checkBtnSmallChecked]}>
+                      {proteinMet && <Text style={styles.checkBtnSmallIcon}>✓</Text>}
+                    </View>
+                    <Text style={{ color: '#f0f2f5', fontSize: 12 }}>140g+ Protein Met</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </View>
+          )}
+
+        </ScrollView>
+
+        {/* ==================================================================
+             BOTTOM LUXURY NAVIGATION BAR
+             ================================================================== */}
+        <View style={styles.bottomNav}>
+          <TouchableOpacity
+            style={[styles.navItem, activeTab === 'cockpit' && styles.navItemActive]}
+            onPress={() => {
+              triggerHaptic('light');
+              setActiveTab('cockpit');
+            }}
+          >
+            <Text style={[styles.navIcon, activeTab === 'cockpit' && styles.navIconActive]}>◈</Text>
+            <Text style={[styles.navLabel, activeTab === 'cockpit' && styles.navLabelActive]}>Cockpit</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.navItem, activeTab === 'today' && styles.navItemActive]}
+            onPress={() => {
+              triggerHaptic('light');
+              setActiveTab('today');
+            }}
+          >
+            <Text style={[styles.navIcon, activeTab === 'today' && styles.navIconActive]}>◻</Text>
+            <Text style={[styles.navLabel, activeTab === 'today' && styles.navLabelActive]}>Today</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.navItem, activeTab === 'metro' && styles.navItemActive]}
+            onPress={() => {
+              triggerHaptic('light');
+              setActiveTab('metro');
+            }}
+          >
+            <Text style={[styles.navIcon, activeTab === 'metro' && styles.navIconActive]}>◎</Text>
+            <Text style={[styles.navLabel, activeTab === 'metro' && styles.navLabelActive]}>Metro</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.navItem, activeTab === 'body' && styles.navItemActive]}
+            onPress={() => {
+              triggerHaptic('light');
+              setActiveTab('body');
+            }}
+          >
+            <Text style={[styles.navIcon, activeTab === 'body' && styles.navIconActive]}>▲</Text>
+            <Text style={[styles.navLabel, activeTab === 'body' && styles.navLabelActive]}>Gym</Text>
+          </TouchableOpacity>
+        </View>
+
       </View>
     </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
     flex: 1,
-    backgroundColor: '#0a0c10',
+    backgroundColor: '#08090c',
+    alignItems: 'center', // Centers viewport on desktop
+  },
+  viewportContainer: {
+    flex: 1,
+    width: '100%',
+    maxWidth: 520, // Strict mobile-oriented width constraint on desktop!
+    backgroundColor: '#08090c',
+    position: 'relative',
   },
   header: {
     flexDirection: 'row',
@@ -676,33 +852,39 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.08)',
-    backgroundColor: 'rgba(10,12,16,0.95)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(8, 9, 12, 0.96)',
   },
-  brandWrap: {
+  brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 10,
   },
-  brandIconMark: {
-    width: 14,
-    height: 14,
-    position: 'relative',
+  icePickIconBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 6,
+    backgroundColor: '#ffffff',
     justifyContent: 'center',
     alignItems: 'center',
+    position: 'relative',
+    shadowColor: '#a78bfa',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
   },
-  shardHead: {
+  shardBlade: {
     position: 'absolute',
-    top: 0,
-    width: 12,
-    height: 4,
+    top: 4,
+    width: 13,
+    height: 3,
     backgroundColor: '#a78bfa',
     transform: [{ rotate: '-25deg' }],
     borderRadius: 1,
   },
-  shardShaft: {
+  shardHandle: {
     position: 'absolute',
-    bottom: 0,
+    bottom: 3,
     width: 3,
     height: 12,
     backgroundColor: '#a78bfa',
@@ -712,23 +894,24 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontWeight: '800',
-    fontSize: 14,
+    fontSize: 13,
     color: '#f0f2f5',
-    letterSpacing: 1,
+    letterSpacing: 1.2,
   },
-  brandCaption: {
+  brandSubtitle: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 10,
+    fontSize: 9,
     color: '#5f6368',
+    letterSpacing: 0.8,
   },
   syncBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
+    gap: 5,
     paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingVertical: 3,
     borderRadius: 12,
-    backgroundColor: 'rgba(57, 211, 83, 0.1)',
+    backgroundColor: 'rgba(57, 211, 83, 0.08)',
     borderWidth: 1,
     borderColor: 'rgba(57, 211, 83, 0.25)',
   },
@@ -740,7 +923,7 @@ const styles = StyleSheet.create({
   },
   syncText: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 10,
+    fontSize: 9,
     color: '#39d353',
     fontWeight: '700',
   },
@@ -755,146 +938,460 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     borderRadius: 20,
     zIndex: 100,
+    shadowColor: '#000',
+    shadowOpacity: 0.6,
+    shadowRadius: 10,
   },
   toastText: {
     color: '#f0f2f5',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '700',
   },
-  mainContent: {
+  contentScroll: {
     flex: 1,
-    padding: 16,
+    paddingHorizontal: 14,
+    paddingTop: 14,
+  },
+  cockpitGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 10,
+    marginBottom: 12,
+  },
+  gaugeCard: {
+    flex: 1,
+    minWidth: '47%',
+    backgroundColor: '#111319',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: 8,
+    padding: 12,
+  },
+  gaugeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  gaugeLabel: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#9aa0a6',
+    letterSpacing: 0.5,
+  },
+  gaugeValueBig: {
+    fontSize: 24,
+    fontWeight: '800',
+    color: '#f0f2f5',
+    marginVertical: 2,
+  },
+  gaugeValueMedium: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#f0f2f5',
+  },
+  gaugeSubtext: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 9,
+    color: '#5f6368',
+    marginTop: 4,
+  },
+  progressTrack: {
+    height: 4,
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 2,
+    overflow: 'hidden',
+    marginVertical: 4,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#f0f2f5',
+    borderRadius: 2,
+  },
+  pillLavender: {
+    backgroundColor: 'rgba(167, 139, 250, 0.12)',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(167, 139, 250, 0.3)',
+  },
+  pillLavenderText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#c4b5fd',
+  },
+  pillGold: {
+    backgroundColor: 'rgba(197, 160, 89, 0.12)',
+    paddingHorizontal: 5,
+    paddingVertical: 2,
+    borderRadius: 4,
+    borderWidth: 1,
+    borderColor: 'rgba(197, 160, 89, 0.3)',
+  },
+  pillGoldText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#c5a059',
+  },
+  monoSubLabel: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 9,
+    color: '#5f6368',
   },
   card: {
-    backgroundColor: '#12141a',
+    backgroundColor: '#111319',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 10,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: 8,
     padding: 14,
-    marginBottom: 14,
-  },
-  cardMajor: {
-    borderColor: 'rgba(197, 160, 89, 0.35)',
+    marginBottom: 12,
   },
   cardHeaderRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
-  cardLabel: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 11,
+  cardSectionTitle: {
+    fontSize: 13,
     fontWeight: '700',
-    color: '#9aa0a6',
-    letterSpacing: 0.6,
-  },
-  goldPill: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 11,
-    color: '#c5a059',
-    fontWeight: '700',
-  },
-  monoSubtext: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 10,
-    color: '#5f6368',
-  },
-  largeValue: {
-    fontSize: 28,
-    fontWeight: '800',
     color: '#f0f2f5',
   },
-  progressBarTrack: {
-    height: 6,
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 3,
-    overflow: 'hidden',
+  cardSectionSubtitle: {
+    fontSize: 10,
+    color: '#5f6368',
+    marginTop: 2,
   },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: '#f0f2f5',
-    borderRadius: 3,
+  heatmapLegend: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
-  quickInputRow: {
+  legendText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 8,
+    color: '#5f6368',
+  },
+  legendBox: {
+    width: 7,
+    height: 7,
+    borderRadius: 1.5,
+  },
+  heatCell: {
+    width: 10,
+    height: 10,
+    borderRadius: 2,
+  },
+  heatCellGlow: {
+    shadowColor: '#39d353',
+    shadowOpacity: 0.6,
+    shadowRadius: 4,
+  },
+  dayInfoPill: {
+    marginTop: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 10,
+    color: '#c4b5fd',
+    textAlign: 'center',
+  },
+  forecastBox: {
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    paddingTop: 8,
+  },
+  forecastTitle: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#f0f2f5',
+    marginBottom: 4,
+  },
+  forecastDetail: {
+    fontSize: 11,
+    color: '#9aa0a6',
+    lineHeight: 18,
+  },
+  quickTaskBox: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#181b24',
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.08)',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    marginBottom: 14,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    marginBottom: 12,
   },
-  textInput: {
+  quickTaskInput: {
     flex: 1,
     color: '#f0f2f5',
-    fontSize: 13,
-    paddingVertical: 8,
-  },
-  addBtn: {
-    backgroundColor: '#f0f2f5',
-    paddingHorizontal: 12,
+    fontSize: 12,
     paddingVertical: 6,
+  },
+  catBadge: {
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    borderRadius: 3,
+  },
+  catBadgeActive: {
+    backgroundColor: 'rgba(167, 139, 250, 0.2)',
+  },
+  catBadgeText: {
+    fontSize: 9,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    color: '#5f6368',
+    fontWeight: '700',
+  },
+  catBadgeTextActive: {
+    color: '#c4b5fd',
+  },
+  quickAddBtn: {
+    backgroundColor: '#f0f2f5',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
     borderRadius: 4,
   },
-  addBtnText: {
-    color: '#0a0c10',
-    fontSize: 11,
+  quickAddBtnText: {
+    color: '#08090c',
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  routineCountText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 10,
+    color: '#5f6368',
     fontWeight: '700',
   },
   routineRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    gap: 12,
-    paddingVertical: 8,
+    gap: 10,
+    paddingVertical: 9,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255,255,255,0.04)',
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
   },
   routineRowDone: {
-    opacity: 0.5,
+    opacity: 0.45,
   },
-  checkCircle: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+  checkBtn: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
     borderWidth: 1.5,
     borderColor: '#5f6368',
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 2,
   },
-  checkCircleChecked: {
+  checkBtnChecked: {
     backgroundColor: '#f0f2f5',
     borderColor: '#f0f2f5',
   },
-  checkMark: {
-    color: '#0a0c10',
-    fontSize: 11,
+  checkBtnIcon: {
+    color: '#08090c',
+    fontSize: 10,
     fontWeight: '900',
   },
-  routineTime: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 10,
-    color: '#5f6368',
+  checkBtnSmall: {
+    width: 16,
+    height: 16,
+    borderRadius: 3,
+    borderWidth: 1.5,
+    borderColor: '#5f6368',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 1,
   },
-  routineFocus: {
-    fontSize: 13,
+  checkBtnSmallChecked: {
+    backgroundColor: '#f0f2f5',
+    borderColor: '#f0f2f5',
+  },
+  checkBtnSmallIcon: {
+    color: '#08090c',
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  routineTimePill: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 9,
+    color: '#5f6368',
+    fontWeight: '600',
+  },
+  routineCutoffTag: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 8,
+    color: '#c4b5fd',
+    backgroundColor: 'rgba(167, 139, 250, 0.1)',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 2,
+  },
+  routineName: {
+    fontSize: 12,
     fontWeight: '600',
     color: '#f0f2f5',
-    marginTop: 1,
+    marginTop: 2,
+  },
+  taskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingVertical: 7,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+  },
+  taskTitle: {
+    fontSize: 12,
+    fontWeight: '500',
+    color: '#f0f2f5',
+  },
+  taskCategoryPill: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 8,
+    color: '#5f6368',
+    marginTop: 2,
   },
   textCrossed: {
     color: '#5f6368',
     textDecorationLine: 'line-through',
   },
-  scratchpadInput: {
+  emptyNotice: {
+    fontSize: 11,
+    color: '#5f6368',
+    paddingVertical: 8,
+  },
+  scratchpadArea: {
     color: '#f0f2f5',
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 12,
-    minHeight: 80,
+    fontSize: 11,
+    minHeight: 70,
     textAlignVertical: 'top',
+    paddingTop: 4,
+  },
+  metroVerticalWrapper: {
+    position: 'relative',
+    paddingLeft: 18,
+  },
+  metroRailLine: {
+    position: 'absolute',
+    left: 8,
+    top: 14,
+    bottom: 20,
+    width: 2,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+  },
+  metroStationRow: {
+    position: 'relative',
+    marginBottom: 14,
+  },
+  metroRailNode: {
+    position: 'absolute',
+    left: -18,
+    top: 14,
+    width: 16,
+    height: 16,
+    borderRadius: 8,
+    backgroundColor: '#08090c',
+    borderWidth: 2,
+    borderColor: '#5f6368',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  metroRailNodeDone: {
+    backgroundColor: '#f0f2f5',
+    borderColor: '#f0f2f5',
+    shadowColor: '#ffffff',
+    shadowOpacity: 0.6,
+    shadowRadius: 6,
+  },
+  metroRailNodeMajor: {
+    borderColor: '#c5a059',
+  },
+  metroNodeInnerDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: '#5f6368',
+  },
+  metroNodeCheck: {
+    fontSize: 9,
+    fontWeight: '900',
+    color: '#08090c',
+  },
+  metroCard: {
+    backgroundColor: '#111319',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: 8,
+    padding: 12,
+  },
+  metroCardDone: {
+    borderColor: 'rgba(57, 211, 83, 0.25)',
+  },
+  metroCardMajor: {
+    borderColor: 'rgba(197, 160, 89, 0.35)',
+  },
+  stationMonthTag: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 10,
+    fontWeight: '800',
+    color: '#f0f2f5',
+  },
+  stationPhaseTag: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 8,
+    color: '#5f6368',
+  },
+  stationStatusBadge: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 9,
+    color: '#5f6368',
+    fontWeight: '700',
+  },
+  stationName: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#f0f2f5',
+    marginTop: 4,
+  },
+  stationObjective: {
+    fontSize: 11,
+    color: '#9aa0a6',
+    marginTop: 2,
+    marginBottom: 8,
+    lineHeight: 16,
+  },
+  deliverablesLedger: {
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(255, 255, 255, 0.05)',
+    paddingTop: 6,
+  },
+  deliverableItem: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 8,
+    paddingVertical: 5,
+  },
+  deliverableItemDone: {
+    opacity: 0.5,
+  },
+  streamBadgeText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#5f6368',
+    letterSpacing: 0.5,
+  },
+  deliverableText: {
+    fontSize: 11,
+    color: '#f0f2f5',
+    lineHeight: 15,
   },
   bottomNav: {
     position: 'absolute',
@@ -902,11 +1399,11 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     flexDirection: 'row',
-    backgroundColor: 'rgba(18,20,26,0.95)',
+    backgroundColor: 'rgba(10, 12, 16, 0.98)',
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255,255,255,0.08)',
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
     paddingVertical: 8,
-    paddingBottom: Platform.OS === 'ios' ? 24 : 8,
+    paddingBottom: Platform.OS === 'ios' ? 22 : 8,
   },
   navItem: {
     flex: 1,
@@ -915,14 +1412,15 @@ const styles = StyleSheet.create({
   },
   navItemActive: {},
   navIcon: {
-    fontSize: 16,
+    fontSize: 15,
     color: '#5f6368',
   },
   navIconActive: {
     color: '#f0f2f5',
   },
   navLabel: {
-    fontSize: 10,
+    fontSize: 9,
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     color: '#5f6368',
     fontWeight: '600',
   },
