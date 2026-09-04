@@ -297,7 +297,7 @@ export default function App() {
               </View>
             </View>
 
-            {/* GitHub-Style Green Execution Heatmap */}
+            {/* Purple Execution Heatmap */}
             <View style={styles.card}>
               <View style={styles.cardHeaderRow}>
                 <Text style={styles.cardLabel}>DAILY EXECUTION PULSE</Text>
@@ -308,17 +308,17 @@ export default function App() {
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 <View style={{ flexDirection: 'row', gap: 3 }}>
-                  {Array.from({ length: 26 }).map((_, wIdx) => (
+                  {Array.from({ length: 52 }).map((_, wIdx) => (
                     <View key={wIdx} style={{ flexDirection: 'column', gap: 3 }}>
                       {Array.from({ length: 7 }).map((_, dIdx) => {
-                        const isRecent = wIdx >= 23;
+                        const isRecent = wIdx >= 48;
                         let level = 0;
                         if (isRecent && dIdx === 1) level = 4;
                         else if (isRecent && dIdx === 3) level = 3;
                         else if (isRecent && dIdx === 5) level = 2;
                         else if (isRecent) level = 1;
 
-                        const colors = ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'];
+                        const colors = ['#17171d', '#3b1d60', '#6b21a8', '#9333ea', '#d8b4fe'];
                         return (
                           <View
                             key={dIdx}
