@@ -98,6 +98,14 @@ const Today = {
       });
     }
 
+    // Kill List Drawer button
+    const btnKillList = document.getElementById("btnOpenKillList");
+    if (btnKillList) {
+      btnKillList.addEventListener("click", () => {
+        if (window.KillListDrawer) window.KillListDrawer.open(this.selectedDateStr);
+      });
+    }
+
     // Mini-Calendar Navigation Buttons
     const btnPrevMonth = document.getElementById("btnPrevMonth");
     const btnNextMonth = document.getElementById("btnNextMonth");
@@ -277,6 +285,17 @@ const Today = {
       this.renderSchedule();
       this.renderGymCard();
       this.renderTasks();
+
+      // Refresh Kill List count badge
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.get_kill_list) {
+        try {
+          const klData = await window.pywebview.api.get_kill_list(targetDate);
+          const klBadge = document.getElementById("todayKillListBadge");
+          if (klBadge && klData && klData.items) {
+            klBadge.textContent = `${klData.items.length}/3`;
+          }
+        } catch (e) {}
+      }
     } catch (err) {
       console.error("Error loading Today data:", err);
     }
@@ -297,13 +316,18 @@ const Today = {
     const blocks = this.schedule.blocks || [];
     blocksContainer.innerHTML = blocks
       .map((block, idx) => {
-        const isDeepWork = block.type === "deep_work";
+        const isDeepWork = block.type === "deep_work" || (block.focus && block.focus.includes("SGH Library"));
         const isChecked = this.completedBlocks.has(String(idx));
         return `
-          <div class="routine-block ${isDeepWork ? "deep-work" : ""}">
+          <div 
+            class="routine-block ${isDeepWork ? "deep-work clickable" : ""}"
+            ${isDeepWork ? `onclick="if (!event.target.classList.contains('check-dot')) { if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}'); }"` : ""}
+            ${isDeepWork ? 'title="Click to open SGH Library Kill List Drawer"' : ""}
+            style="${isDeepWork ? "cursor: pointer;" : ""}"
+          >
             <div 
               class="check-dot ${isChecked ? "checked" : ""}" 
-              onclick="Today.toggleRoutineBlock(${idx})"
+              onclick="event.stopPropagation(); Today.toggleRoutineBlock(${idx})"
               title="Check off routine block"
             ></div>
             <div class="routine-time">${block.time}</div>
@@ -311,7 +335,11 @@ const Today = {
               <div class="routine-focus" style="${isChecked ? "text-decoration: line-through; color: var(--text-tertiary);" : ""}">${this.escapeHtml(block.focus)}</div>
               <div class="routine-activity">${this.escapeHtml(block.activity)}</div>
             </div>
-            ${isDeepWork ? '<span class="key-pill" style="color: var(--accent-purple-light); border-color: var(--accent-purple-glow);">TUM Focus</span>' : ""}
+            ${
+              isDeepWork
+                ? `<button class="btn-ghost-icon" onclick="event.stopPropagation(); if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');" style="color: var(--accent-lavender); border-color: rgba(196, 181, 253, 0.35); font-family: var(--font-mono); font-size: 10px; padding: 2px 7px;" title="Open Kill List Drawer">⚡ Kill List</button>`
+                : ""
+            }
           </div>
         `;
       })

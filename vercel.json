@@ -1,7 +1,6 @@
 {
-  "buildCommand": "cd client && npm install && npx expo export -p web",
-  "outputDirectory": "client/dist",
-  "framework": null,
+  "outputDirectory": "ui",
+  "cleanUrls": true,
   "rewrites": [
     { "source": "/(.*)", "destination": "/index.html" }
   ]

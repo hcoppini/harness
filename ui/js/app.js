@@ -50,6 +50,7 @@ window.HarnessApp = {
       if (window.CommandPalette) window.CommandPalette.init();
       if (window.Dashboard) await window.Dashboard.init();
       if (window.Today) await window.Today.init();
+      if (window.KillListDrawer) await window.KillListDrawer.init();
       if (window.Tum) await window.Tum.init();
       if (window.Projects) await window.Projects.init();
       if (window.Body) await window.Body.init();

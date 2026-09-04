@@ -1,0 +1,40 @@
+{
+  "links": [
+    {
+      "name": "TM1 Official Portal",
+      "category": "school",
+      "url": "https://tm1.edu.pl",
+      "desc": "Official School News & Announcements"
+    },
+    {
+      "name": "TM1 Live Plan (Optivum)",
+      "category": "school",
+      "url": "https://planlekcji.staff.edu.pl/plany/o6.html",
+      "desc": "Liceum 3lb Live Timetable"
+    },
+    {
+      "name": "Vulcan UONET+ E-Dziennik",
+      "category": "school",
+      "url": "https://uonetplus.vulcan.net.pl",
+      "desc": "Grades, attendance, and official teacher notices"
+    },
+    {
+      "name": "SIGG Platform (GPW)",
+      "category": "contest",
+      "url": "https://sigg.gpw.pl",
+      "desc": "Szkolna Internetowa Gra Giełdowa"
+    },
+    {
+      "name": "TUM Heilbronn Portal",
+      "category": "university",
+      "url": "https://www.tum.de/heilbronn",
+      "desc": "B.Sc. Management and Data Science Requirements"
+    },
+    {
+      "name": "CKE Matura Portal",
+      "category": "academics",
+      "url": "https://cke.gov.pl",
+      "desc": "Official Matura Arkusze (Maths & CS Rozszerzona)"
+    }
+  ]
+}

@@ -1,0 +1,287 @@
+{
+  "schedules": {
+    "A_MON": {
+      "name": "Schedule A: Monday (SGH Study + Boxing)",
+      "days": [
+        "Monday"
+      ],
+      "description": "Late start (08:50). Finish at 14:15, direct transition to SGH Library for TUM prep before boxing.",
+      "blocks": [
+        {
+          "time": "07:15 – 08:00",
+          "focus": "Launch & Commute",
+          "activity": "Wake up, high-protein breakfast, 40 min commute to school.",
+          "type": "routine"
+        },
+        {
+          "time": "08:50 – 14:15",
+          "focus": "Liceum",
+          "activity": "Physics, Polish, CS (2h), Math (2h). Complete minor homework during breaks.",
+          "type": "school"
+        },
+        {
+          "time": "14:30 – 16:30",
+          "focus": "SGH Library: TUM Deep Work (2h)",
+          "activity": "60m Math Rozszerzona + 60m CS Matura/Raw Coding (No AI).",
+          "type": "deep_work"
+        },
+        {
+          "time": "16:30 – 17:15",
+          "focus": "Commute Home & Chores",
+          "activity": "40 min commute home, quick chores, pre-boxing fuel.",
+          "type": "chore"
+        },
+        {
+          "time": "17:20 – 20:30/21:00",
+          "focus": "Boxing Block",
+          "activity": "Transit, boxing training/sparring, transit home.",
+          "type": "training"
+        },
+        {
+          "time": "20:30/21:00 – 21:45",
+          "focus": "Nutrition & Shower",
+          "activity": "Heavy post-workout dinner, protein, hot shower.",
+          "type": "nutrition"
+        },
+        {
+          "time": "21:45 – 22:45",
+          "focus": "Free Time",
+          "activity": "Zero cognitive load. Decompress, read, unwind.",
+          "type": "rest"
+        },
+        {
+          "time": "22:45 – 06:45",
+          "focus": "Sleep (8 hrs)",
+          "activity": "Non-negotiable physical recovery.",
+          "type": "sleep"
+        }
+      ]
+    },
+    "A_WED": {
+      "name": "Schedule A: Wednesday (Fast Study + Boxing)",
+      "days": [
+        "Wednesday"
+      ],
+      "description": "School ends at 15:05. Compressed 60-min deep work sprint at SGH Library before commute.",
+      "blocks": [
+        {
+          "time": "06:35 – 07:20",
+          "focus": "Launch & Commute",
+          "activity": "Wake up, breakfast, 40 min commute for 08:00 start.",
+          "type": "routine"
+        },
+        {
+          "time": "08:00 – 15:05",
+          "focus": "Liceum",
+          "activity": "History (2h), Civics, Math, English (2h), Special classes.",
+          "type": "school"
+        },
+        {
+          "time": "15:15 – 16:30",
+          "focus": "SGH Library: Deep Work (75m)",
+          "activity": "High-intensity Math R problem set or raw CS logic.",
+          "type": "deep_work"
+        },
+        {
+          "time": "16:30 – 17:15",
+          "focus": "Commute Home & Chores",
+          "activity": "40 min commute home, quick chores, pre-workout meal.",
+          "type": "chore"
+        },
+        {
+          "time": "17:20 – 20:30/21:00",
+          "focus": "Boxing Block",
+          "activity": "Transit, boxing session, transit home.",
+          "type": "training"
+        },
+        {
+          "time": "20:30/21:00 – 21:45",
+          "focus": "Nutrition & Shower",
+          "activity": "Dinner and recovery.",
+          "type": "nutrition"
+        },
+        {
+          "time": "21:45 – 22:45",
+          "focus": "Free Time",
+          "activity": "Decompress and relax.",
+          "type": "rest"
+        },
+        {
+          "time": "22:45 – 06:45",
+          "focus": "Sleep (8 hrs)",
+          "activity": "Lights out.",
+          "type": "sleep"
+        }
+      ]
+    },
+    "A_FRI": {
+      "name": "Schedule A: Friday (SGH Study + Boxing)",
+      "days": [
+        "Friday"
+      ],
+      "description": "Ends at 14:15. Deep work at SGH Library + Boxing.",
+      "blocks": [
+        {
+          "time": "06:35 – 07:20",
+          "focus": "Launch & Commute",
+          "activity": "Wake up, breakfast, commute to school for 08:00 start.",
+          "type": "routine"
+        },
+        {
+          "time": "08:00 – 14:15",
+          "focus": "Liceum",
+          "activity": "Polish, CS, Geo, Health, Math, German, PE.",
+          "type": "school"
+        },
+        {
+          "time": "14:30 – 16:30",
+          "focus": "SGH Library: TUM Deep Work (2h)",
+          "activity": "60m Math R + 60m CS coding / SIGG analysis.",
+          "type": "deep_work"
+        },
+        {
+          "time": "16:30 – 17:15",
+          "focus": "Commute Home & Chores",
+          "activity": "40 min commute home, chores, pre-boxing meal.",
+          "type": "chore"
+        },
+        {
+          "time": "17:20 – 20:30/21:00",
+          "focus": "Boxing Block",
+          "activity": "Boxing session / sparring wrap-up.",
+          "type": "training"
+        },
+        {
+          "time": "20:30/21:00 – 21:45",
+          "focus": "Nutrition & Shower",
+          "activity": "Dinner and wind-down.",
+          "type": "nutrition"
+        },
+        {
+          "time": "21:45 – 23:00",
+          "focus": "Weekend Kickoff Free Time",
+          "activity": "Guilt-free relaxation, gaming, or socializing.",
+          "type": "rest"
+        },
+        {
+          "time": "23:00 – 07:30",
+          "focus": "Sleep (8.5 hrs)",
+          "activity": "Deep weekend recovery.",
+          "type": "sleep"
+        }
+      ]
+    },
+    "B": {
+      "name": "Schedule B: Gym & TUM Sprint Days",
+      "days": [
+        "Tuesday",
+        "Thursday"
+      ],
+      "description": "School ends 14:15. Deep work in SGH Library followed by commute home and 50m targeted gym lift.",
+      "blocks": [
+        {
+          "time": "06:35 – 07:20",
+          "focus": "Launch & Commute",
+          "activity": "Breakfast and 40 min commute for 08:00 start.",
+          "type": "routine"
+        },
+        {
+          "time": "08:00 – 14:15",
+          "focus": "Liceum",
+          "activity": "Engagement in classes; eliminate minor homework.",
+          "type": "school"
+        },
+        {
+          "time": "14:30 – 16:30",
+          "focus": "SGH Library: TUM Deep Work (2h)",
+          "activity": "60m Math Rozszerzona + 60m Raw Coding/CS Matura.",
+          "type": "deep_work"
+        },
+        {
+          "time": "16:30 – 17:15",
+          "focus": "Commute Home & Chores",
+          "activity": "40 min commute home, complete daily chores, change for gym.",
+          "type": "chore"
+        },
+        {
+          "time": "17:45 – 18:45",
+          "focus": "Gym (50–60 min)",
+          "activity": "Tue: Posterior Chain / Thu: Unilateral & Pull (Protocol in Harness Body tab).",
+          "type": "training"
+        },
+        {
+          "time": "19:00 – 20:00",
+          "focus": "Dinner & German",
+          "activity": "Dinner + 20 min German input (Nicos Weg/Anki).",
+          "type": "study"
+        },
+        {
+          "time": "20:00 – 22:45",
+          "focus": "Free Time (2h 45m)",
+          "activity": "Completely free evening. Gaming, personal projects, friends.",
+          "type": "rest"
+        },
+        {
+          "time": "22:45 – 06:45",
+          "focus": "Sleep (8 hrs)",
+          "activity": "Rest.",
+          "type": "sleep"
+        }
+      ]
+    },
+    "C_SAT": {
+      "name": "Schedule C: Saturday (Fresh Morning Block)",
+      "days": [
+        "Saturday"
+      ],
+      "description": "5k Zone 2 Recovery Run, then 2 hrs TUM Deep Work. Afternoon and night 100% open.",
+      "blocks": [
+        {
+          "time": "09:30 – 10:15",
+          "focus": "Running",
+          "activity": "5k Zone 2 Recovery Run.",
+          "type": "training"
+        },
+        {
+          "time": "11:00 – 13:00",
+          "focus": "TUM Deep Work (2 hrs)",
+          "activity": "Timed exam sheets or startup/coding project work.",
+          "type": "deep_work"
+        },
+        {
+          "time": "13:00 onwards",
+          "focus": "100% Free Time",
+          "activity": "Entire afternoon and night completely open.",
+          "type": "rest"
+        }
+      ]
+    },
+    "C_SUN": {
+      "name": "Schedule C: Sunday (Complete Reset)",
+      "days": [
+        "Sunday"
+      ],
+      "description": "Zero workouts. Let your central nervous system recover.",
+      "blocks": [
+        {
+          "time": "All Day",
+          "focus": "Total Rest & Recovery",
+          "activity": "Zero workouts. Let your central nervous system recover.",
+          "type": "rest"
+        },
+        {
+          "time": "18:00 – 19:00",
+          "focus": "Weekly Prep",
+          "activity": "Chores, verify the upcoming week in Harness, pack your bags.",
+          "type": "routine"
+        },
+        {
+          "time": "22:30",
+          "focus": "Lights Out",
+          "activity": "Lights out.",
+          "type": "sleep"
+        }
+      ]
+    }
+  }
+}

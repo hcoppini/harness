@@ -238,6 +238,10 @@
           <p class="section-caption">Routines are pre-calibrated. Zero input fatigue. Check the boxes.</p>
         </div>
         <div style="display: flex; gap: 8px;">
+          <button id="btnOpenKillList" class="btn-ghost-icon" title="Open Kill List Drawer (SGH Library Deep Work)">
+            <span style="color: var(--accent-lavender); font-weight: 700;">⚡ Kill List</span>
+            <span class="key-pill" id="todayKillListBadge">0/3</span>
+          </button>
           <button id="btnRollover" class="btn-ghost-icon" title="Carry forward pending tasks from prior days (R)">
             <span>Carry Over</span>
             <span class="key-pill">R</span>
@@ -490,6 +494,48 @@
 
       <!-- Collapsible 4-Semester Grade Ledger -->
       <div id="gradesTableDrawer" class="monotone-card" style="display: none; margin-top: 16px;">
+        <!-- Bavarian Formula & TUM Stage 1 Aptitude Card -->
+        <div style="background: rgba(196, 181, 253, 0.03); border: 1px solid rgba(196, 181, 253, 0.12); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div>
+              <div class="card-label" style="color: var(--accent-lavender); font-size: 10px;">TUM STAGE 1 APTITUDE ASSESSMENT // BAVARIAN FORMULA</div>
+              <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
+                N = 1 + 3 &times; (P_max - P) / (P_max - P_min) &bull; 65% Overall GPA + 35% Curricular Subjects (Math 2x, CS 2x, Lang 1x)
+              </div>
+            </div>
+            <div id="tumAdmissionBadge">
+              <span class="mono-chip done" style="font-size: 11px; padding: 4px 10px; font-weight: 700;">Loading...</span>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; font-family: var(--font-mono);">
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
+              <div style="font-size: 9px; color: var(--text-tertiary);">GERMAN GPA (1.0-4.0)</div>
+              <div id="tumGermanGpaVal" style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">--</div>
+              <div id="tumPolishGpaVal" style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Polish: --</div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
+              <div style="font-size: 9px; color: var(--text-tertiary);">TOTAL TUM SCORE</div>
+              <div id="tumTotalScoreVal" style="font-size: 18px; font-weight: 700; color: var(--accent-lavender); margin-top: 2px;">-- / 100</div>
+              <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Safe &ge; 88.0 pts</div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
+              <div style="font-size: 9px; color: var(--text-tertiary);">CURRICULAR SCORE</div>
+              <div id="tumSubjectScoreVal" style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">--</div>
+              <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Math 2x, CS 2x, Lang 1x</div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
+              <div style="font-size: 9px; color: var(--text-tertiary);">ADMISSION VERDICT</div>
+              <div id="tumVerdictText" style="font-size: 10px; font-weight: 700; color: var(--text-primary); margin-top: 4px; line-height: 1.3;">
+                --
+              </div>
+            </div>
+          </div>
+        </div>
+
         <div class="card-label-row">
           <span class="card-label">4-Semester Liceum Grade Ledger</span>
           <div style="display: flex; gap: 4px;" id="semesterFilterButtons">
@@ -702,6 +748,107 @@
     </section>
 
   </main>
+
+  <!-- ====================================================================
+       KILL LIST SLIDING DRAWER & LAUNCHER (Harness 2.1)
+       ==================================================================== -->
+  <div id="killListBackdrop" class="kill-list-backdrop"></div>
+  <aside id="killListDrawer" class="kill-list-drawer">
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <span class="mono-chip lavender" style="font-size: 9px; font-weight: 700;">PURE SYNTAX // SEP '26</span>
+          <span id="killListDateLabel" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Today</span>
+        </div>
+        <h2 style="font-size: 17px; font-weight: 700; color: var(--text-primary); margin: 0;">
+          Kill List // SGH Library
+        </h2>
+        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
+          Zero-AI Deep Work (14:30 – 16:30) • 3-Item Rule Enforced
+        </div>
+      </div>
+      <button id="closeKillListBtn" class="drawer-close-btn">&times;</button>
+    </div>
+
+    <!-- Active Station Pace Velocity / Ghost Beacon -->
+    <div id="killListVelocityContainer" style="margin-bottom: 12px;">
+      <!-- Rendered dynamically -->
+    </div>
+
+    <!-- Evening Lock Warning -->
+    <div id="killListLockBanner" style="display: none; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 4px; padding: 8px 10px; margin-bottom: 14px; font-family: var(--font-mono); font-size: 11px; color: #f59e0b;">
+      <span style="font-weight: 700;">EVENING LOCK (18:00+):</span> Tomorrow's session items are locked to prevent library-seat procrastination.
+    </div>
+
+    <!-- 3-Item Section Header -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+      <span class="card-label" style="font-size: 10px;">TODAY'S 3 KILL ITEMS</span>
+      <span id="killListCountBadge" class="mono-chip lavender">0 / 3 Active</span>
+    </div>
+
+    <!-- Items List -->
+    <div id="killListItemsContainer" style="margin-bottom: 16px;">
+      <!-- Rendered dynamically -->
+    </div>
+
+    <!-- Full Notice (if 3 items reached) -->
+    <div id="killListFullNotice" style="display: none; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 12px; text-align: center; font-size: 11px; color: var(--text-tertiary); margin-bottom: 16px;">
+      <span style="color: var(--accent-lavender); font-weight: 600;">3-Item Rule Enforced:</span> Session quota reached (3/3). Check off or delete an item to add another.
+    </div>
+
+    <!-- Add Item Form (Visible when count < 3) -->
+    <div id="killListAddCard" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 6px; padding: 14px; margin-top: auto;">
+      <div class="card-label" style="margin-bottom: 10px;">ADD KILL ITEM (MAX 3)</div>
+      <form id="addKillItemForm" style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label">CATEGORY</label>
+            <select id="killItemCategory" class="form-input" style="width: 100%;">
+              <option value="Math R">Math Rozszerzona</option>
+              <option value="Algorithms">Raw Algorithms</option>
+              <option value="SIGG">SIGG / Quant</option>
+              <option value="German">German / Anki</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">LAUNCHER</label>
+            <select id="killItemActionType" class="form-input" style="width: 100%;">
+              <option value="pdf">PDF Reader</option>
+              <option value="url">Browser Link</option>
+              <option value="workspace">VS Code</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="form-label">TASK TITLE</label>
+          <input type="text" id="killItemTitle" class="form-input" placeholder="e.g. CKE Math R Diagnostic Sets" required style="width: 100%;">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label">TARGET SPEC</label>
+            <input type="text" id="killItemSpec" class="form-input" placeholder="e.g. Tasks 1-5 / 45m" style="width: 100%;">
+          </div>
+          <div>
+            <label class="form-label">LINK METRO DELIVERABLE</label>
+            <select id="killItemDeliverable" class="form-input" style="width: 100%;">
+              <option value="">-- None --</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="form-label">TARGET PATH / URL</label>
+          <input type="text" id="killItemPath" class="form-input" placeholder="e.g. https://hackerrank.com or arkusze/cke.pdf" style="width: 100%;">
+        </div>
+
+        <button type="submit" class="btn-ghost-icon" style="justify-content: center; background: rgba(196, 181, 253, 0.08); border-color: rgba(196, 181, 253, 0.3); color: var(--accent-lavender); font-weight: 600; padding: 8px; margin-top: 4px;">
+          + Add to Kill List
+        </button>
+      </form>
+    </div>
+  </aside>
 
   <!-- ====================================================================
        NATIVE IN-APP MODALS
@@ -921,6 +1068,7 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- App Script Modules -->
+  <script src="js/web_bridge.js?v=3.5"></script>
   <script src="js/api_bridge.js?v=3.5"></script>
   <script src="js/metro.js?v=3.5"></script>
   <script src="js/dashboard.js?v=3.5"></script>
@@ -931,6 +1079,7 @@
   <script src="js/knowledge.js?v=3.5"></script>
   <script src="js/focus_timer.js?v=3.5"></script>
   <script src="js/command_palette.js?v=3.5"></script>
+  <script src="js/kill_list.js?v=3.5"></script>
   <script src="js/app.js?v=3.5"></script>
 </body>
 </html>

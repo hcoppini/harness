@@ -1,0 +1,455 @@
+{
+  "title": "TUM Heilbronn Metro Line Roadmap (2026 - 2028)",
+  "target_program": "B.Sc. Management and Data Science // TUM Campus Heilbronn",
+  "formula": "Aptitude Assessment: Overall GPA (65%) + Subject Grades (35% with Math 2x, CS 2x, Lang 1x)",
+  "stations": [
+    {
+      "id": "sep-2026",
+      "date": "2026-09",
+      "month_label": "SEP '26",
+      "name": "Pure Syntax",
+      "phase": "Phase 1: Year 3 Liceum",
+      "is_major": true,
+      "status": "active",
+      "branches": [
+        "academics",
+        "code",
+        "sigg",
+        "german",
+        "physical"
+      ],
+      "objective": "Diagnostic benchmarking & pure unassisted algorithmic habit building.",
+      "deliverables": {
+        "Academics": "Benchmark diagnostic test in Math Rozszerzona. Target first-month grade average >= 4.75.",
+        "Code": "Zero AI copilot rule activated. Complete 15 foundational HackerRank/LeetCode Easy problems writing pure algorithms by hand.",
+        "SIGG": "Team registered with teacher-guardian; test environment accounts setup.",
+        "German": "20 min/day active input (Nicos Weg A2 module). Target: 100 new vocabulary items in Anki.",
+        "Physical": "Weight 68.5 kg, daily protein floor at 140g."
+      },
+      "next_action": "Complete first 5 HackerRank problems without AI and trace variables by hand.",
+      "completed_deliverables": []
+    },
+    {
+      "id": "oct-2026",
+      "date": "2026-10",
+      "month_label": "OCT '26",
+      "name": "Gra Testowa",
+      "phase": "Phase 1: Year 3 Liceum",
+      "is_major": false,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "code",
+        "sigg",
+        "german"
+      ],
+      "objective": "Max out educational bonus capital (+2 PLN/point) & first major school exams.",
+      "deliverables": {
+        "Academics": "First major sprawdziany in Math & CS. Maintain grade 5.0 in both.",
+        "Code": "Solve 20 past CKE Matura task 1s (computational thinking/math logic on paper).",
+        "SIGG": "Gra Testowa (Oct 13 - Nov 16). Complete all individual educational e-learning modules to max out bonus multiplier.",
+        "German": "Finish A2.1 vocabulary deck."
+      },
+      "next_action": "Complete all SIGG educational quizzes to unlock maximum initial capital leverage."
+    },
+    {
+      "id": "nov-2026",
+      "date": "2026-11",
+      "month_label": "NOV '26",
+      "name": "Stage 1 Deployment",
+      "phase": "Phase 1: Year 3 Liceum",
+      "is_major": true,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "code",
+        "sigg",
+        "physical"
+      ],
+      "objective": "Launch real trading in Stage 1 & CKE data parsing tasks.",
+      "deliverables": {
+        "Academics": "Mid-semester review. All subjects > 4.0, Math and CS locked at 5.0+.",
+        "SIGG": "Stage 1 begins (Nov 17). Execute first transaction within mandatory 14 days. Focus strictly on WIG20/mWIG40 momentum setups (respect 1 order/10s throttle).",
+        "Code": "Transition to CKE Matura programming tasks in Python/C++ (file operations, data parsing).",
+        "Physical": "Weight 69.5 kg; 5k run pace under 4:40."
+      },
+      "next_action": "Execute first transaction in SIGG Stage 1 within the 14-day mandatory window."
+    },
+    {
+      "id": "dec-2026",
+      "date": "2026-12",
+      "month_label": "DEC '26",
+      "name": "Semester 1 Lock",
+      "phase": "Phase 1: Year 3 Liceum",
+      "is_major": true,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "code",
+        "sigg",
+        "german"
+      ],
+      "objective": "Lock in high grades on Sem 1 transcript & audit stock scanner.",
+      "deliverables": {
+        "Academics": "Finalize Semester 1 proposed grades. No grade below 4; Math, CS, English at 5 or 6.",
+        "SIGG": "Mid-Stage 1 portfolio review. Rebalance positions before holiday low-liquidity periods.",
+        "German": "A2 certification test (self-assessment or mock). Begin transition to B1 materials.",
+        "Code": "Audit desktop/polish_stocks_day_trade-main and understand every function without AI explanation."
+      },
+      "next_action": "Review Semester 1 transcript and ensure all STEM subjects are 5.0+."
+    },
+    {
+      "id": "jan-2027",
+      "date": "2027-01",
+      "month_label": "JAN '27",
+      "name": "Stage 1 Finish",
+      "phase": "Phase 1: Year 3 Liceum",
+      "is_major": false,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "code",
+        "sigg"
+      ],
+      "objective": "Stage 1 competition conclusion & dynamic programming drills.",
+      "deliverables": {
+        "Academics": "Formal Semester 1 grades locked onto official transcript.",
+        "SIGG": "Stage 1 closes (Jan 16). Review rank. If top 12: secure direct Finals spot; if not: prepare for Stage 2.",
+        "Code": "Solve 10 dynamic programming and recursion problems from previous Matura sheets."
+      },
+      "next_action": "Check national rank in Stage 1 and configure Stage 2 futures strategy."
+    },
+    {
+      "id": "feb-2027",
+      "date": "2027-02",
+      "month_label": "FEB '27",
+      "name": "Winter Intensive",
+      "phase": "Phase 1: Year 3 Liceum",
+      "is_major": false,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "sigg",
+        "german",
+        "physical"
+      ],
+      "objective": "Winter break math acceleration & futures simulation.",
+      "deliverables": {
+        "Academics": "Complete 5 full Math Rozszerzona past sheets (CKE 2020-2024).",
+        "SIGG": "Futures simulation prep: paper-trade WIG20 futures (FW20) leverage and short mechanics.",
+        "German": "B1 grammar foundations (Subjunctive II, passive voice, subordinate clauses).",
+        "Physical": "Weight 71.0 kg; bench/squat/deadlift baseline increase of 5%."
+      },
+      "next_action": "Solve 5 complete Math R arkusze under timed conditions."
+    },
+    {
+      "id": "mar-2027",
+      "date": "2027-03",
+      "month_label": "MAR '27",
+      "name": "Stage 2 Derivatives",
+      "phase": "Phase 1: Year 3 Liceum",
+      "is_major": true,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "code",
+        "sigg"
+      ],
+      "objective": "Stage 2 live futures trading & Matura SQL database mastery.",
+      "deliverables": {
+        "SIGG": "Stage 2 live (Mar 2 - Mar 27) with 10,000 PLN capital. Execute trade in first 7 days. Apply strict stop-losses on short positions.",
+        "Academics": "Q3 school grades checkup. Ensure Polish, History, and Biology stay >= 4.0.",
+        "Code": "Master SQL databases and Access/Excel data processing modules required for Matura Informatyka."
+      },
+      "next_action": "Trade FW20 contracts with strict risk-to-reward ratio."
+    },
+    {
+      "id": "apr-2027",
+      "date": "2027-04",
+      "month_label": "APR '27",
+      "name": "Regional Play-offs & Finals",
+      "phase": "Phase 1: Year 3 Liceum",
+      "is_major": false,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "sigg",
+        "german"
+      ],
+      "objective": "GPW Warsaw Trading Floor finals sprint.",
+      "deliverables": {
+        "SIGG": "Dogrywka (Apr 13-17) or live Finals at GPW Warsaw Trading Floor (Apr 23).",
+        "Academics": "End-of-year sprint begins. Target 5.0+ in all core STEM subjects.",
+        "German": "B1 intermediate listening comprehension (DW Langsam gesprochene Nachrichten)."
+      },
+      "next_action": "Prepare live portfolio strategy for Warsaw Trading Floor final."
+    },
+    {
+      "id": "may-2027",
+      "date": "2027-05",
+      "month_label": "MAY '27",
+      "name": "Trial Matura Audit",
+      "phase": "Phase 1: Year 3 Liceum",
+      "is_major": false,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "physical"
+      ],
+      "objective": "Write official 2027 Matura 1 year early under timed exam conditions.",
+      "deliverables": {
+        "Academics": "Sit down with 2027 official Matura papers written by 4th-graders. Score yourself under real exam timing (aim for >70% raw score on Math R 1 year early).",
+        "Physical": "Body weight 72.5 kg at 14-15% body fat."
+      },
+      "next_action": "Score 2027 official CKE Math sheet and identify gap topics."
+    },
+    {
+      "id": "jun-2027",
+      "date": "2027-06",
+      "month_label": "JUN '27",
+      "name": "Year 3 Final Report",
+      "phase": "Phase 1: Year 3 Liceum",
+      "is_major": true,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "code",
+        "harness"
+      ],
+      "objective": "Milepost 1 for TUM: 3rd Class Liceum Final Transcript (GPA >= 4.8).",
+      "deliverables": {
+        "Academics": "Milepost 1 for TUM: 3rd Class Liceum Final Transcript completed with GPA >= 4.8.",
+        "Code": "Complete a standalone, production-ready project for your portfolio without AI-generated scaffolding.",
+        "Harness": "Update portfolio database with SIGG credentials and year-end metrics."
+      },
+      "next_action": "Verify final 3rd-year certificate grades with school administration."
+    },
+    {
+      "id": "jul-aug-2027",
+      "date": "2027-07",
+      "month_label": "JUL '27",
+      "name": "Summer Build",
+      "phase": "Phase 2: Year 4 Liceum",
+      "is_major": false,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "german",
+        "physical"
+      ],
+      "objective": "Goethe B1 certification, Math Calculus sprint, and 74kg mass check.",
+      "deliverables": {
+        "German": "Target Goethe-Zertifikat B1 exam or verify B1 competence. Start B2 reading.",
+        "Academics": "Math Rozszerzona topical review (Calculus, Stereometry, Combinatorics).",
+        "Physical": "Peak summer check: 73.5-74 kg, 13-14% body fat, 5k run maintained at sub-4:40 pace."
+      },
+      "next_action": "Register for Goethe B1 examination."
+    },
+    {
+      "id": "sep-2027",
+      "date": "2027-09",
+      "month_label": "SEP '27",
+      "name": "Class 4 Kickoff",
+      "phase": "Phase 2: Year 4 Liceum",
+      "is_major": true,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "code"
+      ],
+      "objective": "Official Matura declarations locked & daily timed algorithm speed drills.",
+      "deliverables": {
+        "Academics": "Lock in official Matura declarations: Matematyka Podstawowa + Rozszerzona, Informatyka Rozszerzona, Język Angielski Dwujęzyczny / C1.",
+        "Code": "Daily timed Matura algorithm speed-drills (45 min/day)."
+      },
+      "next_action": "Submit official deklaracja maturalna to school director."
+    },
+    {
+      "id": "oct-2027",
+      "date": "2027-10",
+      "month_label": "OCT '27",
+      "name": "TUM Portfolio Prep",
+      "phase": "Phase 2: Year 4 Liceum",
+      "is_major": false,
+      "status": "upcoming",
+      "branches": [
+        "tum_pipeline",
+        "german"
+      ],
+      "objective": "Draft English Letter of Motivation highlighting SIGG, coding, and startups.",
+      "deliverables": {
+        "TUM Heilbronn": "Draft English Letter of Motivation (emphasizing data science projects, SIGG trading algorithms, startup initiatives).",
+        "German": "B2 technical business/math vocabulary immersion."
+      },
+      "next_action": "Complete first draft of TUM Letter of Motivation."
+    },
+    {
+      "id": "nov-2027",
+      "date": "2027-11",
+      "month_label": "NOV '27",
+      "name": "Mock Exam Wave 1",
+      "phase": "Phase 2: Year 4 Liceum",
+      "is_major": true,
+      "status": "upcoming",
+      "branches": [
+        "academics"
+      ],
+      "objective": "School mock exams (Próbne). Targets: Math R >= 80%, CS >= 75%, English >= 90%.",
+      "deliverables": {
+        "Academics": "School mock exams (Nowa Era / Operon / CKE). Target scores: Math R >= 80%, Informatyka >= 75%, English Bilingual >= 90%."
+      },
+      "next_action": "Simulate 3 trial mock exams before school test week."
+    },
+    {
+      "id": "dec-2027",
+      "date": "2027-12",
+      "month_label": "DEC '27",
+      "name": "Semester 3 Final Report",
+      "phase": "Phase 2: Year 4 Liceum",
+      "is_major": false,
+      "status": "upcoming",
+      "branches": [
+        "academics"
+      ],
+      "objective": "Milepost 2 for TUM: First-semester grades of 4th liceum finalized.",
+      "deliverables": {
+        "Academics": "Milepost 2 for TUM: First-semester grades of 4th liceum finalized. All semi-annual grades on transcript reflect high distinction."
+      },
+      "next_action": "Secure official school stamped record of first semester grades."
+    },
+    {
+      "id": "jan-2028",
+      "date": "2028-01",
+      "month_label": "JAN '28",
+      "name": "Uni-Assist Setup",
+      "phase": "Phase 2: Year 4 Liceum",
+      "is_major": true,
+      "status": "upcoming",
+      "branches": [
+        "tum_pipeline",
+        "academics"
+      ],
+      "objective": "Set up uni-assist.de for VPD processing & address weakest 3 math topics.",
+      "deliverables": {
+        "TUM Pipeline": "Set up account on uni-assist.de for VPD (Vorprüfungsdokumentation) processing.",
+        "Academics": "Identify weakest 3 math topics from mock results and solve 100 dedicated drill problems."
+      },
+      "next_action": "Create and verify profile on uni-assist.de."
+    },
+    {
+      "id": "feb-2028",
+      "date": "2028-02",
+      "month_label": "FEB '28",
+      "name": "Winter Lock-in",
+      "phase": "Phase 2: Year 4 Liceum",
+      "is_major": false,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "german"
+      ],
+      "objective": "10 full past-paper simulations under timed conditions. Zero external assistance.",
+      "deliverables": {
+        "Academics": "10 full past-paper simulations under timed conditions. Zero external assistance.",
+        "German": "B2 conversational practice (prepares for potential TUM aptitude assessment interview)."
+      },
+      "next_action": "Complete past CKE papers 2021-2027 in exam hall conditions."
+    },
+    {
+      "id": "mar-2028",
+      "date": "2028-03",
+      "month_label": "MAR '28",
+      "name": "Formal Clearance",
+      "phase": "Phase 2: Year 4 Liceum",
+      "is_major": false,
+      "status": "upcoming",
+      "branches": [
+        "tum_pipeline",
+        "academics"
+      ],
+      "objective": "Order certified sworn translations (German/English) of transcripts.",
+      "deliverables": {
+        "Academics": "Final school grades for 4th year locked in.",
+        "TUM Pipeline": "Order sworn certified translations (German or English) of your 3rd and 4th-year semester reports (Halbjahresnoten)."
+      },
+      "next_action": "Engage certified sworn translator for school transcripts."
+    },
+    {
+      "id": "apr-2028",
+      "date": "2028-04",
+      "month_label": "APR '28",
+      "name": "Graduation",
+      "phase": "Phase 2: Year 4 Liceum",
+      "is_major": true,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "tum_pipeline"
+      ],
+      "objective": "Receive Świadectwo Ukończenia Liceum & assemble TUMonline package.",
+      "deliverables": {
+        "Academics": "Receive high school graduation diploma (Świadectwo ukończenia liceum ogólnokształcącego).",
+        "TUMonline": "Portal opens May 15. Prepare upload packages (Passport, CV, Motivation Letter, Transcripts)."
+      },
+      "next_action": "Digitize graduation certificate and prepare certified copies."
+    },
+    {
+      "id": "may-2028",
+      "date": "2028-05",
+      "month_label": "MAY '28",
+      "name": "Egzaminy Maturalne",
+      "phase": "Phase 2: Year 4 Liceum",
+      "is_major": true,
+      "status": "upcoming",
+      "branches": [
+        "academics",
+        "tum_pipeline"
+      ],
+      "objective": "Write official CKE Matura & submit application via TUMonline.",
+      "deliverables": {
+        "Execution": "Write official CKE Matura: Matematyka Podstawa & Rozszerzenie, Język Angielski Dwujęzyczny, Informatyka Rozszerzenie.",
+        "TUM Application": "Submit application via TUMonline as soon as the window opens."
+      },
+      "next_action": "Execute Matura exam days with maximum precision and composure."
+    },
+    {
+      "id": "jun-2028",
+      "date": "2028-06",
+      "month_label": "JUN '28",
+      "name": "VPD & Matura Results",
+      "phase": "Phase 2: Year 4 Liceum",
+      "is_major": false,
+      "status": "upcoming",
+      "branches": [
+        "tum_pipeline",
+        "physical"
+      ],
+      "objective": "Submit graduation certificate to Uni-Assist for expedited VPD generation.",
+      "deliverables": {
+        "TUM Pipeline": "Submit graduation certificate and preliminary grades to Uni-Assist for expedited VPD generation.",
+        "Physical": "Transition back to full boxing schedule (3-4x/week) and gym hypertrophy blocks."
+      },
+      "next_action": "Track Uni-Assist VPD review status daily."
+    },
+    {
+      "id": "jul-2028",
+      "date": "2028-07",
+      "month_label": "JUL '28",
+      "name": "TUM Direct Offer",
+      "phase": "Phase 2: Year 4 Liceum",
+      "is_major": true,
+      "status": "upcoming",
+      "branches": [
+        "tum_pipeline"
+      ],
+      "objective": "Stage 1 Aptitude score >= 88 pts triggers Direct Admission to TUM Heilbronn!",
+      "deliverables": {
+        "July 8-9": "Official CKE Matura results published.",
+        "Action": "Immediately forward official Matura certificate to Uni-Assist / TUMonline before July 15 deadline.",
+        "Outcome": "Stage 1 Aptitude score >= 88 points triggers Direct Admission without an assessment interview.",
+        "Station Arrived": "Acceptance letter confirmed for B.Sc. Management and Data Science at TUM Campus Heilbronn."
+      },
+      "next_action": "Accept TUM Heilbronn direct offer and secure Heilbronn student accommodation."
+    }
+  ]
+}
