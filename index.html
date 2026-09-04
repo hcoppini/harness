@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>HARNESS // Executive OS</title>
+  <link rel="icon" type="image/png" href="favicon.png">
+  <link rel="apple-touch-icon" href="favicon.png">
+  <link rel="stylesheet" href="css/app.css?v=3.5">
+</head>
+<body>
+
+  <!-- Top App Header -->
+  <header class="app-header">
+    <div class="brand-wrap" onclick="window.HarnessApp.switchView('dashboard')">
+      <div class="brand-mark"></div>
+      <span class="brand-title">HARNESS</span>
+      <span class="brand-divider">/</span>
+      <span class="brand-caption">Executive OS</span>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs" id="navTabs">
+      <button class="nav-tab active" data-view="dashboard">
+        <span>Dashboard</span>
+        <span class="key-pill">0</span>
+      </button>
+      <button class="nav-tab" data-view="today">
+        <span>Today</span>
+        <span class="key-pill">1</span>
+      </button>
+      <button class="nav-tab" data-view="tum">
+        <span>TUM Metro</span>
+        <span class="key-pill">2</span>
+      </button>
+      <button class="nav-tab" data-view="projects">
+        <span>Projects</span>
+        <span class="key-pill">3</span>
+      </button>
+      <button class="nav-tab" data-view="body">
+        <span>Body</span>
+        <span class="key-pill">4</span>
+      </button>
+      <button class="nav-tab" data-view="knowledge">
+        <span>Knowledge</span>
+        <span class="key-pill">5</span>
+      </button>
+    </nav>
+
+    <!-- Header Right Controls -->
+    <div class="header-right">
+      <button id="btnOpenJsonModal" class="btn-ghost-icon" title="Standardized JSON Configuration">
+        <span>JSON Hub</span>
+      </button>
+      <div style="display: flex; align-items: baseline; gap: 8px; font-family: var(--font-mono); font-size: 11px;">
+        <span id="currentDatePill" style="color: var(--text-tertiary);">--</span>
+        <span id="currentTimePill" style="color: var(--text-primary); font-weight: 600;">--:--</span>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Viewport -->
+  <main class="main-content">
+
+    <!-- ====================================================================
+         0. DASHBOARD LAYER (Executive Cockpit, Trajectory Gauges, Heatmap)
+         ==================================================================== -->
+    <section id="view-dashboard" class="view-section active">
+      <div class="section-header">
+        <div>
+          <h1 class="section-headline">Executive Cockpit</h1>
+          <p class="section-caption">High-signal trajectory: daily execution velocity, TUM Heilbronn readiness, and habit consistency.</p>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <div class="mono-chip lavender" id="dashboardStreakPill" title="Consecutive execution streak" style="padding: 4px 8px;">
+            <span id="streakCountVal">0</span>d streak
+          </div>
+          <button id="btnRefreshDashboard" class="btn-ghost-icon" title="Refresh Dashboard Data">
+            <span>Refresh</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="dashboard-layout">
+        <!-- 1. TOP EXECUTIVE COCKPIT GAUGES -->
+        <div class="executive-cockpit-grid">
+          <!-- Gauge 1: Today's Execution Velocity -->
+          <div class="cockpit-card" onclick="window.HarnessApp.switchView('today')" style="cursor: pointer;">
+            <div class="cockpit-header">
+              <span class="cockpit-title">Today's Velocity</span>
+              <span class="mono-chip lavender" id="dashTodayRoutineTag">Schedule</span>
+            </div>
+            <div>
+              <div class="cockpit-value" id="dashTodayProgressVal">0%</div>
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="dashTodayProgressBar" style="width: 0%;"></div>
+              </div>
+            </div>
+            <div class="cockpit-subtitle" id="dashTodayRoutineLabel">
+              Loading routine...
+            </div>
+          </div>
+
+          <!-- Gauge 2: TUM Heilbronn Admissions Readiness -->
+          <div class="cockpit-card" onclick="window.HarnessApp.switchView('tum')" style="cursor: pointer;">
+            <div class="cockpit-header">
+              <span class="cockpit-title">TUM Admissions</span>
+              <span class="mono-chip" id="dashGermanLevel">A2 Active</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div>
+                <div class="card-label">GPA STANDING</div>
+                <div class="cockpit-value" id="dashOverallGpa" style="font-size: 18px; margin-top: 2px;">--</div>
+              </div>
+              <div style="text-align: right;">
+                <div class="card-label">MATURA MOCKS</div>
+                <div class="cockpit-value" id="dashMaturaAvg" style="font-size: 18px; margin-top: 2px;">--%</div>
+              </div>
+            </div>
+            <div class="cockpit-subtitle" id="dashActiveStationName">
+              Station: Pure Syntax
+            </div>
+          </div>
+
+          <!-- Gauge 3: Body / Mass & Workouts -->
+          <div class="cockpit-card" onclick="window.HarnessApp.switchView('body')" style="cursor: pointer;">
+            <div class="cockpit-header">
+              <span class="cockpit-title">Physique &amp; Mass</span>
+              <span class="mono-chip" style="font-family: var(--font-mono);">80.0 kg Goal</span>
+            </div>
+            <div>
+              <div style="display: flex; justify-content: space-between; align-items: baseline;">
+                <div class="cockpit-value" id="dashWeightVal" style="font-size: 18px;">68.0 kg</div>
+              </div>
+              <div class="progress-bar-track">
+                <div class="progress-bar-fill" id="dashWeightProgressFill" style="width: 0%;"></div>
+              </div>
+            </div>
+            <div class="cockpit-subtitle" id="dashWorkoutsSummaryText">
+              Boxing 0/3 • Gym 0/4 • Run 0/2
+            </div>
+          </div>
+
+          <!-- Gauge 4: Active Builds & Next Action -->
+          <div class="cockpit-card" onclick="window.HarnessApp.switchView('projects')" style="cursor: pointer;">
+            <div class="cockpit-header">
+              <span class="cockpit-title">Active Sprints</span>
+              <span class="mono-chip lavender">Workspace</span>
+            </div>
+            <div class="cockpit-value" id="dashProjectsCount">4 Builds</div>
+            <div class="cockpit-subtitle" id="dashTopProjectNextAction" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              Review next immediate milestone
+            </div>
+          </div>
+        </div>
+
+        <!-- 2. DAILY EXECUTION HEATMAP -->
+        <div class="monotone-card heatmap-card">
+          <div class="heatmap-header-row">
+            <div>
+              <span class="heatmap-title" id="heatmapContributionsCount">Daily Execution Pulse</span>
+              <div class="heatmap-subtitle">Historical habit density: routines, gym protocols, and tasks</div>
+            </div>
+            <div class="heatmap-legend">
+              <span>Less</span>
+              <div class="legend-square lvl-0" title="0 checked"></div>
+              <div class="legend-square lvl-1" title="1-2 checked"></div>
+              <div class="legend-square lvl-2" title="3-4 checked"></div>
+              <div class="legend-square lvl-3" title="5-6 checked"></div>
+              <div class="legend-square lvl-4" title="7+ checked (100%)"></div>
+              <span>More</span>
+            </div>
+          </div>
+
+          <div class="heatmap-scroll-wrap" id="heatmapScrollWrap">
+            <div class="heatmap-container" id="heatmapContainer">
+              <!-- Rendered by dashboard.js -->
+            </div>
+          </div>
+          <div id="heatmapTooltip" class="heatmap-tooltip"></div>
+        </div>
+
+        <!-- 3. UPCOMING 7-DAY FORECAST -->
+        <div class="monotone-card">
+          <div class="card-label-row">
+            <div>
+              <span class="card-label">7-Day Schedule Forecast</span>
+              <span style="font-size: 11px; color: var(--text-tertiary); margin-left: 8px;">
+                Look ahead: routines, training cutoffs, and scheduled reps
+              </span>
+            </div>
+            <button id="btnJumpToTodayFromDash" class="btn-ghost-icon">
+              <span>Go to Today</span>
+              <span class="key-pill">1</span>
+            </button>
+          </div>
+
+          <div class="upcoming-reel" id="upcomingReelContainer">
+            <!-- Rendered by dashboard.js -->
+          </div>
+        </div>
+
+        <!-- 4. PRIORITY RADAR ROW (Homework & Upcoming Exams) -->
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <!-- Due Homework -->
+          <div class="monotone-card" style="margin-bottom: 0;">
+            <div class="card-label-row">
+              <span class="card-label">Priority Homework</span>
+              <button class="btn-ghost-icon" onclick="window.Today.openAddHomeworkModal()">+ Add</button>
+            </div>
+            <div id="dashHomeworkList" style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
+              <!-- Rendered by dashboard.js -->
+            </div>
+          </div>
+
+          <!-- Upcoming Tests & Exams -->
+          <div class="monotone-card" style="margin-bottom: 0;">
+            <div class="card-label-row">
+              <span class="card-label">Upcoming Tests &amp; Mocks</span>
+              <button class="btn-ghost-icon" onclick="window.Today.openAddExamModal()">+ Add</button>
+            </div>
+            <div id="dashExamsList" style="display: flex; flex-direction: column; gap: 6px; margin-top: 6px;">
+              <!-- Rendered by dashboard.js -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         1. TODAY LAYER (Daily Routine, Mini-Calendar, Timetable)
+         ==================================================================== -->
+    <section id="view-today" class="view-section">
+      <div class="section-header">
+        <div>
+          <h1 class="section-headline">Daily Execution</h1>
+          <p class="section-caption">Routines are pre-calibrated. Zero input fatigue. Check the boxes.</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button id="btnOpenKillList" class="btn-ghost-icon" title="Open Kill List Drawer (SGH Library Deep Work)">
+            <span style="color: var(--accent-lavender); font-weight: 700;">⚡ Kill List</span>
+            <span class="key-pill" id="todayKillListBadge">0/3</span>
+          </button>
+          <button id="btnRollover" class="btn-ghost-icon" title="Carry forward pending tasks from prior days (R)">
+            <span>Carry Over</span>
+            <span class="key-pill">R</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="today-layout">
+        <!-- Left Column: Automated Routine & Tasks -->
+        <div>
+          <!-- Schedule Banner -->
+          <div class="schedule-banner">
+            <div>
+              <span id="scheduleBadge" class="mono-chip lavender">SCHEDULE --</span>
+              <span id="scheduleDayName" style="font-size: 13px; font-weight: 600; margin-left: 8px; color: var(--text-primary);">
+                Loading routine...
+              </span>
+            </div>
+            <span id="scheduleDescription" style="font-size: 11px; color: var(--text-tertiary);"></span>
+          </div>
+
+          <!-- Pre-loaded Day Routine Blocks -->
+          <div id="routineBlocksContainer" class="routine-timeline">
+            <!-- Dynamic schedule time blocks -->
+          </div>
+
+          <!-- Tue/Thu Structured Gym Card -->
+          <div id="todayLiftCard" class="monotone-card" style="display: none; border-color: var(--accent-lavender-border);">
+            <div class="card-label-row">
+              <span id="todayLiftTitle" class="card-label" style="color: var(--accent-lavender);">Structured Gym Protocol</span>
+              <span class="mono-chip">Hypertrophy</span>
+            </div>
+            <div id="todayLiftExercises" style="display: flex; flex-direction: column; gap: 6px;">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Quick Task Bar -->
+          <form id="quickTaskForm" class="quick-task-bar">
+            <span style="color: var(--accent-lavender); font-weight: 600; padding: 0 4px; font-family: var(--font-mono); font-size: 11px;">+</span>
+            <input 
+              type="text" 
+              id="quickTaskInput" 
+              class="quick-task-input" 
+              placeholder="Add task for this day (Press 'N' to focus, Enter to add)..."
+              autocomplete="off"
+            />
+          </form>
+
+          <!-- Custom Tasks Checklist -->
+          <div id="customTaskList">
+            <!-- Dynamic task items -->
+          </div>
+
+          <!-- Scratchpad Card -->
+          <div class="monotone-card" style="margin-top: 14px;">
+            <div class="card-label-row">
+              <span class="card-label">Scratchpad</span>
+              <span id="scratchpadSavePill" class="mono-chip">Auto-saving</span>
+            </div>
+            <textarea 
+              id="scratchpadTextarea" 
+              class="form-textarea" 
+              placeholder="Transient thoughts, code logic, or quick math scratchpad..."
+              spellcheck="false"
+              style="width: 100%; height: 80px;"
+            ></textarea>
+          </div>
+
+          <!-- Sleep & Wake Target -->
+          <div class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">Sleep Target</span>
+              <span class="mono-chip">8h Floor</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+              <div>
+                <label class="form-label">WAKE TIME</label>
+                <input type="text" id="wakeTimeInput" class="form-input" style="width: 100%; font-family: var(--font-mono);" placeholder="06:45" />
+              </div>
+              <div>
+                <label class="form-label">BEDTIME</label>
+                <input type="text" id="sleepTimeInput" class="form-input" style="width: 100%; font-family: var(--font-mono);" placeholder="22:45" />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: Mini-Calendar, Timetable, Radar, Links -->
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Mini-Calendar Date Navigator -->
+          <div class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">Calendar Navigator</span>
+              <button id="btnTodayReset" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">Today</button>
+            </div>
+            <div id="miniCalendarWrap">
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                <button id="btnPrevMonth" class="btn-ghost-icon" style="padding: 2px 6px;">&larr;</button>
+                <span id="calMonthYearLabel" style="font-weight: 600; font-size: 11px; color: var(--text-primary); font-family: var(--font-mono);">Month Year</span>
+                <button id="btnNextMonth" class="btn-ghost-icon" style="padding: 2px 6px;">&rarr;</button>
+              </div>
+              <div id="miniCalendarGrid" class="mini-calendar-grid">
+                <!-- Days rendered dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- School Timetable Widget (TM1 / Optivum 3lb) -->
+          <div class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">TM1 School Timetable</span>
+              <div style="display: flex; gap: 4px;">
+                <button id="btnRefreshSchoolPlan" class="btn-ghost-icon" title="Sync live schedule" style="font-size: 10px; padding: 2px 6px;">Sync</button>
+                <button id="btnOpenTM1Web" class="btn-ghost-icon" title="Open Optivum plan" style="font-size: 10px; padding: 2px 6px;">Web &rarr;</button>
+              </div>
+            </div>
+            <div id="schoolLessonsList" style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+              <!-- Lessons rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Homework & Exam Radar Card -->
+          <div class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">Homework &amp; Exams</span>
+              <div style="display: flex; gap: 4px;">
+                <button id="btnAddHomeworkBtn" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ HW</button>
+                <button id="btnAddExamBtn" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ Exam</button>
+              </div>
+            </div>
+            
+            <div style="margin-top: 4px;">
+              <div class="card-label" style="font-size: 9px; margin-bottom: 4px;">Pending Homework</div>
+              <div id="homeworkItemsList" style="display: flex; flex-direction: column; gap: 4px;">
+                <!-- Homework items rendered dynamically -->
+              </div>
+            </div>
+
+            <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-hairline);">
+              <div class="card-label" style="font-size: 9px; margin-bottom: 4px;">Upcoming Tests &amp; Mocks</div>
+              <div id="upcomingExamsList" style="display: flex; flex-direction: column; gap: 4px;">
+                <!-- Exam items rendered dynamically -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Quick Launch Links Card -->
+          <div class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">Quick Links Launchpad</span>
+              <button id="btnAddNewLinkModal" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ Add Link</button>
+            </div>
+            <div id="easyLinksContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px;">
+              <!-- Easy links rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         2. TUM METRO ROADMAP LAYER (Single Main Line + Stream Highlighters)
+         ==================================================================== -->
+    <section id="view-tum" class="view-section">
+      <div class="section-header" style="margin-bottom: 12px; padding-bottom: 10px;">
+        <div>
+          <h1 class="section-headline">TUM Metro Roadmap (2026 – 2028)</h1>
+          <p class="section-caption">Core milestone timeline anchored on the main track, with stream highlighter lines tracing connected goals.</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button id="btnJumpCurrentStation" class="btn-ghost-icon">Jump to Active Station</button>
+          <button id="btnToggleGradesView" class="btn-ghost-icon">Grades Ledger</button>
+        </div>
+      </div>
+
+      <!-- Metro Viewport -->
+      <div class="metro-viewport">
+        <!-- Metro Toolbar & Stream Filters -->
+        <div class="metro-toolbar">
+          <div class="metro-filters">
+            <span class="card-label" style="margin-right: 4px;">Highlight:</span>
+            <button class="metro-filter-btn active" data-stream="all">All Lines</button>
+            <button class="metro-filter-btn" data-stream="academics">Academics</button>
+            <button class="metro-filter-btn" data-stream="code">Code</button>
+            <button class="metro-filter-btn" data-stream="sigg">SIGG GPW</button>
+            <button class="metro-filter-btn" data-stream="german">German</button>
+            <button class="metro-filter-btn" data-stream="physical">Physical</button>
+          </div>
+          <div style="font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono);">
+            Scroll or drag track • Real-time timeline beacon
+          </div>
+        </div>
+
+        <!-- Draggable Horizontal Track Container -->
+        <div id="metroScrollContainer" class="metro-scroll-container">
+          <div id="metroCanvasWrap" class="metro-canvas-wrap">
+            <!-- Rendered by MetroMap engine -->
+          </div>
+        </div>
+
+        <!-- Station Details Slide-Over Drawer -->
+        <div id="stationDrawer" class="station-drawer">
+          <button id="closeStationDrawerBtn" class="drawer-close-btn">&times;</button>
+          
+          <div style="margin-top: 8px; margin-bottom: 16px;">
+            <div id="drawerStationMonth" style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-lavender); font-weight: 600;">
+              SEP '26 // PHASE 1
+            </div>
+            <h2 id="drawerStationTitle" style="font-size: 17px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">
+              Pure Syntax
+            </h2>
+          </div>
+
+          <div style="margin-bottom: 16px;">
+            <label class="form-label">STATION STATUS</label>
+            <select id="drawerStationStatus" class="form-input" style="width: 100%;">
+              <option value="upcoming">Upcoming</option>
+              <option value="active">Active Station</option>
+              <option value="completed">Completed / Reached</option>
+            </select>
+          </div>
+
+          <!-- Objective Box -->
+          <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 16px;">
+            <div class="card-label" style="margin-bottom: 4px;">CORE OBJECTIVE</div>
+            <div id="drawerStationObjective" style="font-size: 12px; color: var(--text-primary); line-height: 1.5;">
+              --
+            </div>
+          </div>
+
+          <!-- Deliverables Checklist -->
+          <div style="margin-bottom: 16px;">
+            <div class="card-label" style="margin-bottom: 8px;">DELIVERABLES BREAKDOWN</div>
+            <div id="drawerDeliverablesList">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+
+          <!-- Next Action Box -->
+          <div style="border-top: 1px solid var(--border-hairline); padding-top: 14px;">
+            <div class="card-label" style="margin-bottom: 4px;">IMMEDIATE NEXT ACTION</div>
+            <div id="drawerStationNextAction" style="font-size: 12px; font-weight: 600; color: var(--text-primary); line-height: 1.4;">
+              --
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Collapsible 4-Semester Grade Ledger -->
+      <div id="gradesTableDrawer" class="monotone-card" style="display: none; margin-top: 16px;">
+        <!-- Bavarian Formula & TUM Stage 1 Aptitude Card -->
+        <div style="background: rgba(196, 181, 253, 0.03); border: 1px solid rgba(196, 181, 253, 0.12); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px;">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+            <div>
+              <div class="card-label" style="color: var(--accent-lavender); font-size: 10px;">TUM STAGE 1 APTITUDE ASSESSMENT // BAVARIAN FORMULA</div>
+              <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
+                N = 1 + 3 &times; (P_max - P) / (P_max - P_min) &bull; 65% Overall GPA + 35% Curricular Subjects (Math 2x, CS 2x, Lang 1x)
+              </div>
+            </div>
+            <div id="tumAdmissionBadge">
+              <span class="mono-chip done" style="font-size: 11px; padding: 4px 10px; font-weight: 700;">Loading...</span>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; font-family: var(--font-mono);">
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
+              <div style="font-size: 9px; color: var(--text-tertiary);">GERMAN GPA (1.0-4.0)</div>
+              <div id="tumGermanGpaVal" style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">--</div>
+              <div id="tumPolishGpaVal" style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Polish: --</div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
+              <div style="font-size: 9px; color: var(--text-tertiary);">TOTAL TUM SCORE</div>
+              <div id="tumTotalScoreVal" style="font-size: 18px; font-weight: 700; color: var(--accent-lavender); margin-top: 2px;">-- / 100</div>
+              <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Safe &ge; 88.0 pts</div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
+              <div style="font-size: 9px; color: var(--text-tertiary);">CURRICULAR SCORE</div>
+              <div id="tumSubjectScoreVal" style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">--</div>
+              <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Math 2x, CS 2x, Lang 1x</div>
+            </div>
+
+            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
+              <div style="font-size: 9px; color: var(--text-tertiary);">ADMISSION VERDICT</div>
+              <div id="tumVerdictText" style="font-size: 10px; font-weight: 700; color: var(--text-primary); margin-top: 4px; line-height: 1.3;">
+                --
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="card-label-row">
+          <span class="card-label">4-Semester Liceum Grade Ledger</span>
+          <div style="display: flex; gap: 4px;" id="semesterFilterButtons">
+            <button class="btn-ghost-icon active" data-sem="1">Sem 1</button>
+            <button class="btn-ghost-icon" data-sem="2">Sem 2</button>
+            <button class="btn-ghost-icon" data-sem="3">Sem 3</button>
+            <button class="btn-ghost-icon" data-sem="4">Sem 4</button>
+          </div>
+        </div>
+        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+          <thead>
+            <tr style="border-bottom: 1px solid var(--border-hairline); text-align: left; color: var(--text-tertiary); font-size: 10px; font-weight: 600; font-family: var(--font-mono);">
+              <th style="padding: 6px 0;">SUBJECT</th>
+              <th>TARGET</th>
+              <th>ACTUAL (1-6)</th>
+              <th>STATUS</th>
+            </tr>
+          </thead>
+          <tbody id="gradesTableBody">
+            <!-- Rendered dynamically -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         3. PROJECTS LAYER (Builds, Workspaces & Competitions)
+         ==================================================================== -->
+    <section id="view-projects" class="view-section">
+      <div class="section-header">
+        <div>
+          <h1 class="section-headline">Active Projects &amp; Workspaces</h1>
+          <p class="section-caption">Every build maintains a concrete milestone, live Git status, and direct IDE launcher.</p>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <div style="display: flex; gap: 4px;" id="projectStatusFilters">
+            <button class="btn-ghost-icon active" data-filter="all">All</button>
+            <button class="btn-ghost-icon" data-filter="active">Active</button>
+            <button class="btn-ghost-icon" data-filter="completed">Completed</button>
+            <button class="btn-ghost-icon" data-filter="paused">Paused</button>
+          </div>
+          <button id="btnAddNewProject" class="btn-primary">+ New Project</button>
+        </div>
+      </div>
+
+      <div id="projectsContainer" class="projects-grid">
+        <!-- Rendered dynamically by projects.js -->
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         4. BODY / LIFE LAYER (Machine Maintenance & Gym)
+         ==================================================================== -->
+    <section id="view-body" class="view-section">
+      <div class="section-header">
+        <div>
+          <h1 class="section-headline">Machine Maintenance</h1>
+          <p class="section-caption">Physical foundation: Hypertrophy progression to 80kg, Boxing sparring, and Recovery.</p>
+        </div>
+      </div>
+
+      <div class="today-layout">
+        <!-- Left: Mass Progress & Gym Protocols -->
+        <div>
+          <!-- Mass Target Card -->
+          <div class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">Hypertrophy Target</span>
+              <span style="font-size: 12px; font-weight: 600; color: var(--text-primary); font-family: var(--font-mono);">
+                <span id="currentWeightDisplay">68.0</span> kg &rarr; 80.0 kg
+              </span>
+            </div>
+            <div class="progress-bar-track" style="margin: 8px 0;">
+              <div id="weightProgressBar" class="progress-bar-fill" style="width: 5%;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-size: 9px; color: var(--text-tertiary); font-family: var(--font-mono);">
+              <span>Base: 68.0 kg</span>
+              <span>Target: 80.0 kg (Lean Mass)</span>
+            </div>
+          </div>
+
+          <!-- Structured Gym Protocols -->
+          <div class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">Structured Gym Protocols</span>
+              <div style="display: flex; gap: 4px;">
+                <button class="btn-ghost-icon active" id="tabGymTuesday">Tuesday (Posterior)</button>
+                <button class="btn-ghost-icon" id="tabGymThursday">Thursday (Vertical Pull)</button>
+              </div>
+            </div>
+            <div id="gymRoutineDisplay">
+              <!-- Rendered dynamically -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Daily Weigh-in & Workout Log -->
+        <div>
+          <!-- Daily Weigh-in Form -->
+          <form id="bodyMetricForm" class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">Daily Weigh-in</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">MORNING WEIGHT (KG)</label>
+              <input type="number" step="0.1" id="logWeightInput" class="form-input" placeholder="e.g. 68.5" required />
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; font-size: 11px;">
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="logCaloriesMet" style="accent-color: var(--accent-lavender);" />
+                <span>Calorie surplus achieved</span>
+              </label>
+              <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                <input type="checkbox" id="logProteinMet" style="accent-color: var(--accent-lavender);" />
+                <span>Protein target met (140g floor)</span>
+              </label>
+            </div>
+            <button type="submit" class="btn-primary" style="width: 100%; justify-content: center;">Record Weigh-in</button>
+          </form>
+
+          <!-- Training Session Log -->
+          <form id="workoutLogForm" class="monotone-card">
+            <div class="card-label-row">
+              <span class="card-label">Log Training Session</span>
+            </div>
+            <div class="form-group">
+              <label class="form-label">DISCIPLINE</label>
+              <select id="logWorkoutType" class="form-input">
+                <option value="boxing">Boxing (Sparring / Heavy Bag)</option>
+                <option value="gym">Gym (Hypertrophy / Sets)</option>
+                <option value="running">Running (Zone 2 / Tempo)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label class="form-label">SESSION DETAILS</label>
+              <input type="text" id="logWorkoutDetails" class="form-input" placeholder="e.g. 5 rounds sparring + footwork" required />
+            </div>
+            <button type="submit" class="btn-ghost-icon" style="width: 100%; justify-content: center; padding: 6px;">Log Session</button>
+          </form>
+        </div>
+      </div>
+    </section>
+
+
+    <!-- ====================================================================
+         5. KNOWLEDGE LAYER (Algorithm Ledger & Reflection)
+         ==================================================================== -->
+    <section id="view-knowledge" class="view-section">
+      <div class="section-header">
+        <div>
+          <h1 class="section-headline">Knowledge &amp; Reflection</h1>
+          <p class="section-caption">Unassisted algorithm ledger, first-principles notes, and evening audit.</p>
+        </div>
+        <button id="btnNewNote" class="btn-primary">+ New Note</button>
+      </div>
+
+      <div style="display: grid; grid-template-columns: 280px 1fr; gap: 20px; height: calc(100vh - 160px);">
+        <!-- Notes Sidebar -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-md); overflow-y: auto;">
+          <div id="knowledgeListContainer">
+            <!-- Dynamic note items -->
+          </div>
+        </div>
+
+        <!-- Note Viewer & Reflection -->
+        <div style="display: flex; flex-direction: column; gap: 16px; overflow-y: auto;">
+          <div class="monotone-card" style="flex: 1; margin-bottom: 0;">
+            <div id="noteDisplayView">
+              <div class="card-label-row">
+                <div>
+                  <h2 id="noteTitle" style="font-size: 15px; font-weight: 700; color: var(--text-primary);">Select a note</h2>
+                  <div id="noteMeta" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); margin-top: 2px;"></div>
+                </div>
+                <div style="display: flex; gap: 6px;">
+                  <button id="btnEditNote" class="btn-ghost-icon" style="display: none;">Edit</button>
+                  <button id="btnDeleteNote" class="btn-ghost-icon" style="display: none; color: #ef4444;">Delete</button>
+                </div>
+              </div>
+              <div id="noteContentView" style="font-size: 12px; line-height: 1.7; white-space: pre-wrap; margin-top: 14px; color: var(--text-secondary);"></div>
+            </div>
+
+            <!-- Note Edit Form -->
+            <form id="noteEditForm" style="display: none; flex-direction: column; gap: 10px;">
+              <input type="hidden" id="editNoteId" />
+              <input type="text" id="editNoteTitle" class="form-input" placeholder="Note Title..." required />
+              <textarea id="editNoteContent" class="form-textarea" style="height: 180px;" placeholder="Write first-principles algorithms or key concepts..." required></textarea>
+              <div style="display: flex; justify-content: flex-end; gap: 6px;">
+                <button type="button" id="btnCancelEditNote" class="btn-ghost-icon">Cancel</button>
+                <button type="submit" class="btn-primary">Save Note</button>
+              </div>
+            </form>
+          </div>
+
+          <!-- Evening Reflection Audit -->
+          <div class="monotone-card" style="margin-bottom: 0;">
+            <div class="card-label-row">
+              <span class="card-label">Evening Reflection Audit</span>
+              <span id="reflectionSavePill" class="mono-chip">Auto-saving</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px;">
+              <input type="text" id="reflectionWorked" class="form-input" placeholder="1. What worked today?" />
+              <input type="text" id="reflectionSlipped" class="form-input" placeholder="2. Where did I slip / lose focus?" />
+              <input type="text" id="reflectionTomorrow" class="form-input" placeholder="3. What single adjustment tomorrow?" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ====================================================================
+       KILL LIST SLIDING DRAWER & LAUNCHER (Harness 2.1)
+       ==================================================================== -->
+  <div id="killListBackdrop" class="kill-list-backdrop"></div>
+  <aside id="killListDrawer" class="kill-list-drawer">
+    <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+          <span class="mono-chip lavender" style="font-size: 9px; font-weight: 700;">PURE SYNTAX // SEP '26</span>
+          <span id="killListDateLabel" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Today</span>
+        </div>
+        <h2 style="font-size: 17px; font-weight: 700; color: var(--text-primary); margin: 0;">
+          Kill List // SGH Library
+        </h2>
+        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
+          Zero-AI Deep Work (14:30 – 16:30) • 3-Item Rule Enforced
+        </div>
+      </div>
+      <button id="closeKillListBtn" class="drawer-close-btn">&times;</button>
+    </div>
+
+    <!-- Active Station Pace Velocity / Ghost Beacon -->
+    <div id="killListVelocityContainer" style="margin-bottom: 12px;">
+      <!-- Rendered dynamically -->
+    </div>
+
+    <!-- Evening Lock Warning -->
+    <div id="killListLockBanner" style="display: none; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 4px; padding: 8px 10px; margin-bottom: 14px; font-family: var(--font-mono); font-size: 11px; color: #f59e0b;">
+      <span style="font-weight: 700;">EVENING LOCK (18:00+):</span> Tomorrow's session items are locked to prevent library-seat procrastination.
+    </div>
+
+    <!-- 3-Item Section Header -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+      <span class="card-label" style="font-size: 10px;">TODAY'S 3 KILL ITEMS</span>
+      <span id="killListCountBadge" class="mono-chip lavender">0 / 3 Active</span>
+    </div>
+
+    <!-- Items List -->
+    <div id="killListItemsContainer" style="margin-bottom: 16px;">
+      <!-- Rendered dynamically -->
+    </div>
+
+    <!-- Full Notice (if 3 items reached) -->
+    <div id="killListFullNotice" style="display: none; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 12px; text-align: center; font-size: 11px; color: var(--text-tertiary); margin-bottom: 16px;">
+      <span style="color: var(--accent-lavender); font-weight: 600;">3-Item Rule Enforced:</span> Session quota reached (3/3). Check off or delete an item to add another.
+    </div>
+
+    <!-- Add Item Form (Visible when count < 3) -->
+    <div id="killListAddCard" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 6px; padding: 14px; margin-top: auto;">
+      <div class="card-label" style="margin-bottom: 10px;">ADD KILL ITEM (MAX 3)</div>
+      <form id="addKillItemForm" style="display: flex; flex-direction: column; gap: 8px;">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label">CATEGORY</label>
+            <select id="killItemCategory" class="form-input" style="width: 100%;">
+              <option value="Math R">Math Rozszerzona</option>
+              <option value="Algorithms">Raw Algorithms</option>
+              <option value="SIGG">SIGG / Quant</option>
+              <option value="German">German / Anki</option>
+            </select>
+          </div>
+          <div>
+            <label class="form-label">LAUNCHER</label>
+            <select id="killItemActionType" class="form-input" style="width: 100%;">
+              <option value="pdf">PDF Reader</option>
+              <option value="url">Browser Link</option>
+              <option value="workspace">VS Code</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="form-label">TASK TITLE</label>
+          <input type="text" id="killItemTitle" class="form-input" placeholder="e.g. CKE Math R Diagnostic Sets" required style="width: 100%;">
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
+          <div>
+            <label class="form-label">TARGET SPEC</label>
+            <input type="text" id="killItemSpec" class="form-input" placeholder="e.g. Tasks 1-5 / 45m" style="width: 100%;">
+          </div>
+          <div>
+            <label class="form-label">LINK METRO DELIVERABLE</label>
+            <select id="killItemDeliverable" class="form-input" style="width: 100%;">
+              <option value="">-- None --</option>
+            </select>
+          </div>
+        </div>
+
+        <div>
+          <label class="form-label">TARGET PATH / URL</label>
+          <input type="text" id="killItemPath" class="form-input" placeholder="e.g. https://hackerrank.com or arkusze/cke.pdf" style="width: 100%;">
+        </div>
+
+        <button type="submit" class="btn-ghost-icon" style="justify-content: center; background: rgba(196, 181, 253, 0.08); border-color: rgba(196, 181, 253, 0.3); color: var(--accent-lavender); font-weight: 600; padding: 8px; margin-top: 4px;">
+          + Add to Kill List
+        </button>
+      </form>
+    </div>
+  </aside>
+
+  <!-- ====================================================================
+       NATIVE IN-APP MODALS
+       ==================================================================== -->
+
+  <!-- 1. Add / Edit Project Modal -->
+  <div id="projectModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="card-label-row" style="margin-bottom: 14px;">
+        <h2 id="projectModalTitle" style="font-size: 15px; font-weight: 700; color: var(--text-primary);">New Project Build</h2>
+        <button class="drawer-close-btn" onclick="window.Projects.closeModal()">&times;</button>
+      </div>
+      <form id="projectForm">
+        <input type="hidden" id="projFormId" />
+        <div class="form-group">
+          <label class="form-label">PROJECT NAME</label>
+          <input type="text" id="projFormName" class="form-input" placeholder="e.g. SIGG Scanner, Matura CS" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">DESCRIPTION / PURPOSE</label>
+          <input type="text" id="projFormDesc" class="form-input" placeholder="Brief high-signal summary..." />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label">STATUS</label>
+            <select id="projFormStatus" class="form-input">
+              <option value="active">Active</option>
+              <option value="completed">Completed</option>
+              <option value="paused">Paused</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">DEADLINE / TARGET</label>
+            <input type="text" id="projFormDeadline" class="form-input" placeholder="e.g. 2026-10-15 or Daily" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">CURRENT MILESTONE</label>
+          <input type="text" id="projFormMilestone" class="form-input" placeholder="What milestone is active?" />
+        </div>
+        <div class="form-group">
+          <label class="form-label">IMMEDIATE NEXT ACTION</label>
+          <input type="text" id="projFormNextAction" class="form-input" placeholder="Concrete next physical step to execute..." required />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label">LOCAL DIRECTORY PATH</label>
+            <input type="text" id="projFormLocalPath" class="form-input" placeholder="c:\Users\heito\..." />
+          </div>
+          <div class="form-group">
+            <label class="form-label">GITHUB REPO URL</label>
+            <input type="text" id="projFormGithubUrl" class="form-input" placeholder="https://github.com/..." />
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">NOTES &amp; RULES</label>
+          <textarea id="projFormNotes" class="form-textarea" placeholder="Key rules, architectural notes, context..."></textarea>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 14px;">
+          <button type="button" class="btn-ghost-icon" onclick="window.Projects.closeModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Save Project</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 2. Add / Edit Quick Link Modal -->
+  <div id="quickLinkModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="card-label-row" style="margin-bottom: 14px;">
+        <h2 id="linkModalTitle" style="font-size: 15px; font-weight: 700; color: var(--text-primary);">Add Quick Link</h2>
+        <button class="drawer-close-btn" onclick="window.Today.closeLinkModal()">&times;</button>
+      </div>
+      <form id="quickLinkForm">
+        <input type="hidden" id="linkFormIndex" />
+        <div class="form-group">
+          <label class="form-label">PORTAL / TITLE</label>
+          <input type="text" id="linkFormName" class="form-input" placeholder="e.g. Vulcan UONET+, GitHub, TUM" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">URL (HTTPS://)</label>
+          <input type="url" id="linkFormUrl" class="form-input" placeholder="https://..." required />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label">CATEGORY</label>
+            <select id="linkFormCategory" class="form-input">
+              <option value="school">School (TM1/Vulcan)</option>
+              <option value="contest">Contest (SIGG/GPW)</option>
+              <option value="university">University (TUM)</option>
+              <option value="academics">Academics (CKE)</option>
+              <option value="dev">Development / Code</option>
+              <option value="custom">Custom</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">DESCRIPTION</label>
+            <input type="text" id="linkFormDesc" class="form-input" placeholder="Brief note..." />
+          </div>
+        </div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px;">
+          <button type="button" id="btnDeleteLink" class="btn-ghost-icon" style="color: #ef4444; display: none;">Delete</button>
+          <div style="display: flex; gap: 6px; margin-left: auto;">
+            <button type="button" class="btn-ghost-icon" onclick="window.Today.closeLinkModal()">Cancel</button>
+            <button type="submit" class="btn-primary">Save Bookmark</button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 3. Add Homework Modal -->
+  <div id="addHomeworkModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="card-label-row" style="margin-bottom: 14px;">
+        <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary);">Add Homework Assignment</h2>
+        <button class="drawer-close-btn" onclick="window.Today.closeHomeworkModal()">&times;</button>
+      </div>
+      <form id="homeworkModalForm">
+        <div class="form-group">
+          <label class="form-label">SUBJECT</label>
+          <input type="text" id="hwFormSubject" class="form-input" placeholder="e.g. Matematyka, Informatyka, Fizyka" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">ASSIGNMENT DETAILS</label>
+          <input type="text" id="hwFormTitle" class="form-input" placeholder="e.g. Zadania 14-22 ze zbioru Kłaczkowa" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">DUE DATE</label>
+          <input type="date" id="hwFormDueDate" class="form-input" required />
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 14px;">
+          <button type="button" class="btn-ghost-icon" onclick="window.Today.closeHomeworkModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Save Assignment</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 4. Add Exam / Test Modal -->
+  <div id="addExamModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="card-label-row" style="margin-bottom: 14px;">
+        <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary);">Schedule Exam / Test</h2>
+        <button class="drawer-close-btn" onclick="window.Today.closeExamModal()">&times;</button>
+      </div>
+      <form id="examModalForm">
+        <div class="form-group">
+          <label class="form-label">SUBJECT</label>
+          <input type="text" id="examFormSubject" class="form-input" placeholder="e.g. Matematyka R, Informatyka" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">TEST TITLE</label>
+          <input type="text" id="examFormTitle" class="form-input" placeholder="e.g. Sprawdzian: Ciągi liczbowe i granice" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">EXAM DATE</label>
+          <input type="date" id="examFormDate" class="form-input" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">SCOPE &amp; TOPICS</label>
+          <input type="text" id="examFormScope" class="form-input" placeholder="e.g. Rozdziały 3-4, arkusz próbny" />
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 14px;">
+          <button type="button" class="btn-ghost-icon" onclick="window.Today.closeExamModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Schedule Exam</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 5. JSON Hub Modal -->
+  <div id="jsonModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="card-label-row" style="margin-bottom: 12px;">
+        <div>
+          <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary);">Standardized JSON Hub</h2>
+          <p style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
+            Second-brain configuration: routines, gym workouts, and 2-year metro roadmap.
+          </p>
+        </div>
+        <button id="btnCloseJsonModal" class="drawer-close-btn">&times;</button>
+      </div>
+
+      <div style="display: flex; gap: 4px; margin-bottom: 10px;">
+        <button class="btn-ghost-icon active" id="btnJsonTabSchedules">Schedules (A/B/C)</button>
+        <button class="btn-ghost-icon" id="btnJsonTabGym">Gym Routines</button>
+        <button class="btn-ghost-icon" id="btnJsonTabRoadmap">Metro Roadmap</button>
+      </div>
+
+      <textarea id="jsonConfigTextarea" class="form-textarea" style="height: 260px; font-family: var(--font-mono); font-size: 11px;" spellcheck="false"></textarea>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
+        <span id="jsonImportStatus" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);"></span>
+        <button id="btnSaveJsonConfig" class="btn-primary">Save &amp; Apply JSON</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Kill List Sliding Drawer (Harness 2.1 - SGH Library Execution Engine) -->
+  <div id="killListBackdrop" class="kill-list-backdrop"></div>
+  <div id="killListDrawer" class="kill-list-drawer">
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 14px;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--accent-lavender); letter-spacing: 0.06em;">SGH LIBRARY // KILL LIST</span>
+          <span id="killListCountBadge" class="mono-chip lavender">0 / 3 Active</span>
+        </div>
+        <div id="killListDateLabel" style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-top: 4px;">
+          Today
+        </div>
+      </div>
+      <button id="closeKillListBtn" class="drawer-close-btn">&times;</button>
+    </div>
+
+    <!-- Station Pace Velocity (Ghost Beacon) Container -->
+    <div id="killListVelocityContainer" style="margin-bottom: 16px;">
+      <!-- Populated by kill_list.js -->
+    </div>
+
+    <!-- Evening Lock Banner (18:00+ Review Lock) -->
+    <div id="killListLockBanner" style="display: none; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px; padding: 10px 12px; margin-bottom: 16px; font-size: 11px; color: #f59e0b;">
+      <div style="font-weight: 700; margin-bottom: 2px;">🔒 Evening Review Mode (18:00+ Lock)</div>
+      <div style="color: var(--text-secondary); line-height: 1.35;">
+        Session completed or locked for evening transition. Focus on review, dinner, and 21:00 screen cutoff.
+      </div>
+    </div>
+
+    <!-- Kill List Items Container -->
+    <div style="margin-bottom: 20px;">
+      <div class="card-label-row" style="margin-bottom: 8px;">
+        <span class="card-label">SGH Deep Work Queue</span>
+        <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">3-Item Rule Enforced</span>
+      </div>
+      <div id="killListItemsContainer">
+        <!-- Rendered dynamically by kill_list.js -->
+      </div>
+    </div>
+
+    <!-- 3-Item Limit Notice -->
+    <div id="killListFullNotice" style="display: none; background: rgba(196, 181, 253, 0.06); border: 1px solid rgba(196, 181, 253, 0.18); border-radius: 6px; padding: 12px; text-align: center; margin-bottom: 16px;">
+      <div style="font-size: 12px; font-weight: 600; color: var(--accent-lavender); margin-bottom: 4px;">Kill List Capacity Reached (3 / 3)</div>
+      <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+        Cognitive load capped for the SGH Library session. Finish or delete an item to enqueue another task.
+      </div>
+    </div>
+
+    <!-- Add Item Card -->
+    <div id="killListAddCard" style="background: #0d0f12; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 16px;">
+      <div class="card-label" style="margin-bottom: 10px; color: var(--accent-lavender);">+ Enqueue Kill Item</div>
+      <form id="addKillItemForm">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">STREAM / CATEGORY</label>
+            <select id="killItemCategory" class="form-input">
+              <option value="Math R">Math R (Matura Rozszerzona)</option>
+              <option value="Algorithms">Algorithms (CS Drills)</option>
+              <option value="SIGG">SIGG (GPW Contest)</option>
+              <option value="German">German (Goethe B2 / DW)</option>
+              <option value="Raw CS">Raw CS (Systems / Syntax)</option>
+              <option value="Secondary">Secondary Task</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">ACTION / LAUNCHER</label>
+            <select id="killItemActionType" class="form-input">
+              <option value="url">Web URL (HackerRank, DW, etc.)</option>
+              <option value="pdf">PDF (CKE Arkusze, Kłaczkow)</option>
+              <option value="workspace">VS Code Workspace</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">TASK TITLE</label>
+          <input type="text" id="killItemTitle" class="form-input" placeholder="e.g. CKE Matura Próbna Maj 2024" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">SPECIFICATION / TARGET</label>
+          <input type="text" id="killItemSpec" class="form-input" placeholder="e.g. Zadania 1–5 (Zero-AI, pen & paper)" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">TARGET PATH / URL</label>
+          <input type="text" id="killItemPath" class="form-input" placeholder="https://... or C:\Users\..." />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">LINK TO METRO DELIVERABLE (BURNDOWN)</label>
+          <select id="killItemDeliverable" class="form-input">
+            <option value="">-- Optional: Link Deliverable --</option>
+          </select>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+          <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 8px 12px;">
+            ⚡ Enqueue to Kill List
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Bottom App Status Bar -->
+  <footer class="app-footer">
+    <div style="display: flex; align-items: center; gap: 8px;">
+      <span style="font-weight: 600; color: var(--text-primary);">HARNESS OS</span>
+      <span>&bull;</span>
+      <span>SQLite WAL Storage</span>
+    </div>
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span>[0-5] Layers</span>
+      <span>[Ctrl+K] Palette</span>
+      <span>[T] Timer</span>
+      <span>[N] New Task</span>
+      <span>[R] Rollover</span>
+    </div>
+  </footer>
+
+  <!-- Notification Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- App Script Modules -->
+  <script src="js/web_bridge.js?v=3.5"></script>
+  <script src="js/api_bridge.js?v=3.5"></script>
+  <script src="js/metro.js?v=3.5"></script>
+  <script src="js/dashboard.js?v=3.5"></script>
+  <script src="js/today.js?v=3.5"></script>
+  <script src="js/tum.js?v=3.5"></script>
+  <script src="js/projects.js?v=3.5"></script>
+  <script src="js/body.js?v=3.5"></script>
+  <script src="js/knowledge.js?v=3.5"></script>
+  <script src="js/focus_timer.js?v=3.5"></script>
+  <script src="js/command_palette.js?v=3.5"></script>
+  <script src="js/kill_list.js?v=3.5"></script>
+  <script src="js/app.js?v=3.5"></script>
+</body>
+</html>

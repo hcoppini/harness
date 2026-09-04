@@ -1,5 +1,14 @@
-server.py
-main.py
 app/
 tests/
-data/harness.db
+client/
+mobile/
+dist/
+build/
+server.py
+main.py
+start_mobile.bat
+run.bat
+generate_app_icons.py
+Harness.exe
+*.py
+*.bat
