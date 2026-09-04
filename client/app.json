@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "HARNESS",
+    "slug": "harness-executive-os",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#0a0c10"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.heitor.harness"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": []
+  }
+}
