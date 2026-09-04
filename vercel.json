@@ -1,4 +1,8 @@
 {
   "buildCommand": "cd client && npm install && npx expo export -p web",
-  "outputDirectory": "client/dist"
+  "outputDirectory": "client/dist",
+  "framework": null,
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
 }
