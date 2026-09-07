@@ -7,13 +7,17 @@ from pathlib import Path
 from typing import Optional
 
 # Base directory paths
-if getattr(sys, "frozen", False):
+if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+    BASE_DIR = Path(__file__).resolve().parent.parent
+    DATA_DIR = Path("/tmp/data")
+elif getattr(sys, "frozen", False):
     # Running as compiled executable: persist data alongside the executable
     BASE_DIR = Path(sys.executable).resolve().parent
+    DATA_DIR = BASE_DIR / "data"
 else:
     BASE_DIR = Path(__file__).resolve().parent.parent
+    DATA_DIR = BASE_DIR / "data"
 
-DATA_DIR = BASE_DIR / "data"
 DEFAULT_DB_PATH = DATA_DIR / "harness.db"
 
 
@@ -36,8 +40,17 @@ def get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
 
 def init_db(db_path: Optional[Path] = None) -> None:
     """Initializes all database tables and ensures JSON data templates are present."""
-    # Ensure JSON templates exist if running frozen
-    if getattr(sys, "frozen", False):
+    # Ensure JSON templates exist if running on Vercel or frozen
+    if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
+        src_data = Path(__file__).resolve().parent.parent / "data"
+        if src_data.exists():
+            import shutil
+            DATA_DIR.mkdir(parents=True, exist_ok=True)
+            for json_file in src_data.glob("*.json"):
+                dest = DATA_DIR / json_file.name
+                if not dest.exists():
+                    shutil.copy2(json_file, dest)
+    elif getattr(sys, "frozen", False):
         meipass = getattr(sys, "_MEIPASS", None)
         if meipass:
             bundled_data = Path(meipass) / "data"
