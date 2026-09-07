@@ -152,3 +152,67 @@ def test_rpc_dispatcher(client):
         content_type="application/json"
     )
     assert bad_res.status_code == 404
+
+
+def test_kill_list_rest_api(client):
+    test_date = "2029-01-01"
+
+    # 1. Get kill list
+    res = client.get(f"/api/kill-list?date={test_date}")
+    assert res.status_code == 200
+    kl_data = res.get_json()
+    assert "items" in kl_data
+    assert "max_allowed" in kl_data
+
+    # 2. Add kill list item
+    add_res = client.post(
+        "/api/kill-list",
+        data=json.dumps({
+            "category": "Math R",
+            "title": "CKE Math R Arkusz 2024",
+            "action_type": "pdf",
+            "target_path": "arkusze/math.pdf",
+            "target_spec": "Tasks 1-8",
+            "station_deliverable_id": "sep26_math_diag",
+            "date": test_date,
+        }),
+        content_type="application/json",
+    )
+    assert add_res.status_code == 201
+    item = add_res.get_json()
+    item_id = item["id"]
+    assert item["title"] == "CKE Math R Arkusz 2024"
+
+    # 3. Complete kill item (atomic link test)
+    comp_res = client.post(f"/api/kill-list/{item_id}/complete")
+    assert comp_res.status_code == 200
+    comp_data = comp_res.get_json()
+    assert comp_data["success"] is True
+    assert comp_data["completed"] is True
+
+    # 4. Toggle kill item
+    toggle_res = client.post(f"/api/kill-list/{item_id}/toggle")
+    assert toggle_res.status_code == 200
+    assert toggle_res.get_json()["completed"] is False
+
+    # 5. Delete item
+    del_res = client.delete(f"/api/kill-list/{item_id}")
+    assert del_res.status_code == 200
+    assert del_res.get_json()["success"] is True
+
+
+def test_tum_bavarian_aptitude_api(client):
+    res = client.post(
+        "/api/tum/aptitude",
+        data=json.dumps({
+            "gpa_pl": 5.5,
+            "math_pl": 6.0,
+            "cs_pl": 6.0,
+            "lang_pl": 5.5,
+        }),
+        content_type="application/json",
+    )
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["total_tum_points"] >= 88.0
+    assert "DIRECT ADMISSION SAFE" in data["verdict"]

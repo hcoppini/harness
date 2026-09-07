@@ -96,6 +96,36 @@ const Tum = {
         `;
       })
       .join("");
+
+    this.renderBavarianAssessment();
+  },
+
+  renderBavarianAssessment() {
+    if (!this.data || !this.data.bavarian_assessment) return;
+    const b = this.data.bavarian_assessment;
+
+    const badgeEl = document.getElementById("tumAdmissionBadge");
+    const gpaEl = document.getElementById("tumGermanGpaVal");
+    const plGpaEl = document.getElementById("tumPolishGpaVal");
+    const totalEl = document.getElementById("tumTotalScoreVal");
+    const subjEl = document.getElementById("tumSubjectScoreVal");
+    const verdictEl = document.getElementById("tumVerdictText");
+
+    if (gpaEl) gpaEl.textContent = Number(b.german_gpa).toFixed(2);
+    if (plGpaEl) plGpaEl.textContent = `Polish: ${b.gpa_pl !== undefined ? Number(b.gpa_pl).toFixed(2) : "--"}`;
+    if (totalEl) totalEl.textContent = `${Number(b.total_tum_points).toFixed(1)} / 100`;
+    if (subjEl) subjEl.textContent = `${b.pts_subject !== undefined ? Number(b.pts_subject).toFixed(1) : "--"} pts`;
+    if (verdictEl) verdictEl.textContent = b.verdict;
+
+    if (badgeEl) {
+      if (b.total_tum_points >= 88.0) {
+        badgeEl.innerHTML = `<span class="mono-chip done" style="background: rgba(110, 231, 183, 0.15); border-color: rgba(110, 231, 183, 0.4); color: #6ee7b7; font-size: 11px; padding: 4px 10px; font-weight: 700;">DIRECT ADMISSION SAFE (Level 1)</span>`;
+      } else if (b.total_tum_points >= 70.0) {
+        badgeEl.innerHTML = `<span class="mono-chip amber" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); color: #f59e0b; font-size: 11px; padding: 4px 10px; font-weight: 700;">INTERVIEW THRESHOLD (Level 2)</span>`;
+      } else {
+        badgeEl.innerHTML = `<span class="mono-chip" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171; font-size: 11px; padding: 4px 10px; font-weight: 700;">DEFICIT: MATH/CS RECOVERY NEEDED</span>`;
+      }
+    }
   },
 
   async updateGradeScore(gradeId, value) {

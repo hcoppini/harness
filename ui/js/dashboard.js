@@ -84,7 +84,11 @@ window.Dashboard = {
     const germanEl = document.getElementById("dashGermanLevel");
     const stName = document.getElementById("dashActiveStationName");
 
-    if (gpaEl) gpaEl.textContent = (metrics.overall_gpa || 0.0).toFixed(2);
+    if (gpaEl) {
+      const pl = (metrics.overall_gpa || 0.0).toFixed(2);
+      const de = metrics.bavarian_gpa ? ` (DE: ${Number(metrics.bavarian_gpa).toFixed(2)})` : "";
+      gpaEl.textContent = `${pl}${de}`;
+    }
     if (maturaEl) maturaEl.textContent = `${(metrics.avg_matura_mock || 0.0).toFixed(0)}%`;
     if (germanEl) germanEl.textContent = metrics.german_stage || "A2 Active";
     if (stName) {

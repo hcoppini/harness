@@ -188,7 +188,72 @@ def rollover_tasks():
     count = api.rollover_tasks()
     return jsonify({"rolled_over_count": count})
 
-# --- Layer 2: TUM Metro ---
+# --- Kill List Drawer & Execution Engine (Harness 2.1) ---
+@app.route("/api/kill-list", methods=["GET"])
+def get_kill_list():
+    date_str = request.args.get("date")
+    return jsonify(api.get_kill_list(date_str))
+
+@app.route("/api/kill-list", methods=["POST"])
+def add_kill_item():
+    payload = request.get_json(silent=True) or {}
+    try:
+        item = api.add_kill_item(
+            category=payload.get("category", "Math R"),
+            title=payload.get("title", "").strip(),
+            action_type=payload.get("action_type", "url"),
+            target_path=payload.get("target_path", ""),
+            target_spec=payload.get("target_spec", ""),
+            station_deliverable_id=payload.get("station_deliverable_id"),
+            date_str=payload.get("date"),
+        )
+        return jsonify(item), 201
+    except ValueError as e:
+        return jsonify({"error": str(e)}), 400
+
+@app.route("/api/kill-list/<item_id>/complete", methods=["POST"])
+def complete_kill_item(item_id):
+    res = api.complete_kill_item(item_id)
+    return jsonify(res)
+
+@app.route("/api/kill-list/<item_id>/toggle", methods=["POST"])
+def toggle_kill_item(item_id):
+    res = api.toggle_kill_item(item_id)
+    return jsonify(res)
+
+@app.route("/api/kill-list/<item_id>", methods=["DELETE"])
+def delete_kill_item(item_id):
+    success = api.delete_kill_item(item_id)
+    return jsonify({"success": success})
+
+@app.route("/api/kill-list/launch", methods=["POST"])
+def launch_kill_item():
+    payload = request.get_json(silent=True) or {}
+    res = api.launch_kill_item(payload.get("action_type", "url"), payload.get("target_path", ""))
+    return jsonify(res)
+
+# --- Layer 2: TUM Metro & Bavarian Aptitude ---
+@app.route("/api/tum/overview", methods=["GET"])
+def get_tum_overview():
+    return jsonify(api.get_tum_overview())
+
+@app.route("/api/tum/aptitude", methods=["POST"])
+def calculate_tum_aptitude():
+    payload = request.get_json(silent=True) or {}
+    gpa = float(payload.get("gpa_pl", 5.0))
+    math_val = float(payload.get("math_pl", 5.0))
+    cs_val = float(payload.get("cs_pl", 5.0))
+    lang_val = float(payload.get("lang_pl", 5.0))
+    return jsonify(api.calculate_tum_aptitude(gpa, math_val, cs_val, lang_val))
+
+@app.route("/api/metro/<station_id>/progress", methods=["GET"])
+def get_station_progress(station_id):
+    return jsonify(api.get_station_deliverables(station_id))
+
+@app.route("/api/metro/<station_id>/velocity", methods=["GET"])
+def get_station_velocity(station_id):
+    date_str = request.args.get("date")
+    return jsonify(api.get_station_pace_velocity(station_id, date_str))
 @app.route("/api/metro", methods=["GET"])
 def get_metro():
     data = api.get_metro_roadmap()

@@ -43,13 +43,13 @@ SEED_PROJECTS = [
     {
         "name": "Financial Agency / Polish SME Outreach",
         "description": "Web dev and automation for Polish small businesses to hit 2,000 PLN/month financial independence.",
-        "status": "active",
+        "status": "paused",
         "local_path": r"c:\Users\heito\Desktop\grodt_v1",
         "github_url": "",
-        "current_milestone": "Outreach pipeline revamp",
-        "next_action": "Audit scraped business list and refine high-converting offer script",
-        "deadline": "2,000 PLN / month target",
-        "notes": "Persistence over perfection. Focus on 10 high-signal calls instead of burning out on 1,000 cold leads.",
+        "current_milestone": "Outreach pipeline revamp (PAUSED: focus on SIGG & TUM core)",
+        "next_action": "Paused to prioritize TUM Heilbronn admissions & SIGG competition",
+        "deadline": "Paused",
+        "notes": "Pruned from active focus per Harness 2.1 execution strategy. Retain core STEM and SIGG.",
     },
 ]
 

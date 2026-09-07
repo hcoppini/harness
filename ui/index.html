@@ -1048,6 +1048,112 @@
     </div>
   </div>
 
+  <!-- 6. Kill List Sliding Drawer (Harness 2.1 - SGH Library Execution Engine) -->
+  <div id="killListBackdrop" class="kill-list-backdrop"></div>
+  <div id="killListDrawer" class="kill-list-drawer">
+    <!-- Header -->
+    <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.07); padding-bottom: 14px;">
+      <div>
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--accent-lavender); letter-spacing: 0.06em;">SGH LIBRARY // KILL LIST</span>
+          <span id="killListCountBadge" class="mono-chip lavender">0 / 3 Active</span>
+        </div>
+        <div id="killListDateLabel" style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-top: 4px;">
+          Today
+        </div>
+      </div>
+      <button id="closeKillListBtn" class="drawer-close-btn">&times;</button>
+    </div>
+
+    <!-- Station Pace Velocity (Ghost Beacon) Container -->
+    <div id="killListVelocityContainer" style="margin-bottom: 16px;">
+      <!-- Populated by kill_list.js -->
+    </div>
+
+    <!-- Evening Lock Banner (18:00+ Review Lock) -->
+    <div id="killListLockBanner" style="display: none; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 6px; padding: 10px 12px; margin-bottom: 16px; font-size: 11px; color: #f59e0b;">
+      <div style="font-weight: 700; margin-bottom: 2px;">🔒 Evening Review Mode (18:00+ Lock)</div>
+      <div style="color: var(--text-secondary); line-height: 1.35;">
+        Session completed or locked for evening transition. Focus on review, dinner, and 21:00 screen cutoff.
+      </div>
+    </div>
+
+    <!-- Kill List Items Container -->
+    <div style="margin-bottom: 20px;">
+      <div class="card-label-row" style="margin-bottom: 8px;">
+        <span class="card-label">SGH Deep Work Queue</span>
+        <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">3-Item Rule Enforced</span>
+      </div>
+      <div id="killListItemsContainer">
+        <!-- Rendered dynamically by kill_list.js -->
+      </div>
+    </div>
+
+    <!-- 3-Item Limit Notice -->
+    <div id="killListFullNotice" style="display: none; background: rgba(196, 181, 253, 0.06); border: 1px solid rgba(196, 181, 253, 0.18); border-radius: 6px; padding: 12px; text-align: center; margin-bottom: 16px;">
+      <div style="font-size: 12px; font-weight: 600; color: var(--accent-lavender); margin-bottom: 4px;">Kill List Capacity Reached (3 / 3)</div>
+      <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+        Cognitive load capped for the SGH Library session. Finish or delete an item to enqueue another task.
+      </div>
+    </div>
+
+    <!-- Add Item Card -->
+    <div id="killListAddCard" style="background: #0d0f12; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 16px;">
+      <div class="card-label" style="margin-bottom: 10px; color: var(--accent-lavender);">+ Enqueue Kill Item</div>
+      <form id="addKillItemForm">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">STREAM / CATEGORY</label>
+            <select id="killItemCategory" class="form-input">
+              <option value="Math R">Math R (Matura Rozszerzona)</option>
+              <option value="Algorithms">Algorithms (CS Drills)</option>
+              <option value="SIGG">SIGG (GPW Contest)</option>
+              <option value="German">German (Goethe B2 / DW)</option>
+              <option value="Raw CS">Raw CS (Systems / Syntax)</option>
+              <option value="Secondary">Secondary Task</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 0;">
+            <label class="form-label">ACTION / LAUNCHER</label>
+            <select id="killItemActionType" class="form-input">
+              <option value="url">Web URL (HackerRank, DW, etc.)</option>
+              <option value="pdf">PDF (CKE Arkusze, Kłaczkow)</option>
+              <option value="workspace">VS Code Workspace</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">TASK TITLE</label>
+          <input type="text" id="killItemTitle" class="form-input" placeholder="e.g. CKE Matura Próbna Maj 2024" required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">SPECIFICATION / TARGET</label>
+          <input type="text" id="killItemSpec" class="form-input" placeholder="e.g. Zadania 1–5 (Zero-AI, pen & paper)" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">TARGET PATH / URL</label>
+          <input type="text" id="killItemPath" class="form-input" placeholder="https://... or C:\Users\..." />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">LINK TO METRO DELIVERABLE (BURNDOWN)</label>
+          <select id="killItemDeliverable" class="form-input">
+            <option value="">-- Optional: Link Deliverable --</option>
+          </select>
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+          <button type="submit" class="btn-primary" style="width: 100%; justify-content: center; padding: 8px 12px;">
+            ⚡ Enqueue to Kill List
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- Bottom App Status Bar -->
   <footer class="app-footer">
     <div style="display: flex; align-items: center; gap: 8px;">

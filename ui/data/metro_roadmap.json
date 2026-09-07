@@ -4,6 +4,34 @@
   "formula": "Aptitude Assessment: Overall GPA (65%) + Subject Grades (35% with Math 2x, CS 2x, Lang 1x)",
   "stations": [
     {
+      "id": "kickoff-2026",
+      "date": "2026-09-01",
+      "month_label": "SEP 1",
+      "name": "Class 3 Kickoff",
+      "phase": "Phase 1: Year 3 Liceum",
+      "is_major": false,
+      "status": "completed",
+      "branches": [
+        "academics",
+        "code",
+        "sigg",
+        "german",
+        "physical"
+      ],
+      "objective": "Class 3 Liceum kickoff, school timetable setup & baseline diagnostics.",
+      "deliverables": {
+        "Academics": "Set up TM1 school timetable & semester targets.",
+        "Code": "Harness OS activated & unassisted coding rule established.",
+        "Physical": "Establish 68.0 kg baseline bodyweight."
+      },
+      "next_action": "Sprint on Pure Syntax deliverables due by end of September.",
+      "completed_deliverables": [
+        "Academics",
+        "Code",
+        "Physical"
+      ]
+    },
+    {
       "id": "sep-2026",
       "date": "2026-09",
       "month_label": "SEP '26",

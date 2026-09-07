@@ -3,6 +3,7 @@ import sqlite3
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from app.db import get_connection, DATA_DIR
+from engine.tum_calculator import calculate_bavarian_grade, calculate_tum_aptitude_score
 
 DEFAULT_SUBJECTS = [
     ("Matematyka", 6.0),
@@ -146,12 +147,37 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
     if close_conn:
         conn.close()
 
+    # Calculate Subject Grades for TUM Aptitude (Math 2x, CS 2x, Lang 1x)
+    def find_subj_grade(name_pattern: str, default_target: float = 5.5) -> float:
+        actuals = []
+        targets = []
+        for sem_grades in semesters.values():
+            for g in sem_grades:
+                if name_pattern.lower() in g["subject"].lower():
+                    if g["actual_grade"] is not None:
+                        actuals.append(g["actual_grade"])
+                    if g["target_grade"] is not None:
+                        targets.append(g["target_grade"])
+        if actuals:
+            return round(sum(actuals) / len(actuals), 2)
+        if targets:
+            return round(sum(targets) / len(targets), 2)
+        return default_target
+
+    math_pl = find_subj_grade("matematyka", 5.5)
+    cs_pl = find_subj_grade("informatyka", 5.5)
+    lang_pl = find_subj_grade("angielski", 5.5)
+    calc_gpa = overall_gpa if overall_gpa > 0 else round((math_pl + cs_pl + lang_pl) / 3.0, 2)
+
+    bavarian_eval = calculate_tum_aptitude_score(calc_gpa, math_pl, cs_pl, lang_pl)
+
     return {
         "overall_gpa": overall_gpa,
         "grades_under_four": grades_under_four,
         "semesters": semesters,
         "matura": matura_list,
         "language": lang_list,
+        "bavarian_assessment": bavarian_eval,
         "target_program": "TUM Campus Heilbronn - Management & Data Science (B.Sc.)",
         "key_requirements": [
             "Abitur-equivalent GPA >= 1.5 - 2.0 (Polish GPA ~ 5.0+)",
@@ -161,6 +187,13 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
             "Extracurricular impact: SIGG national finals & live software repos",
         ],
     }
+
+
+def calculate_custom_tum_aptitude(
+    gpa_pl: float, math_pl: float, cs_pl: float, lang_pl: float
+) -> Dict[str, Any]:
+    """Calculates hypothetical TUM Stage 1 Aptitude Assessment points."""
+    return calculate_tum_aptitude_score(gpa_pl, math_pl, cs_pl, lang_pl)
 
 
 def update_grade(

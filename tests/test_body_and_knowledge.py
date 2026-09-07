@@ -17,20 +17,23 @@ def test_db(tmp_path):
 
 
 def test_body_metric_and_workout_logging(test_db):
+    from datetime import datetime
+    today_str = datetime.now().strftime("%Y-%m-%d")
+
     # Log bodyweight
     metric = body_service.log_body_metric(
         weight_kg=69.5,
         calories_met=True,
         protein_met=True,
         notes="Clean bulk target hit",
-        date_str="2026-08-29",
+        date_str=today_str,
         conn=test_db,
     )
     assert metric["weight_kg"] == 69.5
 
     # Log workouts
-    body_service.log_workout("boxing", "6 rounds sparring + heavy bag", intensity=8, date_str="2026-08-29", conn=test_db)
-    body_service.log_workout("gym", "Upper body hypertrophy: bench 4x8, rows 4x10", intensity=7, date_str="2026-08-29", conn=test_db)
+    body_service.log_workout("boxing", "6 rounds sparring + heavy bag", intensity=8, date_str=today_str, conn=test_db)
+    body_service.log_workout("gym", "Upper body hypertrophy: bench 4x8, rows 4x10", intensity=7, date_str=today_str, conn=test_db)
 
     summary = body_service.get_weekly_workout_summary(conn=test_db)
     assert summary["current_weight"] == 69.5

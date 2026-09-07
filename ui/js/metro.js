@@ -32,7 +32,7 @@ const MetroMap = {
       color: "#c4b5fd", // Lavender
       strokeWidth: 2.5,
       baseY: 175,
-      heightOffsets: [0, -10, 5, -10, 0, 5, -10, 0, -5, -15, 10, 10, -5, -15, -10, -15, -5, -10, -10, -15, -20, -15, 0],
+      heightOffsets: [0, 0, -10, 5, -10, 0, 5, -10, 0, -5, -15, 10, 10, -5, -15, -10, -15, -5, -10, -10, -15, -20, -15, 0],
     },
     {
       id: "code",
@@ -41,7 +41,7 @@ const MetroMap = {
       color: "#7dd3fc", // Sky Blue
       strokeWidth: 2.5,
       baseY: 210,
-      heightOffsets: [-5, 5, -10, -5, 0, 10, -10, 10, -10, 5, -15, -10, -5, -10, -5, -5, -10, -10, -5, 10, -15, 5, 0],
+      heightOffsets: [0, -5, 5, -10, -5, 0, 10, -10, 10, -10, 5, -15, -10, -5, -10, -5, -5, -10, -10, -5, 10, -15, 5, 0],
     },
     {
       id: "sigg",
@@ -50,7 +50,7 @@ const MetroMap = {
       color: "#fdba74", // Orange
       strokeWidth: 3.0,
       baseY: 250,
-      heightOffsets: [0, -15, -20, -15, -20, -25, -20, -25, -30, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+      heightOffsets: [0, 0, -15, -20, -15, -20, -25, -20, -25, -30, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
     },
     {
       id: "german",
@@ -59,7 +59,7 @@ const MetroMap = {
       color: "#6ee7b7", // Emerald
       strokeWidth: 2.5,
       baseY: 295,
-      heightOffsets: [0, 5, 10, -5, 10, -5, 10, 10, 10, -5, -15, -25, -5, 10, -10, 10, 10, -10, -10, -15, 10, -25, 0],
+      heightOffsets: [0, 0, 5, 10, -5, 10, -5, 10, 10, 10, -5, -15, -25, -5, 10, -10, 10, 10, -10, -10, -15, 10, -25, 0],
     },
     {
       id: "physical",
@@ -68,7 +68,7 @@ const MetroMap = {
       color: "#fda4af", // Rose
       strokeWidth: 2.5,
       baseY: 335,
-      heightOffsets: [0, 10, -10, 10, 10, 10, 10, -10, 10, -10, -15, -20, -5, 10, 10, -10, 10, 10, 10, -15, 10, 10, 0],
+      heightOffsets: [0, 0, 10, -10, 10, 10, 10, 10, -10, 10, -10, -15, -20, -5, 10, 10, -10, 10, 10, 10, -15, 10, 10, 0],
     },
   ],
 
@@ -153,6 +153,12 @@ const MetroMap = {
     try {
       if (!window.pywebview || !window.pywebview.api) return;
       this.data = await window.pywebview.api.get_metro_roadmap();
+      if (window.pywebview.api.get_station_deliverables) {
+        this.stationProgress = await window.pywebview.api.get_station_deliverables("sep-2026") || [];
+      }
+      if (window.pywebview.api.get_station_pace_velocity) {
+        this.paceVelocity = await window.pywebview.api.get_station_pace_velocity("sep-2026") || null;
+      }
       this.render();
       setTimeout(() => this.scrollToBeacon(), 200);
     } catch (err) {
@@ -210,11 +216,11 @@ const MetroMap = {
 
     // Phase Milestones
     const phases = [
-      { name: "Phase 1: Year 3 Liceum", x: startX, width: 4.8 * spacing },
-      { name: "Phase 2: SIGG Finals & Year 3 Lock", x: startX + 5 * spacing, width: 4.8 * spacing },
-      { name: "Phase 3: Summer Mass & B1", x: startX + 10 * spacing, width: 1.8 * spacing },
-      { name: "Phase 4: Matura Crucible", x: startX + 12 * spacing, width: 7.8 * spacing },
-      { name: "Phase 5: Official CKE & TUM", x: startX + 20 * spacing, width: 1.8 * spacing },
+      { name: "Phase 1: Year 3 Liceum", x: startX, width: 5.8 * spacing },
+      { name: "Phase 2: SIGG Finals & Year 3 Lock", x: startX + 6 * spacing, width: 4.8 * spacing },
+      { name: "Phase 3: Summer Mass & B1", x: startX + 11 * spacing, width: 1.8 * spacing },
+      { name: "Phase 4: Matura Crucible", x: startX + 13 * spacing, width: 7.8 * spacing },
+      { name: "Phase 5: Official CKE & TUM", x: startX + 21 * spacing, width: 1.8 * spacing },
     ];
 
     let phaseHeadersHtml = phases
@@ -475,6 +481,16 @@ const MetroMap = {
                 })
                 .join("")}
             </div>
+            ${
+              status === "active" && this.paceVelocity
+                ? `
+                  <div style="margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(255,255,255,0.06); font-family: var(--font-mono); font-size: 8px; font-weight: 600; display: flex; align-items: center; gap: 4px; ${this.paceVelocity.is_behind ? "color: #f59e0b;" : "color: #a1a1aa;"}">
+                    <span class="beacon-dot ${this.paceVelocity.is_behind ? "pulse" : "optimal"}" style="width: 5px; height: 5px;"></span>
+                    <span>${this.paceVelocity.status_text}</span>
+                  </div>
+                `
+                : ""
+            }
           </div>
         `;
       })
@@ -521,7 +537,22 @@ const MetroMap = {
       const progressPercent = totalDelivs > 0 ? Math.round((completedCount / totalDelivs) * 100) : 0;
       const isAllComplete = totalDelivs > 0 && completedCount >= totalDelivs;
 
+      let velocityHeader = "";
+      if (this.paceVelocity && station.status === "active") {
+        const isBehind = this.paceVelocity.is_behind;
+        velocityHeader = `
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; margin-bottom: 8px; border-radius: 4px; font-family: var(--font-mono); font-size: 10px; ${isBehind ? "background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #f59e0b;" : "background: rgba(161, 161, 170, 0.08); border: 1px solid rgba(161, 161, 170, 0.2); color: #a1a1aa;"}">
+            <div style="display: flex; align-items: center; gap: 5px;">
+              <span class="beacon-dot ${isBehind ? "pulse" : "optimal"}" style="width: 6px; height: 6px;"></span>
+              <span style="font-weight: 700;">${this.paceVelocity.status_text}</span>
+            </div>
+            <span style="opacity: 0.8;">Day ${this.paceVelocity.day_of_month}/${this.paceVelocity.total_days}</span>
+          </div>
+        `;
+      }
+
       const progressHeader = `
+        ${velocityHeader}
         <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 10px; font-family: var(--font-mono);">
             <span style="color: var(--text-tertiary);">DELIVERABLES (${completedCount}/${totalDelivs})</span>
@@ -537,7 +568,16 @@ const MetroMap = {
         .map(([key, val]) => {
           const streamMatch = this.streams.find((s) => s.name.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(s.id));
           const lineBadgeColor = streamMatch ? streamMatch.color : "var(--accent-lavender)";
-          const isChecked = completedList.includes(key);
+
+          // Find linked deliverable in stationProgress to display live burn-down counter
+          const pMatch = (this.stationProgress || []).find(
+            (p) => p.stream.toLowerCase() === key.toLowerCase() || (streamMatch && p.stream.toLowerCase() === streamMatch.id)
+          );
+          const counterPill = pMatch
+            ? `<span style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-lavender); font-weight: 700; margin-left: 6px; background: rgba(196, 181, 253, 0.08); padding: 1px 5px; border-radius: 2px;">[${pMatch.completed_count} / ${pMatch.total_required} ${pMatch.unit_label}]</span>`
+            : "";
+
+          const isChecked = completedList.includes(key) || (pMatch && pMatch.is_completed);
 
           return `
             <div 
@@ -547,8 +587,11 @@ const MetroMap = {
             >
               <div class="check-dot ${isChecked ? "checked" : ""}" style="margin-top: 1px;"></div>
               <div style="flex: 1;">
-                <div style="font-family: var(--font-mono); font-size: 8px; font-weight: 700; text-transform: uppercase; color: ${lineBadgeColor}; margin-bottom: 2px;">
-                  ${key} STREAM
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+                  <span style="font-family: var(--font-mono); font-size: 8px; font-weight: 700; text-transform: uppercase; color: ${lineBadgeColor};">
+                    ${key} STREAM
+                  </span>
+                  ${counterPill}
                 </div>
                 <div class="deliverable-desc" style="font-size: 11px; color: var(--text-primary); line-height: 1.4;">
                   ${this.escapeHtml(val)}

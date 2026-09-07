@@ -11,6 +11,7 @@ from app.services import (
     knowledge_service,
     school_service,
 )
+from engine import kill_list_controller, tum_calculator
 
 
 class HarnessAPI:
@@ -152,9 +153,67 @@ class HarnessAPI:
             completed_exercises=completed_exercises,
         )
 
-    # --- Layer 2: TUM ---
+    # --- Kill List Drawer & Execution Engine (Harness 2.1) ---
+    def get_kill_list(self, date_str: Optional[str] = None) -> Dict[str, Any]:
+        """Returns Kill List items for library session, enforcing 3-Item Rule & Evening Lock."""
+        return kill_list_controller.get_kill_list(date_str)
+
+    def add_kill_item(
+        self,
+        category: str,
+        title: str,
+        action_type: str,
+        target_path: str,
+        target_spec: str = "",
+        station_deliverable_id: Optional[str] = None,
+        date_str: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Adds an item to the Kill List (max 3 items per session)."""
+        return kill_list_controller.add_kill_item(
+            category=category,
+            title=title,
+            action_type=action_type,
+            target_path=target_path,
+            target_spec=target_spec,
+            station_deliverable_id=station_deliverable_id,
+            date_str=date_str,
+        )
+
+    def complete_kill_item(self, item_id: str) -> Dict[str, Any]:
+        """Marks kill item done and atomically increments connected station deliverable."""
+        return kill_list_controller.complete_kill_item(item_id)
+
+    def toggle_kill_item(self, item_id: str) -> Dict[str, Any]:
+        """Toggles kill item done status and syncs station deliverable counter."""
+        return kill_list_controller.toggle_kill_item(item_id)
+
+    def delete_kill_item(self, item_id: str) -> bool:
+        """Deletes a kill item from the daily list."""
+        return kill_list_controller.delete_kill_item(item_id)
+
+    def launch_kill_item(self, action_type: str, target_path: str) -> Dict[str, Any]:
+        """Directly triggers native OS / browser launcher for PDF, URL, or VS Code workspace."""
+        return kill_list_controller.launch_kill_item(action_type, target_path)
+
+    # --- Layer 2: TUM & Metro ---
     def get_tum_overview(self) -> Dict[str, Any]:
         return tum_service.get_tum_overview()
+
+    def calculate_tum_aptitude(
+        self, gpa_pl: float, math_pl: float, cs_pl: float, lang_pl: float
+    ) -> Dict[str, Any]:
+        """Computes TUM Stage 1 Aptitude Assessment (0-100 pts) using Bavarian Formula."""
+        return tum_calculator.calculate_tum_aptitude_score(gpa_pl, math_pl, cs_pl, lang_pl)
+
+    def get_station_deliverables(self, station_id: str = "sep-2026") -> List[Dict[str, Any]]:
+        """Returns deliverables with counter progress for active station."""
+        return kill_list_controller.get_station_deliverables(station_id)
+
+    def get_station_pace_velocity(
+        self, station_id: str = "sep-2026", date_str: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Station Velocity Indicator (Ghost Beacon) calculating Pace Deficit or Optimal Velocity."""
+        return kill_list_controller.get_station_pace_velocity(station_id, date_str)
 
     def update_grade(
         self,

@@ -32,7 +32,7 @@ const MetroMap = {
       color: "#c4b5fd", // Lavender
       strokeWidth: 2.5,
       baseY: 175,
-      heightOffsets: [0, -10, 5, -10, 0, 5, -10, 0, -5, -15, 10, 10, -5, -15, -10, -15, -5, -10, -10, -15, -20, -15, 0],
+      heightOffsets: [0, 0, -10, 5, -10, 0, 5, -10, 0, -5, -15, 10, 10, -5, -15, -10, -15, -5, -10, -10, -15, -20, -15, 0],
     },
     {
       id: "code",
@@ -41,7 +41,7 @@ const MetroMap = {
       color: "#7dd3fc", // Sky Blue
       strokeWidth: 2.5,
       baseY: 210,
-      heightOffsets: [-5, 5, -10, -5, 0, 10, -10, 10, -10, 5, -15, -10, -5, -10, -5, -5, -10, -10, -5, 10, -15, 5, 0],
+      heightOffsets: [0, -5, 5, -10, -5, 0, 10, -10, 10, -10, 5, -15, -10, -5, -10, -5, -5, -10, -10, -5, 10, -15, 5, 0],
     },
     {
       id: "sigg",
@@ -50,7 +50,7 @@ const MetroMap = {
       color: "#fdba74", // Orange
       strokeWidth: 3.0,
       baseY: 250,
-      heightOffsets: [0, -15, -20, -15, -20, -25, -20, -25, -30, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
+      heightOffsets: [0, 0, -15, -20, -15, -20, -25, -20, -25, -30, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20],
     },
     {
       id: "german",
@@ -59,7 +59,7 @@ const MetroMap = {
       color: "#6ee7b7", // Emerald
       strokeWidth: 2.5,
       baseY: 295,
-      heightOffsets: [0, 5, 10, -5, 10, -5, 10, 10, 10, -5, -15, -25, -5, 10, -10, 10, 10, -10, -10, -15, 10, -25, 0],
+      heightOffsets: [0, 0, 5, 10, -5, 10, -5, 10, 10, 10, -5, -15, -25, -5, 10, -10, 10, 10, -10, -10, -15, 10, -25, 0],
     },
     {
       id: "physical",
@@ -68,7 +68,7 @@ const MetroMap = {
       color: "#fda4af", // Rose
       strokeWidth: 2.5,
       baseY: 335,
-      heightOffsets: [0, 10, -10, 10, 10, 10, 10, -10, 10, -10, -15, -20, -5, 10, 10, -10, 10, 10, 10, -15, 10, 10, 0],
+      heightOffsets: [0, 0, 10, -10, 10, 10, 10, 10, -10, 10, -10, -15, -20, -5, 10, 10, -10, 10, 10, 10, -15, 10, 10, 0],
     },
   ],
 
@@ -216,11 +216,11 @@ const MetroMap = {
 
     // Phase Milestones
     const phases = [
-      { name: "Phase 1: Year 3 Liceum", x: startX, width: 4.8 * spacing },
-      { name: "Phase 2: SIGG Finals & Year 3 Lock", x: startX + 5 * spacing, width: 4.8 * spacing },
-      { name: "Phase 3: Summer Mass & B1", x: startX + 10 * spacing, width: 1.8 * spacing },
-      { name: "Phase 4: Matura Crucible", x: startX + 12 * spacing, width: 7.8 * spacing },
-      { name: "Phase 5: Official CKE & TUM", x: startX + 20 * spacing, width: 1.8 * spacing },
+      { name: "Phase 1: Year 3 Liceum", x: startX, width: 5.8 * spacing },
+      { name: "Phase 2: SIGG Finals & Year 3 Lock", x: startX + 6 * spacing, width: 4.8 * spacing },
+      { name: "Phase 3: Summer Mass & B1", x: startX + 11 * spacing, width: 1.8 * spacing },
+      { name: "Phase 4: Matura Crucible", x: startX + 13 * spacing, width: 7.8 * spacing },
+      { name: "Phase 5: Official CKE & TUM", x: startX + 21 * spacing, width: 1.8 * spacing },
     ];
 
     let phaseHeadersHtml = phases

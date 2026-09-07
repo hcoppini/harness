@@ -227,6 +227,66 @@ def init_db(db_path: Optional[Path] = None) -> None:
         """
     )
 
+    # 8. Execution Engine: Kill List & Metro Deliverable Progress (Harness 2.1)
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS kill_list_items (
+            id TEXT PRIMARY KEY,
+            date TEXT NOT NULL,                        -- YYYY-MM-DD
+            category TEXT NOT NULL,                    -- 'Math R', 'Algorithms', 'SIGG', 'German'
+            title TEXT NOT NULL,
+            action_type TEXT NOT NULL,                 -- 'pdf', 'url', 'workspace'
+            target_path TEXT NOT NULL,
+            target_spec TEXT NOT NULL,
+            station_deliverable_id TEXT,               -- Foreign key link to active station deliverable
+            completed INTEGER DEFAULT 0,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    )
+
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS station_deliverable_progress (
+            deliverable_id TEXT PRIMARY KEY,
+            station_id TEXT NOT NULL,
+            stream TEXT NOT NULL,                      -- 'academics', 'code', 'sigg', 'german', 'physical'
+            title TEXT NOT NULL,
+            total_required INTEGER NOT NULL DEFAULT 1,
+            completed_count INTEGER NOT NULL DEFAULT 0,
+            unit_label TEXT NOT NULL,                  -- 'problems', 'exercises', 'gate', 'words', 'days'
+            is_completed INTEGER DEFAULT 0
+        );
+        """
+    )
+
+    # Seed Sep '26 (Pure Syntax) Deliverables if not already seeded
+    seed_deliverables = [
+        ("sep26_math_diag", "sep-2026", "academics", "Math R Diagnostic Problem Sets", 40, 0, "problems", 0),
+        ("sep26_hackerrank_15", "sep-2026", "code", "HackerRank Easy/Medium without AI", 15, 0, "exercises", 0),
+        ("sep26_sigg_setup", "sep-2026", "sigg", "Team registered & Gra Testowa access", 1, 0, "gate", 0),
+        ("sep26_german_anki", "sep-2026", "german", "A2 Nicos Weg Vocabulary Units", 100, 0, "words", 0),
+        ("sep26_phys_protein", "sep-2026", "physical", "Daily Protein Floor Met (140g)", 30, 0, "days", 0),
+    ]
+    for d_id, s_id, stream, title, total, comp, unit, is_done in seed_deliverables:
+        cursor.execute(
+            """
+            INSERT OR IGNORE INTO station_deliverable_progress 
+            (deliverable_id, station_id, stream, title, total_required, completed_count, unit_label, is_completed)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (d_id, s_id, stream, title, total, comp, unit, is_done),
+        )
+
+    # Prune Workspace: Move Financial Agency / Polish SME Outreach to PAUSED
+    cursor.execute(
+        """
+        UPDATE projects
+        SET status = 'paused'
+        WHERE name LIKE '%Financial Agency%' OR name LIKE '%Polish SME Outreach%';
+        """
+    )
+
     conn.commit()
     conn.close()
 

@@ -67,18 +67,21 @@ def test_metro_roadmap():
     assert "TUM" in roadmap["title"]
     assert len(roadmap["stations"]) >= 20
 
-    # First station is Sep '26
+    # Kickoff station is index 0, Sep '26 (Pure Syntax) is index 1
     first_station = roadmap["stations"][0]
-    assert first_station["id"] == "sep-2026"
-    assert "Pure Syntax" in first_station["name"]
-    assert "Academics" in first_station["deliverables"]
+    assert first_station["id"] == "kickoff-2026"
+    assert "Class 3 Kickoff" in first_station["name"]
+
+    sep_station = [s for s in roadmap["stations"] if s["id"] == "sep-2026"][0]
+    assert "Pure Syntax" in sep_station["name"]
+    assert "Academics" in sep_station["deliverables"]
 
     # Test status update
     updated = tum_service.update_station_status("sep-2026", "active")
     assert updated is True
 
     # Test deliverable toggling checklist
-    deliv_keys = list(first_station["deliverables"].keys())
+    deliv_keys = list(sep_station["deliverables"].keys())
     assert len(deliv_keys) > 0
 
     # Toggle one on
