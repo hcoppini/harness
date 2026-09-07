@@ -82,6 +82,30 @@ def css_static(filename):
 def js_static(filename):
     return send_from_directory(UI_DIR / "js", filename)
 
+@app.route("/data/<path:filename>")
+def data_static(filename):
+    if (UI_DIR / "data" / filename).exists():
+        return send_from_directory(UI_DIR / "data", filename)
+    if (BASE_DIR / "data" / filename).exists():
+        return send_from_directory(BASE_DIR / "data", filename)
+    return jsonify({"error": "File not found"}), 404
+
+@app.route("/favicon.png")
+def favicon_png():
+    if (BASE_DIR / "favicon.png").exists():
+        return send_file(BASE_DIR / "favicon.png", mimetype="image/png")
+    if (UI_DIR / "favicon.png").exists():
+        return send_file(UI_DIR / "favicon.png", mimetype="image/png")
+    return "", 404
+
+@app.route("/favicon.ico")
+def favicon_ico():
+    if (BASE_DIR / "favicon.ico").exists():
+        return send_file(BASE_DIR / "favicon.ico", mimetype="image/x-icon")
+    if (UI_DIR / "favicon.ico").exists():
+        return send_file(UI_DIR / "favicon.ico", mimetype="image/x-icon")
+    return "", 404
+
 # --------------------------------------------------------------------------
 # REST API Endpoints
 # --------------------------------------------------------------------------

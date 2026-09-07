@@ -216,3 +216,40 @@ def test_tum_bavarian_aptitude_api(client):
     data = res.get_json()
     assert data["total_tum_points"] >= 88.0
     assert "DIRECT ADMISSION SAFE" in data["verdict"]
+
+
+def test_static_routes_and_vercel_entrypoint(client):
+    # Test Root Index
+    res = client.get("/")
+    assert res.status_code == 200
+    assert b"HARNESS" in res.data
+
+    # Test Static CSS
+    res_css = client.get("/css/app.css")
+    assert res_css.status_code == 200
+
+    # Test Static JS
+    res_js = client.get("/js/app.js")
+    assert res_js.status_code == 200
+
+    # Test Static API Bridge
+    res_bridge = client.get("/js/api_bridge.js")
+    assert res_bridge.status_code == 200
+
+    # Test Mobile Index
+    res_mobile = client.get("/mobile")
+    assert res_mobile.status_code == 200
+
+    # Test Manifest & Favicon
+    res_manifest = client.get("/manifest.json")
+    assert res_manifest.status_code == 200
+
+    res_fav = client.get("/favicon.png")
+    assert res_fav.status_code in (200, 404)
+
+    # Test Vercel Entrypoint Module
+    import os
+    os.environ["VERCEL"] = "1"
+    from api.index import app as vercel_app
+    assert vercel_app is not None
+

@@ -50,6 +50,10 @@ def init_db(db_path: Optional[Path] = None) -> None:
                 dest = DATA_DIR / json_file.name
                 if not dest.exists():
                     shutil.copy2(json_file, dest)
+            src_db = src_data / "harness.db"
+            dest_db = DATA_DIR / "harness.db"
+            if src_db.exists() and not dest_db.exists():
+                shutil.copy2(src_db, dest_db)
     elif getattr(sys, "frozen", False):
         meipass = getattr(sys, "_MEIPASS", None)
         if meipass:
