@@ -49,6 +49,10 @@
 
     <!-- Header Right Controls -->
     <div class="header-right">
+      <button id="syncStatusBadge" class="sync-badge" title="Click to sync Laptop and PC">
+        <span class="sync-dot" id="syncDot"></span>
+        <span class="sync-text" id="syncStatusText">Synced</span>
+      </button>
       <button id="btnOpenJsonModal" class="btn-ghost-icon" title="Standardized JSON Configuration">
         <span>JSON Hub</span>
       </button>
@@ -1037,6 +1041,7 @@
         <button class="btn-ghost-icon active" id="btnJsonTabSchedules">Schedules (A/B/C)</button>
         <button class="btn-ghost-icon" id="btnJsonTabGym">Gym Routines</button>
         <button class="btn-ghost-icon" id="btnJsonTabRoadmap">Metro Roadmap</button>
+        <button class="btn-ghost-icon" id="btnJsonTabSync">Cloud Sync</button>
       </div>
 
       <textarea id="jsonConfigTextarea" class="form-textarea" style="height: 260px; font-family: var(--font-mono); font-size: 11px;" spellcheck="false"></textarea>

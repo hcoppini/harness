@@ -384,11 +384,12 @@ def toggle_station_deliverable(station_id: str, deliverable_key: str) -> Dict[st
 
 
 def get_all_configs() -> Dict[str, Any]:
-    """Returns all structured JSON configs (schedules, gym routines, roadmap)."""
+    """Returns all structured JSON configs (schedules, gym routines, roadmap, sync config)."""
     res = {
         "schedules": {},
         "gym_routines": {},
         "metro_roadmap": {},
+        "sync_config": {},
     }
     try:
         s_file = DATA_DIR / "schedules.json"
@@ -405,17 +406,23 @@ def get_all_configs() -> Dict[str, Any]:
         if m_file.exists():
             with open(m_file, "r", encoding="utf-8") as f:
                 res["metro_roadmap"] = json.load(f)
+
+        c_file = DATA_DIR / "sync_config.json"
+        if c_file.exists():
+            with open(c_file, "r", encoding="utf-8") as f:
+                res["sync_config"] = json.load(f)
     except Exception:
         pass
     return res
 
 
 def import_config(config_type: str, json_content: str) -> bool:
-    """Imports or updates a configuration file (schedules, gym_routines, or metro_roadmap)."""
+    """Imports or updates a configuration file (schedules, gym_routines, metro_roadmap, or sync_config)."""
     filename_map = {
         "schedules": DATA_DIR / "schedules.json",
         "gym_routines": DATA_DIR / "gym_routines.json",
         "metro_roadmap": DATA_DIR / "metro_roadmap.json",
+        "sync_config": DATA_DIR / "sync_config.json",
     }
     target = filename_map.get(config_type)
     if not target:
@@ -428,3 +435,4 @@ def import_config(config_type: str, json_content: str) -> bool:
         return True
     except Exception:
         return False
+

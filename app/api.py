@@ -357,3 +357,29 @@ class HarnessAPI:
 
     def delete_knowledge_item(self, item_id: int) -> bool:
         return knowledge_service.delete_knowledge_item(item_id)
+
+    # --- Cross-Device Cloud Sync ---
+    def sync_now(self) -> Dict[str, Any]:
+        from app.services import sync_service
+        return sync_service.sync_all()
+
+    def get_sync_status(self) -> Dict[str, Any]:
+        from app.services import sync_service
+        cfg = sync_service.get_sync_config()
+        status = "synced" if cfg.get("last_synced_at") else ("unconfigured" if not cfg.get("supabase_key") else "ready")
+        return {
+            "status": status,
+            "supabase_url": cfg.get("supabase_url", ""),
+            "has_key": bool(cfg.get("supabase_key")),
+            "last_synced_at": cfg.get("last_synced_at"),
+            "auto_sync": cfg.get("auto_sync", True),
+        }
+
+    def configure_sync(self, supabase_url: str, supabase_key: str, auto_sync: bool = True) -> bool:
+        from app.services import sync_service
+        cfg = sync_service.get_sync_config()
+        cfg["supabase_url"] = supabase_url.strip()
+        cfg["supabase_key"] = supabase_key.strip()
+        cfg["auto_sync"] = auto_sync
+        sync_service.save_sync_config(cfg)
+        return True

@@ -1,8 +1,13 @@
-"""Desktop application entrypoint for Harness using PyWebView."""
-
 import os
 import sys
 from pathlib import Path
+
+# Redirect stdout/stderr if None (required for PyInstaller --noconsole / --windowed)
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
 import webview
 from app.api import HarnessAPI
 
