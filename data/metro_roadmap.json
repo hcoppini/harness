@@ -55,7 +55,10 @@
         "Physical": "Weight 68.5 kg, daily protein floor at 140g."
       },
       "next_action": "Complete first 5 HackerRank problems without AI and trace variables by hand.",
-      "completed_deliverables": []
+      "completed_deliverables": [
+        "German",
+        "Physical"
+      ]
     },
     {
       "id": "oct-2026",
