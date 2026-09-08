@@ -32,6 +32,27 @@ window.Dashboard = {
         if (window.HarnessApp) window.HarnessApp.switchView("today");
       });
     }
+
+    const btn7Day = document.getElementById("btnView7DaySchedule");
+    if (btn7Day) {
+      btn7Day.addEventListener("click", () => {
+        this.openDetailedScheduleModal();
+      });
+    }
+
+    const btnJumpToday = document.getElementById("btnDetailedJumpToday");
+    if (btnJumpToday) {
+      btnJumpToday.addEventListener("click", () => {
+        const targetDate = this.selectedForecastDate || new Date().toISOString().split("T")[0];
+        this.closeDetailedScheduleModal();
+        if (window.HarnessApp) {
+          window.HarnessApp.switchView("today");
+          if (window.Today) {
+            window.Today.selectDate(targetDate);
+          }
+        }
+      });
+    }
   },
 
   async load() {
@@ -319,9 +340,31 @@ window.Dashboard = {
           `;
         }
 
+        let actionsHtml = "";
+        if (day.actions && day.actions.length > 0) {
+          actionsHtml = `
+            <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 2px;">
+              ${day.actions.slice(0, 3).map((act) => `
+                <div class="forecast-action-item">
+                  <span class="forecast-action-time">${this.escapeHtml(act.time.split(" - ")[0])}</span>
+                  <span class="forecast-action-label">${this.escapeHtml(act.label)}</span>
+                </div>
+              `).join("")}
+            </div>
+          `;
+        }
+
+        const klCount = (day.kill_list_items || []).length;
+        const taskCount = day.task_count || 0;
+        const taskPill = klCount > 0 ? `⚡ ${klCount} kill • ${taskCount} tasks` : taskCount > 0 ? `${taskCount} tasks` : "Routine ready";
 
         return `
-          <div class="forecast-day-card ${isTomorrow ? "tomorrow-highlight" : ""}">
+          <div 
+            class="forecast-day-card ${isTomorrow ? "tomorrow-highlight" : ""}" 
+            onclick="Dashboard.openDetailedScheduleModal('${day.date}')"
+            title="Click to view detailed timeline for ${day.day_name}"
+            style="cursor: pointer;"
+          >
             <div>
               <div class="forecast-header">
                 <div class="forecast-day-name">
@@ -337,18 +380,202 @@ window.Dashboard = {
                 </span>
                 <div class="forecast-highlight-text">${this.escapeHtml(day.key_highlight)}</div>
                 ${day.cutoff_info ? `<div class="forecast-cutoff-text">${this.escapeHtml(day.cutoff_info)}</div>` : ""}
+                ${actionsHtml}
                 ${gymSnippet}
               </div>
             </div>
 
             <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--border-hairline); font-size: 10px; color: var(--text-tertiary); display: flex; justify-content: space-between;">
-              <span>${day.task_count > 0 ? `${day.task_count} tasks` : "Routine ready"}</span>
-              <span>${day.is_tomorrow ? "Next day" : `in ${day.days_away}d`}</span>
+              <span style="${klCount > 0 ? "color: var(--accent-lavender); font-weight: 600;" : ""}">${taskPill}</span>
+              <span>${day.is_tomorrow ? "Next day" : `in ${day.days_away}d &rarr;`}</span>
             </div>
           </div>
         `;
       })
       .join("");
+  },
+
+  openDetailedScheduleModal(selectedDate = null) {
+    const modal = document.getElementById("detailedScheduleModal");
+    if (!modal || !this.data || !this.data.upcoming) return;
+
+    const upcoming = this.data.upcoming;
+    if (upcoming.length === 0) return;
+
+    this.selectedForecastDate = selectedDate || upcoming[0].date;
+
+    // Render day tabs
+    const tabsContainer = document.getElementById("detailedScheduleDayTabs");
+    if (tabsContainer) {
+      tabsContainer.innerHTML = upcoming
+        .map((day) => {
+          const isSelected = day.date === this.selectedForecastDate;
+          return `
+            <button 
+              class="btn-ghost-icon ${isSelected ? "active" : ""}" 
+              onclick="Dashboard.selectDetailedDay('${day.date}')"
+              style="white-space: nowrap; font-size: 11px; padding: 4px 8px; ${isSelected ? "border-color: var(--accent-lavender); color: var(--accent-lavender); font-weight: 700;" : ""}"
+            >
+              <span>${day.day_name.slice(0, 3)}</span> 
+              <span style="font-family: var(--font-mono); font-size: 10px; opacity: 0.75;">${day.display_date.split(",")[1] || day.display_date}</span>
+            </button>
+          `;
+        })
+        .join("");
+    }
+
+    const currentDay = upcoming.find((d) => d.date === this.selectedForecastDate) || upcoming[0];
+    this.renderDetailedScheduleDay(currentDay);
+
+    modal.classList.add("open");
+  },
+
+  selectDetailedDay(dateStr) {
+    this.selectedForecastDate = dateStr;
+    const upcoming = this.data.upcoming || [];
+    const currentDay = upcoming.find((d) => d.date === dateStr);
+
+    const tabs = document.querySelectorAll("#detailedScheduleDayTabs button");
+    tabs.forEach((btn) => {
+      if (btn.textContent.includes(currentDay ? currentDay.day_name.slice(0, 3) : "")) {
+        btn.classList.add("active");
+        btn.style.borderColor = "var(--accent-lavender)";
+        btn.style.color = "var(--accent-lavender)";
+        btn.style.fontWeight = "700";
+      } else {
+        btn.classList.remove("active");
+        btn.style.borderColor = "";
+        btn.style.color = "";
+        btn.style.fontWeight = "normal";
+      }
+    });
+
+    if (currentDay) {
+      this.renderDetailedScheduleDay(currentDay);
+    }
+  },
+
+  renderDetailedScheduleDay(day) {
+    const content = document.getElementById("detailedScheduleContent");
+    if (!content || !day) return;
+
+    const schedKey = (day.schedule_key || "").toLowerCase();
+    let badgeClass = "sched-a";
+    if (schedKey.includes("b")) badgeClass = "sched-b";
+    if (schedKey.includes("c")) badgeClass = "sched-c";
+
+    // 1. Day Banner
+    const bannerHtml = `
+      <div style="background: rgba(196, 181, 253, 0.05); border: 1px solid rgba(196, 181, 253, 0.18); border-radius: 6px; padding: 12px; margin-bottom: 14px;">
+        <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="forecast-schedule-badge ${badgeClass}" style="font-size: 10px; padding: 2px 6px;">
+              ${day.schedule_key ? `SCHEDULE ${day.schedule_key}` : "ROUTINE"}
+            </span>
+            <span style="font-size: 14px; font-weight: 700; color: var(--text-primary);">${day.day_name}, ${day.display_date}</span>
+          </div>
+          <span style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-lavender);">
+            ${day.is_tomorrow ? "TOMORROW" : `in ${day.days_away} days`}
+          </span>
+        </div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-top: 2px;">
+          ${this.escapeHtml(day.schedule_name)}
+        </div>
+        ${day.cutoff_info ? `<div style="font-family: var(--font-mono); font-size: 10px; color: #f59e0b; margin-top: 4px;">⚠️ Cutoff Target: ${this.escapeHtml(day.cutoff_info)}</div>` : ""}
+      </div>
+    `;
+
+    // 2. Timeline Blocks
+    const blocks = day.blocks || [];
+    let blocksHtml = "";
+    if (blocks.length > 0) {
+      blocksHtml = `
+        <div style="margin-bottom: 14px;">
+          <div class="card-label" style="margin-bottom: 8px;">PRE-CALIBRATED ROUTINE TIMELINE</div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            ${blocks
+              .map((b) => `
+                <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 7px 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px;">
+                  <div style="display: flex; align-items: baseline; gap: 10px;">
+                    <span style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-lavender); flex-shrink: 0; min-width: 85px;">
+                      ${this.escapeHtml(b.time || "")}
+                    </span>
+                    <span style="font-size: 12px; font-weight: 500; color: var(--text-primary);">
+                      ${this.escapeHtml(b.focus || "")}
+                    </span>
+                  </div>
+                  ${b.cutoff ? `<span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary);">${this.escapeHtml(b.cutoff)}</span>` : ""}
+                </div>
+              `)
+              .join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    // 3. Gym Protocol
+    let gymHtml = "";
+    if (day.gym_routine) {
+      const g = day.gym_routine;
+      const exercises = g.exercises || [];
+      gymHtml = `
+        <div style="margin-bottom: 14px; background: rgba(244, 63, 94, 0.04); border: 1px solid rgba(244, 63, 94, 0.2); border-radius: 6px; padding: 12px;">
+          <div class="card-label" style="color: #fda4af; margin-bottom: 6px;">STRUCTURED HYPERTROPHY PROTOCOL</div>
+          <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
+            ${this.escapeHtml(g.name)}
+          </div>
+          ${exercises.length > 0 ? `
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
+              ${exercises
+                .map((ex) => `
+                  <div style="font-size: 11px; padding: 4px 8px; background: rgba(0,0,0,0.25); border-radius: 3px; border: 1px solid var(--border-hairline);">
+                    <span style="font-weight: 600; color: var(--text-primary);">${this.escapeHtml(ex.name)}</span>
+                    <span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); margin-left: 4px;">${this.escapeHtml(ex.sets || "")}</span>
+                  </div>
+                `)
+                .join("")}
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }
+
+    // 4. Scheduled Tasks & Kill Items
+    const tasks = day.tasks || [];
+    const killItems = day.kill_list_items || [];
+    let itemsHtml = "";
+    if (tasks.length > 0 || killItems.length > 0) {
+      itemsHtml = `
+        <div style="margin-bottom: 10px;">
+          <div class="card-label" style="margin-bottom: 6px;">SCHEDULED TASKS &amp; KILL ITEMS (${tasks.length + killItems.length})</div>
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            ${killItems
+              .map((k) => `
+                <div style="font-size: 11px; padding: 6px 10px; background: rgba(196,181,253,0.06); border: 1px solid rgba(196,181,253,0.18); border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                  <span>⚡ <strong>[${this.escapeHtml(k.category)}]</strong> ${this.escapeHtml(k.title)}</span>
+                  <span class="mono-chip lavender" style="font-size: 8px;">Kill Item</span>
+                </div>
+              `)
+              .join("")}
+            ${tasks
+              .map((t) => `
+                <div style="font-size: 11px; padding: 6px 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
+                  <span>${this.escapeHtml(t.title)}</span>
+                  <span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary);">${this.escapeHtml(t.category || "Task")}</span>
+                </div>
+              `)
+              .join("")}
+          </div>
+        </div>
+      `;
+    }
+
+    content.innerHTML = bannerHtml + blocksHtml + gymHtml + itemsHtml;
+  },
+
+  closeDetailedScheduleModal() {
+    const modal = document.getElementById("detailedScheduleModal");
+    if (modal) modal.classList.remove("open");
   },
 
   renderRadar() {

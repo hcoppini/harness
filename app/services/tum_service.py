@@ -1,9 +1,11 @@
 import json
 import sqlite3
+from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from app.db import get_connection, DATA_DIR
 from engine.tum_calculator import calculate_bavarian_grade, calculate_tum_aptitude_score
+from engine.grade_parser import parse_polish_grade, calculate_subject_average, get_grade_badge_color
 
 DEFAULT_SUBJECTS = [
     ("Matematyka", 6.0),
@@ -87,16 +89,53 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
     seed_tum_data_if_empty(conn)
     cursor = conn.cursor()
 
-    # 1. Fetch grades grouped by semester
+    # 1. Fetch grade entries and group by (subject, semester)
+    cursor.execute("SELECT * FROM tum_grade_entries ORDER BY date ASC, id ASC")
+    all_entries = cursor.fetchall()
+    entries_by_subj_sem: Dict[tuple, List[Dict[str, Any]]] = {}
+    for er in all_entries:
+        key = (er["subject"].strip().lower(), er["semester"])
+        if key not in entries_by_subj_sem:
+            entries_by_subj_sem[key] = []
+        parsed = parse_polish_grade(er["raw_input"])
+        entries_by_subj_sem[key].append({
+            "id": er["id"],
+            "subject": er["subject"],
+            "semester": er["semester"],
+            "raw_input": er["raw_input"],
+            "numeric_value": er["numeric_value"],
+            "weight": er["weight"],
+            "category": er["category"],
+            "description": er["description"] or "",
+            "date": er["date"],
+            "counts_in_average": bool(er["counts_in_average"]),
+            "display_label": parsed["display_label"],
+            "badge_color": parsed["badge_color"],
+            "grade_type": parsed["grade_type"],
+        })
+
+    # Fetch subjects grouped by semester
     cursor.execute("SELECT * FROM tum_grades ORDER BY semester ASC, id ASC")
     grade_rows = cursor.fetchall()
     semesters: Dict[int, List[Dict[str, Any]]] = {1: [], 2: [], 3: [], 4: []}
+    semester_gpas: Dict[int, float] = {1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0}
     total_grades = []
     grades_under_four = 0
 
     for row in grade_rows:
         sem = row["semester"]
-        actual = row["actual_grade"]
+        subj = row["subject"]
+        key = (subj.strip().lower(), sem)
+        subj_entries = entries_by_subj_sem.get(key, [])
+        running_avg = calculate_subject_average(subj_entries)
+
+        if running_avg is not None:
+            actual = running_avg
+            if row["actual_grade"] != actual:
+                cursor.execute("UPDATE tum_grades SET actual_grade = ? WHERE id = ?", (actual, row["id"]))
+        else:
+            actual = row["actual_grade"]
+
         if actual is not None:
             total_grades.append(actual)
             if actual < 4.0:
@@ -105,14 +144,21 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
         semesters[sem].append(
             {
                 "id": row["id"],
-                "subject": row["subject"],
+                "subject": subj,
                 "semester": sem,
                 "target_grade": row["target_grade"],
                 "actual_grade": actual,
+                "running_average": running_avg,
+                "entries": subj_entries,
                 "percentage": row["percentage"],
                 "notes": row["notes"] or "",
             }
         )
+
+    # Calculate semester GPAs
+    for s_idx in range(1, 5):
+        sem_actuals = [g["actual_grade"] for g in semesters[s_idx] if g["actual_grade"] is not None]
+        semester_gpas[s_idx] = round(sum(sem_actuals) / len(sem_actuals), 2) if sem_actuals else 0.0
 
     overall_gpa = round(sum(total_grades) / len(total_grades), 2) if total_grades else 0.0
 
@@ -175,6 +221,7 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
         "overall_gpa": overall_gpa,
         "grades_under_four": grades_under_four,
         "semesters": semesters,
+        "semester_gpas": semester_gpas,
         "matura": matura_list,
         "language": lang_list,
         "bavarian_assessment": bavarian_eval,
@@ -187,6 +234,204 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
             "Extracurricular impact: SIGG national finals & live software repos",
         ],
     }
+
+
+def add_grade_entry(
+    subject: str,
+    semester: int,
+    raw_input: str,
+    weight: float = 1.0,
+    category: str = "Grade",
+    description: str = "",
+    date_str: Optional[str] = None,
+    conn: Optional[sqlite3.Connection] = None,
+) -> Dict[str, Any]:
+    """
+    Parses and logs an individual grade entry, immediately recalculating the subject's running average.
+    """
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    parsed = parse_polish_grade(raw_input)
+    target_date = date_str or datetime.now().strftime("%Y-%m-%d")
+    wt = float(weight or 1.0)
+    num_val = parsed["numeric_value"]
+    counts = 1 if parsed["counts_in_average"] else 0
+
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT INTO tum_grade_entries 
+        (subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            subject.strip(),
+            int(semester),
+            raw_input.strip(),
+            num_val,
+            wt,
+            category.strip(),
+            description.strip(),
+            target_date,
+            counts,
+        ),
+    )
+    entry_id = cursor.lastrowid
+
+    # Ensure subject exists in tum_grades for this semester
+    cursor.execute(
+        "SELECT id FROM tum_grades WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) AND semester = ?",
+        (subject.strip(), int(semester)),
+    )
+    if not cursor.fetchone():
+        cursor.execute(
+            "INSERT INTO tum_grades (subject, semester, target_grade, actual_grade) VALUES (?, ?, 5.0, NULL)",
+            (subject.strip(), int(semester)),
+        )
+
+    # Recalculate subject running average
+    cursor.execute(
+        """
+        SELECT * FROM tum_grade_entries 
+        WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) AND semester = ?
+        """,
+        (subject.strip(), int(semester)),
+    )
+    rows = cursor.fetchall()
+    entries = [dict(r) for r in rows]
+    running_avg = calculate_subject_average(entries)
+
+    # Update tum_grades for this subject and semester
+    cursor.execute(
+        """
+        UPDATE tum_grades 
+        SET actual_grade = ?
+        WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) AND semester = ?
+        """,
+        (running_avg, subject.strip(), int(semester)),
+    )
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+    return {
+        "success": True,
+        "entry": {
+            "id": entry_id,
+            "subject": subject.strip(),
+            "semester": int(semester),
+            "raw_input": raw_input,
+            "numeric_value": num_val,
+            "weight": wt,
+            "category": category,
+            "description": description,
+            "date": target_date,
+            "counts_in_average": bool(counts),
+            "display_label": parsed["display_label"],
+            "badge_color": parsed["badge_color"],
+        },
+        "running_average": running_avg,
+    }
+
+
+def delete_grade_entry(entry_id: int, conn: Optional[sqlite3.Connection] = None) -> bool:
+    """Deletes a grade entry and updates the running average."""
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT subject, semester FROM tum_grade_entries WHERE id = ?", (entry_id,))
+    row = cursor.fetchone()
+    if not row:
+        if close_conn:
+            conn.close()
+        return False
+
+    subject = row["subject"]
+    semester = row["semester"]
+
+    cursor.execute("DELETE FROM tum_grade_entries WHERE id = ?", (entry_id,))
+
+    # Recalculate
+    cursor.execute(
+        """
+        SELECT * FROM tum_grade_entries 
+        WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) AND semester = ?
+        """,
+        (subject, semester),
+    )
+    rows = cursor.fetchall()
+    running_avg = calculate_subject_average([dict(r) for r in rows])
+
+    cursor.execute(
+        """
+        UPDATE tum_grades 
+        SET actual_grade = ?
+        WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) AND semester = ?
+        """,
+        (running_avg, subject, semester),
+    )
+    conn.commit()
+
+    if close_conn:
+        conn.close()
+
+    return True
+
+
+def get_grade_entries(
+    subject: Optional[str] = None,
+    semester: Optional[int] = None,
+    conn: Optional[sqlite3.Connection] = None,
+) -> List[Dict[str, Any]]:
+    """Returns list of all grade entries, optionally filtered by subject/semester."""
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    cursor = conn.cursor()
+    query = "SELECT * FROM tum_grade_entries WHERE 1=1"
+    params = []
+    if subject:
+        query += " AND LOWER(TRIM(subject)) = LOWER(TRIM(?))"
+        params.append(subject.strip())
+    if semester:
+        query += " AND semester = ?"
+        params.append(int(semester))
+    query += " ORDER BY date DESC, id DESC"
+
+    cursor.execute(query, tuple(params))
+    rows = cursor.fetchall()
+    results = []
+    for r in rows:
+        parsed = parse_polish_grade(r["raw_input"])
+        results.append({
+            "id": r["id"],
+            "subject": r["subject"],
+            "semester": r["semester"],
+            "raw_input": r["raw_input"],
+            "numeric_value": r["numeric_value"],
+            "weight": r["weight"],
+            "category": r["category"],
+            "description": r["description"] or "",
+            "date": r["date"],
+            "counts_in_average": bool(r["counts_in_average"]),
+            "display_label": parsed["display_label"],
+            "badge_color": parsed["badge_color"],
+            "grade_type": parsed["grade_type"],
+        })
+
+    if close_conn:
+        conn.close()
+
+    return results
 
 
 def calculate_custom_tum_aptitude(

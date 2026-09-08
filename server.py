@@ -229,6 +229,7 @@ def add_kill_item():
             target_path=payload.get("target_path", ""),
             target_spec=payload.get("target_spec", ""),
             station_deliverable_id=payload.get("station_deliverable_id"),
+            quantity=int(payload.get("quantity", 1)),
             date_str=payload.get("date"),
         )
         return jsonify(item), 201
@@ -269,6 +270,47 @@ def calculate_tum_aptitude():
     cs_val = float(payload.get("cs_pl", 5.0))
     lang_val = float(payload.get("lang_pl", 5.0))
     return jsonify(api.calculate_tum_aptitude(gpa, math_val, cs_val, lang_val))
+
+@app.route("/api/tum/grades/entries", methods=["GET", "POST"])
+def tum_grade_entries():
+    if request.method == "POST":
+        payload = request.get_json(silent=True) or {}
+        res = api.add_grade_entry(
+            subject=payload.get("subject", ""),
+            semester=int(payload.get("semester", 1)),
+            raw_input=payload.get("raw_input", ""),
+            weight=float(payload.get("weight", 1.0)),
+            category=payload.get("category", "Grade"),
+            description=payload.get("description", ""),
+            date_str=payload.get("date"),
+        )
+        return jsonify(res), 201
+    else:
+        subject = request.args.get("subject")
+        semester = request.args.get("semester")
+        sem_int = int(semester) if semester and semester.isdigit() else None
+        return jsonify(api.get_grade_entries(subject=subject, semester=sem_int))
+
+@app.route("/api/tum/grades/entries/<int:entry_id>", methods=["DELETE"])
+def delete_tum_grade_entry(entry_id):
+    success = api.delete_grade_entry(entry_id)
+    return jsonify({"success": success})
+
+@app.route("/api/metro/deliverables/<deliverable_id>/progress", methods=["POST"])
+def update_deliverable_progress_route(deliverable_id):
+    payload = request.get_json(silent=True) or {}
+    new_count = payload.get("new_count")
+    delta = payload.get("delta")
+    res = api.update_deliverable_progress(deliverable_id, new_count=new_count, delta=delta)
+    return jsonify(res)
+
+@app.route("/api/metro/deliverables/<deliverable_id>/reps", methods=["POST"])
+def log_study_reps_route(deliverable_id):
+    payload = request.get_json(silent=True) or {}
+    count = int(payload.get("count", 1))
+    notes = payload.get("notes", "")
+    res = api.log_study_reps(deliverable_id, count=count, notes=notes)
+    return jsonify(res)
 
 @app.route("/api/metro/<station_id>/progress", methods=["GET"])
 def get_station_progress(station_id):

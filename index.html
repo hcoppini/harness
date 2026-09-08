@@ -49,6 +49,10 @@
 
     <!-- Header Right Controls -->
     <div class="header-right">
+      <button id="syncStatusBadge" class="sync-badge" title="Click to sync Laptop and PC">
+        <span class="sync-dot" id="syncDot"></span>
+        <span class="sync-text" id="syncStatusText">Synced</span>
+      </button>
       <button id="btnOpenJsonModal" class="btn-ghost-icon" title="Standardized JSON Configuration">
         <span>JSON Hub</span>
       </button>
@@ -189,10 +193,15 @@
                 Look ahead: routines, training cutoffs, and scheduled reps
               </span>
             </div>
-            <button id="btnJumpToTodayFromDash" class="btn-ghost-icon">
-              <span>Go to Today</span>
-              <span class="key-pill">1</span>
-            </button>
+            <div style="display: flex; gap: 6px;">
+              <button id="btnView7DaySchedule" class="btn-ghost-icon" title="View detailed 7-day schedule breakdown">
+                <span>Detailed 7-Day Plan</span>
+              </button>
+              <button id="btnJumpToTodayFromDash" class="btn-ghost-icon">
+                <span>Go to Today</span>
+                <span class="key-pill">1</span>
+              </button>
+            </div>
           </div>
 
           <div class="upcoming-reel" id="upcomingReelContainer">
@@ -261,6 +270,24 @@
               </span>
             </div>
             <span id="scheduleDescription" style="font-size: 11px; color: var(--text-tertiary);"></span>
+          </div>
+
+          <!-- Embedded SGH Deep Work Kill List (Daily Execution Center) -->
+          <div id="todayInlineKillListCard" class="monotone-card" style="margin-bottom: 14px; border: 1px solid rgba(196, 181, 253, 0.25); background: rgba(13, 15, 18, 0.95);">
+            <div class="card-label-row" style="margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="card-label" style="color: var(--accent-lavender); font-weight: 700; font-size: 11px;">⚡ SGH LIBRARY KILL LIST</span>
+                <span id="todayInlineKillCountBadge" class="mono-chip lavender">0 / 3 Active</span>
+              </div>
+              <div style="display: flex; gap: 5px; align-items: center;">
+                <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.quickLogStudy('sep26_german_anki', 20, '20 Anki vocabulary words')" style="font-size: 10px; padding: 2px 6px;" title="Fast register +20 German words">+20 DE Words</button>
+                <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.quickLogStudy('sep26_hackerrank_15', 1, '1 LeetCode/HackerRank algorithm')" style="font-size: 10px; padding: 2px 6px;" title="Fast register +1 LeetCode problem">+1 LeetCode</button>
+                <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.open()" style="font-size: 10px; padding: 2px 7px;">Manage Drawer &rarr;</button>
+              </div>
+            </div>
+            <div id="todayInlineKillListContainer">
+              <!-- Rendered by today.js -->
+            </div>
           </div>
 
           <!-- Pre-loaded Day Routine Blocks -->
@@ -537,27 +564,39 @@
         </div>
 
         <div class="card-label-row">
-          <span class="card-label">4-Semester Liceum Grade Ledger</span>
-          <div style="display: flex; gap: 4px;" id="semesterFilterButtons">
-            <button class="btn-ghost-icon active" data-sem="1">Sem 1</button>
-            <button class="btn-ghost-icon" data-sem="2">Sem 2</button>
-            <button class="btn-ghost-icon" data-sem="3">Sem 3</button>
-            <button class="btn-ghost-icon" data-sem="4">Sem 4</button>
+          <div>
+            <span class="card-label">Real-Time Grade Ledger &amp; Running Subject Averages</span>
+            <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">
+              Every singular mark (points, percentages, pluses/minuses, np, bz) directly recalculates your GPA.
+            </div>
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <div style="display: flex; gap: 4px;" id="semesterFilterButtons">
+              <button class="btn-ghost-icon active" data-sem="1">Sem 1</button>
+              <button class="btn-ghost-icon" data-sem="2">Sem 2</button>
+              <button class="btn-ghost-icon" data-sem="3">Sem 3</button>
+              <button class="btn-ghost-icon" data-sem="4">Sem 4</button>
+            </div>
+            <button id="btnOpenAddGradeModal" class="btn-primary" style="padding: 3px 8px; font-size: 11px;">+ Log Grade</button>
           </div>
         </div>
-        <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
-          <thead>
-            <tr style="border-bottom: 1px solid var(--border-hairline); text-align: left; color: var(--text-tertiary); font-size: 10px; font-weight: 600; font-family: var(--font-mono);">
-              <th style="padding: 6px 0;">SUBJECT</th>
-              <th>TARGET</th>
-              <th>ACTUAL (1-6)</th>
-              <th>STATUS</th>
-            </tr>
-          </thead>
-          <tbody id="gradesTableBody">
-            <!-- Rendered dynamically -->
-          </tbody>
-        </table>
+        <div style="overflow-x: auto;">
+          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+            <thead>
+              <tr style="border-bottom: 1px solid var(--border-hairline); text-align: left; color: var(--text-tertiary); font-size: 10px; font-weight: 600; font-family: var(--font-mono);">
+                <th style="padding: 8px 0; width: 140px;">SUBJECT</th>
+                <th style="padding: 8px 10px;">GRADE LEDGER (CHIPS)</th>
+                <th style="padding: 8px 10px; width: 95px;">RUNNING AVG</th>
+                <th style="padding: 8px 10px; width: 65px;">TARGET</th>
+                <th style="padding: 8px 10px; width: 95px;">STATUS</th>
+                <th style="padding: 8px 0; width: 75px; text-align: right;">ACTION</th>
+              </tr>
+            </thead>
+            <tbody id="gradesTableBody">
+              <!-- Rendered dynamically -->
+            </tbody>
+          </table>
+        </div>
       </div>
     </section>
 
@@ -750,107 +789,6 @@
   </main>
 
   <!-- ====================================================================
-       KILL LIST SLIDING DRAWER & LAUNCHER (Harness 2.1)
-       ==================================================================== -->
-  <div id="killListBackdrop" class="kill-list-backdrop"></div>
-  <aside id="killListDrawer" class="kill-list-drawer">
-    <div style="display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px;">
-      <div>
-        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-          <span class="mono-chip lavender" style="font-size: 9px; font-weight: 700;">PURE SYNTAX // SEP '26</span>
-          <span id="killListDateLabel" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Today</span>
-        </div>
-        <h2 style="font-size: 17px; font-weight: 700; color: var(--text-primary); margin: 0;">
-          Kill List // SGH Library
-        </h2>
-        <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
-          Zero-AI Deep Work (14:30 – 16:30) • 3-Item Rule Enforced
-        </div>
-      </div>
-      <button id="closeKillListBtn" class="drawer-close-btn">&times;</button>
-    </div>
-
-    <!-- Active Station Pace Velocity / Ghost Beacon -->
-    <div id="killListVelocityContainer" style="margin-bottom: 12px;">
-      <!-- Rendered dynamically -->
-    </div>
-
-    <!-- Evening Lock Warning -->
-    <div id="killListLockBanner" style="display: none; background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); border-radius: 4px; padding: 8px 10px; margin-bottom: 14px; font-family: var(--font-mono); font-size: 11px; color: #f59e0b;">
-      <span style="font-weight: 700;">EVENING LOCK (18:00+):</span> Tomorrow's session items are locked to prevent library-seat procrastination.
-    </div>
-
-    <!-- 3-Item Section Header -->
-    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-      <span class="card-label" style="font-size: 10px;">TODAY'S 3 KILL ITEMS</span>
-      <span id="killListCountBadge" class="mono-chip lavender">0 / 3 Active</span>
-    </div>
-
-    <!-- Items List -->
-    <div id="killListItemsContainer" style="margin-bottom: 16px;">
-      <!-- Rendered dynamically -->
-    </div>
-
-    <!-- Full Notice (if 3 items reached) -->
-    <div id="killListFullNotice" style="display: none; background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.08); border-radius: 6px; padding: 12px; text-align: center; font-size: 11px; color: var(--text-tertiary); margin-bottom: 16px;">
-      <span style="color: var(--accent-lavender); font-weight: 600;">3-Item Rule Enforced:</span> Session quota reached (3/3). Check off or delete an item to add another.
-    </div>
-
-    <!-- Add Item Form (Visible when count < 3) -->
-    <div id="killListAddCard" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 6px; padding: 14px; margin-top: auto;">
-      <div class="card-label" style="margin-bottom: 10px;">ADD KILL ITEM (MAX 3)</div>
-      <form id="addKillItemForm" style="display: flex; flex-direction: column; gap: 8px;">
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-          <div>
-            <label class="form-label">CATEGORY</label>
-            <select id="killItemCategory" class="form-input" style="width: 100%;">
-              <option value="Math R">Math Rozszerzona</option>
-              <option value="Algorithms">Raw Algorithms</option>
-              <option value="SIGG">SIGG / Quant</option>
-              <option value="German">German / Anki</option>
-            </select>
-          </div>
-          <div>
-            <label class="form-label">LAUNCHER</label>
-            <select id="killItemActionType" class="form-input" style="width: 100%;">
-              <option value="pdf">PDF Reader</option>
-              <option value="url">Browser Link</option>
-              <option value="workspace">VS Code</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label class="form-label">TASK TITLE</label>
-          <input type="text" id="killItemTitle" class="form-input" placeholder="e.g. CKE Math R Diagnostic Sets" required style="width: 100%;">
-        </div>
-
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-          <div>
-            <label class="form-label">TARGET SPEC</label>
-            <input type="text" id="killItemSpec" class="form-input" placeholder="e.g. Tasks 1-5 / 45m" style="width: 100%;">
-          </div>
-          <div>
-            <label class="form-label">LINK METRO DELIVERABLE</label>
-            <select id="killItemDeliverable" class="form-input" style="width: 100%;">
-              <option value="">-- None --</option>
-            </select>
-          </div>
-        </div>
-
-        <div>
-          <label class="form-label">TARGET PATH / URL</label>
-          <input type="text" id="killItemPath" class="form-input" placeholder="e.g. https://hackerrank.com or arkusze/cke.pdf" style="width: 100%;">
-        </div>
-
-        <button type="submit" class="btn-ghost-icon" style="justify-content: center; background: rgba(196, 181, 253, 0.08); border-color: rgba(196, 181, 253, 0.3); color: var(--accent-lavender); font-weight: 600; padding: 8px; margin-top: 4px;">
-          + Add to Kill List
-        </button>
-      </form>
-    </div>
-  </aside>
-
-  <!-- ====================================================================
        NATIVE IN-APP MODALS
        ==================================================================== -->
 
@@ -1037,6 +975,7 @@
         <button class="btn-ghost-icon active" id="btnJsonTabSchedules">Schedules (A/B/C)</button>
         <button class="btn-ghost-icon" id="btnJsonTabGym">Gym Routines</button>
         <button class="btn-ghost-icon" id="btnJsonTabRoadmap">Metro Roadmap</button>
+        <button class="btn-ghost-icon" id="btnJsonTabSync">Cloud Sync</button>
       </div>
 
       <textarea id="jsonConfigTextarea" class="form-textarea" style="height: 260px; font-family: var(--font-mono); font-size: 11px;" spellcheck="false"></textarea>
@@ -1044,6 +983,111 @@
       <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 12px;">
         <span id="jsonImportStatus" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);"></span>
         <button id="btnSaveJsonConfig" class="btn-primary">Save &amp; Apply JSON</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 6. Add Grade Modal (Real-Time Grade Ledger) -->
+  <div id="addGradeModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 480px;">
+      <div class="card-label-row" style="margin-bottom: 14px;">
+        <div>
+          <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary);">Log Grade Entry</h2>
+          <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">
+            Supports Polish marks (4+, 3-), points (17/17), percentages (85%), and markers (np, bz).
+          </div>
+        </div>
+        <button class="drawer-close-btn" onclick="Tum.closeAddGradeModal()">&times;</button>
+      </div>
+      <form id="addGradeForm">
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label">SUBJECT</label>
+            <input type="text" id="gradeFormSubject" class="form-input" placeholder="e.g. Matematyka, Informatyka" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">SEMESTER</label>
+            <select id="gradeFormSemester" class="form-input">
+              <option value="1">Sem 1</option>
+              <option value="2">Sem 2</option>
+              <option value="3">Sem 3</option>
+              <option value="4">Sem 4</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label">GRADE / MARK INPUT</label>
+            <input type="text" id="gradeFormRaw" class="form-input" placeholder="e.g. 5, 4+, 17/17, 85%, np" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">WEIGHT</label>
+            <input type="number" step="0.5" min="0.5" max="10" id="gradeFormWeight" class="form-input" value="1.0" required />
+          </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label">CATEGORY</label>
+            <select id="gradeFormCategory" class="form-input">
+              <option value="Sprawdzian">Sprawdzian (Exam)</option>
+              <option value="Kartkówka">Kartkówka (Quiz)</option>
+              <option value="Odpowiedź">Odpowiedź ustna</option>
+              <option value="Zadanie">Zadanie domowe</option>
+              <option value="Projekt">Projekt / Konkurs</option>
+              <option value="Matura Mock">Matura Mock</option>
+              <option value="Aktywność">Aktywność</option>
+              <option value="Other">Other</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label">DATE</label>
+            <input type="date" id="gradeFormDate" class="form-input" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">DESCRIPTION / SCOPE (OPTIONAL)</label>
+          <input type="text" id="gradeFormDesc" class="form-input" placeholder="e.g. Ciągi i szeregi, zadania Kurczab" />
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 6px; margin-top: 14px;">
+          <button type="button" class="btn-ghost-icon" onclick="Tum.closeAddGradeModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Save to Ledger</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 7. Detailed 7-Day Schedule Forecast Modal -->
+  <div id="detailedScheduleModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 680px;">
+      <div class="card-label-row" style="margin-bottom: 12px;">
+        <div>
+          <h2 id="detailedScheduleModalTitle" style="font-size: 16px; font-weight: 700; color: var(--text-primary);">Detailed 7-Day Schedule Forecast</h2>
+          <p id="detailedScheduleModalSub" style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
+            Full timeline breakdown: routines, TM1 school timetable, gym workouts, and SGH deep work blocks.
+          </p>
+        </div>
+        <button class="drawer-close-btn" onclick="Dashboard.closeDetailedScheduleModal()">&times;</button>
+      </div>
+
+      <!-- 7-Day Selector Tabs -->
+      <div id="detailedScheduleDayTabs" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px; border-bottom: 1px solid var(--border-hairline);">
+        <!-- Day tab pills generated dynamically -->
+      </div>
+
+      <!-- Selected Day Details Container -->
+      <div id="detailedScheduleContent" style="max-height: 480px; overflow-y: auto; padding-right: 4px;">
+        <!-- Detailed day breakdown generated dynamically -->
+      </div>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; border-top: 1px solid var(--border-hairline); padding-top: 10px;">
+        <button type="button" class="btn-ghost-icon" onclick="Dashboard.closeDetailedScheduleModal()">Close</button>
+        <button type="button" id="btnDetailedJumpToday" class="btn-primary">
+          Open in Daily Execution &rarr;
+        </button>
       </div>
     </div>
   </div>
@@ -1128,9 +1172,15 @@
           <input type="text" id="killItemTitle" class="form-input" placeholder="e.g. CKE Matura Próbna Maj 2024" required />
         </div>
 
-        <div class="form-group">
-          <label class="form-label">SPECIFICATION / TARGET</label>
-          <input type="text" id="killItemSpec" class="form-input" placeholder="e.g. Zadania 1–5 (Zero-AI, pen & paper)" />
+        <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label">SPECIFICATION / TARGET</label>
+            <input type="text" id="killItemSpec" class="form-input" placeholder="e.g. Zadania 1–5 (Zero-AI, pen & paper)" />
+          </div>
+          <div class="form-group">
+            <label class="form-label">QUANTITY / REPS</label>
+            <input type="number" id="killItemQuantity" class="form-input" value="1" min="1" max="500" placeholder="1" />
+          </div>
         </div>
 
         <div class="form-group">
@@ -1151,6 +1201,22 @@
           </button>
         </div>
       </form>
+
+      <!-- Direct Study Reps Quick Burn-down -->
+      <div style="background: rgba(196, 181, 253, 0.04); border: 1px solid rgba(196, 181, 253, 0.15); border-radius: 6px; padding: 12px; margin-top: 14px;">
+        <div class="card-label" style="color: var(--accent-lavender); font-size: 10px; margin-bottom: 8px;">QUICK STUDY REPS (BURNDOWN PROGRESS)</div>
+        <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+          <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.quickLogStudy('sep26_german_anki', 20, '20 Anki vocabulary words')">
+            +20 German Words
+          </button>
+          <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.quickLogStudy('sep26_hackerrank_15', 1, '1 LeetCode/HackerRank algorithm')">
+            +1 Algorithm Drill
+          </button>
+          <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.quickLogStudy('sep26_math_diag', 5, '5 Math diagnostic problems')">
+            +5 Math Problems
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -1174,7 +1240,6 @@
   <div id="toastContainer" class="toast-container"></div>
 
   <!-- App Script Modules -->
-  <script src="js/web_bridge.js?v=3.5"></script>
   <script src="js/api_bridge.js?v=3.5"></script>
   <script src="js/metro.js?v=3.5"></script>
   <script src="js/dashboard.js?v=3.5"></script>

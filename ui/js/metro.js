@@ -517,9 +517,19 @@ const MetroMap = {
     this.openDrawer(station);
   },
 
-  openDrawer(station) {
+  async openDrawer(station) {
     const drawer = document.getElementById("stationDrawer");
     if (!drawer) return;
+
+    // Refresh deliverables and pace velocity for THIS station
+    if (window.pywebview && window.pywebview.api) {
+      if (window.pywebview.api.get_station_deliverables) {
+        this.stationProgress = (await window.pywebview.api.get_station_deliverables(station.id)) || [];
+      }
+      if (window.pywebview.api.get_station_pace_velocity) {
+        this.paceVelocity = (await window.pywebview.api.get_station_pace_velocity(station.id)) || null;
+      }
+    }
 
     document.getElementById("drawerStationTitle").textContent = station.name;
     document.getElementById("drawerStationMonth").textContent = `${station.month_label} // ${station.phase}`;
@@ -569,24 +579,60 @@ const MetroMap = {
           const streamMatch = this.streams.find((s) => s.name.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(s.id));
           const lineBadgeColor = streamMatch ? streamMatch.color : "var(--accent-lavender)";
 
-          // Find linked deliverable in stationProgress to display live burn-down counter
+          // Find linked deliverable in stationProgress
           const pMatch = (this.stationProgress || []).find(
             (p) => p.stream.toLowerCase() === key.toLowerCase() || (streamMatch && p.stream.toLowerCase() === streamMatch.id)
           );
-          const counterPill = pMatch
-            ? `<span style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-lavender); font-weight: 700; margin-left: 6px; background: rgba(196, 181, 253, 0.08); padding: 1px 5px; border-radius: 2px;">[${pMatch.completed_count} / ${pMatch.total_required} ${pMatch.unit_label}]</span>`
-            : "";
 
           const isChecked = completedList.includes(key) || (pMatch && pMatch.is_completed);
+
+          let counterPill = "";
+          let stepperControls = "";
+
+          if (pMatch) {
+            const delivId = pMatch.deliverable_id;
+            const curCount = pMatch.completed_count;
+            const totalReq = pMatch.total_required;
+            const unitLabel = pMatch.unit_label;
+
+            counterPill = `<span style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-lavender); font-weight: 700; margin-left: 6px; background: rgba(196, 181, 253, 0.08); padding: 1px 5px; border-radius: 2px;">[${curCount} / ${totalReq} ${unitLabel}]</span>`;
+
+            let quickStepBtn = "";
+            if (pMatch.stream === "german") {
+              quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 6px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverable('${delivId}', 20)">+20 Words</button>`;
+            } else if (pMatch.stream === "code") {
+              quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 6px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverable('${delivId}', 1)">+1 Prob</button>`;
+            } else if (pMatch.stream === "academics") {
+              quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 6px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverable('${delivId}', 5)">+5 Probs</button>`;
+            }
+
+            stepperControls = `
+              <div class="deliv-stepper" onclick="event.stopPropagation();" style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(255, 255, 255, 0.08);">
+                <button type="button" class="deliv-stepper-btn" onclick="MetroMap.stepDeliverable('${delivId}', -1)" title="Decrement">&minus;</button>
+                <input 
+                  type="number" 
+                  class="deliv-input-count" 
+                  value="${curCount}" 
+                  min="0" 
+                  max="${totalReq}" 
+                  onchange="MetroMap.setDeliverableProgress('${delivId}', this.value)" 
+                  title="Direct rep count"
+                />
+                <button type="button" class="deliv-stepper-btn" onclick="MetroMap.stepDeliverable('${delivId}', 1)" title="Increment">+</button>
+                ${quickStepBtn}
+                <span style="color: var(--text-tertiary); font-size: 10px; font-family: var(--font-mono); margin-left: 2px;">/ ${totalReq} ${unitLabel}</span>
+              </div>
+            `;
+          }
 
           return `
             <div 
               class="deliverable-item ${isChecked ? "checked" : ""}" 
               onclick="MetroMap.toggleDeliverable('${station.id}', '${this.escapeHtml(key)}')"
-              title="Click to toggle deliverable"
+              title="Click to toggle deliverable completion"
             >
-              <div class="check-dot ${isChecked ? "checked" : ""}" style="margin-top: 1px;"></div>
-              <div style="flex: 1;">
+              <div class="check-dot ${isChecked ? "checked" : ""}" style="margin-top: 2px;"></div>
+              <div style="flex: 1; min-width: 0;">
                 <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
                   <span style="font-family: var(--font-mono); font-size: 8px; font-weight: 700; text-transform: uppercase; color: ${lineBadgeColor};">
                     ${key} STREAM
@@ -596,6 +642,7 @@ const MetroMap = {
                 <div class="deliverable-desc" style="font-size: 11px; color: var(--text-primary); line-height: 1.4;">
                   ${this.escapeHtml(val)}
                 </div>
+                ${stepperControls}
               </div>
             </div>
           `;
@@ -606,6 +653,46 @@ const MetroMap = {
     }
 
     drawer.classList.add("open");
+  },
+
+  async stepDeliverable(deliverableId, delta) {
+    try {
+      if (!window.pywebview || !window.pywebview.api) return;
+      const res = await window.pywebview.api.update_deliverable_progress(deliverableId, null, delta);
+      if (this.selectedStation) {
+        await this.openDrawer(this.selectedStation);
+      }
+      await this.load();
+      if (window.KillListDrawer) window.KillListDrawer.load();
+      if (window.Today) window.Today.load();
+      if (window.Dashboard) window.Dashboard.load();
+      if (window.HarnessApp && window.HarnessApp.showToast && res && res.deliverable) {
+        window.HarnessApp.showToast(`${res.deliverable.title}: ${res.deliverable.completed_count}/${res.deliverable.total_required}`);
+      }
+    } catch (err) {
+      console.error("Error stepping deliverable:", err);
+    }
+  },
+
+  async setDeliverableProgress(deliverableId, newCount) {
+    try {
+      if (!window.pywebview || !window.pywebview.api) return;
+      const count = parseInt(newCount, 10);
+      if (isNaN(count)) return;
+      const res = await window.pywebview.api.update_deliverable_progress(deliverableId, count, 0);
+      if (this.selectedStation) {
+        await this.openDrawer(this.selectedStation);
+      }
+      await this.load();
+      if (window.KillListDrawer) window.KillListDrawer.load();
+      if (window.Today) window.Today.load();
+      if (window.Dashboard) window.Dashboard.load();
+      if (window.HarnessApp && window.HarnessApp.showToast && res && res.deliverable) {
+        window.HarnessApp.showToast(`${res.deliverable.title}: ${res.deliverable.completed_count}/${res.deliverable.total_required}`);
+      }
+    } catch (err) {
+      console.error("Error setting deliverable progress:", err);
+    }
   },
 
   closeDrawer() {

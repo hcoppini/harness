@@ -129,6 +129,24 @@ def init_db(db_path: Optional[Path] = None) -> None:
 
     cursor.execute(
         """
+        CREATE TABLE IF NOT EXISTS tum_grade_entries (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            semester INTEGER NOT NULL,
+            raw_input TEXT NOT NULL,
+            numeric_value REAL DEFAULT NULL,
+            weight REAL NOT NULL DEFAULT 1.0,
+            category TEXT DEFAULT 'Grade',
+            description TEXT DEFAULT '',
+            date TEXT NOT NULL,
+            counts_in_average INTEGER NOT NULL DEFAULT 1,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+        """
+    )
+
+    cursor.execute(
+        """
         CREATE TABLE IF NOT EXISTS tum_matura (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             subject TEXT NOT NULL UNIQUE,              -- Maths R, CS R, Bilingual English, etc.
@@ -256,11 +274,18 @@ def init_db(db_path: Optional[Path] = None) -> None:
             target_path TEXT NOT NULL,
             target_spec TEXT NOT NULL,
             station_deliverable_id TEXT,               -- Foreign key link to active station deliverable
+            quantity INTEGER NOT NULL DEFAULT 1,       -- Volume/reps count (e.g. 20 words, 5 problems)
             completed INTEGER DEFAULT 0,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         );
         """
     )
+
+    # Migrations for kill_list_items
+    cursor.execute("PRAGMA table_info(kill_list_items)")
+    kli_cols = [row[1] for row in cursor.fetchall()]
+    if "quantity" not in kli_cols:
+        cursor.execute("ALTER TABLE kill_list_items ADD COLUMN quantity INTEGER NOT NULL DEFAULT 1")
 
     cursor.execute(
         """

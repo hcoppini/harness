@@ -6,6 +6,7 @@ linking completed kill-items to the active 24-month TUM Metro Line deliverables.
 """
 
 import calendar
+import json
 import os
 import sqlite3
 import subprocess
@@ -101,7 +102,7 @@ def get_kill_list(
         """
         SELECT 
             k.id, k.date, k.category, k.title, k.action_type, k.target_path, k.target_spec,
-            k.station_deliverable_id, k.completed, k.created_at,
+            k.station_deliverable_id, k.quantity, k.completed, k.created_at,
             s.stream, s.title AS deliverable_title, s.total_required, s.completed_count,
             s.unit_label, s.is_completed AS deliverable_is_completed
         FROM kill_list_items k
@@ -123,6 +124,7 @@ def get_kill_list(
             "target_path": r["target_path"],
             "target_spec": r["target_spec"],
             "station_deliverable_id": r["station_deliverable_id"],
+            "quantity": r["quantity"] if "quantity" in r.keys() else 1,
             "completed": bool(r["completed"]),
             "created_at": r["created_at"],
             "deliverable": {
@@ -157,6 +159,7 @@ def add_kill_item(
     target_path: str,
     target_spec: str = "",
     station_deliverable_id: Optional[str] = None,
+    quantity: int = 1,
     date_str: Optional[str] = None,
     conn: Optional[sqlite3.Connection] = None,
 ) -> Dict[str, Any]:
@@ -180,12 +183,13 @@ def add_kill_item(
             conn.close()
         raise ValueError("3-Item Rule Enforced: Maximum of 3 active kill-items allowed per library session.")
 
+    qty = max(1, int(quantity or 1))
     item_id = f"kill_{uuid.uuid4().hex[:8]}"
     cursor.execute(
         """
         INSERT INTO kill_list_items 
-        (id, date, category, title, action_type, target_path, target_spec, station_deliverable_id, completed)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 0)
+        (id, date, category, title, action_type, target_path, target_spec, station_deliverable_id, quantity, completed)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0)
         """,
         (
             item_id,
@@ -196,6 +200,7 @@ def add_kill_item(
             target_path.strip(),
             target_spec.strip(),
             station_deliverable_id or None,
+            qty,
         ),
     )
     conn.commit()
@@ -212,6 +217,7 @@ def add_kill_item(
         "target_path": target_path,
         "target_spec": target_spec,
         "station_deliverable_id": station_deliverable_id,
+        "quantity": qty,
         "completed": False,
     }
 
@@ -225,7 +231,7 @@ def complete_kill_item(item_id: str, conn: Optional[sqlite3.Connection] = None) 
 
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT station_deliverable_id, completed FROM kill_list_items WHERE id = ?",
+        "SELECT station_deliverable_id, quantity, completed FROM kill_list_items WHERE id = ?",
         (item_id,),
     )
     row = cursor.fetchone()
@@ -240,6 +246,7 @@ def complete_kill_item(item_id: str, conn: Optional[sqlite3.Connection] = None) 
         return {"success": True, "already_completed": True}
 
     deliverable_id = row["station_deliverable_id"]
+    qty = row["quantity"] if "quantity" in row.keys() and row["quantity"] else 1
 
     cursor.execute("UPDATE kill_list_items SET completed = 1 WHERE id = ?", (item_id,))
 
@@ -248,11 +255,11 @@ def complete_kill_item(item_id: str, conn: Optional[sqlite3.Connection] = None) 
         cursor.execute(
             """
             UPDATE station_deliverable_progress 
-            SET completed_count = completed_count + 1,
-                is_completed = CASE WHEN completed_count + 1 >= total_required THEN 1 ELSE 0 END
+            SET completed_count = completed_count + ?,
+                is_completed = CASE WHEN completed_count + ? >= total_required THEN 1 ELSE 0 END
             WHERE deliverable_id = ?
             """,
-            (deliverable_id,),
+            (qty, qty, deliverable_id),
         )
         cursor.execute("SELECT * FROM station_deliverable_progress WHERE deliverable_id = ?", (deliverable_id,))
         d_row = cursor.fetchone()
@@ -286,7 +293,7 @@ def toggle_kill_item(item_id: str, conn: Optional[sqlite3.Connection] = None) ->
 
     cursor = conn.cursor()
     cursor.execute(
-        "SELECT station_deliverable_id, completed FROM kill_list_items WHERE id = ?",
+        "SELECT station_deliverable_id, quantity, completed FROM kill_list_items WHERE id = ?",
         (item_id,),
     )
     row = cursor.fetchone()
@@ -298,12 +305,13 @@ def toggle_kill_item(item_id: str, conn: Optional[sqlite3.Connection] = None) ->
     current_status = row["completed"]
     new_status = 0 if current_status == 1 else 1
     deliverable_id = row["station_deliverable_id"]
+    qty = row["quantity"] if "quantity" in row.keys() and row["quantity"] else 1
 
     cursor.execute("UPDATE kill_list_items SET completed = ? WHERE id = ?", (new_status, item_id))
 
     updated_deliverable = None
     if deliverable_id:
-        delta = 1 if new_status == 1 else -1
+        delta = qty if new_status == 1 else -qty
         cursor.execute(
             """
             UPDATE station_deliverable_progress 
@@ -470,3 +478,113 @@ def get_station_pace_velocity(
         "badge_variant": badge_variant,
         "deliverables": pace_items,
     }
+
+
+def update_deliverable_progress(
+    deliverable_id: str,
+    new_count: Optional[int] = None,
+    delta: Optional[int] = None,
+    conn: Optional[sqlite3.Connection] = None,
+) -> Dict[str, Any]:
+    """
+    Sets or increments the completed count for a station deliverable,
+    automatically syncing completion flag and metro_roadmap.json.
+    """
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    cursor = conn.cursor()
+    cursor.execute(
+        "SELECT * FROM station_deliverable_progress WHERE deliverable_id = ?",
+        (deliverable_id,),
+    )
+    row = cursor.fetchone()
+    if not row:
+        if close_conn:
+            conn.close()
+        return {"success": False, "error": f"Deliverable {deliverable_id} not found"}
+
+    total_required = row["total_required"]
+    station_id = row["station_id"]
+    curr_count = row["completed_count"]
+
+    if new_count is not None:
+        updated_count = max(0, int(new_count))
+    elif delta is not None:
+        updated_count = max(0, curr_count + int(delta))
+    else:
+        updated_count = curr_count
+
+    is_done = 1 if updated_count >= total_required else 0
+
+    cursor.execute(
+        """
+        UPDATE station_deliverable_progress 
+        SET completed_count = ?, is_completed = ?
+        WHERE deliverable_id = ?
+        """,
+        (updated_count, is_done, deliverable_id),
+    )
+    conn.commit()
+
+    # Sync with metro_roadmap.json
+    try:
+        roadmap_file = DATA_DIR / "metro_roadmap.json"
+        if roadmap_file.exists():
+            with open(roadmap_file, "r", encoding="utf-8") as f:
+                mdata = json.load(f)
+            target_station = next(
+                (s for s in mdata.get("stations", []) if s.get("id") == station_id or s.get("id") == station_id.replace("_", "-")),
+                None
+            )
+            if target_station:
+                comp_list = target_station.get("completed_deliverables", [])
+                stream_key = row["stream"]
+                deliv_dict = target_station.get("deliverables", {})
+                matched_key = None
+                for k in deliv_dict.keys():
+                    if k.lower() == stream_key.lower() or stream_key.lower() in k.lower() or k.lower() in stream_key.lower():
+                        matched_key = k
+                        break
+
+                if matched_key:
+                    if is_done and matched_key not in comp_list:
+                        comp_list.append(matched_key)
+                    elif not is_done and matched_key in comp_list:
+                        comp_list.remove(matched_key)
+
+                    target_station["completed_deliverables"] = comp_list
+                    if len(deliv_dict) > 0 and len(comp_list) >= len(deliv_dict) and all(k in comp_list for k in deliv_dict.keys()):
+                        target_station["status"] = "completed"
+                    elif target_station.get("status") == "completed" and not is_done:
+                        target_station["status"] = "active"
+
+                    with open(roadmap_file, "w", encoding="utf-8") as f:
+                        json.dump(mdata, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
+    if close_conn:
+        conn.close()
+
+    return {
+        "success": True,
+        "deliverable_id": deliverable_id,
+        "station_id": station_id,
+        "completed_count": updated_count,
+        "total_required": total_required,
+        "is_completed": bool(is_done),
+        "unit_label": row["unit_label"],
+    }
+
+
+def log_study_reps(
+    deliverable_id: str,
+    count: int,
+    notes: str = "",
+    conn: Optional[sqlite3.Connection] = None,
+) -> Dict[str, Any]:
+    """Logs positive study reps (words, problems, exercises) directly into deliverable progress."""
+    return update_deliverable_progress(deliverable_id, delta=count, conn=conn)

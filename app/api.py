@@ -166,6 +166,7 @@ class HarnessAPI:
         target_path: str,
         target_spec: str = "",
         station_deliverable_id: Optional[str] = None,
+        quantity: int = 1,
         date_str: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Adds an item to the Kill List (max 3 items per session)."""
@@ -176,6 +177,7 @@ class HarnessAPI:
             target_path=target_path,
             target_spec=target_spec,
             station_deliverable_id=station_deliverable_id,
+            quantity=quantity,
             date_str=date_str,
         )
 
@@ -195,9 +197,50 @@ class HarnessAPI:
         """Directly triggers native OS / browser launcher for PDF, URL, or VS Code workspace."""
         return kill_list_controller.launch_kill_item(action_type, target_path)
 
+    def update_deliverable_progress(
+        self, deliverable_id: str, new_count: Optional[int] = None, delta: Optional[int] = None
+    ) -> Dict[str, Any]:
+        """Directly sets or adjusts countable progress on a Metro deliverable."""
+        return kill_list_controller.update_deliverable_progress(deliverable_id, new_count=new_count, delta=delta)
+
+    def log_study_reps(self, deliverable_id: str, count: int, notes: str = "") -> Dict[str, Any]:
+        """Registers positive study volume (e.g. 20 German words or 3 LeetCode problems)."""
+        return kill_list_controller.log_study_reps(deliverable_id, count=count, notes=notes)
+
     # --- Layer 2: TUM & Metro ---
     def get_tum_overview(self) -> Dict[str, Any]:
         return tum_service.get_tum_overview()
+
+    def add_grade_entry(
+        self,
+        subject: str,
+        semester: int,
+        raw_input: str,
+        weight: float = 1.0,
+        category: str = "Grade",
+        description: str = "",
+        date_str: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Logs an individual grade (supports 4+, 17/17, 85%, np, bz), recalculating subject average instantly."""
+        return tum_service.add_grade_entry(
+            subject=subject,
+            semester=semester,
+            raw_input=raw_input,
+            weight=weight,
+            category=category,
+            description=description,
+            date_str=date_str,
+        )
+
+    def delete_grade_entry(self, entry_id: int) -> bool:
+        """Removes a grade entry and updates running average."""
+        return tum_service.delete_grade_entry(entry_id)
+
+    def get_grade_entries(
+        self, subject: Optional[str] = None, semester: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """Returns all grade entries, optionally filtered."""
+        return tum_service.get_grade_entries(subject=subject, semester=semester)
 
     def calculate_tum_aptitude(
         self, gpa_pl: float, math_pl: float, cs_pl: float, lang_pl: float

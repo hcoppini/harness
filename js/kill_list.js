@@ -1,7 +1,8 @@
 /**
- * Kill List Drawer & Execution Launcher (Harness 2.1)
+ * Kill List Drawer & Execution Launcher (Harness 2.1 / 3.5)
  * Eliminates decision friction during SGH Library TUM Deep Work blocks.
  * Enforces the 3-Item Rule, Evening Lock, single-click launchers, and bi-directional Metro links.
+ * Supports custom quantities and fast study rep burndowns (e.g. +20 German words, +1 LeetCode).
  */
 
 const KillListDrawer = {
@@ -55,6 +56,7 @@ const KillListDrawer = {
   applyCategoryPresets(category) {
     const titleInput = document.getElementById("killItemTitle");
     const specInput = document.getElementById("killItemSpec");
+    const qtyInput = document.getElementById("killItemQuantity");
     const actionSelect = document.getElementById("killItemActionType");
     const pathInput = document.getElementById("killItemPath");
     const delivSelect = document.getElementById("killItemDeliverable");
@@ -62,24 +64,28 @@ const KillListDrawer = {
     if (category === "Math R") {
       if (titleInput && !titleInput.value) titleInput.value = "Math R Diagnostic Problem Set";
       if (specInput && !specInput.value) specInput.value = "Tasks 1–5 (Zero-AI)";
+      if (qtyInput) qtyInput.value = "5";
       if (actionSelect) actionSelect.value = "pdf";
       if (pathInput && !pathInput.value) pathInput.value = "https://cke.gov.pl";
       if (delivSelect) delivSelect.value = "sep26_math_diag";
     } else if (category === "Algorithms") {
       if (titleInput && !titleInput.value) titleInput.value = "HackerRank Data Structures Drill";
       if (specInput && !specInput.value) specInput.value = "1 Problem Unassisted";
+      if (qtyInput) qtyInput.value = "1";
       if (actionSelect) actionSelect.value = "url";
       if (pathInput && !pathInput.value) pathInput.value = "https://www.hackerrank.com/domains/algorithms";
       if (delivSelect) delivSelect.value = "sep26_hackerrank_15";
     } else if (category === "SIGG") {
       if (titleInput && !titleInput.value) titleInput.value = "SIGG WIG20 Momentum Analysis";
       if (specInput && !specInput.value) specInput.value = "Scan mWIG40 liquidity";
+      if (qtyInput) qtyInput.value = "1";
       if (actionSelect) actionSelect.value = "workspace";
       if (pathInput && !pathInput.value) pathInput.value = "c:\\Users\\heito\\Desktop\\polish_stocks_day_trade-main";
       if (delivSelect) delivSelect.value = "sep26_sigg_setup";
     } else if (category === "German") {
       if (titleInput && !titleInput.value) titleInput.value = "A2 Nicos Weg Vocabulary & Anki";
       if (specInput && !specInput.value) specInput.value = "20 New Words";
+      if (qtyInput) qtyInput.value = "20";
       if (actionSelect) actionSelect.value = "url";
       if (pathInput && !pathInput.value) pathInput.value = "https://learngerman.dw.com/en/nicos-weg/c-36519789";
       if (delivSelect) delivSelect.value = "sep26_german_anki";
@@ -117,12 +123,17 @@ const KillListDrawer = {
       this.isEveningLocked = Boolean(res.is_evening_locked);
 
       // 2. Fetch Active Station Deliverables (Sep '26)
-      this.deliverables = await window.pywebview.api.get_station_deliverables("sep-2026") || [];
+      this.deliverables = (await window.pywebview.api.get_station_deliverables("sep-2026")) || [];
 
       // 3. Fetch Station Velocity Ghost Beacon
       this.paceVelocity = await window.pywebview.api.get_station_pace_velocity("sep-2026", this.dateStr);
 
       this.render();
+
+      // Sync inline kill list card on Today view
+      if (window.Today && typeof window.Today.renderInlineKillList === "function") {
+        window.Today.renderInlineKillList(this.items);
+      }
     } catch (err) {
       console.error("Error loading Kill List:", err);
     }
@@ -173,11 +184,23 @@ const KillListDrawer = {
     }
 
     // 4. Render Active Items (3-Item Rule Indicator)
-    const countBadge = document.getElementById("killListCountBadge");
     const count = this.items.length;
+    const completedCount = this.items.filter((i) => i.completed).length;
+
+    const countBadge = document.getElementById("killListCountBadge");
     if (countBadge) {
-      countBadge.textContent = `${count} / 3 Active`;
+      countBadge.textContent = `${completedCount} / ${count} Done`;
       countBadge.className = count >= 3 ? "mono-chip done" : "mono-chip lavender";
+    }
+
+    const todayBadge = document.getElementById("todayKillListBadge");
+    if (todayBadge) {
+      todayBadge.textContent = `${completedCount}/${count}`;
+    }
+
+    const inlineBadge = document.getElementById("todayInlineKillCountBadge");
+    if (inlineBadge) {
+      inlineBadge.textContent = `${completedCount} / ${count} Active`;
     }
 
     const itemsContainer = document.getElementById("killListItemsContainer");
@@ -197,6 +220,7 @@ const KillListDrawer = {
           const streamColor = this.getStreamColor(item.category);
           const actionIcon = this.getActionIcon(item.action_type);
           const delivInfo = item.deliverable;
+          const qtyBadge = item.quantity && item.quantity > 1 ? `<span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--accent-lavender); background: rgba(196, 181, 253, 0.12); padding: 1px 5px; border-radius: 2px;">+${item.quantity} reps</span>` : "";
 
           let burnDownHtml = "";
           if (delivInfo) {
@@ -226,6 +250,7 @@ const KillListDrawer = {
                     <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${streamColor}; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 2px;">
                       ${this.escapeHtml(item.category)}
                     </span>
+                    ${qtyBadge}
                     ${item.target_spec ? `<span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary);">${this.escapeHtml(item.target_spec)}</span>` : ""}
                   </div>
 
@@ -295,7 +320,7 @@ const KillListDrawer = {
   async launchItem(actionType, targetPath) {
     try {
       if (window.pywebview && window.pywebview.api) {
-        const res = await window.pywebview.api.launch_kill_item(actionType, targetPath);
+        await window.pywebview.api.launch_kill_item(actionType, targetPath);
         if (window.HarnessApp && window.HarnessApp.showToast) {
           window.HarnessApp.showToast(`Launched: ${actionType.toUpperCase()}`);
         }
@@ -327,6 +352,8 @@ const KillListDrawer = {
       if (window.pywebview && window.pywebview.api) {
         await window.pywebview.api.delete_kill_item(itemId);
         await this.load();
+        if (window.Today) window.Today.load(this.dateStr);
+        if (window.Dashboard) window.Dashboard.load();
         if (window.HarnessApp && window.HarnessApp.showToast) {
           window.HarnessApp.showToast("Item deleted");
         }
@@ -336,10 +363,31 @@ const KillListDrawer = {
     }
   },
 
+  async quickLogStudy(deliverableId, count = 1, notes = "") {
+    try {
+      if (window.pywebview && window.pywebview.api) {
+        const res = await window.pywebview.api.log_study_reps(deliverableId, count, notes);
+        await this.load();
+        if (window.MetroMap) await window.MetroMap.load();
+        if (window.Today) await window.Today.load(this.dateStr);
+        if (window.Dashboard) await window.Dashboard.load();
+
+        if (window.HarnessApp && window.HarnessApp.showToast) {
+          const title = res && res.deliverable ? res.deliverable.title : "Study session";
+          const progress = res && res.deliverable ? ` (${res.deliverable.completed_count}/${res.deliverable.total_required})` : "";
+          window.HarnessApp.showToast(`+${count} reps logged for ${title}${progress}`);
+        }
+      }
+    } catch (err) {
+      console.error("Error logging study reps:", err);
+    }
+  },
+
   async handleAddItem() {
     const catInput = document.getElementById("killItemCategory");
     const titleInput = document.getElementById("killItemTitle");
     const specInput = document.getElementById("killItemSpec");
+    const qtyInput = document.getElementById("killItemQuantity");
     const actionInput = document.getElementById("killItemActionType");
     const pathInput = document.getElementById("killItemPath");
     const delivInput = document.getElementById("killItemDeliverable");
@@ -347,6 +395,7 @@ const KillListDrawer = {
     const category = catInput ? catInput.value : "Math R";
     const title = titleInput ? titleInput.value.trim() : "";
     const spec = specInput ? specInput.value.trim() : "";
+    const quantity = qtyInput ? parseInt(qtyInput.value, 10) || 1 : 1;
     const actionType = actionInput ? actionInput.value : "url";
     const targetPath = pathInput ? pathInput.value.trim() : "";
     const delivId = delivInput ? delivInput.value : "";
@@ -365,14 +414,18 @@ const KillListDrawer = {
           targetPath,
           spec,
           delivId || null,
-          this.dateStr
+          this.dateStr,
+          quantity
         );
 
-        // Clear title and spec
+        // Clear title, spec, and reset qty
         if (titleInput) titleInput.value = "";
         if (specInput) specInput.value = "";
+        if (qtyInput) qtyInput.value = "1";
 
         await this.load();
+        if (window.Today) await window.Today.load(this.dateStr);
+        if (window.Dashboard) await window.Dashboard.load();
         if (window.HarnessApp && window.HarnessApp.showToast) {
           window.HarnessApp.showToast("Added to Kill List");
         }

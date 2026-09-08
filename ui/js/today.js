@@ -286,15 +286,15 @@ const Today = {
       this.renderGymCard();
       this.renderTasks();
 
-      // Refresh Kill List count badge
+      // Refresh Kill List items and render inline on Today view
       if (window.pywebview && window.pywebview.api && window.pywebview.api.get_kill_list) {
         try {
           const klData = await window.pywebview.api.get_kill_list(targetDate);
-          const klBadge = document.getElementById("todayKillListBadge");
-          if (klBadge && klData && klData.items) {
-            klBadge.textContent = `${klData.items.length}/3`;
-          }
-        } catch (e) {}
+          const klItems = (klData && klData.items) || [];
+          this.renderInlineKillList(klItems);
+        } catch (e) {
+          console.error("Error loading kill list in Today.load:", e);
+        }
       }
     } catch (err) {
       console.error("Error loading Today data:", err);
@@ -869,6 +869,107 @@ const Today = {
     }
   },
 
+  renderInlineKillList(items = []) {
+    const container = document.getElementById("todayInlineKillListContainer");
+    const countBadge = document.getElementById("todayInlineKillCountBadge");
+    const headerBadge = document.getElementById("todayKillListBadge");
+
+    const total = items.length;
+    const completed = items.filter((i) => i.completed).length;
+
+    if (countBadge) {
+      countBadge.textContent = `${completed} / ${total} Done (${total}/3 Active)`;
+      countBadge.className = total >= 3 ? "mono-chip done" : "mono-chip lavender";
+    }
+    if (headerBadge) {
+      headerBadge.textContent = `${completed}/${total}`;
+    }
+
+    if (!container) return;
+
+    if (total === 0) {
+      container.innerHTML = `
+        <div style="padding: 12px; text-align: center; color: var(--text-tertiary); font-size: 11px; border: 1px dashed rgba(255,255,255,0.06); border-radius: 4px;">
+          No SGH deep work tasks active today. Click <strong>+20 DE Words</strong>, <strong>+1 LeetCode</strong>, or <strong>Manage &rarr;</strong> to enqueue.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = items
+      .map((item) => {
+        const isDone = item.completed;
+        const catLower = (item.category || "").toLowerCase();
+        const catColor = catLower.includes("math")
+          ? "#c4b5fd"
+          : catLower.includes("german")
+          ? "#6ee7b7"
+          : catLower.includes("sigg")
+          ? "#fdba74"
+          : "#7dd3fc";
+
+        const qtyBadge = item.quantity && item.quantity > 1
+          ? `<span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--accent-lavender); background: rgba(196, 181, 253, 0.12); padding: 1px 4px; border-radius: 2px;">+${item.quantity} reps</span>`
+          : "";
+
+        let burndownPill = "";
+        if (item.deliverable) {
+          burndownPill = `
+            <span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); margin-left: 6px;">
+              [Burn-down: ${item.deliverable.completed_count}/${item.deliverable.total_required} ${item.deliverable.unit_label}]
+            </span>
+          `;
+        }
+
+        const actionIcon = (item.action_type || "").toLowerCase() === "pdf" ? "📄" : (item.action_type || "").toLowerCase() === "workspace" ? "💻" : "🌐";
+
+        return `
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: rgba(255, 255, 255, 0.02); border: 1px solid ${isDone ? "rgba(255, 255, 255, 0.04)" : "rgba(255, 255, 255, 0.08)"}; border-radius: 4px; transition: all 0.12s ease;">
+            <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
+              <div 
+                class="check-dot ${isDone ? "checked" : ""}" 
+                onclick="KillListDrawer.toggleItem('${item.id}')"
+                style="cursor: pointer; flex-shrink: 0;"
+                title="Toggle complete"
+              ></div>
+              <div style="flex: 1; min-width: 0;">
+                <div style="display: flex; align-items: center; gap: 6px;">
+                  <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${catColor}; text-transform: uppercase;">
+                    ${this.escapeHtml(item.category)}
+                  </span>
+                  ${qtyBadge}
+                  ${burndownPill}
+                </div>
+                <div style="font-size: 12px; font-weight: 500; color: ${isDone ? "var(--text-tertiary)" : "var(--text-primary)"}; text-decoration: ${isDone ? "line-through" : "none"}; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 1px;">
+                  ${this.escapeHtml(item.title)} ${item.target_spec ? `<span style="font-size: 10px; color: var(--text-secondary); font-weight: normal;">— ${this.escapeHtml(item.target_spec)}</span>` : ""}
+                </div>
+              </div>
+            </div>
+
+            <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+              <button 
+                class="btn-ghost-icon" 
+                onclick="KillListDrawer.launchItem('${item.action_type}', '${this.escapeJs(item.target_path)}')"
+                title="Launch ${item.action_type}"
+                style="padding: 2px 6px; font-size: 10px;"
+              >
+                ${actionIcon}
+              </button>
+              <button 
+                class="btn-ghost-icon" 
+                onclick="KillListDrawer.deleteItem('${item.id}')"
+                title="Delete item"
+                style="padding: 2px 6px; font-size: 10px; color: var(--text-tertiary);"
+              >
+                &times;
+              </button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+  },
+
   escapeHtml(str) {
     if (!str) return "";
     return String(str)
@@ -877,6 +978,11 @@ const Today = {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  },
+
+  escapeJs(str) {
+    if (!str) return "";
+    return String(str).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
   },
 };
 

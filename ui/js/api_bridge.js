@@ -7,8 +7,12 @@
 (function () {
   "use strict";
 
-  // Only install bridge if native PyWebView is not present
+  // Only install bridge if native PyWebView is not present and not on local file:// protocol
   if (typeof window === "undefined") return;
+  if (window.location.protocol === "file:") {
+    // Desktop PyWebView runs on file:// - wait for native pywebviewready event
+    return;
+  }
 
   if (!window.pywebview || !window.pywebview.api) {
     console.log("[Harness Bridge] Initializing Web Browser RPC Bridge for Cloud/Web deployment...");

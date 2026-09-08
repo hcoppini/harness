@@ -1310,3 +1310,150 @@ body {
   50% { transform: scale(1.35); opacity: 0.35; }
   100% { transform: scale(1); opacity: 0.9; }
 }
+
+/* --------------------------------------------------------------------------
+   Grade Ledger & Running GPA System (Harness 3.5)
+   -------------------------------------------------------------------------- */
+.grade-chip-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+}
+
+.grade-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 7px;
+  border-radius: 3px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.grade-chip:hover {
+  border-color: rgba(255, 255, 255, 0.35);
+  background: rgba(255, 255, 255, 0.08);
+  transform: translateY(-1px);
+}
+
+.grade-chip .chip-del-btn {
+  opacity: 0.5;
+  font-size: 11px;
+  margin-left: 2px;
+}
+
+.grade-chip:hover .chip-del-btn {
+  opacity: 1;
+  color: #f87171;
+}
+
+.grade-avg-pill {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+/* --------------------------------------------------------------------------
+   Deliverable Progress Stepper in Metro Drawer
+   -------------------------------------------------------------------------- */
+.deliv-progress-wrap {
+  margin-top: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-hairline);
+  border-radius: 4px;
+  padding: 6px 10px;
+}
+
+.deliv-stepper {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.deliv-stepper-btn {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  border-radius: 3px;
+  width: 22px;
+  height: 22px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-weight: 700;
+  font-size: 12px;
+  transition: all 0.1s ease;
+}
+
+.deliv-stepper-btn:hover {
+  background: rgba(196, 181, 253, 0.15);
+  border-color: var(--accent-lavender);
+  color: var(--accent-lavender);
+}
+
+.deliv-input-count {
+  width: 44px;
+  background: var(--bg-input);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  padding: 2px 4px;
+}
+
+.deliv-input-count:focus {
+  border-color: var(--accent-lavender);
+  outline: none;
+}
+
+/* --------------------------------------------------------------------------
+   Upcoming Schedule Forecast & Detailed Plan Modal
+   -------------------------------------------------------------------------- */
+.forecast-day-card {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.forecast-day-card:hover {
+  border-color: rgba(196, 181, 253, 0.4) !important;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.4);
+}
+
+.forecast-action-item {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 11px;
+  line-height: 1.4;
+  margin-top: 3px;
+}
+
+.forecast-action-time {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  flex-shrink: 0;
+}
+
+.forecast-action-label {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

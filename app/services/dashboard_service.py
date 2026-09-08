@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
 from app.db import get_connection, DATA_DIR
 from app.services import today_service, tum_service, body_service, project_service
+from engine import kill_list_controller
 
 
 def get_app_inception_date(conn: sqlite3.Connection) -> str:
@@ -127,6 +128,13 @@ def get_heatmap_data(
             f"Workout: {r['workout_type'].capitalize()} - {r['details']} (Intensity {r['intensity']}/10)"
         )
 
+    # Pre-fetch kill list items
+    cursor.execute("SELECT date, title, category, completed FROM kill_list_items")
+    daily_kill_items: Dict[str, List[Dict[str, Any]]] = {}
+    for kr in cursor.fetchall():
+        kd = kr["date"]
+        daily_kill_items.setdefault(kd, []).append(dict(kr))
+
     # Build weekly columns
     weeks_list = []
     total_contributions = 0
@@ -187,14 +195,19 @@ def get_heatmap_data(
                     if e_idx.isdigit() and int(e_idx) < len(gym_exercises):
                         activities.append(f"✓ Lift: {gym_exercises[int(e_idx)]['name']}")
 
-            # C. Custom Tasks
+            # C. Custom Tasks & Kill List
             tasks_list = daily_tasks.get(cur_str, [])
-            total_tasks = len(tasks_list)
+            kill_list = daily_kill_items.get(cur_str, [])
+            total_tasks = len(tasks_list) + len(kill_list)
             checked_tasks = 0
             for t in tasks_list:
                 if t["completed"]:
                     checked_tasks += 1
                     activities.append(f"✓ Task: {t['title']}")
+            for k in kill_list:
+                if k["completed"]:
+                    checked_tasks += 1
+                    activities.append(f"✓ Kill List [{k['category']}]: {k['title']}")
 
             # D. Supplementary activities (Reflection & Logged Workouts)
             if dl.get("has_reflection", False):
@@ -359,8 +372,27 @@ def get_upcoming_days(
         # Embedded gym routine for Tuesday / Thursday
         gym_routine = today_service.get_gym_routine_for_date(date_str)
 
-        # Scheduled tasks
+        # Scheduled tasks and kill list items
         scheduled_tasks = today_service.get_today_tasks(date_str, conn=conn)
+        kl_info = kill_list_controller.get_kill_list(date_str, conn=conn)
+        kl_items = kl_info.get("items", [])
+
+        # Extract structured key actions
+        actions = []
+        for b in blocks:
+            focus = b.get("focus", "")
+            time_str = b.get("time", "")
+            if "School" in focus or "Liceum" in focus or "Class" in focus:
+                actions.append({"category": "school", "time": time_str, "label": focus})
+            elif "Deep Work" in focus or "SGH" in focus:
+                actions.append({"category": "deep_work", "time": time_str, "label": focus})
+            elif "Lift" in focus or "Gym" in focus or "Boxing" in focus or "Run" in focus:
+                actions.append({"category": "training", "time": time_str, "label": focus})
+            elif "German" in focus or "Dinner" in focus:
+                actions.append({"category": "german", "time": time_str, "label": focus})
+
+        if not actions and blocks:
+            actions = [{"category": "routine", "time": b.get("time", ""), "label": b.get("focus", "")} for b in blocks[:4]]
 
         upcoming.append({
             "date": date_str,
@@ -374,9 +406,11 @@ def get_upcoming_days(
             "key_highlight": key_highlight,
             "cutoff_info": cutoff_info,
             "blocks": blocks,
+            "actions": actions,
             "gym_routine": gym_routine,
             "task_count": len(scheduled_tasks),
             "tasks": scheduled_tasks,
+            "kill_list_items": kl_items,
         })
 
     if close_conn:
@@ -409,9 +443,13 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None) -> Dict[str
     today_sched = today_service.get_schedule_for_date(today_str)
     today_log = today_service.get_daily_log(today_str, conn=conn)
     today_gym = today_service.get_gym_routine_for_date(today_str)
+    kl_info = kill_list_controller.get_kill_list(today_str, conn=conn)
+    kl_items = kl_info.get("items", [])
 
     total_today_tasks = len(today_tasks)
     completed_today_tasks = sum(1 for t in today_tasks if t.get("completed"))
+    total_kl = len(kl_items)
+    completed_kl = sum(1 for k in kl_items if k.get("completed"))
 
     sched_blocks = today_sched.get("blocks", [])
     total_routine_blocks = len(sched_blocks)
@@ -423,9 +461,9 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None) -> Dict[str
     completed_ex_set = set([e.strip() for e in (today_log.get("completed_exercises") or "").split(",") if e.strip()])
     completed_gym_ex = len(completed_ex_set)
 
-    total_today_boxes = total_routine_blocks + total_gym_ex + total_today_tasks
-    checked_today_boxes = completed_routine_blocks + completed_gym_ex + completed_today_tasks
-    today_pct = Math_round_pct = round((checked_today_boxes / total_today_boxes) * 100) if total_today_boxes > 0 else 0
+    total_today_boxes = total_routine_blocks + total_gym_ex + total_today_tasks + total_kl
+    checked_today_boxes = completed_routine_blocks + completed_gym_ex + completed_today_tasks + completed_kl
+    today_pct = round((checked_today_boxes / total_today_boxes) * 100) if total_today_boxes > 0 else 0
 
     # Latest weight
     latest_weight = 68.0
@@ -473,6 +511,8 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None) -> Dict[str
             "schedule_key": today_sched.get("key", "Standard"),
             "has_gym": bool(today_gym),
             "pending_tasks_count": total_today_tasks - completed_today_tasks,
+            "kill_list_count": total_kl,
+            "kill_list_completed": completed_kl,
         },
         "metrics": {
             "total_contributions": heatmap.get("total_contributions", 0),
