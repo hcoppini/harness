@@ -114,7 +114,61 @@
           if (typeof prop !== "string") return target[prop];
           if (prop === "then" || prop === "toJSON") return undefined;
 
-          // 1. Task Operations
+          // 0. Dashboard Operations
+          if (prop === "get_dashboard") {
+            return async function () {
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("get_dashboard", []);
+              } catch (e) {}
+
+              const todayStr = new Date().toISOString().split("T")[0];
+              const localLogs = getStore(STORAGE_KEYS.DAILY_LOGS, {});
+              const todayLog = localLogs[todayStr];
+
+              if (serverRes) {
+                // If local storage has today's live modifications, overlay them onto today_velocity
+                if (todayLog && serverRes.today_velocity) {
+                  const blocksStr = todayLog.completed_blocks || "";
+                  const exStr = todayLog.completed_exercises || "";
+                  const completedBlocksCount = blocksStr ? blocksStr.split(",").map((s) => s.trim()).filter(Boolean).length : 0;
+                  const completedExCount = exStr ? exStr.split(",").map((s) => s.trim()).filter(Boolean).length : 0;
+                  const taskCompletedCount = serverRes.today_velocity.checked_tasks || 0;
+                  const killCompletedCount = serverRes.today_velocity.kill_list_completed || 0;
+
+                  const totalBoxes = serverRes.today_velocity.total_boxes || 14;
+                  const checkedTotal = completedBlocksCount + completedExCount + taskCompletedCount + killCompletedCount;
+
+                  serverRes.today_velocity.checked_boxes = checkedTotal;
+                  serverRes.today_velocity.percentage = totalBoxes > 0 ? Math.round((checkedTotal / totalBoxes) * 100) : 0;
+                }
+                return serverRes;
+              }
+
+              return {
+                metrics: {
+                  current_streak: 11,
+                  total_contributions: 60,
+                  overall_gpa: 0.0,
+                  bavarian_gpa: 1.13,
+                  avg_matura_mock: 0.0,
+                  latest_weight: 68.0,
+                  target_weight: 80.0,
+                },
+                today_velocity: {
+                  percentage: 0,
+                  checked_boxes: 0,
+                  total_boxes: 14,
+                  schedule_name: "Schedule B- Gym & TUM Sprint Days",
+                },
+                heatmap: { weeks: [], total_contributions: 60 },
+                upcoming: [],
+                radar: { homework: [], exams: [] },
+              };
+            };
+          }
+
+          // 1. Task Operations & Today View
           if (prop === "get_today") {
             return async function (dateStr) {
               const todayStr = dateStr || new Date().toISOString().split("T")[0];
@@ -125,30 +179,52 @@
 
               const localTasks = getStore(STORAGE_KEYS.TASKS, []);
               const localLogs = getStore(STORAGE_KEYS.DAILY_LOGS, {});
+              const currentLocalLog = localLogs[todayStr];
 
-              if (serverRes && serverRes.tasks && serverRes.tasks.length > 0) {
+              if (serverRes) {
                 // Merge server and local tasks
                 const taskMap = new Map();
-                serverRes.tasks.forEach((t) => taskMap.set(t.id, t));
+                if (Array.isArray(serverRes.tasks)) {
+                  serverRes.tasks.forEach((t) => taskMap.set(t.id, t));
+                }
                 localTasks.filter((t) => t.date === todayStr).forEach((lt) => {
                   if (!taskMap.has(lt.id)) taskMap.set(lt.id, lt);
                 });
                 const mergedTasks = Array.from(taskMap.values());
                 setStore(STORAGE_KEYS.TASKS, mergedTasks);
-                if (serverRes.log) {
-                  localLogs[todayStr] = { ...(localLogs[todayStr] || {}), ...serverRes.log };
-                  setStore(STORAGE_KEYS.DAILY_LOGS, localLogs);
-                }
-                return { ...serverRes, tasks: mergedTasks, log: localLogs[todayStr] || serverRes.log };
+
+                // Merge server log and local log
+                const serverLog = serverRes.log || {};
+                const mergedLog = {
+                  date: todayStr,
+                  scratchpad: currentLocalLog && currentLocalLog.scratchpad !== undefined ? currentLocalLog.scratchpad : (serverLog.scratchpad || ""),
+                  completed_blocks: currentLocalLog && currentLocalLog.completed_blocks !== undefined ? currentLocalLog.completed_blocks : (serverLog.completed_blocks || ""),
+                  completed_exercises: currentLocalLog && currentLocalLog.completed_exercises !== undefined ? currentLocalLog.completed_exercises : (serverLog.completed_exercises || ""),
+                  wake_time: (currentLocalLog && currentLocalLog.wake_time) || serverLog.wake_time || "",
+                  sleep_time: (currentLocalLog && currentLocalLog.sleep_time) || serverLog.sleep_time || "",
+                  reflection_worked: (currentLocalLog && currentLocalLog.reflection_worked) || serverLog.reflection_worked || "",
+                  reflection_slipped: (currentLocalLog && currentLocalLog.reflection_slipped) || serverLog.reflection_slipped || "",
+                  reflection_tomorrow: (currentLocalLog && currentLocalLog.reflection_tomorrow) || serverLog.reflection_tomorrow || "",
+                };
+
+                localLogs[todayStr] = mergedLog;
+                setStore(STORAGE_KEYS.DAILY_LOGS, localLogs);
+
+                return {
+                  tasks: mergedTasks,
+                  log: mergedLog,
+                  schedule: serverRes.schedule || null,
+                  gym_routine: serverRes.gym_routine || null,
+                };
               }
 
               // Fallback to local storage if server is cold / offline
               const filteredTasks = localTasks.filter((t) => t.date === todayStr);
               return {
                 tasks: filteredTasks,
-                log: localLogs[todayStr] || { date: todayStr, scratchpad: "", completed_blocks: "", completed_exercises: "" },
-                schedule: serverRes?.schedule || null,
-                gym_routine: serverRes?.gym_routine || null,
+                log: currentLocalLog || { date: todayStr, scratchpad: "", completed_blocks: "", completed_exercises: "" },
+                schedule: null,
+                gym_routine: null,
               };
             };
           }
@@ -217,6 +293,11 @@
               const currentLog = localLogs[dateStr] || { date: dateStr, scratchpad: "", completed_blocks: "", completed_exercises: "" };
 
               if (args[1] !== undefined && args[1] !== null) currentLog.scratchpad = args[1];
+              if (args[2] !== undefined && args[2] !== null) currentLog.wake_time = args[2];
+              if (args[3] !== undefined && args[3] !== null) currentLog.sleep_time = args[3];
+              if (args[4] !== undefined && args[4] !== null) currentLog.reflection_worked = args[4];
+              if (args[5] !== undefined && args[5] !== null) currentLog.reflection_slipped = args[5];
+              if (args[6] !== undefined && args[6] !== null) currentLog.reflection_tomorrow = args[6];
               if (args[7] !== undefined && args[7] !== null) currentLog.completed_blocks = args[7];
               if (args[8] !== undefined && args[8] !== null) currentLog.completed_exercises = args[8];
 
@@ -227,6 +308,11 @@
               supabaseRequest("daily_logs", "POST", {
                 date: dateStr,
                 scratchpad: currentLog.scratchpad,
+                wake_time: currentLog.wake_time,
+                sleep_time: currentLog.sleep_time,
+                reflection_worked: currentLog.reflection_worked,
+                reflection_slipped: currentLog.reflection_slipped,
+                reflection_tomorrow: currentLog.reflection_tomorrow,
                 completed_blocks: currentLog.completed_blocks,
                 completed_exercises: currentLog.completed_exercises,
               });
@@ -247,7 +333,7 @@
               const localKillMap = getStore(STORAGE_KEYS.KILL_LIST, {});
               const localItems = localKillMap[todayStr] || [];
 
-              if (serverRes && serverRes.items && serverRes.items.length > 0) {
+              if (serverRes && Array.isArray(serverRes.items)) {
                 localKillMap[todayStr] = serverRes.items;
                 setStore(STORAGE_KEYS.KILL_LIST, localKillMap);
                 return serverRes;

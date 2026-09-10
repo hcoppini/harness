@@ -21,15 +21,48 @@ else:
 DEFAULT_DB_PATH = DATA_DIR / "harness.db"
 
 
+def ensure_db_and_data_files(dest_path: Optional[Path] = None) -> None:
+    """Ensures data directory, JSON files, and seed harness.db are populated before connection."""
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    dest_db = dest_path or DEFAULT_DB_PATH
+
+    # Source data directory containing seed database and JSON templates
+    if getattr(sys, "frozen", False):
+        meipass = getattr(sys, "_MEIPASS", None)
+        src_data = Path(meipass) / "data" if meipass else BASE_DIR / "data"
+    else:
+        src_data = Path(__file__).resolve().parent.parent / "data"
+
+    if src_data.exists() and DATA_DIR.resolve() != src_data.resolve():
+        import shutil
+        for json_file in src_data.glob("*.json"):
+            dest_json = DATA_DIR / json_file.name
+            if not dest_json.exists() or dest_json.stat().st_size == 0:
+                try:
+                    shutil.copy2(json_file, dest_json)
+                except Exception:
+                    pass
+
+        src_db = src_data / "harness.db"
+        if src_db.exists():
+            # Copy harness.db if target does not exist or has < 1024 bytes (empty/corrupt)
+            if not dest_db.exists() or dest_db.stat().st_size < 1024:
+                try:
+                    shutil.copy2(src_db, dest_db)
+                except Exception:
+                    pass
+
+
 def get_db_path() -> Path:
     """Returns the path to the SQLite database file."""
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    ensure_db_and_data_files()
     return DEFAULT_DB_PATH
 
 
 def get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     """Returns a SQLite connection configured with WAL mode and row factory."""
     path = db_path or get_db_path()
+    ensure_db_and_data_files(path)
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     # Enable WAL mode for high concurrency and zero locking issues
@@ -40,31 +73,7 @@ def get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
 
 def init_db(db_path: Optional[Path] = None) -> None:
     """Initializes all database tables and ensures JSON data templates are present."""
-    # Ensure JSON templates exist if running on Vercel or frozen
-    if os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
-        src_data = Path(__file__).resolve().parent.parent / "data"
-        if src_data.exists():
-            import shutil
-            DATA_DIR.mkdir(parents=True, exist_ok=True)
-            for json_file in src_data.glob("*.json"):
-                dest = DATA_DIR / json_file.name
-                if not dest.exists():
-                    shutil.copy2(json_file, dest)
-            src_db = src_data / "harness.db"
-            dest_db = DATA_DIR / "harness.db"
-            if src_db.exists() and not dest_db.exists():
-                shutil.copy2(src_db, dest_db)
-    elif getattr(sys, "frozen", False):
-        meipass = getattr(sys, "_MEIPASS", None)
-        if meipass:
-            bundled_data = Path(meipass) / "data"
-            if bundled_data.exists():
-                import shutil
-                DATA_DIR.mkdir(parents=True, exist_ok=True)
-                for json_file in bundled_data.glob("*.json"):
-                    dest = DATA_DIR / json_file.name
-                    if not dest.exists():
-                        shutil.copy2(json_file, dest)
+    ensure_db_and_data_files(db_path)
 
     conn = get_connection(db_path)
     cursor = conn.cursor()
