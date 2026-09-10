@@ -193,13 +193,19 @@
                 const mergedTasks = Array.from(taskMap.values());
                 setStore(STORAGE_KEYS.TASKS, mergedTasks);
 
-                // Merge server log and local log
+                // Merge server log and local log using union set for checked boxes
                 const serverLog = serverRes.log || {};
+                const mergeBlocks = (a, b) => {
+                  const setA = (a || "").split(",").map((s) => s.trim()).filter(Boolean);
+                  const setB = (b || "").split(",").map((s) => s.trim()).filter(Boolean);
+                  return Array.from(new Set([...setA, ...setB])).join(",");
+                };
+
                 const mergedLog = {
                   date: todayStr,
-                  scratchpad: currentLocalLog && currentLocalLog.scratchpad !== undefined ? currentLocalLog.scratchpad : (serverLog.scratchpad || ""),
-                  completed_blocks: currentLocalLog && currentLocalLog.completed_blocks !== undefined ? currentLocalLog.completed_blocks : (serverLog.completed_blocks || ""),
-                  completed_exercises: currentLocalLog && currentLocalLog.completed_exercises !== undefined ? currentLocalLog.completed_exercises : (serverLog.completed_exercises || ""),
+                  scratchpad: (currentLocalLog && currentLocalLog.scratchpad) ? currentLocalLog.scratchpad : (serverLog.scratchpad || ""),
+                  completed_blocks: mergeBlocks(currentLocalLog?.completed_blocks, serverLog.completed_blocks),
+                  completed_exercises: mergeBlocks(currentLocalLog?.completed_exercises, serverLog.completed_exercises),
                   wake_time: (currentLocalLog && currentLocalLog.wake_time) || serverLog.wake_time || "",
                   sleep_time: (currentLocalLog && currentLocalLog.sleep_time) || serverLog.sleep_time || "",
                   reflection_worked: (currentLocalLog && currentLocalLog.reflection_worked) || serverLog.reflection_worked || "",

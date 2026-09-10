@@ -23,6 +23,10 @@ DEFAULT_DB_PATH = DATA_DIR / "harness.db"
 
 def ensure_db_and_data_files(dest_path: Optional[Path] = None) -> None:
     """Ensures data directory, JSON files, and seed harness.db are populated before connection."""
+    if dest_path is not None and dest_path != DEFAULT_DB_PATH:
+        # Isolated test or custom database: do not copy production harness.db
+        return
+
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     dest_db = dest_path or DEFAULT_DB_PATH
 
@@ -337,6 +341,31 @@ def init_db(db_path: Optional[Path] = None) -> None:
         WHERE name LIKE '%Financial Agency%' OR name LIKE '%Polish SME Outreach%';
         """
     )
+
+    # Seed all historical records from Python SEED_DATA if empty (for zero-dependency serverless)
+    if db_path is None or db_path == DEFAULT_DB_PATH:
+        try:
+            from app.seed_data import SEED_DATA
+            for table_name, rows in SEED_DATA.items():
+                if not rows:
+                    continue
+                cursor.execute(f"SELECT COUNT(*) FROM {table_name}")
+                count = cursor.fetchone()[0]
+                if count == 0:
+                    cols = list(rows[0].keys())
+                    placeholders = ", ".join(["?"] * len(cols))
+                    insert_sql = f"INSERT OR IGNORE INTO {table_name} ({', '.join(cols)}) VALUES ({placeholders})"
+                    for r in rows:
+                        cursor.execute(insert_sql, [r.get(c) for c in cols])
+                elif table_name == "daily_logs":
+                    # Ensure historical seed daily logs exist
+                    cols = list(rows[0].keys())
+                    placeholders = ", ".join(["?"] * len(cols))
+                    insert_sql = f"INSERT OR IGNORE INTO daily_logs ({', '.join(cols)}) VALUES ({placeholders})"
+                    for r in rows:
+                        cursor.execute(insert_sql, [r.get(c) for c in cols])
+        except Exception as e:
+            print(f"Warning: SEED_DATA initialization notice: {e}")
 
     conn.commit()
     conn.close()
