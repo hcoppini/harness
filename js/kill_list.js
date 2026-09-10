@@ -147,15 +147,18 @@ const KillListDrawer = {
     const velocityContainer = document.getElementById("killListVelocityContainer");
     if (velocityContainer && this.paceVelocity) {
       const isBehind = this.paceVelocity.is_behind;
-      const statusText = this.paceVelocity.status_text;
+      let statusText = this.paceVelocity.status_text;
+      if (isBehind && this.paceVelocity.deficit_item_title) {
+        statusText = `Pace Deficit: ${this.paceVelocity.deficit_item_title} (-${this.paceVelocity.max_deficit} ${this.paceVelocity.deficit_unit})`;
+      }
       const badgeStyle = isBehind
-        ? "background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #f59e0b;"
-        : "background: rgba(161, 161, 170, 0.08); border: 1px solid rgba(161, 161, 170, 0.2); color: #a1a1aa;";
+        ? "background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); color: #f59e0b;"
+        : "background: rgba(110, 231, 183, 0.08); border: 1px solid rgba(110, 231, 183, 0.25); color: #6ee7b7;";
 
       velocityContainer.innerHTML = `
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; ${badgeStyle}">
           <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="width: 7px; height: 7px; border-radius: 50%; background: ${isBehind ? "#f59e0b" : "#c4b5fd"}; display: inline-block;"></span>
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: ${isBehind ? "#f59e0b" : "#6ee7b7"}; display: inline-block;"></span>
             <span style="font-weight: 600;">${statusText}</span>
           </div>
           <span style="font-size: 9px; opacity: 0.8;">Day ${this.paceVelocity.day_of_month}/${this.paceVelocity.total_days}</span>
@@ -224,11 +227,24 @@ const KillListDrawer = {
 
           let burnDownHtml = "";
           if (delivInfo) {
+            const paceItem = (this.paceVelocity && Array.isArray(this.paceVelocity.deliverables))
+              ? this.paceVelocity.deliverables.find((p) => p.deliverable_id === item.station_deliverable_id)
+              : null;
+
+            let pacePill = "";
+            if (paceItem) {
+              if (paceItem.is_behind) {
+                pacePill = `<span style="color: #f59e0b; font-weight: 600; margin-left: 6px;">[Deficit: -${paceItem.deficit} ${paceItem.unit_label}]</span>`;
+              } else {
+                pacePill = `<span style="color: #6ee7b7; font-weight: 600; margin-left: 6px;">[Optimal: +${Math.max(0, paceItem.pace_delta)} ${paceItem.unit_label}]</span>`;
+              }
+            }
+
             burnDownHtml = `
-              <div style="display: flex; align-items: center; gap: 6px; margin-top: 6px; font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">
+              <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 6px; font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">
                 <span style="color: var(--accent-lavender); font-weight: 600;">Burn-down:</span>
                 <span>${delivInfo.completed_count}/${delivInfo.total_required} ${delivInfo.unit_label}</span>
-                ${delivInfo.is_completed ? '<span style="color: #6ee7b7; font-weight: 700;">(COMPLETE)</span>' : ""}
+                ${delivInfo.is_completed ? '<span style="color: #6ee7b7; font-weight: 700; margin-left: 6px;">(COMPLETE)</span>' : pacePill}
               </div>
             `;
           }
@@ -312,9 +328,9 @@ const KillListDrawer = {
 
   getActionIcon(actionType) {
     const act = (actionType || "").toLowerCase();
-    if (act === "pdf") return "📄";
-    if (act === "workspace") return "💻";
-    return "🌐";
+    if (act === "pdf") return "PDF";
+    if (act === "workspace") return "CODE";
+    return "URL";
   },
 
   async launchItem(actionType, targetPath) {

@@ -337,7 +337,7 @@ const Today = {
             </div>
             ${
               isDeepWork
-                ? `<button class="btn-ghost-icon" onclick="event.stopPropagation(); if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');" style="color: var(--accent-lavender); border-color: rgba(196, 181, 253, 0.35); font-family: var(--font-mono); font-size: 10px; padding: 2px 7px;" title="Open Kill List Drawer">⚡ Kill List</button>`
+                ? `<button class="btn-ghost-icon" onclick="event.stopPropagation(); if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');" style="color: var(--accent-lavender); border-color: rgba(196, 181, 253, 0.35); font-family: var(--font-mono); font-size: 10px; padding: 2px 7px; letter-spacing: 0.03em;" title="Open Kill List Drawer">Kill List</button>`
                 : ""
             }
           </div>
@@ -921,7 +921,7 @@ const Today = {
           `;
         }
 
-        const actionIcon = (item.action_type || "").toLowerCase() === "pdf" ? "📄" : (item.action_type || "").toLowerCase() === "workspace" ? "💻" : "🌐";
+        const actionIcon = (item.action_type || "").toLowerCase() === "pdf" ? "PDF" : (item.action_type || "").toLowerCase() === "workspace" ? "CODE" : "URL";
 
         return `
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 8px 10px; background: rgba(255, 255, 255, 0.02); border: 1px solid ${isDone ? "rgba(255, 255, 255, 0.04)" : "rgba(255, 255, 255, 0.08)"}; border-radius: 4px; transition: all 0.12s ease;">

@@ -98,6 +98,32 @@ def get_kill_list(
         close_conn = True
 
     cursor = conn.cursor()
+
+    # Auto-carryover: Uncompleted kill items from prior days roll forward to today (up to 3-Item limit)
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    if target_date == today_str:
+        cursor.execute("SELECT COUNT(*) AS cnt FROM kill_list_items WHERE date = ?", (today_str,))
+        existing_count = cursor.fetchone()["cnt"]
+        if existing_count < 3:
+            needed = 3 - existing_count
+            cursor.execute(
+                """
+                SELECT id FROM kill_list_items
+                WHERE date < ? AND completed = 0
+                ORDER BY date ASC, created_at ASC
+                LIMIT ?
+                """,
+                (today_str, needed),
+            )
+            rollover_rows = cursor.fetchall()
+            for r in rollover_rows:
+                cursor.execute(
+                    "UPDATE kill_list_items SET date = ? WHERE id = ?",
+                    (today_str, r["id"]),
+                )
+            if rollover_rows:
+                conn.commit()
+
     cursor.execute(
         """
         SELECT 
@@ -473,6 +499,7 @@ def get_station_pace_velocity(
         "total_days": total_days_in_month,
         "is_behind": overall_behind,
         "max_deficit": max_deficit,
+        "deficit_item_title": deficit_item_title,
         "deficit_unit": deficit_unit,
         "status_text": status_text,
         "badge_variant": badge_variant,

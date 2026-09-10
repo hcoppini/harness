@@ -11,6 +11,7 @@ const Tum = {
 
   async init() {
     this.bindEvents();
+    this.initAptitudeSimulator();
     if (window.MetroMap) {
       await window.MetroMap.init();
     }
@@ -221,6 +222,133 @@ const Tum = {
   renderBavarianAssessment() {
     if (!this.data || !this.data.bavarian_assessment) return;
     const b = this.data.bavarian_assessment;
+    this.actualAptitudeValues = {
+      gpa: b.gpa_pl !== undefined ? Number(b.gpa_pl) : 5.0,
+      math: b.math_pl !== undefined ? Number(b.math_pl) : 5.5,
+      cs: b.cs_pl !== undefined ? Number(b.cs_pl) : 5.5,
+      lang: b.lang_pl !== undefined ? Number(b.lang_pl) : 5.5,
+    };
+
+    if (!this.isSimulating) {
+      const sliderGpa = document.getElementById("simSliderGpa");
+      const sliderMath = document.getElementById("simSliderMath");
+      const sliderCs = document.getElementById("simSliderCs");
+      const sliderLang = document.getElementById("simSliderLang");
+      if (sliderGpa) sliderGpa.value = this.actualAptitudeValues.gpa;
+      if (sliderMath) sliderMath.value = this.actualAptitudeValues.math;
+      if (sliderCs) sliderCs.value = this.actualAptitudeValues.cs;
+      if (sliderLang) sliderLang.value = this.actualAptitudeValues.lang;
+      this.updateSimulatorDisplay(
+        this.actualAptitudeValues.gpa,
+        this.actualAptitudeValues.math,
+        this.actualAptitudeValues.cs,
+        this.actualAptitudeValues.lang,
+        false
+      );
+    }
+  },
+
+  initAptitudeSimulator() {
+    const sliderGpa = document.getElementById("simSliderGpa");
+    const sliderMath = document.getElementById("simSliderMath");
+    const sliderCs = document.getElementById("simSliderCs");
+    const sliderLang = document.getElementById("simSliderLang");
+    const syncBtn = document.getElementById("tumSimulatorSyncBtn");
+
+    const onSliderChange = () => {
+      this.isSimulating = true;
+      const gpa = parseFloat(sliderGpa ? sliderGpa.value : 5.0);
+      const math = parseFloat(sliderMath ? sliderMath.value : 5.5);
+      const cs = parseFloat(sliderCs ? sliderCs.value : 5.5);
+      const lang = parseFloat(sliderLang ? sliderLang.value : 5.5);
+      this.updateSimulatorDisplay(gpa, math, cs, lang, true);
+    };
+
+    if (sliderGpa) sliderGpa.addEventListener("input", onSliderChange);
+    if (sliderMath) sliderMath.addEventListener("input", onSliderChange);
+    if (sliderCs) sliderCs.addEventListener("input", onSliderChange);
+    if (sliderLang) sliderLang.addEventListener("input", onSliderChange);
+
+    if (syncBtn) {
+      syncBtn.addEventListener("click", () => {
+        this.isSimulating = false;
+        const vals = this.actualAptitudeValues || { gpa: 5.0, math: 5.5, cs: 5.5, lang: 5.5 };
+        if (sliderGpa) sliderGpa.value = vals.gpa;
+        if (sliderMath) sliderMath.value = vals.math;
+        if (sliderCs) sliderCs.value = vals.cs;
+        if (sliderLang) sliderLang.value = vals.lang;
+        this.updateSimulatorDisplay(vals.gpa, vals.math, vals.cs, vals.lang, false);
+      });
+    }
+  },
+
+  calculateBavarianGrade(p, pMax = 6.0, pMin = 2.0) {
+    if (p >= pMax) return 1.0;
+    if (p <= pMin) return 4.0;
+    return Math.round((1.0 + 3.0 * ((pMax - p) / (pMax - pMin))) * 100) / 100;
+  },
+
+  calculateAptitudeScore(gpaPl, mathPl, csPl, langPl) {
+    const gGpa = this.calculateBavarianGrade(gpaPl);
+    const gMath = this.calculateBavarianGrade(mathPl);
+    const gCs = this.calculateBavarianGrade(csPl);
+    const gLang = this.calculateBavarianGrade(langPl);
+
+    const gradeToPoints = (g) => Math.max(0, Math.min(100, (4.0 - g) * (100.0 / 3.0)));
+    const ptsGpa = gradeToPoints(gGpa);
+    const ptsMath = gradeToPoints(gMath);
+    const ptsCs = gradeToPoints(gCs);
+    const ptsLang = gradeToPoints(gLang);
+
+    const subjectScore = (ptsMath * 2 + ptsCs * 2 + ptsLang * 1) / 5.0;
+    const totalScore = Math.round((0.65 * ptsGpa + 0.35 * subjectScore) * 10) / 10;
+
+    let verdict = "DEFICIT: MATH/CS RECOVERY NEEDED";
+    if (totalScore >= 88.0) {
+      verdict = "DIRECT ADMISSION SAFE (Level 1)";
+    } else if (totalScore >= 70.0) {
+      verdict = "INTERVIEW THRESHOLD (Level 2)";
+    }
+
+    return {
+      german_gpa: gGpa,
+      total_tum_points: totalScore,
+      verdict,
+      gpa_pl: gpaPl,
+      math_pl: mathPl,
+      cs_pl: csPl,
+      lang_pl: langPl,
+      pts_subject: Math.round(subjectScore * 10) / 10,
+    };
+  },
+
+  updateSimulatorDisplay(gpa, math, cs, lang, isSimulating = false) {
+    const simValGpa = document.getElementById("simValGpa");
+    const simValMath = document.getElementById("simValMath");
+    const simValCs = document.getElementById("simValCs");
+    const simValLang = document.getElementById("simValLang");
+    const simModeBadge = document.getElementById("simModeBadge");
+
+    if (simValGpa) simValGpa.textContent = Number(gpa).toFixed(2);
+    if (simValMath) simValMath.textContent = Number(math).toFixed(2);
+    if (simValCs) simValCs.textContent = Number(cs).toFixed(2);
+    if (simValLang) simValLang.textContent = Number(lang).toFixed(2);
+
+    if (simModeBadge) {
+      if (isSimulating) {
+        simModeBadge.textContent = "What-If Simulated";
+        simModeBadge.style.color = "#f59e0b";
+        simModeBadge.style.background = "rgba(245, 158, 11, 0.1)";
+        simModeBadge.style.borderColor = "rgba(245, 158, 11, 0.3)";
+      } else {
+        simModeBadge.textContent = "Live Ledger Linked";
+        simModeBadge.style.color = "var(--accent-lavender)";
+        simModeBadge.style.background = "rgba(196, 181, 253, 0.1)";
+        simModeBadge.style.borderColor = "rgba(196, 181, 253, 0.2)";
+      }
+    }
+
+    const calc = this.calculateAptitudeScore(gpa, math, cs, lang);
 
     const badgeEl = document.getElementById("tumAdmissionBadge");
     const gpaEl = document.getElementById("tumGermanGpaVal");
@@ -229,16 +357,16 @@ const Tum = {
     const subjEl = document.getElementById("tumSubjectScoreVal");
     const verdictEl = document.getElementById("tumVerdictText");
 
-    if (gpaEl) gpaEl.textContent = Number(b.german_gpa).toFixed(2);
-    if (plGpaEl) plGpaEl.textContent = `Polish: ${b.gpa_pl !== undefined ? Number(b.gpa_pl).toFixed(2) : "--"}`;
-    if (totalEl) totalEl.textContent = `${Number(b.total_tum_points).toFixed(1)} / 100`;
-    if (subjEl) subjEl.textContent = `${b.pts_subject !== undefined ? Number(b.pts_subject).toFixed(1) : "--"} pts`;
-    if (verdictEl) verdictEl.textContent = b.verdict;
+    if (gpaEl) gpaEl.textContent = Number(calc.german_gpa).toFixed(2);
+    if (plGpaEl) plGpaEl.textContent = `Polish: ${Number(calc.gpa_pl).toFixed(2)}`;
+    if (totalEl) totalEl.textContent = `${Number(calc.total_tum_points).toFixed(1)} / 100`;
+    if (subjEl) subjEl.textContent = `${Number(calc.pts_subject).toFixed(1)} pts`;
+    if (verdictEl) verdictEl.textContent = calc.verdict;
 
     if (badgeEl) {
-      if (b.total_tum_points >= 88.0) {
+      if (calc.total_tum_points >= 88.0) {
         badgeEl.innerHTML = `<span class="mono-chip done" style="background: rgba(110, 231, 183, 0.15); border-color: rgba(110, 231, 183, 0.4); color: #6ee7b7; font-size: 11px; padding: 4px 10px; font-weight: 700;">DIRECT ADMISSION SAFE (Level 1)</span>`;
-      } else if (b.total_tum_points >= 70.0) {
+      } else if (calc.total_tum_points >= 70.0) {
         badgeEl.innerHTML = `<span class="mono-chip amber" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); color: #f59e0b; font-size: 11px; padding: 4px 10px; font-weight: 700;">INTERVIEW THRESHOLD (Level 2)</span>`;
       } else {
         badgeEl.innerHTML = `<span class="mono-chip" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171; font-size: 11px; padding: 4px 10px; font-weight: 700;">DEFICIT: MATH/CS RECOVERY NEEDED</span>`;

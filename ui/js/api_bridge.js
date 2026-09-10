@@ -434,6 +434,163 @@
             };
           }
 
+          if (prop === "get_station_deliverables") {
+            return async function (stationId = "sep-2026") {
+              const localMap = getStore(STORAGE_KEYS.DELIVERABLES, {});
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("get_station_deliverables", [stationId]);
+              } catch (e) {}
+
+              if (serverRes && Array.isArray(serverRes)) {
+                const merged = serverRes.map((d) => {
+                  const cached = localMap[d.deliverable_id];
+                  if (cached && cached.completed_count > d.completed_count) {
+                    return { ...d, completed_count: cached.completed_count, is_completed: cached.completed_count >= d.total_required };
+                  }
+                  return d;
+                });
+                merged.forEach((d) => {
+                  localMap[d.deliverable_id] = d;
+                });
+                setStore(STORAGE_KEYS.DELIVERABLES, localMap);
+                return merged;
+              }
+
+              const list = Object.values(localMap).filter(
+                (d) => d.station_id === stationId || d.station_id === stationId.replace("_", "-") || d.station_id === stationId.replace("-", "_")
+              );
+              if (list.length > 0) return list;
+
+              return [
+                { deliverable_id: "sep26_math_diag", station_id: "sep-2026", stream: "Math R", title: "Diagnostic Exam 1-40", total_required: 40, completed_count: 0, unit_label: "problems", is_completed: false },
+                { deliverable_id: "sep26_hackerrank_15", station_id: "sep-2026", stream: "Algorithms", title: "Basic Data Structures (15 items)", total_required: 15, completed_count: 0, unit_label: "exercises", is_completed: false },
+                { deliverable_id: "sep26_sigg_setup", station_id: "sep-2026", stream: "SIGG", title: "Registration & Platform Setup", total_required: 1, completed_count: 0, unit_label: "setup", is_completed: false },
+                { deliverable_id: "sep26_german_anki", station_id: "sep-2026", stream: "German", title: "Goethe A2 Core Vocabulary (400 Words)", total_required: 400, completed_count: 0, unit_label: "words", is_completed: false },
+                { deliverable_id: "sep26_phys_protein", station_id: "sep-2026", stream: "Physique", title: "Daily 140g+ Target Consistency (20/30 Days)", total_required: 20, completed_count: 0, unit_label: "days", is_completed: false },
+              ];
+            };
+          }
+
+          if (prop === "update_deliverable_progress") {
+            return async function (deliverableId, newCount = null, delta = null) {
+              const localMap = getStore(STORAGE_KEYS.DELIVERABLES, {});
+              const deliv = localMap[deliverableId] || {
+                deliverable_id: deliverableId,
+                completed_count: 0,
+                total_required: 100,
+                unit_label: "units",
+                is_completed: false,
+              };
+
+              let updatedCount = deliv.completed_count;
+              if (newCount !== null && newCount !== undefined) {
+                updatedCount = Math.max(0, parseInt(newCount, 10) || 0);
+              } else if (delta !== null && delta !== undefined) {
+                updatedCount = Math.max(0, updatedCount + (parseInt(delta, 10) || 0));
+              }
+              deliv.completed_count = updatedCount;
+              deliv.is_completed = updatedCount >= (deliv.total_required || 1);
+              localMap[deliverableId] = deliv;
+              setStore(STORAGE_KEYS.DELIVERABLES, localMap);
+
+              rpcCall("update_deliverable_progress", [deliverableId, newCount, delta]).catch(() => {});
+              supabaseRequest(`station_deliverable_progress?deliverable_id=eq.${deliverableId}`, "PATCH", {
+                completed_count: updatedCount,
+                is_completed: deliv.is_completed,
+              });
+
+              return {
+                success: true,
+                deliverable_id: deliverableId,
+                completed_count: updatedCount,
+                total_required: deliv.total_required,
+                is_completed: deliv.is_completed,
+                unit_label: deliv.unit_label,
+              };
+            };
+          }
+
+          if (prop === "log_study_reps") {
+            return async function (deliverableId, count = 1, notes = "") {
+              const res = await apiProxy.update_deliverable_progress(deliverableId, null, count);
+              rpcCall("log_study_reps", [deliverableId, count, notes]).catch(() => {});
+              return res;
+            };
+          }
+
+          if (prop === "get_station_pace_velocity") {
+            return async function (stationId = "sep-2026", dateStr = null) {
+              const todayDt = dateStr ? new Date(dateStr) : new Date();
+              const dayOfMonth = todayDt.getDate();
+              const year = todayDt.getFullYear();
+              const month = todayDt.getMonth();
+              const totalDays = new Date(year, month + 1, 0).getDate();
+
+              const deliverables = await apiProxy.get_station_deliverables(stationId);
+
+              let maxDeficit = 0.0;
+              let deficitItemTitle = "";
+              let deficitUnit = "";
+              let overallBehind = false;
+
+              const paceItems = deliverables.map((d) => {
+                const total = d.total_required || 1;
+                const comp = d.completed_count || 0;
+                const targetPace = (dayOfMonth / totalDays) * total;
+                const delta = comp - targetPace;
+                const isBehind = comp < targetPace;
+                const deficit = isBehind ? Math.round((targetPace - comp) * 10) / 10 : 0.0;
+
+                if (deficit > maxDeficit) {
+                  maxDeficit = deficit;
+                  deficitItemTitle = d.title;
+                  deficitUnit = d.unit_label;
+                  overallBehind = true;
+                }
+
+                return {
+                  deliverable_id: d.deliverable_id,
+                  title: d.title,
+                  stream: d.stream,
+                  total_required: total,
+                  completed_count: comp,
+                  unit_label: d.unit_label,
+                  target_pace: Math.round(targetPace * 10) / 10,
+                  pace_delta: Math.round(delta * 10) / 10,
+                  is_behind: isBehind,
+                  deficit: deficit,
+                  is_completed: Boolean(d.is_completed),
+                };
+              });
+
+              let statusText = "";
+              let badgeVariant = "optimal";
+              if (overallBehind && maxDeficit > 0) {
+                statusText = `Pace Deficit: -${maxDeficit} ${deficitUnit}`;
+                badgeVariant = "amber";
+              } else {
+                const avgDelta = paceItems.reduce((acc, p) => acc + p.pace_delta, 0) / Math.max(1, paceItems.length);
+                statusText = `Pace Velocity: Optimal (+${Math.abs(Math.round(avgDelta * 10) / 10)})`;
+                badgeVariant = "optimal";
+              }
+
+              return {
+                station_id: stationId,
+                date: todayDt.toISOString().split("T")[0],
+                day_of_month: dayOfMonth,
+                total_days: totalDays,
+                is_behind: overallBehind,
+                max_deficit: maxDeficit,
+                deficit_item_title: deficitItemTitle,
+                deficit_unit: deficitUnit,
+                status_text: statusText,
+                badge_variant: badgeVariant,
+                deliverables: paceItems,
+              };
+            };
+          }
+
           // 3. System Links & General Utilities
           if (prop === "open_external_url") {
             return async function (url) {

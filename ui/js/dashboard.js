@@ -356,7 +356,7 @@ window.Dashboard = {
 
         const klCount = (day.kill_list_items || []).length;
         const taskCount = day.task_count || 0;
-        const taskPill = klCount > 0 ? `⚡ ${klCount} kill • ${taskCount} tasks` : taskCount > 0 ? `${taskCount} tasks` : "Routine ready";
+        const taskPill = klCount > 0 ? `${klCount} kill • ${taskCount} tasks` : taskCount > 0 ? `${taskCount} tasks` : "Routine ready";
 
         return `
           <div 
@@ -552,7 +552,7 @@ window.Dashboard = {
             ${killItems
               .map((k) => `
                 <div style="font-size: 11px; padding: 6px 10px; background: rgba(196,181,253,0.06); border: 1px solid rgba(196,181,253,0.18); border-radius: 4px; display: flex; align-items: center; justify-content: space-between;">
-                  <span>⚡ <strong>[${this.escapeHtml(k.category)}]</strong> ${this.escapeHtml(k.title)}</span>
+                  <span><strong>[${this.escapeHtml(k.category)}]</strong> ${this.escapeHtml(k.title)}</span>
                   <span class="mono-chip lavender" style="font-size: 8px;">Kill Item</span>
                 </div>
               `)

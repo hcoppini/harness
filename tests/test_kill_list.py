@@ -147,3 +147,26 @@ def test_station_pace_velocity_calculation(test_db):
     velocity_optimal = kill_list_controller.get_station_pace_velocity("sep-2026", date_str=test_date, conn=test_db)
     assert velocity_optimal["is_behind"] is False
     assert "Pace Velocity: Optimal" in velocity_optimal["status_text"]
+
+
+def test_auto_carryover_uncompleted_items(test_db):
+    from datetime import datetime, timedelta
+    today_str = datetime.now().strftime("%Y-%m-%d")
+    yesterday_str = (datetime.now() - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Add item for yesterday
+    past_item = kill_list_controller.add_kill_item(
+        category="Math R",
+        title="Unfinished Geometry Problems",
+        action_type="pdf",
+        target_path="geo.pdf",
+        date_str=yesterday_str,
+        conn=test_db,
+    )
+    assert past_item["date"] == yesterday_str
+
+    # Fetch kill list for today: uncompleted item must roll over to today
+    res = kill_list_controller.get_kill_list(date_str=today_str, conn=test_db)
+    today_ids = [i["id"] for i in res["items"]]
+    assert past_item["id"] in today_ids
+
