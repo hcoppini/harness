@@ -1,5 +1,6 @@
 """Unit tests for TUM Roadmap: grade tracking, Matura metrics, and German progression."""
 
+import json
 import sqlite3
 import pytest
 from app.db import init_db
@@ -63,56 +64,64 @@ def test_german_ladder_transition(test_db):
 
 
 def test_metro_roadmap():
-    roadmap = tum_service.get_metro_roadmap()
-    assert "TUM" in roadmap["title"]
-    assert len(roadmap["stations"]) >= 20
+    orig_file = tum_service.DATA_DIR / "metro_roadmap.json"
+    with open(orig_file, "r", encoding="utf-8") as f:
+        orig_content = f.read()
 
-    # Kickoff station is index 0, Sep '26 (Pure Syntax) is index 1
-    first_station = roadmap["stations"][0]
-    assert first_station["id"] == "kickoff-2026"
-    assert "Class 3 Kickoff" in first_station["name"]
+    try:
+        roadmap = tum_service.get_metro_roadmap()
+        assert "TUM" in roadmap["title"]
+        assert len(roadmap["stations"]) >= 20
 
-    sep_station = [s for s in roadmap["stations"] if s["id"] == "sep-2026"][0]
-    assert "Pure Syntax" in sep_station["name"]
-    assert "Academics" in sep_station["deliverables"]
+        # Kickoff station is index 0, Sep '26 (Pure Syntax) is index 1
+        first_station = roadmap["stations"][0]
+        assert first_station["id"] == "kickoff-2026"
+        assert "Class 3 Kickoff" in first_station["name"]
 
-    # Test status update
-    updated = tum_service.update_station_status("sep-2026", "active")
-    assert updated is True
+        sep_station = [s for s in roadmap["stations"] if s["id"] == "sep-2026"][0]
+        assert "Pure Syntax" in sep_station["name"]
+        assert "Academics" in sep_station["deliverables"]
 
-    # Test deliverable toggling checklist
-    deliv_keys = list(sep_station["deliverables"].keys())
-    assert len(deliv_keys) > 0
+        # Test status update
+        updated = tum_service.update_station_status("sep-2026", "active")
+        assert updated is True
 
-    # Toggle one on
-    res = tum_service.toggle_station_deliverable("sep-2026", deliv_keys[0])
-    assert res["success"] is True
-    assert res["is_checked"] is True
-    assert deliv_keys[0] in res["completed_deliverables"]
+        # Reset completed deliverables for test isolation
+        for s in roadmap["stations"]:
+            if s["id"] == "sep-2026":
+                s["completed_deliverables"] = []
+        with open(orig_file, "w", encoding="utf-8") as f:
+            json.dump(roadmap, f)
 
-    # Toggle all deliverables on to verify automatic completion
-    for k in deliv_keys[1:]:
-        res = tum_service.toggle_station_deliverable("sep-2026", k)
+        # Test deliverable toggling checklist
+        deliv_keys = list(sep_station["deliverables"].keys())
+        assert len(deliv_keys) > 0
+
+        # Toggle one on
+        res = tum_service.toggle_station_deliverable("sep-2026", deliv_keys[0])
         assert res["success"] is True
+        assert res["is_checked"] is True
+        assert deliv_keys[0] in res["completed_deliverables"]
 
-    assert res["station_completed"] is True
-    assert res["station_status"] == "completed"
+        # Toggle all deliverables on to verify automatic completion
+        for k in deliv_keys[1:]:
+            res = tum_service.toggle_station_deliverable("sep-2026", k)
+            assert res["success"] is True
 
-    # Toggle one off to verify reversion
-    res_off = tum_service.toggle_station_deliverable("sep-2026", deliv_keys[0])
-    assert res_off["is_checked"] is False
-    assert res_off["station_completed"] is False
-    assert res_off["station_status"] == "active"
+        assert res["station_completed"] is True
+        assert res["station_status"] == "completed"
 
-    # Reset all checked for clean state
-    current_roadmap = tum_service.get_metro_roadmap()
-    current_sep = [s for s in current_roadmap["stations"] if s["id"] == "sep-2026"][0]
-    for k in list(current_sep.get("completed_deliverables", [])):
-        tum_service.toggle_station_deliverable("sep-2026", k)
-    tum_service.update_station_status("sep-2026", "active")
+        # Toggle one off to verify reversion
+        res_off = tum_service.toggle_station_deliverable("sep-2026", deliv_keys[0])
+        assert res_off["is_checked"] is False
+        assert res_off["station_completed"] is False
+        assert res_off["station_status"] == "active"
 
-    # Test get all configs
-    configs = tum_service.get_all_configs()
-    assert "schedules" in configs
-    assert "gym_routines" in configs
-    assert "metro_roadmap" in configs
+        # Test get all configs
+        configs = tum_service.get_all_configs()
+        assert "schedules" in configs
+        assert "gym_routines" in configs
+        assert "metro_roadmap" in configs
+    finally:
+        with open(orig_file, "w", encoding="utf-8") as f:
+            f.write(orig_content)

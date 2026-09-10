@@ -1,10 +1,11 @@
-"""
-Harness Executive OS - Cross-Device Cloud Sync Engine
-Provides two-way synchronization between Laptop, Desktop PC, and Cloud Database (Supabase / REST).
+﻿"""
+Harness Executive OS - Cross-Device Cloud Sync Engine (Version 3.5)
+Provides two-way synchronization between Laptop, Desktop PC, Vercel Web, and Supabase REST API.
 100% offline-first: runs locally in SQLite and seamlessly replicates deltas when online.
 """
 
 import json
+import os
 import sqlite3
 import urllib.request
 import urllib.error
@@ -25,15 +26,30 @@ DEFAULT_CONFIG = {
 
 
 def get_sync_config() -> Dict[str, Any]:
-    """Loads sync configuration (URL, API Key, timestamps)."""
-    if not CONFIG_FILE.exists():
-        save_sync_config(DEFAULT_CONFIG)
-        return DEFAULT_CONFIG.copy()
-    try:
-        with open(CONFIG_FILE, "r", encoding="utf-8") as f:
-            return {**DEFAULT_CONFIG, **json.load(f)}
-    except Exception:
-        return DEFAULT_CONFIG.copy()
+    """Loads sync configuration (URL, API Key, timestamps) from env or disk."""
+    cfg = DEFAULT_CONFIG.copy()
+    if CONFIG_FILE.exists():
+        try:
+            with open(CONFIG_FILE, "r", encoding="utf-8") as f:
+                cfg.update(json.load(f))
+        except Exception:
+            pass
+
+    # Environment variables take precedence (for Vercel / Cloud deployments)
+    env_url = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or os.environ.get("EXPO_PUBLIC_SUPABASE_URL")
+    env_key = (
+        os.environ.get("SUPABASE_KEY")
+        or os.environ.get("SUPABASE_ANON_KEY")
+        or os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+        or os.environ.get("NEXT_PUBLIC_SUPABASE_ANON_KEY")
+        or os.environ.get("EXPO_PUBLIC_SUPABASE_ANON_KEY")
+    )
+    if env_url:
+        cfg["supabase_url"] = env_url.strip()
+    if env_key:
+        cfg["supabase_key"] = env_key.strip()
+
+    return cfg
 
 
 def save_sync_config(config: Dict[str, Any]) -> None:
@@ -73,29 +89,31 @@ def _make_supabase_request(
 
     req = urllib.request.Request(full_url, data=data_bytes, headers=req_headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=6) as response:
             res_body = response.read().decode("utf-8")
             if res_body:
                 return json.loads(res_body)
             return {}
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, Exception) as e:
-        print(f"[Sync Engine] Request error on {endpoint}: {e}")
         return None
 
 
+# =========================================================================
+# 1. Tasks Sync
+# =========================================================================
 def sync_tasks(conn: sqlite3.Connection) -> int:
-    """Two-way sync for daily tasks."""
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, title, category, is_tum, completed, date FROM tasks")
+        local_tasks = {row["id"]: dict(row) for row in cursor.fetchall()}
+    except (sqlite3.OperationalError, Exception):
+        return 0
+
     remote_tasks = _make_supabase_request("tasks?select=*")
     if remote_tasks is None:
         return 0
 
-    cursor = conn.cursor()
-    cursor.execute("SELECT id, title, category, is_tum, completed, date FROM tasks")
-    local_tasks = {row["id"]: dict(row) for row in cursor.fetchall()}
-
     synced_count = 0
-
-    # 1. Pull remote tasks into local SQLite
     for rt in remote_tasks:
         r_id = rt.get("id")
         if r_id not in local_tasks:
@@ -115,14 +133,12 @@ def sync_tasks(conn: sqlite3.Connection) -> int:
             )
             synced_count += 1
         else:
-            # If remote completed status is different, update local
             loc = local_tasks[r_id]
             r_comp = 1 if rt.get("completed") else 0
             if loc["completed"] != r_comp:
                 cursor.execute("UPDATE tasks SET completed = ? WHERE id = ?", (r_comp, r_id))
                 synced_count += 1
 
-    # 2. Push local tasks not present on remote
     remote_ids = {rt.get("id") for rt in remote_tasks if rt.get("id")}
     for l_id, loc in local_tasks.items():
         if l_id not in remote_ids:
@@ -145,19 +161,22 @@ def sync_tasks(conn: sqlite3.Connection) -> int:
     return synced_count
 
 
+# =========================================================================
+# 2. Daily Logs & Routine Sync
+# =========================================================================
 def sync_daily_logs(conn: sqlite3.Connection) -> int:
-    """Two-way sync for daily routine blocks and scratchpad."""
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT date, scratchpad, completed_blocks, completed_exercises FROM daily_logs")
+        local_logs = {row["date"]: dict(row) for row in cursor.fetchall()}
+    except (sqlite3.OperationalError, Exception):
+        return 0
+
     remote_logs = _make_supabase_request("daily_logs?select=*")
     if remote_logs is None:
         return 0
 
-    cursor = conn.cursor()
-    cursor.execute("SELECT date, scratchpad, completed_blocks, completed_exercises FROM daily_logs")
-    local_logs = {row["date"]: dict(row) for row in cursor.fetchall()}
-
     synced_count = 0
-
-    # 1. Merge remote logs into local SQLite
     for rl in remote_logs:
         dt = rl.get("date")
         if not dt:
@@ -177,17 +196,16 @@ def sync_daily_logs(conn: sqlite3.Connection) -> int:
             )
             synced_count += 1
         else:
-            # Merge completed blocks
             loc = local_logs[dt]
-            loc_blocks = set(filter(None, loc["completed_blocks"].split(",")))
+            loc_blocks = set(filter(None, (loc.get("completed_blocks") or "").split(",")))
             rem_blocks = set(filter(None, (rl.get("completed_blocks") or "").split(",")))
             merged_blocks = ",".join(sorted(loc_blocks.union(rem_blocks)))
 
-            loc_ex = set(filter(None, loc["completed_exercises"].split(",")))
+            loc_ex = set(filter(None, (loc.get("completed_exercises") or "").split(",")))
             rem_ex = set(filter(None, (rl.get("completed_exercises") or "").split(",")))
             merged_ex = ",".join(sorted(loc_ex.union(rem_ex)))
 
-            scratchpad = rl.get("scratchpad") if len(rl.get("scratchpad", "")) >= len(loc["scratchpad"]) else loc["scratchpad"]
+            scratchpad = rl.get("scratchpad") if len(rl.get("scratchpad", "")) >= len(loc.get("scratchpad", "")) else loc.get("scratchpad", "")
 
             if merged_blocks != loc["completed_blocks"] or merged_ex != loc["completed_exercises"] or scratchpad != loc["scratchpad"]:
                 cursor.execute(
@@ -200,7 +218,6 @@ def sync_daily_logs(conn: sqlite3.Connection) -> int:
                 )
                 synced_count += 1
 
-    # 2. Push local logs to remote
     cursor.execute("SELECT date, scratchpad, completed_blocks, completed_exercises FROM daily_logs")
     for row in cursor.fetchall():
         _make_supabase_request(
@@ -208,9 +225,9 @@ def sync_daily_logs(conn: sqlite3.Connection) -> int:
             method="POST",
             payload={
                 "date": row["date"],
-                "scratchpad": row["scratchpad"],
-                "completed_blocks": row["completed_blocks"],
-                "completed_exercises": row["completed_exercises"],
+                "scratchpad": row["scratchpad"] or "",
+                "completed_blocks": row["completed_blocks"] or "",
+                "completed_exercises": row["completed_exercises"] or "",
             },
             headers_extra={"Prefer": "resolution=merge-duplicates"},
         )
@@ -219,14 +236,19 @@ def sync_daily_logs(conn: sqlite3.Connection) -> int:
     return synced_count
 
 
+# =========================================================================
+# 3. Metro Roadmap & Deliverables Sync
+# =========================================================================
 def sync_metro_roadmap() -> int:
-    """Syncs TUM Metro Station deliverable checkmarks."""
     metro_file = DATA_DIR / "metro_roadmap.json"
     if not metro_file.exists():
         return 0
 
-    with open(metro_file, "r", encoding="utf-8") as f:
-        metro_data = json.load(f)
+    try:
+        with open(metro_file, "r", encoding="utf-8") as f:
+            metro_data = json.load(f)
+    except Exception:
+        return 0
 
     stations = metro_data.get("stations", [])
     remote_stations = _make_supabase_request("metro_stations?select=*")
@@ -243,7 +265,6 @@ def sync_metro_roadmap() -> int:
 
         if st_id in remote_map:
             rem = remote_map[st_id]
-            # Merge completed deliverables
             loc_delivs = set(st.get("completed_deliverables", []))
             rem_delivs = set(rem.get("completed_deliverables", []))
             merged = list(loc_delivs.union(rem_delivs))
@@ -254,7 +275,6 @@ def sync_metro_roadmap() -> int:
             st["completed_deliverables"] = merged
             synced_count += 1
         else:
-            # Push local station state to remote
             _make_supabase_request(
                 "metro_stations",
                 method="POST",
@@ -280,11 +300,153 @@ def sync_metro_roadmap() -> int:
     return synced_count
 
 
+# =========================================================================
+# 4. Kill List Items Sync (SGH Library 3-Item Engine)
+# =========================================================================
+def sync_kill_list_items(conn: sqlite3.Connection) -> int:
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, date, category, title, action_type, target_path, target_spec, station_deliverable_id, completed FROM kill_list_items")
+        local_items = {row["id"]: dict(row) for row in cursor.fetchall()}
+    except (sqlite3.OperationalError, Exception):
+        return 0
+
+    remote_items = _make_supabase_request("kill_list_items?select=*")
+    if remote_items is None:
+        return 0
+
+    synced_count = 0
+    for ri in remote_items:
+        r_id = ri.get("id")
+        if not r_id:
+            continue
+        r_comp = 1 if ri.get("completed") else 0
+        if r_id not in local_items:
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO kill_list_items
+                (id, date, category, title, action_type, target_path, target_spec, station_deliverable_id, completed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    r_id,
+                    ri.get("date", ""),
+                    ri.get("category", "General"),
+                    ri.get("title", ""),
+                    ri.get("action_type", "url"),
+                    ri.get("target_path", ""),
+                    ri.get("target_spec", ""),
+                    ri.get("station_deliverable_id"),
+                    r_comp,
+                ),
+            )
+            synced_count += 1
+        else:
+            if local_items[r_id]["completed"] != r_comp:
+                cursor.execute("UPDATE kill_list_items SET completed = ? WHERE id = ?", (r_comp, r_id))
+                synced_count += 1
+
+    remote_ids = {ri.get("id") for ri in remote_items if ri.get("id")}
+    for l_id, loc in local_items.items():
+        if l_id not in remote_ids:
+            _make_supabase_request(
+                "kill_list_items",
+                method="POST",
+                payload={
+                    "id": l_id,
+                    "date": loc["date"],
+                    "category": loc["category"],
+                    "title": loc["title"],
+                    "action_type": loc["action_type"],
+                    "target_path": loc["target_path"],
+                    "target_spec": loc["target_spec"],
+                    "station_deliverable_id": loc["station_deliverable_id"],
+                    "completed": bool(loc["completed"]),
+                },
+                headers_extra={"Prefer": "resolution=merge-duplicates"},
+            )
+            synced_count += 1
+
+    conn.commit()
+    return synced_count
+
+
+# =========================================================================
+# 5. Station Deliverable Progress Sync
+# =========================================================================
+def sync_station_deliverable_progress(conn: sqlite3.Connection) -> int:
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT deliverable_id, station_id, stream, title, total_required, completed_count, unit_label, is_completed FROM station_deliverable_progress")
+        local_map = {row["deliverable_id"]: dict(row) for row in cursor.fetchall()}
+    except (sqlite3.OperationalError, Exception):
+        return 0
+
+    remote_delivs = _make_supabase_request("station_deliverable_progress?select=*")
+    if remote_delivs is None:
+        return 0
+
+    synced_count = 0
+    for rd in remote_delivs:
+        d_id = rd.get("deliverable_id")
+        if not d_id:
+            continue
+        rem_count = rd.get("completed_count", 0)
+        rem_done = 1 if rd.get("is_completed") else 0
+        if d_id in local_map:
+            loc = local_map[d_id]
+            max_count = max(loc["completed_count"], rem_count)
+            is_done = 1 if (max_count >= loc["total_required"] or loc["is_completed"] or rem_done) else 0
+            if max_count != loc["completed_count"] or is_done != loc["is_completed"]:
+                cursor.execute("UPDATE station_deliverable_progress SET completed_count = ?, is_completed = ? WHERE deliverable_id = ?", (max_count, is_done, d_id))
+                synced_count += 1
+        else:
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO station_deliverable_progress
+                (deliverable_id, station_id, stream, title, total_required, completed_count, unit_label, is_completed)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    d_id,
+                    rd.get("station_id", "sep-2026"),
+                    rd.get("stream", "code"),
+                    rd.get("title", ""),
+                    rd.get("total_required", 1),
+                    rem_count,
+                    rd.get("unit_label", "reps"),
+                    rem_done,
+                ),
+            )
+            synced_count += 1
+
+    cursor.execute("SELECT deliverable_id, station_id, stream, title, total_required, completed_count, unit_label, is_completed FROM station_deliverable_progress")
+    for row in cursor.fetchall():
+        _make_supabase_request(
+            "station_deliverable_progress",
+            method="POST",
+            payload={
+                "deliverable_id": row["deliverable_id"],
+                "station_id": row["station_id"],
+                "stream": row["stream"],
+                "title": row["title"],
+                "total_required": row["total_required"],
+                "completed_count": row["completed_count"],
+                "unit_label": row["unit_label"],
+                "is_completed": bool(row["is_completed"]),
+            },
+            headers_extra={"Prefer": "resolution=merge-duplicates"},
+        )
+
+    conn.commit()
+    return synced_count
+
+
+# =========================================================================
+# Master Multi-Entity Synchronizer
+# =========================================================================
 def sync_all() -> Dict[str, Any]:
-    """
-    Executes full bi-directional synchronization.
-    Returns status payload for UI feedback.
-    """
+    """Executes full bi-directional synchronization across all tables."""
     cfg = get_sync_config()
     if not cfg.get("supabase_key"):
         return {
@@ -299,8 +461,10 @@ def sync_all() -> Dict[str, Any]:
         tasks_count = sync_tasks(conn)
         logs_count = sync_daily_logs(conn)
         metro_count = sync_metro_roadmap()
+        kill_count = sync_kill_list_items(conn)
+        deliv_count = sync_station_deliverable_progress(conn)
 
-        total_synced = tasks_count + logs_count + metro_count
+        total_synced = tasks_count + logs_count + metro_count + kill_count + deliv_count
         now_iso = datetime.now().isoformat()
 
         cfg["last_synced_at"] = now_iso
@@ -313,7 +477,6 @@ def sync_all() -> Dict[str, Any]:
             "timestamp": now_iso,
         }
     except Exception as e:
-        print(f"[Sync Engine] Sync failed: {e}")
         return {
             "status": "offline",
             "message": str(e),

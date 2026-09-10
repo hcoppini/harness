@@ -1,4 +1,4 @@
-﻿"""
+"""
 Unit tests for Harness Cross-Device Cloud Sync Engine.
 Tests two-way delta sync, offline resilience, and JSON configuration.
 """
@@ -247,3 +247,50 @@ def test_harness_api_sync_methods(temp_sync_env):
     with patch.object(sync_service, "_make_supabase_request", return_value=[]):
         res = api.sync_now()
         assert res["status"] == "synced"
+
+
+def test_sync_kill_list_items(temp_sync_env):
+    conn, data_dir = temp_sync_env
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS kill_list_items (
+            id TEXT PRIMARY KEY,
+            date TEXT NOT NULL,
+            category TEXT NOT NULL,
+            title TEXT NOT NULL,
+            action_type TEXT NOT NULL,
+            target_path TEXT NOT NULL,
+            target_spec TEXT NOT NULL,
+            station_deliverable_id TEXT,
+            completed INTEGER DEFAULT 0
+        )
+    """)
+    cursor.execute(
+        "INSERT INTO kill_list_items (id, date, category, title, action_type, target_path, target_spec, completed) VALUES ('k1', '2026-09-10', 'Math R', 'Diagnostic 1-5', 'pdf', 'https://cke.gov.pl', 'Zadania 1-5', 0)"
+    )
+    conn.commit()
+
+    remote_items = [
+        {"id": "k1", "date": "2026-09-10", "category": "Math R", "title": "Diagnostic 1-5", "action_type": "pdf", "target_path": "https://cke.gov.pl", "target_spec": "Zadania 1-5", "completed": True},
+        {"id": "k2", "date": "2026-09-10", "category": "German", "title": "20 Anki Words", "action_type": "url", "target_path": "https://dw.com", "target_spec": "A2", "completed": False},
+    ]
+
+    with patch.object(sync_service, "_make_supabase_request", return_value=remote_items):
+        count = sync_service.sync_kill_list_items(conn)
+        assert count >= 1
+
+    cursor.execute("SELECT completed FROM kill_list_items WHERE id = 'k1'")
+    assert cursor.fetchone()[0] == 1
+    cursor.execute("SELECT title FROM kill_list_items WHERE id = 'k2'")
+    assert cursor.fetchone()[0] == "20 Anki Words"
+
+
+def test_sync_env_variable_resolution(temp_sync_env, monkeypatch):
+    conn, data_dir = temp_sync_env
+    monkeypatch.setenv("SUPABASE_URL", "https://env-project.supabase.co")
+    monkeypatch.setenv("SUPABASE_KEY", "env_secret_key_123")
+
+    cfg = sync_service.get_sync_config()
+    assert cfg["supabase_url"] == "https://env-project.supabase.co"
+    assert cfg["supabase_key"] == "env_secret_key_123"
+

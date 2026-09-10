@@ -55,6 +55,7 @@ window.HarnessApp = {
       if (window.Projects) await window.Projects.init();
       if (window.Body) await window.Body.init();
       if (window.Knowledge) await window.Knowledge.init();
+      await this.initSync();
     } catch (err) {
       console.error("Error initializing layers:", err);
     }
@@ -159,6 +160,11 @@ window.HarnessApp = {
         if (window.Today) window.Today.handleRollover();
       }
 
+      if ((e.ctrlKey || e.metaKey) && (e.key === "s" || e.key === "S")) {
+        e.preventDefault();
+        this.triggerSync(false);
+      }
+
       if (e.key === "Escape") {
         this.closeAllModals();
       }
@@ -188,6 +194,7 @@ window.HarnessApp = {
     const tabSched = document.getElementById("btnJsonTabSchedules");
     const tabGym = document.getElementById("btnJsonTabGym");
     const tabRoadmap = document.getElementById("btnJsonTabRoadmap");
+    const tabSync = document.getElementById("btnJsonTabSync");
 
     if (tabSched) {
       tabSched.addEventListener("click", () => this.switchJsonTab("schedules"));
@@ -198,6 +205,9 @@ window.HarnessApp = {
     if (tabRoadmap) {
       tabRoadmap.addEventListener("click", () => this.switchJsonTab("metro_roadmap"));
     }
+    if (tabSync) {
+      tabSync.addEventListener("click", () => this.switchJsonTab("sync_config"));
+    }
 
     const btnSave = document.getElementById("btnSaveJsonConfig");
     if (btnSave) {
@@ -207,14 +217,14 @@ window.HarnessApp = {
     }
   },
 
-  async openJsonModal() {
+  async openJsonModal(initialTab = null) {
     const modal = document.getElementById("jsonModal");
     if (!modal) return;
 
     try {
       if (window.pywebview && window.pywebview.api) {
         this.allConfigs = await window.pywebview.api.get_all_configs();
-        this.switchJsonTab(this.activeJsonTab || "schedules");
+        this.switchJsonTab(initialTab || this.activeJsonTab || "schedules");
       }
       modal.classList.add("open");
     } catch (err) {
@@ -232,13 +242,15 @@ window.HarnessApp = {
     const tabSched = document.getElementById("btnJsonTabSchedules");
     const tabGym = document.getElementById("btnJsonTabGym");
     const tabRoadmap = document.getElementById("btnJsonTabRoadmap");
+    const tabSync = document.getElementById("btnJsonTabSync");
     const textarea = document.getElementById("jsonConfigTextarea");
 
-    [tabSched, tabGym, tabRoadmap].forEach((btn) => btn?.classList.remove("active"));
+    [tabSched, tabGym, tabRoadmap, tabSync].forEach((btn) => btn?.classList.remove("active"));
 
     if (tabName === "schedules" && tabSched) tabSched.classList.add("active");
     if (tabName === "gym_routines" && tabGym) tabGym.classList.add("active");
     if (tabName === "metro_roadmap" && tabRoadmap) tabRoadmap.classList.add("active");
+    if (tabName === "sync_config" && tabSync) tabSync.classList.add("active");
 
     if (textarea && this.allConfigs) {
       const data = this.allConfigs[tabName] || {};
@@ -264,7 +276,11 @@ window.HarnessApp = {
       if (success) {
         if (statusEl) statusEl.textContent = "Saved & Applied.";
         this.showToast("Configuration saved");
-        await this.initAllLayers();
+        if (this.activeJsonTab === "sync_config") {
+          await this.initSync();
+        } else {
+          await this.initAllLayers();
+        }
         setTimeout(() => {
           if (statusEl) statusEl.textContent = "";
         }, 2000);
@@ -273,6 +289,107 @@ window.HarnessApp = {
       }
     } catch (err) {
       if (statusEl) statusEl.textContent = `Error: ${err}`;
+    }
+  },
+
+  // =========================================================================
+  // CROSS-DEVICE CLOUD SYNC ENGINE (Laptop <-> Desktop Cross-Sync)
+  // =========================================================================
+  syncTimer: null,
+
+  async initSync() {
+    const badge = document.getElementById("syncStatusBadge");
+    if (!badge || !window.pywebview || !window.pywebview.api) return;
+
+    try {
+      const status = await window.pywebview.api.get_sync_status();
+      this.updateSyncBadge(status.status);
+
+      // Bind click on badge
+      badge.onclick = async () => {
+        if (status.status === "unconfigured") {
+          await this.openJsonModal("sync_config");
+        } else {
+          await this.triggerSync(false);
+        }
+      };
+
+      // If configured, trigger a background pull/push on startup
+      if (status.has_key && status.auto_sync) {
+        await this.triggerSync(true);
+      }
+
+      // Schedule periodic background sync every 5 minutes
+      if (this.syncTimer) clearInterval(this.syncTimer);
+      this.syncTimer = setInterval(async () => {
+        if (window.pywebview && window.pywebview.api) {
+          const curStatus = await window.pywebview.api.get_sync_status();
+          if (curStatus.has_key && curStatus.auto_sync) {
+            await this.triggerSync(true);
+          }
+        }
+      }, 5 * 60 * 1000);
+    } catch (e) {
+      console.warn("[Sync] Init failed:", e);
+      this.updateSyncBadge("offline");
+    }
+  },
+
+  updateSyncBadge(status) {
+    const dot = document.getElementById("syncDot");
+    const text = document.getElementById("syncStatusText");
+    const badge = document.getElementById("syncStatusBadge");
+    if (!dot || !text || !badge) return;
+
+    dot.className = "sync-dot";
+
+    if (status === "syncing") {
+      dot.classList.add("syncing");
+      text.textContent = "Syncing...";
+      badge.title = "Synchronizing with Cloud / Other Device...";
+    } else if (status === "synced" || status === "ready") {
+      text.textContent = "Synced";
+      badge.title = "Laptop & Desktop in Sync (Click to Sync Now)";
+    } else if (status === "unconfigured") {
+      dot.classList.add("unconfigured");
+      text.textContent = "Setup Sync";
+      badge.title = "Click to set up Supabase Cloud Sync Key";
+    } else {
+      dot.classList.add("offline");
+      text.textContent = "Offline";
+      badge.title = "Offline: Changes cached locally in SQLite (Click to Retry)";
+    }
+  },
+
+  async triggerSync(isBackground = false) {
+    if (!window.pywebview || !window.pywebview.api) return;
+
+    this.updateSyncBadge("syncing");
+
+    try {
+      const res = await window.pywebview.api.sync_now();
+      if (res.status === "synced") {
+        this.updateSyncBadge("synced");
+        if (!isBackground) {
+          this.showToast(res.synced_count > 0 ? `Synced ${res.synced_count} updates` : "All devices in sync");
+        }
+        // Refresh active view data quietly
+        if (this.currentView === "dashboard" && window.Dashboard) window.Dashboard.load();
+        if (this.currentView === "today" && window.Today) window.Today.load();
+        if (this.currentView === "tum" && window.Tum) window.Tum.load();
+      } else if (res.status === "unconfigured") {
+        this.updateSyncBadge("unconfigured");
+      } else {
+        this.updateSyncBadge("offline");
+        if (!isBackground) {
+          this.showToast("Offline: changes saved locally");
+        }
+      }
+    } catch (e) {
+      this.updateSyncBadge("offline");
+      if (!isBackground) {
+        this.showToast("Sync unreachable (local mode)");
+      }
     }
   },
 

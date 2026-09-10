@@ -12,9 +12,14 @@ from flask import Flask, request, jsonify, send_from_directory, send_file
 
 # Initialize SQLite database on launch
 from app.db import init_db
-init_db()
-
 from app.api import HarnessAPI
+from app.services import sync_service
+
+# Preload state from Supabase on startup if configured
+try:
+    sync_service.sync_all()
+except Exception:
+    pass
 
 BASE_DIR = Path(__file__).resolve().parent
 UI_DIR = BASE_DIR / "ui"
@@ -148,6 +153,14 @@ def rpc_dispatcher(method_name):
     try:
         method = getattr(api, method_name)
         result = method(*args, **kwargs)
+
+        # If write mutation, trigger immediate background sync to Supabase
+        if any(method_name.startswith(p) for p in ["add_", "toggle_", "delete_", "update_", "save_", "log_", "rollover_", "import_", "quick_"]):
+            try:
+                sync_service.sync_all()
+            except Exception:
+                pass
+
         return jsonify({"result": result, "status": "ok"}), 200
     except Exception as e:
         return jsonify({"error": str(e), "status": "error"}), 500
