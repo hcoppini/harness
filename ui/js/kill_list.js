@@ -278,7 +278,7 @@ const KillListDrawer = {
       }
     }
 
-    // 4. Render 1-Click Metro Deliverables Sequential Queue
+    // 4. Render 1-Click Metro Deliverables Sequential Queue (Compact Single-line)
     const metroContainer = document.getElementById("killListMetroDeliverablesQueue");
     if (metroContainer) {
       if (!this.deliverables || this.deliverables.length === 0) {
@@ -293,25 +293,23 @@ const KillListDrawer = {
             const targetSpecLabel = nextSpec ? nextSpec.target_spec : "";
 
             return `
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 5px;">
-                <div style="flex: 1; min-width: 0;">
-                  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
-                    <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${streamColor}; text-transform: uppercase;">${this.escapeHtml(d.stream)}</span>
-                    <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">${d.completed_count}/${d.total_required} ${d.unit_label}</span>
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 4px;">
+                <div style="display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0;">
+                  <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${streamColor}; text-transform: uppercase; width: 62px; flex-shrink: 0;">${this.escapeHtml(d.stream)}</span>
+                  <div style="flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 11px;">
+                    <span style="font-weight: 600; color: var(--text-primary);">${this.escapeHtml(d.title)}</span>
+                    ${targetSpecLabel ? `<span style="font-family: var(--font-mono); color: var(--accent-lavender); margin-left: 6px; font-size: 10px;">[${this.escapeHtml(targetSpecLabel)}]</span>` : ""}
                   </div>
-                  <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-                    ${this.escapeHtml(d.title)}
-                  </div>
-                  ${targetSpecLabel ? `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-lavender); margin-top: 2px;">Next: ${this.escapeHtml(targetSpecLabel)}</div>` : ""}
+                  <span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); flex-shrink: 0;">${d.completed_count}/${d.total_required}</span>
                 </div>
 
-                <div>
+                <div style="flex-shrink: 0;">
                   ${
                     isCompleted
-                      ? `<span class="mono-chip done" style="font-size: 10px;">DONE</span>`
+                      ? `<span class="mono-chip done" style="font-size: 9px; padding: 1px 6px;">DONE</span>`
                       : canEnqueue
-                      ? `<button type="button" class="btn-primary" onclick="KillListDrawer.enqueueProgressive('${d.deliverable_id}')" style="font-size: 10px; padding: 4px 9px; white-space: nowrap; font-weight: 600;">+ Enqueue</button>`
-                      : `<button type="button" class="btn-ghost-icon" disabled style="font-size: 10px; padding: 4px 8px; opacity: 0.4;">Full (3/3)</button>`
+                      ? `<button type="button" class="btn-primary" onclick="KillListDrawer.enqueueProgressive('${d.deliverable_id}')" style="font-size: 9px; padding: 3px 8px; white-space: nowrap; font-weight: 600;">+ Enqueue</button>`
+                      : `<button type="button" class="btn-ghost-icon" disabled style="font-size: 9px; padding: 2px 6px; opacity: 0.4;">Full</button>`
                   }
                 </div>
               </div>
@@ -321,45 +319,42 @@ const KillListDrawer = {
       }
     }
 
-    // 5. Render 1-Click Upcoming School Exams Prep Queue
+    // 5. Render 1-Click Upcoming School Exams Prep Queue (Acute only <= 10 days)
     const examSection = document.getElementById("killListExamQueueSection");
     const examContainer = document.getElementById("killListUpcomingExamsQueue");
     if (examSection && examContainer) {
-      const upcomingExams = (this.workload && this.workload.upcoming_exams) || [];
-      if (upcomingExams.length === 0) {
-        examContainer.innerHTML = `
-          <div style="font-size: 11px; color: var(--text-tertiary); padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 4px; border: 1px dashed rgba(255,255,255,0.06);">
-            No impending school exams (Vulcan synced). All clear for 100% TUM Metro focus.
-          </div>
-        `;
+      const allUpcomingExams = (this.workload && this.workload.upcoming_exams) || [];
+      const acuteExams = allUpcomingExams.filter((ex) => ex.days_left !== undefined && ex.days_left <= 10);
+      if (acuteExams.length === 0) {
+        examSection.style.display = "none";
       } else {
+        examSection.style.display = "block";
         const canEnqueue = count < 3;
-        examContainer.innerHTML = upcomingExams
+        examContainer.innerHTML = acuteExams
           .map((ex) => {
             const daysLeft = ex.days_left;
             const daysColor = daysLeft <= 2 ? "#fda4af" : daysLeft <= 4 ? "#fdba74" : "#c4b5fd";
             const urgencyBadge = `<span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${daysColor}; background: rgba(255,255,255,0.05); padding: 1px 5px; border-radius: 2px;">${daysLeft === 0 ? "TODAY" : daysLeft === 1 ? "TOMORROW" : `IN ${daysLeft} DAYS`}</span>`;
-            const tierBadge = `<span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary);">Tier ${ex.tier}</span>`;
+            const tierBadge = `<span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary);">Tier ${ex.tier || 1}</span>`;
 
             return `
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: rgba(254, 202, 202, 0.02); border: 1px solid rgba(254, 202, 202, 0.15); border-radius: 5px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: rgba(254, 202, 202, 0.02); border: 1px solid rgba(254, 202, 202, 0.15); border-radius: 4px;">
                 <div style="flex: 1; min-width: 0;">
-                  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
                     <span style="font-size: 10px; font-weight: 700; color: #fda4af;">${this.escapeHtml(ex.subject)}</span>
                     ${urgencyBadge}
                     ${tierBadge}
                   </div>
-                  <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  <div style="font-size: 11px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px;">
                     ${this.escapeHtml(ex.title)}
                   </div>
-                  ${ex.scope ? `<div style="font-size: 10px; color: var(--text-tertiary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Zakres: ${this.escapeHtml(ex.scope)}</div>` : ""}
                 </div>
 
                 <div>
                   ${
                     canEnqueue
-                      ? `<button type="button" class="btn-ghost-icon" onclick="KillListDrawer.enqueueExamPrep(${ex.id})" style="font-size: 10px; padding: 4px 8px; color: #fda4af; border-color: rgba(254, 202, 202, 0.3); font-weight: 600; white-space: nowrap;">+ Enqueue Prep</button>`
-                      : `<button type="button" class="btn-ghost-icon" disabled style="font-size: 10px; padding: 4px 8px; opacity: 0.4;">Full (3/3)</button>`
+                      ? `<button type="button" class="btn-ghost-icon" onclick="KillListDrawer.enqueueExamPrep(${ex.id})" style="font-size: 9px; padding: 3px 7px; color: #fda4af; border-color: rgba(254, 202, 202, 0.3); font-weight: 600; white-space: nowrap;">+ Prep</button>`
+                      : `<button type="button" class="btn-ghost-icon" disabled style="font-size: 9px; padding: 2px 6px; opacity: 0.4;">Full</button>`
                   }
                 </div>
               </div>

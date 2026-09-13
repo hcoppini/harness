@@ -609,3 +609,12 @@ class HarnessAPI:
         self._trigger_auto_sync()
         return res
 
+    def auto_sync_vulcan(self, client_date: Optional[str] = None) -> Optional[Dict[str, Any]]:
+        """Silently auto-syncs Vulcan if configured and last sync is older than 20 minutes."""
+        from app.services import vulcan_service
+        res = vulcan_service.auto_sync_vulcan_if_needed(client_date)
+        if res:
+            self._trigger_auto_sync()
+        return res
+
+

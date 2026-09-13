@@ -651,7 +651,7 @@ const MobileApp = {
 
             <!-- Next Physical Action Highlight Box -->
             <div class="next-action-box" onclick="MobileApp.editProjectNextAction(${p.id}, '${this.escapeHtml(nextAction)}', '${this.escapeHtml(milestone)}')">
-              <div class="next-action-label">Next Physical Action ✎</div>
+              <div class="next-action-label">Next Physical Action</div>
               <div class="next-action-text">${this.escapeHtml(nextAction)}</div>
             </div>
 

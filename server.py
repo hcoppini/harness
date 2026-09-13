@@ -22,6 +22,12 @@ try:
 except Exception:
     pass
 
+try:
+    from app.services import vulcan_service
+    vulcan_service.auto_sync_vulcan_if_needed()
+except Exception:
+    pass
+
 BASE_DIR = Path(__file__).resolve().parent
 UI_DIR = BASE_DIR / "ui"
 MOBILE_DIR = BASE_DIR / "mobile"
@@ -758,6 +764,14 @@ def add_manual_exam_route():
     weight = int(payload.get("weight", 2))
     res = api.add_manual_exam(subject, title, exam_date, scope, weight)
     return jsonify(res)
+
+@app.route("/api/vulcan/auto-sync", methods=["POST"])
+def auto_sync_vulcan_route():
+    payload = request.get_json(silent=True) or {}
+    client_date = payload.get("date")
+    res = api.auto_sync_vulcan(client_date)
+    return jsonify(res or {"status": "fresh"})
+
 
 # --- Layer 2: TUM Metro & Bavarian Aptitude ---
 @app.route("/api/tum/overview", methods=["GET"])

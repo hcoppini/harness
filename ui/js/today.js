@@ -41,6 +41,12 @@ const Today = {
     await this.loadSchoolPlan();
     await this.loadEasyLinks();
     await this.loadHomeworkAndExams();
+
+    // Vulcan UONET+ Silent Auto-Sync on startup & 20-min background interval
+    this.silentAutoSyncVulcan();
+    if (!this._vulcanSyncInterval) {
+      this._vulcanSyncInterval = setInterval(() => this.silentAutoSyncVulcan(), 20 * 60 * 1000);
+    }
   },
 
   bindEvents() {
@@ -190,6 +196,7 @@ const Today = {
     this.renderMiniCalendar();
     await this.load(dateStr);
     await this.loadSchoolPlan();
+    await this.loadHomeworkAndExams();
     if (window.Dashboard) {
       window.Dashboard.load();
     }
@@ -764,6 +771,22 @@ const Today = {
   },
 
   // --- Homework & Exams ---
+  async silentAutoSyncVulcan() {
+    try {
+      if (!window.pywebview || !window.pywebview.api) return;
+      if (window.pywebview.api.auto_sync_vulcan) {
+        const res = await window.pywebview.api.auto_sync_vulcan(this.selectedDateStr);
+        if (res && res.status !== "fresh") {
+          await this.loadHomeworkAndExams();
+          if (window.KillListDrawer) await window.KillListDrawer.load();
+          if (window.Dashboard) await window.Dashboard.load();
+        }
+      }
+    } catch (err) {
+      console.warn("Silent Vulcan auto-sync check:", err);
+    }
+  },
+
   async loadHomeworkAndExams() {
     try {
       if (!window.pywebview || !window.pywebview.api) return;
@@ -782,42 +805,96 @@ const Today = {
   renderHomeworkAndExams() {
     const hwContainer = document.getElementById("homeworkItemsList");
     const examContainer = document.getElementById("upcomingExamsList");
+    const hwTotalBadge = document.getElementById("homeworkTotalCountBadge");
+    const examTotalBadge = document.getElementById("examsTotalCountBadge");
+
+    if (hwTotalBadge) {
+      hwTotalBadge.textContent = `${this.homeworkList.length} Tasks Synced`;
+    }
+    if (examTotalBadge) {
+      examTotalBadge.textContent = `${this.examsList.length}`;
+    }
 
     if (hwContainer) {
       if (this.homeworkList.length === 0) {
-        hwContainer.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary);">No pending homework due.</div>`;
+        hwContainer.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 8px 4px;">No pending homework. All caught up!</div>`;
       } else {
-        hwContainer.innerHTML = this.homeworkList
-          .map((h) => {
-            let dueBadge = `${h.due_date}`;
-            if (h.days_left === 0) dueBadge = "Today";
-            else if (h.days_left === 1) dueBadge = "Tomorrow";
-            else if (h.days_left < 0) dueBadge = `${Math.abs(h.days_left)}d overdue`;
-            else dueBadge = `in ${h.days_left}d`;
+        // Horizon Radar: Group homework into
+        // 1. Due This Week (0 to 7 days)
+        // 2. Upcoming / Later Weeks (> 7 days)
+        // 3. Open Backlog / Earlier (< 0 days)
+        const dueThisWeek = this.homeworkList.filter((h) => h.days_left >= 0 && h.days_left <= 7);
+        const dueLater = this.homeworkList.filter((h) => h.days_left > 7);
+        const duePast = this.homeworkList.filter((h) => h.days_left < 0);
 
-            const isOverdue = h.days_left < 0;
+        const renderItem = (h) => {
+          let dueBadge = `${h.due_date}`;
+          let isUrgent = false;
+          let isOverdue = false;
 
-            return `
-              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 6px 8px;">
-                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 72%;">
-                  <div class="check-dot ${h.completed ? "checked" : ""}" onclick="Today.toggleHomeworkItem(${h.id})"></div>
-                  <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 600;">[${this.escapeHtml(h.subject)}]</span>
-                  <span style="font-size: 12px; color: var(--text-primary);">${this.escapeHtml(h.title)}</span>
+          if (h.days_left === 0) {
+            dueBadge = "TODAY";
+            isUrgent = true;
+          } else if (h.days_left === 1) {
+            dueBadge = "TOMORROW";
+            isUrgent = true;
+          } else if (h.days_left < 0) {
+            dueBadge = `${Math.abs(h.days_left)}d overdue`;
+            isOverdue = true;
+          } else {
+            dueBadge = `in ${h.days_left}d (${h.due_date})`;
+          }
+
+          const badgeColor = isOverdue
+            ? "border-color: #ef4444; color: #ef4444;"
+            : isUrgent
+            ? "border-color: #f59e0b; color: #f59e0b;"
+            : "border-color: rgba(196, 181, 253, 0.3); color: var(--accent-lavender);";
+
+          return `
+            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 7px 9px; margin-bottom: 2px;">
+              <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 3px;">
+                <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
+                  <div class="check-dot ${h.completed ? "checked" : ""}" onclick="Today.toggleHomeworkItem(${h.id})" title="Mark completed"></div>
+                  <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 700; white-space: nowrap;">
+                    [${this.escapeHtml(h.subject)}]
+                  </span>
                 </div>
-                <div style="display: flex; align-items: center; gap: 4px;">
-                  <span class="key-pill" style="font-size: 9px; ${isOverdue ? "border-color: #ef4444; color: #ef4444;" : ""}">${dueBadge}</span>
-                  <button class="btn-ghost-icon" style="padding: 1px 4px; font-size: 10px;" onclick="Today.deleteHomeworkItem(${h.id})">&times;</button>
+                <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                  <span class="key-pill" style="font-size: 9px; padding: 1px 5px; ${badgeColor}">${dueBadge}</span>
+                  <button class="btn-ghost-icon" style="padding: 1px 4px; font-size: 10px; color: var(--text-tertiary);" onclick="Today.deleteHomeworkItem(${h.id})" title="Delete">&times;</button>
                 </div>
               </div>
-            `;
-          })
-          .join("");
+              <div style="font-size: 11px; color: ${h.completed ? "var(--text-tertiary)" : "var(--text-primary)"}; text-decoration: ${h.completed ? "line-through" : "none"}; line-height: 1.35; white-space: pre-line; word-break: break-word; padding-left: 18px;">
+                ${this.escapeHtml(h.title)}
+              </div>
+            </div>
+          `;
+        };
+
+        let html = "";
+        if (dueThisWeek.length > 0) {
+          html += `<div style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--accent-lavender); text-transform: uppercase; letter-spacing: 0.05em; margin: 4px 0 2px 2px;">Due This Week (${dueThisWeek.length})</div>`;
+          html += dueThisWeek.map(renderItem).join("");
+        }
+
+        if (dueLater.length > 0) {
+          html += `<div style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin: 6px 0 2px 2px;">Upcoming Weeks (${dueLater.length})</div>`;
+          html += dueLater.map(renderItem).join("");
+        }
+
+        if (duePast.length > 0) {
+          html += `<div style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; margin: 6px 0 2px 2px;">Open / Earlier Backlog (${duePast.length})</div>`;
+          html += duePast.map(renderItem).join("");
+        }
+
+        hwContainer.innerHTML = html;
       }
     }
 
     if (examContainer) {
       if (this.examsList.length === 0) {
-        examContainer.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary);">No upcoming tests scheduled.</div>`;
+        examContainer.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 4px 0;">No upcoming tests scheduled.</div>`;
       } else {
         examContainer.innerHTML = this.examsList
           .map((e) => {
@@ -826,15 +903,20 @@ const Today = {
             else if (e.days_left === 1) countdown = "TOMORROW";
 
             return `
-              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 6px 8px;">
-                <div>
-                  <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 600;">[${this.escapeHtml(e.subject)}]</span>
-                  <span style="font-size: 12px; color: var(--text-primary); margin-left: 4px; font-weight: 500;">${this.escapeHtml(e.title)}</span>
-                  ${e.scope ? `<div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">Scope: ${this.escapeHtml(e.scope)}</div>` : ""}
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 6px 8px; margin-bottom: 2px;">
+                <div style="flex: 1; min-width: 0; padding-right: 6px;">
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 700;">[${this.escapeHtml(e.subject)}]</span>
+                    <span style="font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono);">${e.exam_date}</span>
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-primary); margin-top: 2px; font-weight: 500; line-height: 1.3; word-break: break-word;">
+                    ${this.escapeHtml(e.title)}
+                  </div>
+                  ${e.scope ? `<div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px; line-height: 1.25; word-break: break-word;">Zakres: ${this.escapeHtml(e.scope)}</div>` : ""}
                 </div>
-                <div style="display: flex; align-items: center; gap: 4px;">
-                  <span class="key-pill" style="font-size: 9px; color: var(--accent-purple-light);">${countdown}</span>
-                  <button class="btn-ghost-icon" style="padding: 1px 4px; font-size: 10px;" onclick="Today.deleteExamItem(${e.id})">&times;</button>
+                <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
+                  <span class="key-pill" style="font-size: 9px; color: var(--accent-purple-light); border-color: rgba(196, 181, 253, 0.3);">${countdown}</span>
+                  <button class="btn-ghost-icon" style="padding: 1px 4px; font-size: 10px; color: var(--text-tertiary);" onclick="Today.deleteExamItem(${e.id})" title="Delete">&times;</button>
                 </div>
               </div>
             `;
@@ -951,18 +1033,34 @@ const Today = {
     if (!container) return;
 
     if (total === 0) {
+      let leetCodeLabel = "Next LeetCode (Problem #5)";
+      let mathLabel = "Next Math R (Zad. 1–5)";
+      let germanLabel = "+20 German Anki";
+
+      if (window.KillListDrawer && Array.isArray(window.KillListDrawer.deliverables)) {
+        const lcDeliv = window.KillListDrawer.deliverables.find((d) => d.deliverable_id === "sep26_leetcode_15");
+        if (lcDeliv && lcDeliv.next_spec && lcDeliv.next_spec.title) {
+          leetCodeLabel = lcDeliv.next_spec.title.replace("LeetCode: ", "");
+        }
+        const mathDeliv = window.KillListDrawer.deliverables.find((d) => d.deliverable_id === "sep26_math_diag");
+        if (mathDeliv && mathDeliv.next_spec && mathDeliv.next_spec.target_spec) {
+          const specPart = mathDeliv.next_spec.target_spec.split("(")[0].trim();
+          mathLabel = `Math R (${specPart})`;
+        }
+      }
+
       container.innerHTML = `
         <div style="padding: 10px 12px; text-align: center; color: var(--text-secondary); font-size: 11px; border: 1px dashed rgba(196, 181, 253, 0.2); border-radius: 4px; background: rgba(196, 181, 253, 0.02);">
           <div style="font-weight: 600; color: var(--accent-lavender); margin-bottom: 6px;">Zero Active SGH Tasks — 1-Click Sequential Launch:</div>
           <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 6px;">
             <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.enqueueProgressive('sep26_leetcode_15')" style="font-size: 10px; padding: 3px 8px; color: #7dd3fc; border-color: rgba(125, 211, 252, 0.35);">
-              ⚡ Next LeetCode (Problem #5)
+              ${this.escapeHtml(leetCodeLabel)}
             </button>
             <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.enqueueProgressive('sep26_math_diag')" style="font-size: 10px; padding: 3px 8px; color: #c4b5fd; border-color: rgba(196, 181, 253, 0.35);">
-              ⚡ Next Math R (Zad. 1–5)
+              ${this.escapeHtml(mathLabel)}
             </button>
             <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.quickLogStudy('sep26_german_anki', 20, '20 Anki vocabulary words')" style="font-size: 10px; padding: 3px 8px; color: #6ee7b7; border-color: rgba(110, 231, 183, 0.35);">
-              ⚡ +20 German Anki
+              ${this.escapeHtml(germanLabel)}
             </button>
           </div>
         </div>
@@ -1052,6 +1150,7 @@ const Today = {
         }
         const res = await window.pywebview.api.sync_vulcan_data(this.selectedDateStr, forceRefresh);
         await this.load(this.selectedDateStr);
+        await this.loadHomeworkAndExams();
         if (window.KillListDrawer && window.KillListDrawer.isOpen) {
           await window.KillListDrawer.load();
         }

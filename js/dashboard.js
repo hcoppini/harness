@@ -488,7 +488,7 @@ window.Dashboard = {
         <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-top: 2px;">
           ${this.escapeHtml(day.schedule_name)}
         </div>
-        ${day.cutoff_info ? `<div style="font-family: var(--font-mono); font-size: 10px; color: #f59e0b; margin-top: 4px;">⚠️ Cutoff Target: ${this.escapeHtml(day.cutoff_info)}</div>` : ""}
+        ${day.cutoff_info ? `<div style="font-family: var(--font-mono); font-size: 10px; color: #f59e0b; margin-top: 4px;">Cutoff Target: ${this.escapeHtml(day.cutoff_info)}</div>` : ""}
       </div>
     `;
 

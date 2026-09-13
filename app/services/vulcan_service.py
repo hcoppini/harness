@@ -822,3 +822,31 @@ def sync_vulcan_data(
         "mode": "live" if is_live else "demo_tm1",
         "timestamp": now_iso,
     }
+
+
+def auto_sync_vulcan_if_needed(
+    client_date: Optional[str] = None,
+    max_age_minutes: int = 20,
+    conn: Optional[sqlite3.Connection] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Silently checks and auto-syncs Vulcan in the background if configured
+    and the last sync was performed more than max_age_minutes ago.
+    """
+    cfg = get_vulcan_config()
+    if not cfg.get("enabled", True):
+        return None
+
+    # Check last sync timestamp
+    last_synced = cfg.get("last_synced_at")
+    if last_synced:
+        try:
+            last_dt = datetime.fromisoformat(last_synced)
+            delta_min = (datetime.now() - last_dt).total_seconds() / 60
+            if delta_min < max_age_minutes:
+                return None  # Still fresh, skip unnecessary network call
+        except Exception:
+            pass
+
+    return sync_vulcan_data(client_date=client_date, force_refresh=True, conn=conn)
+

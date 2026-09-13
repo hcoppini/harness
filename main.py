@@ -30,6 +30,11 @@ def main():
     try:
         # Direct API bridge
         api = HarnessAPI()
+        try:
+            from app.services import vulcan_service
+            vulcan_service.auto_sync_vulcan_if_needed()
+        except Exception:
+            pass
 
         # Create native Windows desktop window using Chromium WebView2
         window = webview.create_window(
