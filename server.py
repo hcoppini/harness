@@ -181,7 +181,7 @@ def sync_exchange_endpoint():
     and returns latest merged state for all entities in a single atomic transaction.
     """
     payload = request.get_json(silent=True) or {}
-    client_data = payload.get("data", {})
+    client_data = payload.get("data") if ("data" in payload and isinstance(payload.get("data"), dict)) else payload
     from app.db import get_connection, DATA_DIR
     conn = get_connection()
     synced_count = 0
@@ -491,6 +491,49 @@ def sync_exchange_endpoint():
                 except Exception:
                     pass
 
+        # 9. Merge School Exams
+        for ex in client_data.get("school_exams", []):
+            e_id = ex.get("id")
+            if not e_id:
+                continue
+            cursor.execute("SELECT id, completed, result_percentage FROM school_exams WHERE id = ?", (e_id,))
+            loc = cursor.fetchone()
+            e_comp = 1 if ex.get("completed") else 0
+            e_res = ex.get("result_percentage")
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO school_exams (id, subject, title, exam_date, scope, completed, result_percentage)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (e_id, ex.get("subject", ""), ex.get("title", ""), ex.get("exam_date", ""), ex.get("scope", ""), e_comp, e_res),
+                )
+                synced_count += 1
+            elif loc["completed"] != e_comp or loc["result_percentage"] != e_res:
+                cursor.execute("UPDATE school_exams SET completed = ?, result_percentage = ? WHERE id = ?", (e_comp, e_res, e_id))
+                synced_count += 1
+
+        # 10. Merge Homework Items
+        for hw in client_data.get("homework_items", []):
+            h_id = hw.get("id")
+            if not h_id:
+                continue
+            cursor.execute("SELECT id, completed FROM homework_items WHERE id = ?", (h_id,))
+            loc = cursor.fetchone()
+            h_comp = 1 if hw.get("completed") else 0
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO homework_items (id, subject, title, due_date, completed, source, priority, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (h_id, hw.get("subject", ""), hw.get("title", ""), hw.get("due_date", ""), h_comp, hw.get("source", "manual"), hw.get("priority", 1), hw.get("notes", "")),
+                )
+                synced_count += 1
+            elif loc["completed"] != h_comp:
+                cursor.execute("UPDATE homework_items SET completed = ? WHERE id = ?", (h_comp, h_id))
+                synced_count += 1
+
         conn.commit()
 
         # Query and return the full merged server state
@@ -506,6 +549,8 @@ def sync_exchange_endpoint():
             "daily_logs": fetch_all("SELECT * FROM daily_logs"),
             "kill_list_items": fetch_all("SELECT * FROM kill_list_items"),
             "station_deliverable_progress": fetch_all("SELECT * FROM station_deliverable_progress"),
+            "school_exams": fetch_all("SELECT * FROM school_exams"),
+            "homework_items": fetch_all("SELECT * FROM homework_items"),
             "body_metrics": fetch_all("SELECT * FROM body_metrics"),
             "workouts": fetch_all("SELECT * FROM workouts"),
             "projects": fetch_all("SELECT * FROM projects"),
@@ -642,6 +687,76 @@ def delete_kill_item(item_id):
 def launch_kill_item():
     payload = request.get_json(silent=True) or {}
     res = api.launch_kill_item(payload.get("action_type", "url"), payload.get("target_path", ""))
+    return jsonify(res)
+
+@app.route("/api/kill-list/enqueue-progressive", methods=["POST"])
+def enqueue_progressive_deliverable():
+    payload = request.get_json(silent=True) or {}
+    deliverable_id = payload.get("deliverable_id", "")
+    date_str = payload.get("date")
+    res = api.enqueue_progressive_deliverable(deliverable_id, date_str)
+    return jsonify(res)
+
+@app.route("/api/kill-list/enqueue-exam-prep", methods=["POST"])
+def enqueue_exam_prep():
+    payload = request.get_json(silent=True) or {}
+    exam_id = int(payload.get("exam_id", 0))
+    date_str = payload.get("date")
+    res = api.enqueue_exam_prep(exam_id, date_str)
+    return jsonify(res)
+
+# --- Harness 3.0: Adaptive Workload Governor & Vulcan UONET+ ---
+@app.route("/api/workload", methods=["GET"])
+def get_workload_analysis():
+    date_str = request.args.get("date")
+    return jsonify(api.get_workload_analysis(date_str))
+
+@app.route("/api/workload/recommended", methods=["GET"])
+def get_recommended_kill_items():
+    date_str = request.args.get("date")
+    return jsonify(api.get_recommended_kill_items(date_str))
+
+@app.route("/api/vulcan/sync", methods=["POST"])
+def sync_vulcan():
+    payload = request.get_json(silent=True) or {}
+    client_date = payload.get("date")
+    force = bool(payload.get("force", False))
+    res = api.sync_vulcan_data(client_date, force)
+    return jsonify(res)
+
+@app.route("/api/vulcan/config", methods=["GET", "POST"])
+def vulcan_config():
+    if request.method == "POST":
+        payload = request.get_json(silent=True) or {}
+        success = api.save_vulcan_config(payload)
+        return jsonify({"success": success})
+    return jsonify(api.get_vulcan_config())
+
+@app.route("/api/vulcan/register", methods=["POST"])
+def register_vulcan():
+    payload = request.get_json(silent=True) or {}
+    token_input = payload.get("token") or payload.get("token_input") or ""
+    res = api.register_eduvulcan(token_input)
+    return jsonify(res)
+
+@app.route("/api/vulcan/status", methods=["GET"])
+def get_vulcan_status_route():
+    return jsonify(api.get_vulcan_status())
+
+@app.route("/api/vulcan/disconnect", methods=["POST"])
+def disconnect_vulcan_route():
+    success = api.disconnect_vulcan()
+    return jsonify({"success": success})
+
+@app.route("/api/school/exam/manual", methods=["POST"])
+def add_manual_exam_route():
+    payload = request.get_json(silent=True) or {}
+    subject = payload.get("subject", "General")
+    title = payload.get("title", "Exam")
+    exam_date = payload.get("exam_date") or datetime.now().strftime("%Y-%m-%d")
+    scope = payload.get("scope", "")
+    weight = int(payload.get("weight", 2))
+    res = api.add_manual_exam(subject, title, exam_date, scope, weight)
     return jsonify(res)
 
 # --- Layer 2: TUM Metro & Bavarian Aptitude ---

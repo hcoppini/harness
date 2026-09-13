@@ -28,6 +28,12 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(sync_service, "CONFIG_FILE", test_data / "sync_config.json")
     import server
     monkeypatch.setattr(server, "DATA_DIR", test_data)
+    from app.services import vulcan_service
+    test_vulcan_config = test_data / "vulcan_config.json"
+    if test_vulcan_config.exists():
+        test_vulcan_config.unlink()
+    monkeypatch.setattr(vulcan_service, "CONFIG_FILE", test_vulcan_config)
+
 
     app.config["TESTING"] = True
     with app.test_client() as c:
@@ -456,4 +462,120 @@ def test_four_day_selection_persistence_no_reset(client):
         assert "log" in data
         assert data["log"]["completed_blocks"] == expected["completed_blocks"]
         assert data["log"]["completed_exercises"] == expected["completed_exercises"]
+
+
+def test_harness_3_workload_and_kill_list_routes(client):
+    # 1. Sync Vulcan via POST /api/vulcan/sync
+    sync_res = client.post(
+        "/api/vulcan/sync",
+        data=json.dumps({"date": "2026-09-14", "force": True}),
+        content_type="application/json",
+    )
+    assert sync_res.status_code == 200
+    sync_data = sync_res.get_json()
+    assert sync_data["status"] == "synced"
+    assert sync_data["exams_synced"] >= 4
+
+    # 2. Get Workload Analysis via GET /api/workload
+    wl_res = client.get("/api/workload?date=2026-09-14")
+    assert wl_res.status_code == 200
+    wl_data = wl_res.get_json()
+    assert wl_data["mode"] == "SURGE"
+    assert len(wl_data["upcoming_exams"]) >= 4
+
+    # 3. Enqueue Progressive Deliverable (LeetCode #5)
+    enq_res = client.post(
+        "/api/kill-list/enqueue-progressive",
+        data=json.dumps({"deliverable_id": "sep26_leetcode_15", "date": "2026-09-14"}),
+        content_type="application/json",
+    )
+    assert enq_res.status_code == 200
+    enq_data = enq_res.get_json()
+    assert "Problem #5" in enq_data["target_spec"]
+    assert enq_data["station_deliverable_id"] == "sep26_leetcode_15"
+
+
+def test_sync_exchange_school_data(client):
+    # Test bidirectional synchronization of school exams and homework items
+    exchange_payload = {
+        "school_exams": [
+            {
+                "id": 999,
+                "subject": "Matematyka R",
+                "title": "Sprawdzian Wektory",
+                "exam_date": "2026-09-22",
+                "scope": "Iloczyn skalarny i przestrzen trójwymiarowa",
+                "completed": False,
+                "result_percentage": None,
+            }
+        ],
+        "homework_items": [
+            {
+                "id": 888,
+                "subject": "Informatyka",
+                "title": "Zadania CKE Grafy",
+                "due_date": "2026-09-20",
+                "completed": False,
+                "source": "vulcan",
+                "priority": 1,
+                "notes": "BFS/DFS",
+            }
+        ],
+    }
+
+    res = client.post(
+        "/api/sync/exchange",
+        data=json.dumps(exchange_payload),
+        content_type="application/json",
+    )
+    assert res.status_code == 200
+    merged = res.get_json()
+    data = merged.get("data", {})
+    assert "school_exams" in data
+    assert "homework_items" in data
+
+    exam_ids = [e["id"] for e in data["school_exams"]]
+    assert 999 in exam_ids
+    hw_ids = [h["id"] for h in data["homework_items"]]
+    assert 888 in hw_ids
+
+
+def test_vulcan_status_and_manual_exam_endpoints(client, tmp_path, monkeypatch):
+    from app.services import vulcan_service
+    temp_config = tmp_path / "temp_server_vulcan_config.json"
+    monkeypatch.setattr(vulcan_service, "CONFIG_FILE", temp_config)
+
+    # 1. Check status
+    res = client.get("/api/vulcan/status")
+
+    assert res.status_code == 200
+    st = res.get_json()
+    assert "mode" in st
+    assert "is_connected" in st
+
+    # 2. Add manual exam
+    manual_payload = {
+        "subject": "Informatyka R",
+        "title": "Sprawdzian: Drzewa BST",
+        "exam_date": "2026-09-25",
+        "scope": "Wstawianie, usuwanie, rotacje AVL",
+        "weight": 3,
+    }
+    res_manual = client.post(
+        "/api/school/exam/manual",
+        data=json.dumps(manual_payload),
+        content_type="application/json",
+    )
+    assert res_manual.status_code == 200
+    ex = res_manual.get_json()
+    assert ex["subject"] == "Informatyka R"
+    assert ex["title"] == "Sprawdzian: Drzewa BST"
+    assert ex["id"] is not None
+
+    # 3. Disconnect
+    res_disc = client.post("/api/vulcan/disconnect")
+    assert res_disc.status_code == 200
+    assert res_disc.get_json().get("success") is True
+
+
 

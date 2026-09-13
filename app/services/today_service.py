@@ -8,8 +8,8 @@ from typing import List, Dict, Any, Optional
 from app.db import get_connection, DATA_DIR
 
 
-def get_schedule_for_date(date_str: Optional[str] = None) -> Dict[str, Any]:
-    """Determines Schedule A, B, or C based on the day of the week."""
+def get_schedule_for_date(date_str: Optional[str] = None, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
+    """Determines Schedule A, B, or C based on the day of the week, dynamically synthesized by Workload Governor."""
     target_dt = datetime.strptime(date_str, "%Y-%m-%d") if date_str else datetime.now()
     weekday = target_dt.strftime("%A")  # Monday, Tuesday, etc.
 
@@ -27,6 +27,11 @@ def get_schedule_for_date(date_str: Optional[str] = None) -> Dict[str, Any]:
                 result = dict(sched)
                 result["key"] = key
                 result["weekday"] = weekday
+                try:
+                    from engine import workload_governor
+                    result = workload_governor.synthesize_adaptive_schedule(result, date_str=target_dt.strftime("%Y-%m-%d"), conn=conn)
+                except Exception:
+                    pass
                 return result
 
         return {"name": f"{weekday} Routine", "blocks": [], "weekday": weekday}

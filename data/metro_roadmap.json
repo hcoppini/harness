@@ -49,12 +49,12 @@
       "objective": "Diagnostic benchmarking & pure unassisted algorithmic habit building.",
       "deliverables": {
         "Academics": "Benchmark diagnostic test in Math Rozszerzona. Target first-month grade average >= 4.75.",
-        "Code": "Zero AI copilot rule activated. Complete 15 foundational HackerRank/LeetCode Easy problems writing pure algorithms by hand.",
+        "Code": "Zero AI copilot rule activated. Complete 15 foundational LeetCode Easy problems writing pure algorithms by hand (4/15 solved).",
         "SIGG": "Team registered with teacher-guardian; test environment accounts setup.",
         "German": "20 min/day active input (Nicos Weg A2 module). Target: 100 new vocabulary items in Anki.",
         "Physical": "Weight 68.5 kg, daily protein floor at 140g."
       },
-      "next_action": "Complete first 5 HackerRank problems without AI and trace variables by hand.",
+      "next_action": "Solve LeetCode Problem #5 without AI and trace variables by hand.",
       "completed_deliverables": [
         "Physical"
       ]

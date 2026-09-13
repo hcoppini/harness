@@ -78,14 +78,72 @@ def test_kill_item_with_custom_quantity(test_db):
     )
     assert item["quantity"] == 5
 
-    # Toggle complete -> increments deliverable by 5, not 1!
+    # Toggle complete -> increments deliverable by 5 (4 initial + 5 = 9)
     res = kill_list_controller.toggle_kill_item(item["id"], conn=test_db)
     assert res["success"] is True
     assert res["completed"] is True
-    assert res["deliverable"]["completed_count"] == 5
+    assert res["deliverable"]["completed_count"] == 9
 
-    # Toggle incomplete -> decrements deliverable by 5
+    # Toggle incomplete -> decrements deliverable by 5 back to initial 4
     res_undo = kill_list_controller.toggle_kill_item(item["id"], conn=test_db)
     assert res_undo["success"] is True
     assert res_undo["completed"] is False
-    assert res_undo["deliverable"]["completed_count"] == 0
+    assert res_undo["deliverable"]["completed_count"] == 4
+
+
+def test_progressive_deliverable_enqueue_and_advance(test_db):
+    test_date = "2026-09-14"
+
+    # Initial state seeded in DB: LeetCode has completed_count = 4
+    delivs = kill_list_controller.get_station_deliverables("sep-2026", conn=test_db)
+    leetcode = next(d for d in delivs if d["deliverable_id"] == "sep26_leetcode_15")
+    assert leetcode["completed_count"] == 4
+    assert "Problem #5" in leetcode["next_spec"]["target_spec"]
+
+    # 1-Click enqueue progressive deliverable
+    item = kill_list_controller.enqueue_progressive_deliverable("sep26_leetcode_15", date_str=test_date, conn=test_db)
+    assert "Problem #5" in item["target_spec"]
+    assert item["station_deliverable_id"] == "sep26_leetcode_15"
+    assert item["quantity"] == 1
+
+    # Mark item completed in SGH Library session
+    res = kill_list_controller.toggle_kill_item(item["id"], conn=test_db)
+    assert res["completed"] is True
+    assert res["deliverable"]["completed_count"] == 5
+
+    # Check that next progression auto-advanced to Problem #6!
+    delivs_after = kill_list_controller.get_station_deliverables("sep-2026", conn=test_db)
+    leetcode_after = next(d for d in delivs_after if d["deliverable_id"] == "sep26_leetcode_15")
+    assert leetcode_after["completed_count"] == 5
+    assert "Problem #6" in leetcode_after["next_spec"]["target_spec"]
+
+    # Enqueueing next day naturally gets Problem #6
+    item_next = kill_list_controller.enqueue_progressive_deliverable("sep26_leetcode_15", date_str="2026-09-15", conn=test_db)
+    assert "Problem #6" in item_next["target_spec"]
+
+
+def test_progressive_math_diag_enqueue_and_advance(test_db):
+    test_date = "2026-09-14"
+
+    # Initial state: Math R Diagnostic has completed_count = 0
+    delivs = kill_list_controller.get_station_deliverables("sep-2026", conn=test_db)
+    math_d = next(d for d in delivs if d["deliverable_id"] == "sep26_math_diag")
+    assert math_d["completed_count"] == 0
+    assert "Zadania 1–5" in math_d["next_spec"]["target_spec"]
+
+    # Enqueue first 5
+    item = kill_list_controller.enqueue_progressive_deliverable("sep26_math_diag", date_str=test_date, conn=test_db)
+    assert "Zadania 1–5" in item["target_spec"]
+    assert item["quantity"] == 5
+
+    # Complete it
+    res = kill_list_controller.toggle_kill_item(item["id"], conn=test_db)
+    assert res["completed"] is True
+    assert res["deliverable"]["completed_count"] == 5
+
+    # Check next auto-advanced to 6–10
+    delivs_after = kill_list_controller.get_station_deliverables("sep-2026", conn=test_db)
+    math_after = next(d for d in delivs_after if d["deliverable_id"] == "sep26_math_diag")
+    assert math_after["completed_count"] == 5
+    assert "Zadania 6–10" in math_after["next_spec"]["target_spec"]
+

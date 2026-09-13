@@ -25,7 +25,7 @@ SEED_PROJECTS = [
         "local_path": r"c:\Users\heito\Desktop\harness",
         "github_url": "",
         "current_milestone": "Algorithmic thinking & raw data structures (Python / C++)",
-        "next_action": "Deconstruct and solve 2 HackerRank exercises unassisted; write algorithm in plain English first",
+        "next_action": "Deconstruct and solve LeetCode Problem #5 unassisted; write algorithm in plain English first",
         "deadline": "Daily Repetition",
         "notes": "Crucial: Understand every line. If AI writes code, rewrite it from scratch with comments explaining memory & complexity.",
     },

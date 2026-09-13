@@ -330,7 +330,7 @@ def init_db(db_path: Optional[Path] = None) -> None:
     # Seed Sep '26 (Pure Syntax) Deliverables if not already seeded
     seed_deliverables = [
         ("sep26_math_diag", "sep-2026", "academics", "Math R Diagnostic Problem Sets", 40, 0, "problems", 0),
-        ("sep26_hackerrank_15", "sep-2026", "code", "HackerRank Easy/Medium without AI", 15, 0, "exercises", 0),
+        ("sep26_leetcode_15", "sep-2026", "code", "LeetCode Easy/Medium without AI", 15, 4, "exercises", 0),
         ("sep26_sigg_setup", "sep-2026", "sigg", "Team registered & Gra Testowa access", 1, 0, "gate", 0),
         ("sep26_german_anki", "sep-2026", "german", "A2 Nicos Weg Vocabulary Units", 100, 0, "words", 0),
         ("sep26_phys_protein", "sep-2026", "physical", "Daily Protein Floor Met (140g)", 30, 0, "days", 0),
@@ -344,6 +344,40 @@ def init_db(db_path: Optional[Path] = None) -> None:
             """,
             (d_id, s_id, stream, title, total, comp, unit, is_done),
         )
+
+    # Migration: Upgrade sep26_hackerrank_15 to sep26_leetcode_15 if legacy deliverable exists
+    cursor.execute("SELECT deliverable_id FROM station_deliverable_progress WHERE deliverable_id = 'sep26_leetcode_15'")
+    if cursor.fetchone():
+        cursor.execute("DELETE FROM station_deliverable_progress WHERE deliverable_id = 'sep26_hackerrank_15'")
+    else:
+        cursor.execute(
+            """
+            UPDATE station_deliverable_progress
+            SET deliverable_id = 'sep26_leetcode_15',
+                title = 'LeetCode Easy/Medium without AI'
+            WHERE deliverable_id = 'sep26_hackerrank_15';
+            """
+        )
+    # If production database, ensure LeetCode count is at least 4 (user finished 4th exercise)
+    if db_path is None or db_path == DEFAULT_DB_PATH:
+        cursor.execute(
+            """
+            UPDATE station_deliverable_progress
+            SET completed_count = CASE WHEN completed_count < 4 THEN 4 ELSE completed_count END
+            WHERE deliverable_id = 'sep26_leetcode_15';
+            """
+        )
+
+    cursor.execute(
+        """
+        UPDATE kill_list_items
+        SET station_deliverable_id = 'sep26_leetcode_15',
+            category = 'Algorithms',
+            title = 'LeetCode: Problem #5 (Unassisted)',
+            target_path = 'https://leetcode.com/problemset/all/'
+        WHERE station_deliverable_id = 'sep26_hackerrank_15';
+        """
+    )
 
     # Prune Workspace: Move Financial Agency / Polish SME Outreach to PAUSED
     cursor.execute(

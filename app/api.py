@@ -551,3 +551,61 @@ class HarnessAPI:
         cfg["auto_sync"] = auto_sync
         sync_service.save_sync_config(cfg)
         return True
+
+    # --- Harness 3.0: Vulcan UONET+ & Adaptive Workload Governor ---
+    def get_workload_analysis(self, target_date: Optional[str] = None) -> Dict[str, Any]:
+        from engine import workload_governor
+        return workload_governor.get_workload_analysis(target_date)
+
+    def get_recommended_kill_items(self, date_str: Optional[str] = None) -> List[Dict[str, Any]]:
+        from engine import workload_governor
+        return workload_governor.get_recommended_kill_items(date_str)
+
+    def enqueue_progressive_deliverable(self, deliverable_id: str, date_str: Optional[str] = None) -> Dict[str, Any]:
+        from engine import kill_list_controller
+        res = kill_list_controller.enqueue_progressive_deliverable(deliverable_id, date_str)
+        self._trigger_auto_sync()
+        return res
+
+    def enqueue_exam_prep(self, exam_id: int, date_str: Optional[str] = None) -> Dict[str, Any]:
+        from engine import kill_list_controller
+        res = kill_list_controller.enqueue_exam_prep(exam_id, date_str)
+        self._trigger_auto_sync()
+        return res
+
+    def sync_vulcan_data(self, client_date: Optional[str] = None, force_refresh: bool = False) -> Dict[str, Any]:
+        from app.services import vulcan_service
+        res = vulcan_service.sync_vulcan_data(client_date, force_refresh)
+        self._trigger_auto_sync()
+        return res
+
+    def get_vulcan_config(self) -> Dict[str, Any]:
+        from app.services import vulcan_service
+        return vulcan_service.get_vulcan_config()
+
+    def save_vulcan_config(self, config: Dict[str, Any]) -> bool:
+        from app.services import vulcan_service
+        return vulcan_service.save_vulcan_config(config)
+
+    def register_eduvulcan(self, token_input: str) -> Dict[str, Any]:
+        from app.services import vulcan_service
+        res = vulcan_service.register_eduvulcan_device(token_input)
+        self._trigger_auto_sync()
+        return res
+
+    def get_vulcan_status(self) -> Dict[str, Any]:
+        from app.services import vulcan_service
+        return vulcan_service.get_vulcan_status()
+
+    def disconnect_vulcan(self) -> bool:
+        from app.services import vulcan_service
+        res = vulcan_service.disconnect_vulcan()
+        self._trigger_auto_sync()
+        return res
+
+    def add_manual_exam(self, subject: str, title: str, exam_date: str, scope: str = "", weight: int = 2) -> Dict[str, Any]:
+        from app.services import vulcan_service
+        res = vulcan_service.add_manual_exam(subject, title, exam_date, scope, weight)
+        self._trigger_auto_sync()
+        return res
+

@@ -1,8 +1,8 @@
 /**
- * Kill List Drawer & Execution Launcher (Harness 2.1 / 3.5)
- * Eliminates decision friction during SGH Library TUM Deep Work blocks.
- * Enforces the 3-Item Rule, Evening Lock, single-click launchers, and bi-directional Metro links.
- * Supports custom quantities and fast study rep burndowns (e.g. +20 German words, +1 LeetCode).
+ * Kill List Drawer & Execution Launcher (Harness 3.0 / Executive OS)
+ * Eliminates decision friction during SGH Library / TUM Deep Work blocks.
+ * Enforces the 3-Item Rule, Evening Lock, single-click sequential Metro progression,
+ * 1-click School Exam prep (Vulcan UONET+), and single-click quick burndowns.
  */
 
 const KillListDrawer = {
@@ -19,6 +19,7 @@ const KillListDrawer = {
   })(),
   items: [],
   deliverables: [],
+  workload: null,
   paceVelocity: null,
   isEveningLocked: false,
 
@@ -39,19 +40,22 @@ const KillListDrawer = {
       backdrop.addEventListener("click", () => this.close());
     }
 
-    // Add item form
-    const form = document.getElementById("addKillItemForm");
-    if (form) {
-      form.addEventListener("submit", async (e) => {
+    // Quick add custom item form (single input)
+    const quickForm = document.getElementById("quickAddKillItemForm");
+    if (quickForm) {
+      quickForm.addEventListener("submit", async (e) => {
         e.preventDefault();
-        await this.handleAddItem();
+        await this.handleQuickAdd();
       });
     }
 
-    // Quick presets when category changes
-    const catSelect = document.getElementById("killItemCategory");
-    if (catSelect) {
-      catSelect.addEventListener("change", (e) => this.applyCategoryPresets(e.target.value));
+    // Fallback for legacy form if present
+    const legacyForm = document.getElementById("addKillItemForm");
+    if (legacyForm) {
+      legacyForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        await this.handleQuickAdd();
+      });
     }
 
     // Keyboard ESC to close
@@ -60,45 +64,6 @@ const KillListDrawer = {
         this.close();
       }
     });
-  },
-
-  applyCategoryPresets(category) {
-    const titleInput = document.getElementById("killItemTitle");
-    const specInput = document.getElementById("killItemSpec");
-    const qtyInput = document.getElementById("killItemQuantity");
-    const actionSelect = document.getElementById("killItemActionType");
-    const pathInput = document.getElementById("killItemPath");
-    const delivSelect = document.getElementById("killItemDeliverable");
-
-    if (category === "Math R") {
-      if (titleInput && !titleInput.value) titleInput.value = "Math R Diagnostic Problem Set";
-      if (specInput && !specInput.value) specInput.value = "Tasks 1–5 (Zero-AI)";
-      if (qtyInput) qtyInput.value = "5";
-      if (actionSelect) actionSelect.value = "pdf";
-      if (pathInput && !pathInput.value) pathInput.value = "https://cke.gov.pl";
-      if (delivSelect) delivSelect.value = "sep26_math_diag";
-    } else if (category === "Algorithms") {
-      if (titleInput && !titleInput.value) titleInput.value = "HackerRank Data Structures Drill";
-      if (specInput && !specInput.value) specInput.value = "1 Problem Unassisted";
-      if (qtyInput) qtyInput.value = "1";
-      if (actionSelect) actionSelect.value = "url";
-      if (pathInput && !pathInput.value) pathInput.value = "https://www.hackerrank.com/domains/algorithms";
-      if (delivSelect) delivSelect.value = "sep26_hackerrank_15";
-    } else if (category === "SIGG") {
-      if (titleInput && !titleInput.value) titleInput.value = "SIGG WIG20 Momentum Analysis";
-      if (specInput && !specInput.value) specInput.value = "Scan mWIG40 liquidity";
-      if (qtyInput) qtyInput.value = "1";
-      if (actionSelect) actionSelect.value = "workspace";
-      if (pathInput && !pathInput.value) pathInput.value = "c:\\Users\\heito\\Desktop\\polish_stocks_day_trade-main";
-      if (delivSelect) delivSelect.value = "sep26_sigg_setup";
-    } else if (category === "German") {
-      if (titleInput && !titleInput.value) titleInput.value = "A2 Nicos Weg Vocabulary & Anki";
-      if (specInput && !specInput.value) specInput.value = "20 New Words";
-      if (qtyInput) qtyInput.value = "20";
-      if (actionSelect) actionSelect.value = "url";
-      if (pathInput && !pathInput.value) pathInput.value = "https://learngerman.dw.com/en/nicos-weg/c-36519789";
-      if (delivSelect) delivSelect.value = "sep26_german_anki";
-    }
   },
 
   async open(dateStr = null) {
@@ -128,14 +93,27 @@ const KillListDrawer = {
 
       // 1. Fetch Kill List
       const res = await window.pywebview.api.get_kill_list(this.dateStr);
-      this.items = res.items || [];
-      this.isEveningLocked = Boolean(res.is_evening_locked);
+      this.items = (res && res.items) || [];
+      this.isEveningLocked = Boolean(res && res.is_evening_locked);
 
       // 2. Fetch Active Station Deliverables (Sep '26)
       this.deliverables = (await window.pywebview.api.get_station_deliverables("sep-2026")) || [];
 
       // 3. Fetch Station Velocity Ghost Beacon
-      this.paceVelocity = await window.pywebview.api.get_station_pace_velocity("sep-2026", this.dateStr);
+      try {
+        this.paceVelocity = await window.pywebview.api.get_station_pace_velocity("sep-2026", this.dateStr);
+      } catch (e) {
+        this.paceVelocity = null;
+      }
+
+      // 4. Fetch Workload Governor Analysis
+      try {
+        if (typeof window.pywebview.api.get_workload_analysis === "function") {
+          this.workload = await window.pywebview.api.get_workload_analysis(this.dateStr);
+        }
+      } catch (e) {
+        this.workload = null;
+      }
 
       this.render();
 
@@ -170,7 +148,7 @@ const KillListDrawer = {
             <span style="width: 7px; height: 7px; border-radius: 50%; background: ${isBehind ? "#f59e0b" : "#6ee7b7"}; display: inline-block;"></span>
             <span style="font-weight: 600;">${statusText}</span>
           </div>
-          <span style="font-size: 9px; opacity: 0.8;">Day ${this.paceVelocity.day_of_month}/${this.paceVelocity.total_days}</span>
+          <span style="font-size: 9px; opacity: 0.8;">Day ${this.paceVelocity.day_of_month || 1}/${this.paceVelocity.total_days || 30}</span>
         </div>
       `;
     }
@@ -181,21 +159,7 @@ const KillListDrawer = {
       lockBanner.style.display = this.isEveningLocked ? "block" : "none";
     }
 
-    // 3. Render Deliverable Dropdown in Add Form
-    const delivSelect = document.getElementById("killItemDeliverable");
-    if (delivSelect && this.deliverables.length > 0) {
-      delivSelect.innerHTML = `
-        <option value="">-- Optional: Link Deliverable --</option>
-        ${this.deliverables
-          .map(
-            (d) =>
-              `<option value="${d.deliverable_id}">[${d.stream.toUpperCase()}] ${d.title} (${d.completed_count}/${d.total_required} ${d.unit_label})</option>`
-          )
-          .join("")}
-      `;
-    }
-
-    // 4. Render Active Items (3-Item Rule Indicator)
+    // 3. Render Active Items (3-Item Rule Indicator)
     const count = this.items.length;
     const completedCount = this.items.filter((i) => i.completed).length;
 
@@ -216,105 +180,196 @@ const KillListDrawer = {
     }
 
     const itemsContainer = document.getElementById("killListItemsContainer");
-    if (!itemsContainer) return;
+    if (itemsContainer) {
+      if (count === 0) {
+        itemsContainer.innerHTML = `
+          <div style="background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.08); border-radius: 6px; padding: 20px 16px; text-align: center; color: var(--text-tertiary); font-size: 12px;">
+            <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Zero-AI Deep Work Session Ready</div>
+            <div>Select a 1-click Metro item below or enqueue an upcoming school exam prep.</div>
+          </div>
+        `;
+      } else {
+        itemsContainer.innerHTML = this.items
+          .map((item) => {
+            const isDone = item.completed;
+            const streamColor = this.getStreamColor(item.category);
+            const actionIcon = this.getActionIcon(item.action_type);
+            const delivInfo = item.deliverable;
+            const qtyBadge = item.quantity && item.quantity > 1 ? `<span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--accent-lavender); background: rgba(196, 181, 253, 0.12); padding: 1px 5px; border-radius: 2px;">+${item.quantity} reps</span>` : "";
 
-    if (count === 0) {
-      itemsContainer.innerHTML = `
-        <div style="background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.08); border-radius: 6px; padding: 24px 16px; text-align: center; color: var(--text-tertiary); font-size: 12px;">
-          <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Zero-AI SGH Library Session Ready</div>
-          <div>Queue up to 3 high-impact tasks: Math Rozszerzona, Raw CS Algorithm, and SIGG/German.</div>
-        </div>
-      `;
-    } else {
-      itemsContainer.innerHTML = this.items
-        .map((item) => {
-          const isDone = item.completed;
-          const streamColor = this.getStreamColor(item.category);
-          const actionIcon = this.getActionIcon(item.action_type);
-          const delivInfo = item.deliverable;
-          const qtyBadge = item.quantity && item.quantity > 1 ? `<span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--accent-lavender); background: rgba(196, 181, 253, 0.12); padding: 1px 5px; border-radius: 2px;">+${item.quantity} reps</span>` : "";
+            let burnDownHtml = "";
+            if (delivInfo) {
+              const paceItem = (this.paceVelocity && Array.isArray(this.paceVelocity.deliverables))
+                ? this.paceVelocity.deliverables.find((p) => p.deliverable_id === item.station_deliverable_id)
+                : null;
 
-          let burnDownHtml = "";
-          if (delivInfo) {
-            const paceItem = (this.paceVelocity && Array.isArray(this.paceVelocity.deliverables))
-              ? this.paceVelocity.deliverables.find((p) => p.deliverable_id === item.station_deliverable_id)
-              : null;
-
-            let pacePill = "";
-            if (paceItem) {
-              if (paceItem.is_behind) {
-                pacePill = `<span style="color: #f59e0b; font-weight: 600; margin-left: 6px;">[Deficit: -${paceItem.deficit} ${paceItem.unit_label}]</span>`;
-              } else {
-                pacePill = `<span style="color: #6ee7b7; font-weight: 600; margin-left: 6px;">[Optimal: +${Math.max(0, paceItem.pace_delta)} ${paceItem.unit_label}]</span>`;
+              let pacePill = "";
+              if (paceItem) {
+                if (paceItem.is_behind) {
+                  pacePill = `<span style="color: #f59e0b; font-weight: 600; margin-left: 6px;">[Deficit: -${paceItem.deficit} ${paceItem.unit_label}]</span>`;
+                } else {
+                  pacePill = `<span style="color: #6ee7b7; font-weight: 600; margin-left: 6px;">[Optimal: +${Math.max(0, paceItem.pace_delta)} ${paceItem.unit_label}]</span>`;
+                }
               }
+
+              burnDownHtml = `
+                <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 6px; font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">
+                  <span style="color: var(--accent-lavender); font-weight: 600;">Burn-down:</span>
+                  <span>${delivInfo.completed_count}/${delivInfo.total_required} ${delivInfo.unit_label}</span>
+                  ${delivInfo.is_completed ? '<span style="color: #6ee7b7; font-weight: 700; margin-left: 6px;">(COMPLETE)</span>' : pacePill}
+                </div>
+              `;
             }
 
-            burnDownHtml = `
-              <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 6px; font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">
-                <span style="color: var(--accent-lavender); font-weight: 600;">Burn-down:</span>
-                <span>${delivInfo.completed_count}/${delivInfo.total_required} ${delivInfo.unit_label}</span>
-                ${delivInfo.is_completed ? '<span style="color: #6ee7b7; font-weight: 700; margin-left: 6px;">(COMPLETE)</span>' : pacePill}
+            return `
+              <div class="kill-item-card ${isDone ? "done" : ""}" style="background: #0d0f12; border: 1px solid ${isDone ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.08)"}; border-radius: 6px; padding: 12px 14px; margin-bottom: 8px; transition: all 0.15s ease;">
+                <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;">
+                  <!-- Checkbox -->
+                  <div 
+                    class="check-dot ${isDone ? "checked" : ""}" 
+                    onclick="KillListDrawer.toggleItem('${item.id}')"
+                    title="Mark kill-item completed and advance progressive Metro counter"
+                    style="margin-top: 3px; cursor: pointer; flex-shrink: 0;"
+                  ></div>
+
+                  <!-- Info Block -->
+                  <div style="flex: 1; min-width: 0;">
+                    <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                      <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${streamColor}; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 2px;">
+                        ${this.escapeHtml(item.category)}
+                      </span>
+                      ${qtyBadge}
+                      ${item.target_spec ? `<span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary);">${this.escapeHtml(item.target_spec)}</span>` : ""}
+                    </div>
+
+                    <div style="font-size: 13px; font-weight: 600; color: ${isDone ? "var(--text-tertiary)" : "var(--text-primary)"}; text-decoration: ${isDone ? "line-through" : "none"}; line-height: 1.4; word-break: break-word;">
+                      ${this.escapeHtml(item.title)}
+                    </div>
+
+                    ${burnDownHtml}
+                  </div>
+
+                  <!-- Launch & Delete Buttons -->
+                  <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0;">
+                    <button 
+                      class="btn-ghost-icon launch-btn" 
+                      onclick="KillListDrawer.launchItem('${item.action_type}', '${this.escapeJs(item.target_path)}')"
+                      title="Launch ${item.action_type.toUpperCase()}"
+                      style="padding: 4px 8px; font-size: 10px; font-family: var(--font-mono); display: flex; align-items: center; gap: 4px; border-color: rgba(255,255,255,0.12);"
+                    >
+                      <span>${actionIcon}</span>
+                      <span>Launch</span>
+                    </button>
+
+                    <button 
+                      class="btn-ghost-icon" 
+                      onclick="KillListDrawer.deleteItem('${item.id}')"
+                      title="Delete item"
+                      style="padding: 2px 6px; font-size: 10px; color: var(--text-tertiary);"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                </div>
               </div>
             `;
-          }
-
-          return `
-            <div class="kill-item-card ${isDone ? "done" : ""}" style="background: #0d0f12; border: 1px solid ${isDone ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.08)"}; border-radius: 6px; padding: 14px; margin-bottom: 10px; transition: all 0.15s ease;">
-              <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;">
-                <!-- Checkbox -->
-                <div 
-                  class="check-dot ${isDone ? "checked" : ""}" 
-                  onclick="KillListDrawer.toggleItem('${item.id}')"
-                  title="Mark kill-item completed and increment Metro deliverable"
-                  style="margin-top: 3px; cursor: pointer; flex-shrink: 0;"
-                ></div>
-
-                <!-- Info Block -->
-                <div style="flex: 1; min-width: 0;">
-                  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                    <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${streamColor}; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 2px;">
-                      ${this.escapeHtml(item.category)}
-                    </span>
-                    ${qtyBadge}
-                    ${item.target_spec ? `<span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary);">${this.escapeHtml(item.target_spec)}</span>` : ""}
-                  </div>
-
-                  <div style="font-size: 13px; font-weight: 600; color: ${isDone ? "var(--text-tertiary)" : "var(--text-primary)"}; text-decoration: ${isDone ? "line-through" : "none"}; line-height: 1.4; word-break: break-word;">
-                    ${this.escapeHtml(item.title)}
-                  </div>
-
-                  ${burnDownHtml}
-                </div>
-
-                <!-- Launch Button -->
-                <div style="display: flex; flex-direction: column; align-items: flex-end; gap: 6px; flex-shrink: 0;">
-                  <button 
-                    class="btn-ghost-icon launch-btn" 
-                    onclick="KillListDrawer.launchItem('${item.action_type}', '${this.escapeJs(item.target_path)}')"
-                    title="Launch ${item.action_type.toUpperCase()}"
-                    style="padding: 4px 8px; font-size: 10px; font-family: var(--font-mono); display: flex; align-items: center; gap: 4px; border-color: rgba(255,255,255,0.12);"
-                  >
-                    <span>${actionIcon}</span>
-                    <span>Launch</span>
-                  </button>
-
-                  <button 
-                    class="btn-ghost-icon" 
-                    onclick="KillListDrawer.deleteItem('${item.id}')"
-                    title="Delete item"
-                    style="padding: 2px 6px; font-size: 10px; color: var(--text-tertiary);"
-                  >
-                    &times;
-                  </button>
-                </div>
-              </div>
-            </div>
-          `;
-        })
-        .join("");
+          })
+          .join("");
+      }
     }
 
-    // 5. Add Form Lock Condition (3-Item Rule Enforced)
+    // 4. Render 1-Click Metro Deliverables Sequential Queue
+    const metroContainer = document.getElementById("killListMetroDeliverablesQueue");
+    if (metroContainer) {
+      if (!this.deliverables || this.deliverables.length === 0) {
+        metroContainer.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 8px;">No active Metro deliverables found.</div>`;
+      } else {
+        const canEnqueue = count < 3;
+        metroContainer.innerHTML = this.deliverables
+          .map((d) => {
+            const nextSpec = d.next_spec;
+            const isCompleted = d.is_completed || d.completed_count >= d.total_required;
+            const streamColor = this.getStreamColor(d.stream);
+            const targetSpecLabel = nextSpec ? nextSpec.target_spec : "";
+
+            return `
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.07); border-radius: 5px;">
+                <div style="flex: 1; min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                    <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${streamColor}; text-transform: uppercase;">${this.escapeHtml(d.stream)}</span>
+                    <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">${d.completed_count}/${d.total_required} ${d.unit_label}</span>
+                  </div>
+                  <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${this.escapeHtml(d.title)}
+                  </div>
+                  ${targetSpecLabel ? `<div style="font-family: var(--font-mono); font-size: 11px; color: var(--accent-lavender); margin-top: 2px;">Next: ${this.escapeHtml(targetSpecLabel)}</div>` : ""}
+                </div>
+
+                <div>
+                  ${
+                    isCompleted
+                      ? `<span class="mono-chip done" style="font-size: 10px;">DONE</span>`
+                      : canEnqueue
+                      ? `<button type="button" class="btn-primary" onclick="KillListDrawer.enqueueProgressive('${d.deliverable_id}')" style="font-size: 10px; padding: 4px 9px; white-space: nowrap; font-weight: 600;">+ Enqueue</button>`
+                      : `<button type="button" class="btn-ghost-icon" disabled style="font-size: 10px; padding: 4px 8px; opacity: 0.4;">Full (3/3)</button>`
+                  }
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+    }
+
+    // 5. Render 1-Click Upcoming School Exams Prep Queue
+    const examSection = document.getElementById("killListExamQueueSection");
+    const examContainer = document.getElementById("killListUpcomingExamsQueue");
+    if (examSection && examContainer) {
+      const upcomingExams = (this.workload && this.workload.upcoming_exams) || [];
+      if (upcomingExams.length === 0) {
+        examContainer.innerHTML = `
+          <div style="font-size: 11px; color: var(--text-tertiary); padding: 8px 10px; background: rgba(255,255,255,0.02); border-radius: 4px; border: 1px dashed rgba(255,255,255,0.06);">
+            No impending school exams (Vulcan synced). All clear for 100% TUM Metro focus.
+          </div>
+        `;
+      } else {
+        const canEnqueue = count < 3;
+        examContainer.innerHTML = upcomingExams
+          .map((ex) => {
+            const daysLeft = ex.days_left;
+            const daysColor = daysLeft <= 2 ? "#fda4af" : daysLeft <= 4 ? "#fdba74" : "#c4b5fd";
+            const urgencyBadge = `<span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${daysColor}; background: rgba(255,255,255,0.05); padding: 1px 5px; border-radius: 2px;">${daysLeft === 0 ? "TODAY" : daysLeft === 1 ? "TOMORROW" : `IN ${daysLeft} DAYS`}</span>`;
+            const tierBadge = `<span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary);">Tier ${ex.tier}</span>`;
+
+            return `
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 12px; background: rgba(254, 202, 202, 0.02); border: 1px solid rgba(254, 202, 202, 0.15); border-radius: 5px;">
+                <div style="flex: 1; min-width: 0;">
+                  <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+                    <span style="font-size: 10px; font-weight: 700; color: #fda4af;">${this.escapeHtml(ex.subject)}</span>
+                    ${urgencyBadge}
+                    ${tierBadge}
+                  </div>
+                  <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                    ${this.escapeHtml(ex.title)}
+                  </div>
+                  ${ex.scope ? `<div style="font-size: 10px; color: var(--text-tertiary); margin-top: 1px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Zakres: ${this.escapeHtml(ex.scope)}</div>` : ""}
+                </div>
+
+                <div>
+                  ${
+                    canEnqueue
+                      ? `<button type="button" class="btn-ghost-icon" onclick="KillListDrawer.enqueueExamPrep(${ex.id})" style="font-size: 10px; padding: 4px 8px; color: #fda4af; border-color: rgba(254, 202, 202, 0.3); font-weight: 600; white-space: nowrap;">+ Enqueue Prep</button>`
+                      : `<button type="button" class="btn-ghost-icon" disabled style="font-size: 10px; padding: 4px 8px; opacity: 0.4;">Full (3/3)</button>`
+                  }
+                </div>
+              </div>
+            `;
+          })
+          .join("");
+      }
+    }
+
+    // 6. 3-Item Rule Capacity Notice & Quick Add Visibility
     const addCard = document.getElementById("killListAddCard");
     const fullNotice = document.getElementById("killListFullNotice");
     if (count >= 3) {
@@ -388,6 +443,37 @@ const KillListDrawer = {
     }
   },
 
+  async enqueueProgressive(deliverableId) {
+    try {
+      if (!window.pywebview || !window.pywebview.api) return;
+      await window.pywebview.api.enqueue_progressive_deliverable(deliverableId, this.dateStr);
+      await this.load();
+      if (window.Today) await window.Today.load(this.dateStr);
+      if (window.Dashboard) await window.Dashboard.load();
+      if (window.MetroMap) await window.MetroMap.load();
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast("Enqueued auto-advancing Metro deliverable");
+      }
+    } catch (err) {
+      alert(err.message || "Failed to enqueue deliverable");
+    }
+  },
+
+  async enqueueExamPrep(examId) {
+    try {
+      if (!window.pywebview || !window.pywebview.api) return;
+      await window.pywebview.api.enqueue_exam_prep(examId, this.dateStr);
+      await this.load();
+      if (window.Today) await window.Today.load(this.dateStr);
+      if (window.Dashboard) await window.Dashboard.load();
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast("Enqueued exam prep to Kill List");
+      }
+    } catch (err) {
+      alert(err.message || "Failed to enqueue exam prep");
+    }
+  },
+
   async quickLogStudy(deliverableId, count = 1, notes = "") {
     try {
       if (window.pywebview && window.pywebview.api) {
@@ -408,46 +494,56 @@ const KillListDrawer = {
     }
   },
 
-  async handleAddItem() {
-    const catInput = document.getElementById("killItemCategory");
-    const titleInput = document.getElementById("killItemTitle");
-    const specInput = document.getElementById("killItemSpec");
-    const qtyInput = document.getElementById("killItemQuantity");
-    const actionInput = document.getElementById("killItemActionType");
-    const pathInput = document.getElementById("killItemPath");
-    const delivInput = document.getElementById("killItemDeliverable");
+  async handleQuickAdd() {
+    const titleInput = document.getElementById("quickKillItemTitle") || document.getElementById("killItemTitle");
+    const text = titleInput ? titleInput.value.trim() : "";
+    if (!text) return;
 
-    const category = catInput ? catInput.value : "Math R";
-    const title = titleInput ? titleInput.value.trim() : "";
-    const spec = specInput ? specInput.value.trim() : "";
-    const quantity = qtyInput ? parseInt(qtyInput.value, 10) || 1 : 1;
-    const actionType = actionInput ? actionInput.value : "url";
-    const targetPath = pathInput ? pathInput.value.trim() : "";
-    const delivId = delivInput ? delivInput.value : "";
+    let cat = "Secondary";
+    let actionType = "url";
+    let targetPath = text;
+    let spec = "";
 
-    if (!title) {
-      alert("Please enter a task title.");
-      return;
+    const lower = text.toLowerCase();
+    if (lower.includes("math") || lower.includes("matemat") || lower.includes("cke")) {
+      cat = "Math R";
+      actionType = "pdf";
+      targetPath = "https://cke.gov.pl";
+    } else if (lower.includes("leet") || lower.includes("algo") || lower.includes("code")) {
+      cat = "Algorithms";
+      actionType = "url";
+      targetPath = "https://leetcode.com";
+    } else if (lower.includes("german") || lower.includes("deutsch") || lower.includes("anki")) {
+      cat = "German";
+      actionType = "url";
+      targetPath = "https://learngerman.dw.com";
+    } else if (lower.includes("sigg") || lower.includes("gpw")) {
+      cat = "SIGG";
+      actionType = "workspace";
+      targetPath = "c:\\Users\\heito\\Desktop\\polish_stocks_day_trade-main";
+    } else if (text.startsWith("http://") || text.startsWith("https://")) {
+      actionType = "url";
+    } else if (text.toLowerCase().endsWith(".pdf")) {
+      actionType = "pdf";
+    } else {
+      actionType = "url";
+      targetPath = "";
     }
 
     try {
       if (window.pywebview && window.pywebview.api) {
         await window.pywebview.api.add_kill_item(
-          category,
-          title,
+          cat,
+          text,
           actionType,
           targetPath,
           spec,
-          delivId || null,
-          this.dateStr,
-          quantity
+          null,
+          1,
+          this.dateStr
         );
 
-        // Clear title, spec, and reset qty
         if (titleInput) titleInput.value = "";
-        if (specInput) specInput.value = "";
-        if (qtyInput) qtyInput.value = "1";
-
         await this.load();
         if (window.Today) await window.Today.load(this.dateStr);
         if (window.Dashboard) await window.Dashboard.load();

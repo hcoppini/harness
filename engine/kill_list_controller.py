@@ -211,6 +211,10 @@ def add_kill_item(
 
     qty = max(1, int(quantity or 1))
     item_id = f"kill_{uuid.uuid4().hex[:8]}"
+    d_id = station_deliverable_id or None
+    if d_id == "sep26_hackerrank_15":
+        d_id = "sep26_leetcode_15"
+
     cursor.execute(
         """
         INSERT INTO kill_list_items 
@@ -225,7 +229,7 @@ def add_kill_item(
             action_type.strip().lower(),
             target_path.strip(),
             target_spec.strip(),
-            station_deliverable_id or None,
+            d_id,
             qty,
         ),
     )
@@ -246,6 +250,155 @@ def add_kill_item(
         "quantity": qty,
         "completed": False,
     }
+
+
+def compute_progressive_spec(deliverable_id: str, completed_count: int, total_required: int = 100) -> Dict[str, Any]:
+    """
+    Computes dynamic next progressive target specification, quantity, and resource path.
+    Enables automatic sequential advancement (e.g. CKE Zadania 1–5 -> 6–10, LeetCode #4 -> #5).
+    """
+    d_id = (deliverable_id or "").lower()
+    comp = max(0, int(completed_count or 0))
+    total = max(1, int(total_required or 100))
+
+    if "math" in d_id:
+        step = 5
+        start = comp + 1
+        end = min(total, comp + step)
+        return {
+            "category": "Math R",
+            "title": f"Math R Diagnostic: Zadania {start}–{end}",
+            "target_spec": f"Zadania {start}–{end} (Zero-AI, pen & paper)",
+            "quantity": step,
+            "action_type": "pdf",
+            "target_path": "https://cke.gov.pl",
+        }
+    elif "leetcode" in d_id or "hackerrank" in d_id or "code" in d_id:
+        prob_num = comp + 1
+        return {
+            "category": "Algorithms",
+            "title": f"LeetCode: Problem #{prob_num} (Unassisted)",
+            "target_spec": f"Problem #{prob_num} (Zero-AI, trace by hand)",
+            "quantity": 1,
+            "action_type": "url",
+            "target_path": "https://leetcode.com/problemset/all/",
+        }
+    elif "german" in d_id or "anki" in d_id:
+        step = 20
+        start = comp + 1
+        end = min(total, comp + step)
+        return {
+            "category": "German",
+            "title": f"German Vocabulary: Words {start}–{end}",
+            "target_spec": f"Words {start}–{end} (Nicos Weg A2)",
+            "quantity": step,
+            "action_type": "url",
+            "target_path": "https://learngerman.dw.com/en/nicos-weg/c-36519789",
+        }
+    elif "sigg" in d_id:
+        return {
+            "category": "SIGG",
+            "title": "SIGG 2025/2026: Scanner Workspace",
+            "target_spec": "Scan mWIG40 momentum & liquidity",
+            "quantity": 1,
+            "action_type": "workspace",
+            "target_path": r"c:\Users\heito\Desktop\polish_stocks_day_trade-main",
+        }
+    elif "protein" in d_id or "phys" in d_id:
+        return {
+            "category": "Physical",
+            "title": "Nutrition: 140g Daily Protein Floor",
+            "target_spec": "Log 140g high-protein meals",
+            "quantity": 1,
+            "action_type": "url",
+            "target_path": "https://www.myfitnesspal.com",
+        }
+    else:
+        return {
+            "category": "Deep Work",
+            "title": f"Next Session Deliverable Rep",
+            "target_spec": f"Sequential target #{comp + 1}",
+            "quantity": 1,
+            "action_type": "url",
+            "target_path": "",
+        }
+
+
+def enqueue_progressive_deliverable(
+    deliverable_id: str,
+    date_str: Optional[str] = None,
+    conn: Optional[sqlite3.Connection] = None,
+) -> Dict[str, Any]:
+    """1-click enqueues the next progressive sequential deliverable into the Kill List."""
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM station_deliverable_progress WHERE deliverable_id = ?", (deliverable_id,))
+    row = cursor.fetchone()
+    if not row:
+        if close_conn:
+            conn.close()
+        raise ValueError(f"Deliverable {deliverable_id} not found")
+
+    prog = compute_progressive_spec(deliverable_id, row["completed_count"], row["total_required"])
+    res = add_kill_item(
+        category=prog["category"],
+        title=prog["title"],
+        action_type=prog["action_type"],
+        target_path=prog["target_path"],
+        target_spec=prog["target_spec"],
+        station_deliverable_id=deliverable_id,
+        quantity=prog["quantity"],
+        date_str=date_str,
+        conn=conn,
+    )
+
+    if close_conn:
+        conn.close()
+    return res
+
+
+def enqueue_exam_prep(
+    exam_id: int,
+    date_str: Optional[str] = None,
+    conn: Optional[sqlite3.Connection] = None,
+) -> Dict[str, Any]:
+    """1-click enqueues an upcoming school exam preparation session into the Kill List."""
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM school_exams WHERE id = ?", (exam_id,))
+    row = cursor.fetchone()
+    if not row:
+        if close_conn:
+            conn.close()
+        raise ValueError(f"Exam {exam_id} not found")
+
+    title = f"Exam Prep: {row['subject']} ({row['title']})"
+    scope_str = f" — Scope: {row['scope']}" if row['scope'] else ""
+    target_spec = f"Core concept drill & problem sets{scope_str}"
+
+    res = add_kill_item(
+        category="Exam Prep",
+        title=title,
+        action_type="pdf",
+        target_path="https://cke.gov.pl",
+        target_spec=target_spec,
+        station_deliverable_id=None,
+        quantity=1,
+        date_str=date_str,
+        conn=conn,
+    )
+
+    if close_conn:
+        conn.close()
+    return res
 
 
 def complete_kill_item(item_id: str, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
@@ -272,6 +425,8 @@ def complete_kill_item(item_id: str, conn: Optional[sqlite3.Connection] = None) 
         return {"success": True, "already_completed": True}
 
     deliverable_id = row["station_deliverable_id"]
+    if deliverable_id == "sep26_hackerrank_15":
+        deliverable_id = "sep26_leetcode_15"
     qty = row["quantity"] if "quantity" in row.keys() and row["quantity"] else 1
 
     cursor.execute("UPDATE kill_list_items SET completed = 1 WHERE id = ?", (item_id,))
@@ -331,6 +486,8 @@ def toggle_kill_item(item_id: str, conn: Optional[sqlite3.Connection] = None) ->
     current_status = row["completed"]
     new_status = 0 if current_status == 1 else 1
     deliverable_id = row["station_deliverable_id"]
+    if deliverable_id == "sep26_hackerrank_15":
+        deliverable_id = "sep26_leetcode_15"
     qty = row["quantity"] if "quantity" in row.keys() and row["quantity"] else 1
 
     cursor.execute("UPDATE kill_list_items SET completed = ? WHERE id = ?", (new_status, item_id))
@@ -420,6 +577,7 @@ def get_station_deliverables(
             "completed_count": r["completed_count"],
             "unit_label": r["unit_label"],
             "is_completed": bool(r["is_completed"]),
+            "next_spec": compute_progressive_spec(r["deliverable_id"], r["completed_count"], r["total_required"]),
         }
         for r in rows
     ]

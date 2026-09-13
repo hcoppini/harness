@@ -31,4 +31,8 @@ Thumbs.db
 *.db-wal
 *.db-shm
 
+# Private credentials & local school sync tokens
+data/vulcan_config.json
+
+
 

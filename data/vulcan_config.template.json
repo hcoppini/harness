@@ -1,0 +1,11 @@
+{
+  "enabled": true,
+  "service_url": "https://lekcjaplus.vulcan.net.pl",
+  "student_symbol": "warszawamokotow",
+  "student_name": "Janek Smagiel",
+  "username": "",
+  "token": "",
+  "registered_device": null,
+  "last_synced_at": null,
+  "demo_mode": true
+}

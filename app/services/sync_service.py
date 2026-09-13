@@ -803,6 +803,8 @@ def sync_with_web_server(conn: sqlite3.Connection, cfg: Optional[Dict[str, Any]]
     local_data["daily_logs"] = fetch_all("SELECT * FROM daily_logs")
     local_data["kill_list_items"] = fetch_all("SELECT * FROM kill_list_items")
     local_data["station_deliverable_progress"] = fetch_all("SELECT * FROM station_deliverable_progress")
+    local_data["school_exams"] = fetch_all("SELECT * FROM school_exams")
+    local_data["homework_items"] = fetch_all("SELECT * FROM homework_items")
     local_data["body_metrics"] = fetch_all("SELECT * FROM body_metrics")
     local_data["workouts"] = fetch_all("SELECT * FROM workouts")
     local_data["projects"] = fetch_all("SELECT * FROM projects")
@@ -1137,6 +1139,51 @@ def sync_with_web_server(conn: sqlite3.Connection, cfg: Optional[Dict[str, Any]]
                         json.dump(loc_metro, f, indent=2, ensure_ascii=False)
             except Exception:
                 pass
+
+    # 9. School Exams
+    if "school_exams" in remote_data:
+        for ex in remote_data["school_exams"]:
+            e_id = ex.get("id")
+            if not e_id:
+                continue
+            cursor.execute("SELECT id, completed, result_percentage FROM school_exams WHERE id = ?", (e_id,))
+            loc = cursor.fetchone()
+            e_comp = 1 if ex.get("completed") else 0
+            e_res = ex.get("result_percentage")
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO school_exams (id, subject, title, exam_date, scope, completed, result_percentage)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (e_id, ex.get("subject", ""), ex.get("title", ""), ex.get("exam_date", ""), ex.get("scope", ""), e_comp, e_res),
+                )
+                synced_count += 1
+            elif loc["completed"] != e_comp or loc["result_percentage"] != e_res:
+                cursor.execute("UPDATE school_exams SET completed = ?, result_percentage = ? WHERE id = ?", (e_comp, e_res, e_id))
+                synced_count += 1
+
+    # 10. Homework Items
+    if "homework_items" in remote_data:
+        for hw in remote_data["homework_items"]:
+            h_id = hw.get("id")
+            if not h_id:
+                continue
+            cursor.execute("SELECT id, completed FROM homework_items WHERE id = ?", (h_id,))
+            loc = cursor.fetchone()
+            h_comp = 1 if hw.get("completed") else 0
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO homework_items (id, subject, title, due_date, completed, source, priority, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (h_id, hw.get("subject", ""), hw.get("title", ""), hw.get("due_date", ""), h_comp, hw.get("source", "manual"), hw.get("priority", 1), hw.get("notes", "")),
+                )
+                synced_count += 1
+            elif loc["completed"] != h_comp:
+                cursor.execute("UPDATE homework_items SET completed = ? WHERE id = ?", (h_comp, h_id))
+                synced_count += 1
 
     conn.commit()
     return {"status": "synced", "synced_count": synced_count, "timestamp": datetime.now().isoformat()}

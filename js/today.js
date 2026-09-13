@@ -318,6 +318,9 @@ const Today = {
     const dayNameEl = document.getElementById("scheduleDayName");
     const descEl = document.getElementById("scheduleDescription");
     const blocksContainer = document.getElementById("routineBlocksContainer");
+    const wlBadge = document.getElementById("workloadBadge");
+    const inlineKillCard = document.getElementById("todayInlineKillListCard");
+    const inlineKillTitle = document.getElementById("todayInlineKillListTitle");
 
     if (!this.schedule || !blocksContainer) return;
 
@@ -325,7 +328,55 @@ const Today = {
     if (dayNameEl) dayNameEl.textContent = `${this.schedule.weekday || ""} • ${this.schedule.name || ""}`;
     if (descEl) descEl.textContent = this.schedule.description || "";
 
+    // Harness 3.0: Workload Governor Badge
+    if (wlBadge) {
+      const wl = this.schedule.workload;
+      if (wl && wl.mode) {
+        wlBadge.style.display = "inline-block";
+        wlBadge.textContent = wl.mode;
+        if (wl.mode === "SURGE") {
+          wlBadge.className = "mono-chip";
+          wlBadge.style.background = "rgba(239, 68, 68, 0.15)";
+          wlBadge.style.color = "#f87171";
+          wlBadge.style.border = "1px solid rgba(239, 68, 68, 0.35)";
+          wlBadge.title = `Surge Protocol: Academic load ${wl.academic_load_score}/100. High test density defense. Commute cutoff 16:30.`;
+        } else if (wl.mode === "BALANCED") {
+          wlBadge.className = "mono-chip lavender";
+          wlBadge.style.background = "";
+          wlBadge.style.color = "";
+          wlBadge.style.border = "";
+          wlBadge.title = `Balanced Mode: Academic load ${wl.academic_load_score}/100. Dual-track TUM Metro & school prep.`;
+        } else {
+          wlBadge.className = "mono-chip";
+          wlBadge.style.background = "rgba(110, 231, 183, 0.12)";
+          wlBadge.style.color = "#6ee7b7";
+          wlBadge.style.border = "1px solid rgba(110, 231, 183, 0.3)";
+          wlBadge.title = `Cruise Mode: Academic load ${wl.academic_load_score}/100. 100% TUM Metro priority focus.`;
+        }
+      } else {
+        wlBadge.style.display = "none";
+      }
+    }
+
     const blocks = this.schedule.blocks || [];
+    const isSunday = this.schedule.key === "G_REST" || (this.schedule.weekday || "").toLowerCase().includes("sun");
+    const hasDeepWork = blocks.some((b) => b.type === "deep_work" || (b.focus && (b.focus.includes("Deep Work") || b.focus.includes("SGH Library"))));
+
+    // Harness 3.0: Kill List Visibility Rule
+    // Hide completely on days without SGH Library / deep work sessions (e.g. Sunday rest).
+    // On home sprint days (Saturday), label it "TUM DEEP WORK KILL LIST".
+    // On weekdays with SGH Library, label it "SGH LIBRARY KILL LIST".
+    if (inlineKillCard) {
+      if (!hasDeepWork || isSunday) {
+        inlineKillCard.style.display = "none";
+      } else {
+        inlineKillCard.style.display = "block";
+        if (inlineKillTitle) {
+          const isSgh = blocks.some((b) => (b.focus && b.focus.includes("SGH Library")) || (b.activity && b.activity.includes("SGH")));
+          inlineKillTitle.textContent = isSgh ? "SGH LIBRARY KILL LIST" : "TUM DEEP WORK KILL LIST";
+        }
+      }
+    }
     blocksContainer.innerHTML = blocks
       .map((block, idx) => {
         const isDeepWork = block.type === "deep_work" || (block.focus && block.focus.includes("SGH Library"));
@@ -901,8 +952,19 @@ const Today = {
 
     if (total === 0) {
       container.innerHTML = `
-        <div style="padding: 12px; text-align: center; color: var(--text-tertiary); font-size: 11px; border: 1px dashed rgba(255,255,255,0.06); border-radius: 4px;">
-          No SGH deep work tasks active today. Click <strong>+20 DE Words</strong>, <strong>+1 LeetCode</strong>, or <strong>Manage &rarr;</strong> to enqueue.
+        <div style="padding: 10px 12px; text-align: center; color: var(--text-secondary); font-size: 11px; border: 1px dashed rgba(196, 181, 253, 0.2); border-radius: 4px; background: rgba(196, 181, 253, 0.02);">
+          <div style="font-weight: 600; color: var(--accent-lavender); margin-bottom: 6px;">Zero Active SGH Tasks — 1-Click Sequential Launch:</div>
+          <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 6px;">
+            <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.enqueueProgressive('sep26_leetcode_15')" style="font-size: 10px; padding: 3px 8px; color: #7dd3fc; border-color: rgba(125, 211, 252, 0.35);">
+              ⚡ Next LeetCode (Problem #5)
+            </button>
+            <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.enqueueProgressive('sep26_math_diag')" style="font-size: 10px; padding: 3px 8px; color: #c4b5fd; border-color: rgba(196, 181, 253, 0.35);">
+              ⚡ Next Math R (Zad. 1–5)
+            </button>
+            <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.quickLogStudy('sep26_german_anki', 20, '20 Anki vocabulary words')" style="font-size: 10px; padding: 3px 8px; color: #6ee7b7; border-color: rgba(110, 231, 183, 0.35);">
+              ⚡ +20 German Anki
+            </button>
+          </div>
         </div>
       `;
       return;
@@ -980,6 +1042,230 @@ const Today = {
         `;
       })
       .join("");
+  },
+
+  async syncVulcan(forceRefresh = false) {
+    try {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.sync_vulcan_data) {
+        if (window.HarnessApp && window.HarnessApp.showToast) {
+          window.HarnessApp.showToast("Connecting to Vulcan / eduVULCAN...");
+        }
+        const res = await window.pywebview.api.sync_vulcan_data(this.selectedDateStr, forceRefresh);
+        await this.load(this.selectedDateStr);
+        if (window.KillListDrawer && window.KillListDrawer.isOpen) {
+          await window.KillListDrawer.load();
+        }
+        if (window.MetroMap) {
+          await window.MetroMap.load();
+        }
+        const examsCount = res && res.exams_synced !== undefined ? res.exams_synced : 0;
+        const hwCount = res && res.homework_synced !== undefined ? res.homework_synced : 0;
+        const mode = res && res.mode === "live" ? "Live Account" : "TM1 Simulator";
+        if (window.HarnessApp && window.HarnessApp.showToast) {
+          window.HarnessApp.showToast(`Vulcan Synced [${mode}]: ${examsCount} exams, ${hwCount} homework.`);
+        }
+      }
+    } catch (err) {
+      console.error("Error syncing Vulcan:", err);
+      alert(err.message || "Failed to sync Vulcan data");
+    }
+  },
+
+  async openVulcanConfig() {
+    const modal = document.getElementById("vulcanConfigModal");
+    if (!modal) return;
+    modal.classList.add("open");
+
+    const dateInput = document.getElementById("manualExamDate");
+    if (dateInput && !dateInput.value) {
+      dateInput.value = this.selectedDateStr || this.getLocalDateStr();
+    }
+
+    try {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.get_vulcan_status) {
+        const status = await window.pywebview.api.get_vulcan_status();
+        this.renderVulcanStatus(status);
+      }
+    } catch (e) {
+      console.warn("Could not load vulcan status:", e);
+    }
+  },
+
+  closeVulcanConfig() {
+    const modal = document.getElementById("vulcanConfigModal");
+    if (modal) modal.classList.remove("open");
+  },
+
+  renderVulcanStatus(status) {
+    if (!status) return;
+    const badge = document.getElementById("vulcanStatusModeBadge");
+    const nameEl = document.getElementById("vulcanStudentName");
+    const infoEl = document.getElementById("vulcanSchoolInfo");
+    const syncEl = document.getElementById("vulcanLastSyncTime");
+
+    const isLive = status.is_connected || status.mode === "live";
+
+    if (badge) {
+      badge.textContent = isLive ? `LIVE (${(status.student_symbol || "Warszawa").toUpperCase()})` : "DEMO SIMULATOR";
+      badge.className = isLive ? "mono-chip emerald" : "mono-chip";
+      if (isLive) {
+        badge.style.background = "rgba(16, 185, 129, 0.15)";
+        badge.style.color = "#34d399";
+        badge.style.border = "1px solid rgba(16, 185, 129, 0.35)";
+      } else {
+        badge.style.background = "";
+        badge.style.color = "";
+        badge.style.border = "";
+      }
+    }
+
+    if (nameEl) {
+      nameEl.textContent = status.student_name || "Janek Smagieł";
+    }
+
+    if (infoEl) {
+      const symbolStr = status.student_symbol ? `Symbol: ${status.student_symbol}` : "Symbol: Warszawa";
+      const schoolStr = status.school_name ? ` • ${status.school_name}` : " • TM1 Mechatroniczne";
+      const liveNotice = isLive ? " [Linked via eduVULCAN JWT]" : " [Realistic TM1 Schedule Simulator]";
+      infoEl.textContent = `${symbolStr}${schoolStr}${liveNotice}`;
+    }
+
+    if (syncEl) {
+      if (status.last_synced_at) {
+        try {
+          const dt = new Date(status.last_synced_at);
+          syncEl.textContent = `Last Sync: ${dt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}`;
+        } catch (e) {
+          syncEl.textContent = `Last Sync: ${status.last_synced_at.slice(11, 16)}`;
+        }
+      } else {
+        syncEl.textContent = "Last Sync: Not yet synced";
+      }
+    }
+  },
+
+  switchVulcanModalTab(tabName) {
+    const tabs = ["connect", "manual", "demo"];
+    tabs.forEach((t) => {
+      const btn = document.getElementById(`vulcanTabBtn${t.charAt(0).toUpperCase() + t.slice(1)}`);
+      const pane = document.getElementById(`vulcanTab${t.charAt(0).toUpperCase() + t.slice(1)}`);
+      if (btn) {
+        if (t === tabName) {
+          btn.style.color = "var(--accent-lavender)";
+          btn.style.borderColor = "rgba(196, 181, 253, 0.4)";
+        } else {
+          btn.style.color = "var(--text-tertiary)";
+          btn.style.borderColor = "transparent";
+        }
+      }
+      if (pane) {
+        pane.style.display = t === tabName ? "block" : "none";
+      }
+    });
+  },
+
+  openEduVulcanWebTokenPage() {
+    const url = "https://eduvulcan.pl/api/ap";
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.open_external_url) {
+      window.pywebview.api.open_external_url(url);
+    } else {
+      window.open(url, "_blank");
+    }
+    if (window.HarnessApp && window.HarnessApp.showToast) {
+      window.HarnessApp.showToast("Opening eduvulcan.pl/api/ap. Copy the token and paste it here.");
+    }
+  },
+
+  async submitVulcanToken() {
+    const input = document.getElementById("vulcanTokenInput");
+    if (!input) return;
+    const tokenVal = input.value.trim();
+    if (!tokenVal) {
+      alert("Please paste your token string or JSON from https://eduvulcan.pl/api/ap first.");
+      return;
+    }
+
+    try {
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast("Generating RSA certificate & pairing with eduVULCAN...");
+      }
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.register_eduvulcan) {
+        const res = await window.pywebview.api.register_eduvulcan(tokenVal);
+        if (res && res.success) {
+          input.value = "";
+          if (window.HarnessApp && window.HarnessApp.showToast) {
+            window.HarnessApp.showToast(`eduVULCAN Linked: ${res.student_name || "Student"} (${res.school || res.symbol})! Synced ${res.exams_synced || 0} exams.`);
+          }
+          await this.openVulcanConfig();
+          await this.load(this.selectedDateStr);
+          if (window.KillListDrawer && window.KillListDrawer.isOpen) {
+            await window.KillListDrawer.load();
+          }
+        } else {
+          alert((res && res.error) || "Failed to pair with eduVULCAN. Please check your token.");
+        }
+      }
+    } catch (err) {
+      console.error("Error pairing eduVULCAN:", err);
+      alert(err.message || "Failed to register eduVULCAN");
+    }
+  },
+
+  async disconnectVulcan() {
+    try {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.disconnect_vulcan) {
+        await window.pywebview.api.disconnect_vulcan();
+        if (window.HarnessApp && window.HarnessApp.showToast) {
+          window.HarnessApp.showToast("Disconnected eduVULCAN. Switched to TM1 Simulator Mode.");
+        }
+        await this.openVulcanConfig();
+        await this.load(this.selectedDateStr);
+      }
+    } catch (err) {
+      console.error("Error disconnecting Vulcan:", err);
+    }
+  },
+
+  async handleManualExamSubmit(event) {
+    if (event) event.preventDefault();
+    const subjInput = document.getElementById("manualExamSubject");
+    const titleInput = document.getElementById("manualExamTitle");
+    const dateInput = document.getElementById("manualExamDate");
+    const scopeInput = document.getElementById("manualExamScope");
+    const weightInput = document.getElementById("manualExamWeight");
+
+    if (!subjInput || !titleInput || !dateInput) return;
+
+    const subject = subjInput.value.trim();
+    const title = titleInput.value.trim();
+    const examDate = dateInput.value.trim();
+    const scope = scopeInput ? scopeInput.value.trim() : "";
+    const weight = weightInput ? parseInt(weightInput.value, 10) || 2 : 2;
+
+    if (!subject || !title || !examDate) {
+      alert("Please fill in subject, title, and exam date.");
+      return;
+    }
+
+    try {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.add_manual_exam) {
+        await window.pywebview.api.add_manual_exam(subject, title, examDate, scope, weight);
+        if (window.HarnessApp && window.HarnessApp.showToast) {
+          window.HarnessApp.showToast(`Saved exam: ${title} (${subject}) on ${examDate}`);
+        }
+        subjInput.value = "";
+        titleInput.value = "";
+        if (scopeInput) scopeInput.value = "";
+        this.closeVulcanConfig();
+        await this.load(this.selectedDateStr);
+        if (window.KillListDrawer && window.KillListDrawer.isOpen) {
+          await window.KillListDrawer.load();
+        }
+      }
+    } catch (err) {
+      console.error("Error adding manual exam:", err);
+      alert(err.message || "Failed to add manual exam");
+    }
   },
 
   escapeHtml(str) {

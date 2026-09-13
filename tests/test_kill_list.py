@@ -21,7 +21,7 @@ def test_kill_list_seeding_and_deliverables(test_db):
     assert len(deliverables) == 5
     ids = [d["deliverable_id"] for d in deliverables]
     assert "sep26_math_diag" in ids
-    assert "sep26_hackerrank_15" in ids
+    assert "sep26_leetcode_15" in ids
     assert "sep26_sigg_setup" in ids
 
 
@@ -134,9 +134,9 @@ def test_station_pace_velocity_calculation(test_db):
     assert velocity["is_behind"] is True
     assert "Pace Deficit" in velocity["status_text"]
 
-    # Now simulate completing HackerRank exercises
+    # Now simulate completing exercises
     cursor = test_db.cursor()
-    cursor.execute("UPDATE station_deliverable_progress SET completed_count = 10 WHERE deliverable_id = 'sep26_hackerrank_15'")
+    cursor.execute("UPDATE station_deliverable_progress SET completed_count = 10 WHERE deliverable_id IN ('sep26_leetcode_15', 'sep26_hackerrank_15')")
     cursor.execute("UPDATE station_deliverable_progress SET completed_count = 25 WHERE deliverable_id = 'sep26_math_diag'")
     cursor.execute("UPDATE station_deliverable_progress SET completed_count = 1 WHERE deliverable_id = 'sep26_sigg_setup'")
     cursor.execute("UPDATE station_deliverable_progress SET completed_count = 60 WHERE deliverable_id = 'sep26_german_anki'")
@@ -169,4 +169,56 @@ def test_auto_carryover_uncompleted_items(test_db):
     res = kill_list_controller.get_kill_list(date_str=today_str, conn=test_db)
     today_ids = [i["id"] for i in res["items"]]
     assert past_item["id"] in today_ids
+
+
+def test_progressive_deliverable_advancement(test_db):
+    test_date = "2026-09-20"
+
+    # 1. Math R progression: starts at 0 -> Zadania 1–5
+    math_item = kill_list_controller.enqueue_progressive_deliverable("sep26_math_diag", date_str=test_date, conn=test_db)
+    assert "Zadania 1–5" in math_item["target_spec"]
+    assert math_item["quantity"] == 5
+
+    # Complete it
+    complete_res = kill_list_controller.complete_kill_item(math_item["id"], conn=test_db)
+    assert complete_res["deliverable"]["completed_count"] == 5
+
+    # Next progression for Math R must automatically advance to Zadania 6–10
+    spec_next = kill_list_controller.compute_progressive_spec("sep26_math_diag", 5, 40)
+    assert "Zadania 6–10" in spec_next["target_spec"]
+
+    # 2. LeetCode progression: user starts at 4 -> next is Problem #5
+    cursor = test_db.cursor()
+    cursor.execute("UPDATE station_deliverable_progress SET completed_count = 4 WHERE deliverable_id = 'sep26_leetcode_15'")
+    test_db.commit()
+
+    lc_item = kill_list_controller.enqueue_progressive_deliverable("sep26_leetcode_15", date_str=test_date, conn=test_db)
+    assert "Problem #5" in lc_item["title"]
+    assert "Problem #5" in lc_item["target_spec"]
+
+    # Complete Problem #5
+    lc_done = kill_list_controller.complete_kill_item(lc_item["id"], conn=test_db)
+    assert lc_done["deliverable"]["completed_count"] == 5
+
+    # Next progression must automatically advance to Problem #6
+    spec_lc_next = kill_list_controller.compute_progressive_spec("sep26_leetcode_15", 5, 15)
+    assert "Problem #6" in spec_lc_next["title"]
+
+
+def test_enqueue_exam_prep(test_db):
+    from app.services import homework_service
+    # Create an upcoming exam
+    exam = homework_service.add_exam(
+        subject="Fizyka",
+        title="Sprawdzian z Kinematyki",
+        exam_date="2026-09-22",
+        scope="Ruch jednostajny i zmienny, wykresy",
+        conn=test_db,
+    )
+
+    kill_item = kill_list_controller.enqueue_exam_prep(exam["id"], date_str="2026-09-21", conn=test_db)
+    assert kill_item["category"] == "Exam Prep"
+    assert "Fizyka" in kill_item["title"]
+    assert "Ruch jednostajny" in kill_item["target_spec"]
+
 

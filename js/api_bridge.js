@@ -534,7 +534,7 @@
 
               return [
                 { deliverable_id: "sep26_math_diag", station_id: "sep-2026", stream: "Math R", title: "Diagnostic Exam 1-40", total_required: 40, completed_count: 0, unit_label: "problems", is_completed: false },
-                { deliverable_id: "sep26_hackerrank_15", station_id: "sep-2026", stream: "Algorithms", title: "Basic Data Structures (15 items)", total_required: 15, completed_count: 0, unit_label: "exercises", is_completed: false },
+                { deliverable_id: "sep26_leetcode_15", station_id: "sep-2026", stream: "Algorithms", title: "LeetCode Algorithm Drills (15 items)", total_required: 15, completed_count: 4, unit_label: "problems", is_completed: false },
                 { deliverable_id: "sep26_sigg_setup", station_id: "sep-2026", stream: "SIGG", title: "Registration & Platform Setup", total_required: 1, completed_count: 0, unit_label: "setup", is_completed: false },
                 { deliverable_id: "sep26_german_anki", station_id: "sep-2026", stream: "German", title: "Goethe A2 Core Vocabulary (400 Words)", total_required: 400, completed_count: 0, unit_label: "words", is_completed: false },
                 { deliverable_id: "sep26_phys_protein", station_id: "sep-2026", stream: "Physique", title: "Daily 140g+ Target Consistency (20/30 Days)", total_required: 20, completed_count: 0, unit_label: "days", is_completed: false },
