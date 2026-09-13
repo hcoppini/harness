@@ -20,7 +20,7 @@ def test_add_and_get_homework(test_db):
     hw = homework_service.add_homework(
         subject="Matematyka R",
         title="Zadania 1-15 z geometrii analitycznej",
-        due_date="2026-09-05",
+        due_date="2026-09-25",
         priority=2,
         notes="Wymagane dowody twierdzeń",
         conn=test_db,
@@ -38,7 +38,7 @@ def test_toggle_and_delete_homework(test_db):
     hw = homework_service.add_homework(
         subject="Informatyka",
         title="Implementacja przeszukiwania binarnego",
-        due_date="2026-09-03",
+        due_date="2026-09-24",
         conn=test_db,
     )
     
@@ -56,7 +56,7 @@ def test_add_and_get_exams(test_db):
     exam = homework_service.add_exam(
         subject="Fizyka",
         title="Sprawdzian: Termodynamika i praca gazu",
-        exam_date="2026-09-10",
+        exam_date="2026-09-20",
         scope="Rozdział 3 i 4 podręcznika",
         conn=test_db,
     )
@@ -76,7 +76,7 @@ def test_json_school_data_import_and_export(test_db):
             {
                 "subject": "Język Niemiecki",
                 "title": "Napisz esej o technologii (150 słów)",
-                "due_date": "2026-09-08",
+                "due_date": "2026-09-28",
                 "priority": 1
             }
         ],
@@ -84,7 +84,7 @@ def test_json_school_data_import_and_export(test_db):
             {
                 "subject": "Matematyka R",
                 "title": "Próbna Matura CKE",
-                "exam_date": "2026-09-15",
+                "exam_date": "2026-09-25",
                 "scope": "Całość materiału klasa 1-2"
             }
         ]
@@ -98,3 +98,30 @@ def test_json_school_data_import_and_export(test_db):
 
     exams = homework_service.get_upcoming_exams(conn=test_db)
     assert any("Próbna Matura" in e["title"] for e in exams)
+
+
+def test_prune_expired_homework(test_db):
+    # Overdue homework with past deadline
+    homework_service.add_homework(
+        subject="Historia",
+        title="Zadanie z przeszłości",
+        due_date="2026-09-01",
+        conn=test_db,
+    )
+    # Active homework with future deadline
+    homework_service.add_homework(
+        subject="Matematyka",
+        title="Zadanie z przyszłości",
+        due_date="2026-09-20",
+        conn=test_db,
+    )
+
+    # Calling get_upcoming_homework with today="2026-09-13" must prune past homework
+    upcoming = homework_service.get_upcoming_homework(conn=test_db, today_str="2026-09-13")
+    assert len(upcoming) == 1
+    assert upcoming[0]["subject"] == "Matematyka"
+
+    # Verify past item is completely deleted from the database
+    cursor = test_db.cursor()
+    cursor.execute("SELECT count(*) FROM homework_items WHERE due_date < '2026-09-13'")
+    assert cursor.fetchone()[0] == 0

@@ -17,22 +17,55 @@ def _calculate_days_left(target_date_str: str) -> int:
         return 0
 
 
-def get_upcoming_homework(conn: Optional[sqlite3.Connection] = None, limit: int = 30) -> List[Dict[str, Any]]:
-    """Returns pending/uncompleted homework items ordered by due date."""
+def prune_expired_homework(
+    today_str: Optional[str] = None, conn: Optional[sqlite3.Connection] = None
+) -> int:
+    """
+    Deletes all homework items whose deadline has passed (due_date < today_str).
+    Eliminates obsolete overdue homework automatically.
+    """
     close_conn = False
     if conn is None:
         conn = get_connection()
         close_conn = True
 
+    current_date = today_str or datetime.now().strftime("%Y-%m-%d")
+    cursor = conn.cursor()
+    cursor.execute("DELETE FROM homework_items WHERE due_date < ?", (current_date,))
+    conn.commit()
+    deleted_count = cursor.rowcount
+
+    if close_conn:
+        conn.close()
+
+    return deleted_count
+
+
+def get_upcoming_homework(
+    conn: Optional[sqlite3.Connection] = None,
+    limit: int = 50,
+    today_str: Optional[str] = None,
+    auto_prune: bool = True,
+) -> List[Dict[str, Any]]:
+    """Returns pending/uncompleted homework items due today or in the future, automatically pruning expired items."""
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    current_date = today_str or datetime.now().strftime("%Y-%m-%d")
+    if auto_prune:
+        prune_expired_homework(current_date, conn=conn)
+
     cursor = conn.cursor()
     cursor.execute(
         """
         SELECT * FROM homework_items
-        WHERE completed = 0
+        WHERE completed = 0 AND due_date >= ?
         ORDER BY due_date ASC, priority DESC
         LIMIT ?
         """,
-        (limit,),
+        (current_date, limit),
     )
     rows = cursor.fetchall()
     items = []

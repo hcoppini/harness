@@ -75,9 +75,16 @@ class HarnessAPI:
         """Opens safe HTTP/HTTPS URL in default Windows browser."""
         return school_service.open_external_url(url)
 
-    def get_upcoming_homework(self) -> List[Dict[str, Any]]:
+    def get_upcoming_homework(self, date_str: Optional[str] = None) -> List[Dict[str, Any]]:
         from app.services import homework_service
-        return homework_service.get_upcoming_homework()
+        return homework_service.get_upcoming_homework(today_str=date_str)
+
+    def prune_expired_homework(self, date_str: Optional[str] = None) -> int:
+        from app.services import homework_service
+        res = homework_service.prune_expired_homework(today_str=date_str)
+        if res > 0:
+            self._trigger_auto_sync()
+        return res
 
     def get_homework_for_date(self, date_str: Optional[str] = None) -> List[Dict[str, Any]]:
         from app.services import homework_service

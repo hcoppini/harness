@@ -615,9 +615,8 @@ def _fetch_live_vulcan_payload(cfg: Dict[str, Any], target_date: str) -> Optiona
     except Exception:
         curr_dt = datetime.now().date()
 
-    d_from = (curr_dt - timedelta(days=14)).strftime("%Y-%m-%d")
+    d_from = curr_dt.strftime("%Y-%m-%d")
     d_to = (curr_dt + timedelta(days=60)).strftime("%Y-%m-%d")
-
 
     # 1. Upcoming exams
     exams_url = f"{rest_url}/mobile/exam/byPupil?pupilId={pupil_id}&dateFrom={d_from}&dateTo={d_to}&lastSyncDate=1970-01-01%2001:00:00&lastId=-2147483648&pageSize=500"
@@ -650,11 +649,14 @@ def _fetch_live_vulcan_payload(cfg: Dict[str, Any], target_date: str) -> Optiona
             })
 
     normalized_hw = []
+    today_iso = curr_dt.strftime("%Y-%m-%d")
     if isinstance(raw_hw, list):
         for h in raw_hw:
             subj = h.get("Subject", {}).get("Name", "General") if isinstance(h.get("Subject"), dict) else "General"
             content = h.get("Content", "Zadanie domowe")
             deadline = (h.get("DeadlineAt") or h.get("DateAt") or target_date)[:10]
+            if deadline < today_iso:
+                continue  # Deadline reached, skip obsolete overdue homework
             normalized_hw.append({
                 "subject": subj,
                 "title": content[:70],
@@ -752,11 +754,16 @@ def sync_vulcan_data(
             )
             exams_synced += 1
 
-    # 2. Merge homework items
+    # 2. Merge homework items (and auto-prune any whose deadline has passed)
+    today_iso = target_date or datetime.now().strftime("%Y-%m-%d")
+    cursor.execute("DELETE FROM homework_items WHERE due_date < ?", (today_iso,))
+
     for h in payload.get("homework", []):
         subj = h.get("subject", "General").strip()
         title = h.get("title", "Homework").strip()
         due_date = h.get("due_date", target_date)
+        if due_date < today_iso:
+            continue  # Deadline reached, skip obsolete overdue homework
         prio = int(h.get("priority", 1))
         notes = h.get("notes", "")
 

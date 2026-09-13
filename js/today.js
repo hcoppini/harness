@@ -791,7 +791,7 @@ const Today = {
     try {
       if (!window.pywebview || !window.pywebview.api) return;
       if (window.pywebview.api.get_upcoming_homework) {
-        this.homeworkList = await window.pywebview.api.get_upcoming_homework();
+        this.homeworkList = await window.pywebview.api.get_upcoming_homework(this.selectedDateStr);
       }
       if (window.pywebview.api.get_upcoming_exams) {
         this.examsList = await window.pywebview.api.get_upcoming_exams();
@@ -819,18 +819,16 @@ const Today = {
       if (this.homeworkList.length === 0) {
         hwContainer.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 8px 4px;">No pending homework. All caught up!</div>`;
       } else {
-        // Horizon Radar: Group homework into
+        // Active Horizon Radar: Expired homework is automatically deleted when deadline passes.
+        // Group remaining active homework into:
         // 1. Due This Week (0 to 7 days)
-        // 2. Upcoming / Later Weeks (> 7 days)
-        // 3. Open Backlog / Earlier (< 0 days)
+        // 2. Upcoming Weeks (> 7 days)
         const dueThisWeek = this.homeworkList.filter((h) => h.days_left >= 0 && h.days_left <= 7);
         const dueLater = this.homeworkList.filter((h) => h.days_left > 7);
-        const duePast = this.homeworkList.filter((h) => h.days_left < 0);
 
         const renderItem = (h) => {
           let dueBadge = `${h.due_date}`;
           let isUrgent = false;
-          let isOverdue = false;
 
           if (h.days_left === 0) {
             dueBadge = "TODAY";
@@ -838,16 +836,11 @@ const Today = {
           } else if (h.days_left === 1) {
             dueBadge = "TOMORROW";
             isUrgent = true;
-          } else if (h.days_left < 0) {
-            dueBadge = `${Math.abs(h.days_left)}d overdue`;
-            isOverdue = true;
           } else {
             dueBadge = `in ${h.days_left}d (${h.due_date})`;
           }
 
-          const badgeColor = isOverdue
-            ? "border-color: #ef4444; color: #ef4444;"
-            : isUrgent
+          const badgeColor = isUrgent
             ? "border-color: #f59e0b; color: #f59e0b;"
             : "border-color: rgba(196, 181, 253, 0.3); color: var(--accent-lavender);";
 
@@ -881,11 +874,6 @@ const Today = {
         if (dueLater.length > 0) {
           html += `<div style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--text-secondary); text-transform: uppercase; letter-spacing: 0.05em; margin: 6px 0 2px 2px;">Upcoming Weeks (${dueLater.length})</div>`;
           html += dueLater.map(renderItem).join("");
-        }
-
-        if (duePast.length > 0) {
-          html += `<div style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--text-tertiary); text-transform: uppercase; letter-spacing: 0.05em; margin: 6px 0 2px 2px;">Open / Earlier Backlog (${duePast.length})</div>`;
-          html += duePast.map(renderItem).join("");
         }
 
         hwContainer.innerHTML = html;
