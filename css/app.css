@@ -818,7 +818,7 @@ body {
 .check-dot {
   width: 14px;
   height: 14px;
-  border: 1px solid var(--border-medium);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
   border-radius: 3px;
   cursor: pointer;
   display: flex;
@@ -827,10 +827,12 @@ body {
   flex-shrink: 0;
   transition: all 0.12s ease;
   background: transparent;
+  box-sizing: border-box;
 }
 
 .check-dot:hover {
   border-color: var(--accent-lavender);
+  background: rgba(196, 181, 253, 0.08);
 }
 
 .check-dot.checked {
@@ -840,10 +842,12 @@ body {
 
 .check-dot.checked::after {
   content: "";
-  width: 6px;
-  height: 6px;
-  background: #09090b;
-  border-radius: 1px;
+  width: 4px;
+  height: 7px;
+  border: solid #09090b;
+  border-width: 0 1.8px 1.8px 0;
+  transform: rotate(45deg) translate(-0.5px, -0.5px);
+  display: block;
 }
 
 /* Quick Task Form */
@@ -1517,3 +1521,93 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ==========================================================================
+   Responsive Viewport Fallbacks (Tablets, Foldables & Mobile Windows)
+   ========================================================================== */
+@media (max-width: 960px) {
+  body {
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100vh;
+  }
+
+  .app-header {
+    padding: 0 14px;
+    height: auto;
+    min-height: 52px;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+
+  .nav-tabs {
+    overflow-x: auto;
+    white-space: nowrap;
+    scrollbar-width: none;
+    max-width: 100%;
+    padding-bottom: 4px;
+  }
+
+  .nav-tabs::-webkit-scrollbar {
+    display: none;
+  }
+
+  .main-content {
+    overflow-y: visible !important;
+    height: auto !important;
+    padding: 16px 14px 40px !important;
+  }
+
+  .dashboard-layout {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .executive-cockpit-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .today-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .tum-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  .projects-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .body-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
+@media (max-width: 640px) {
+  .executive-cockpit-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .brand-caption, .brand-divider {
+    display: none;
+  }
+
+  .header-right {
+    gap: 6px;
+  }
+
+  #btnOpenJsonModal {
+    display: none;
+  }
+
+  .modal-content, .json-modal-content {
+    width: 94vw !important;
+    padding: 16px !important;
+  }
+}
+

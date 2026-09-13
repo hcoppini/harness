@@ -43,7 +43,7 @@ window.Dashboard = {
     const btnJumpToday = document.getElementById("btnDetailedJumpToday");
     if (btnJumpToday) {
       btnJumpToday.addEventListener("click", () => {
-        const targetDate = this.selectedForecastDate || new Date().toISOString().split("T")[0];
+        const targetDate = this.selectedForecastDate || this.getLocalDateStr();
         this.closeDetailedScheduleModal();
         if (window.HarnessApp) {
           window.HarnessApp.switchView("today");
@@ -55,12 +55,19 @@ window.Dashboard = {
     }
   },
 
+  getLocalDateStr(d = new Date()) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  },
+
   async load() {
     try {
       if (!window.pywebview || !window.pywebview.api || typeof window.pywebview.api.get_dashboard !== "function") {
         return;
       }
-      this.data = await window.pywebview.api.get_dashboard();
+      this.data = await window.pywebview.api.get_dashboard(this.getLocalDateStr());
       this.render();
     } catch (err) {
       console.error("Error loading dashboard data:", err);

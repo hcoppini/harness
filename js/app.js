@@ -13,6 +13,7 @@ window.HarnessApp = {
     this.bindKeybindings();
     this.bindModals();
     this.bindJsonModal();
+    this.bindSyncModal();
     this.startClock();
 
     const startBridge = async () => {
@@ -48,14 +49,23 @@ window.HarnessApp = {
     try {
       if (window.FocusTimer) window.FocusTimer.init();
       if (window.CommandPalette) window.CommandPalette.init();
+      // Render active layer (Dashboard) immediately for instant startup
       if (window.Dashboard) await window.Dashboard.init();
-      if (window.Today) await window.Today.init();
-      if (window.KillListDrawer) await window.KillListDrawer.init();
-      if (window.Tum) await window.Tum.init();
-      if (window.Projects) await window.Projects.init();
-      if (window.Body) await window.Body.init();
-      if (window.Knowledge) await window.Knowledge.init();
-      await this.initSync();
+
+      // Initialize secondary layers asynchronously without blocking UI render
+      Promise.allSettled([
+        window.Today ? window.Today.init() : Promise.resolve(),
+        window.KillListDrawer ? window.KillListDrawer.init() : Promise.resolve(),
+        window.Tum ? window.Tum.init() : Promise.resolve(),
+        window.Projects ? window.Projects.init() : Promise.resolve(),
+        window.Body ? window.Body.init() : Promise.resolve(),
+        window.Knowledge ? window.Knowledge.init() : Promise.resolve(),
+      ]).catch((err) => console.warn("[App] Background layers init error:", err));
+
+      // Non-blocking background sync initialization
+      setTimeout(() => {
+        this.initSync().catch((err) => console.warn("[App] Sync init error:", err));
+      }, 50);
     } catch (err) {
       console.error("Error initializing layers:", err);
     }
@@ -293,9 +303,130 @@ window.HarnessApp = {
   },
 
   // =========================================================================
-  // CROSS-DEVICE CLOUD SYNC ENGINE (Laptop <-> Desktop Cross-Sync)
+  // CROSS-DEVICE CLOUD & WEB SYNC ENGINE (Laptop <-> Desktop <-> Web)
   // =========================================================================
   syncTimer: null,
+  _focusSyncBound: false,
+
+  bindSyncModal() {
+    const btnClose = document.getElementById("btnCloseSyncModal");
+    const modal = document.getElementById("syncModal");
+    const form = document.getElementById("syncSettingsForm");
+    const btnSyncNow = document.getElementById("btnSyncNowFromModal");
+    const btnUseLocal = document.getElementById("btnUseLocalSync");
+    const btnOpenJson = document.getElementById("btnSyncOpenJsonHub");
+
+    if (btnClose) {
+      btnClose.addEventListener("click", () => this.closeSyncModal());
+    }
+
+    if (btnUseLocal) {
+      btnUseLocal.addEventListener("click", () => {
+        const input = document.getElementById("syncInputWebUrl");
+        if (input) input.value = "http://localhost:5000";
+      });
+    }
+
+    if (btnOpenJson) {
+      btnOpenJson.addEventListener("click", () => {
+        this.closeSyncModal();
+        this.openJsonModal("sync_config");
+      });
+    }
+
+    if (btnSyncNow) {
+      btnSyncNow.addEventListener("click", async () => {
+        await this.triggerSync(false);
+        await this.refreshSyncModal();
+      });
+    }
+
+    if (form) {
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+        const webUrl = (document.getElementById("syncInputWebUrl")?.value || "").trim();
+        const key = (document.getElementById("syncInputSupabaseKey")?.value || "").trim();
+        const autoSync = Boolean(document.getElementById("syncInputAutoSync")?.checked);
+
+        try {
+          if (window.pywebview && window.pywebview.api) {
+            if (typeof window.pywebview.api.save_sync_settings === "function") {
+              await window.pywebview.api.save_sync_settings(webUrl, key, null, autoSync);
+            } else {
+              await window.pywebview.api.configure_web_sync(webUrl, autoSync);
+            }
+            this.showToast("Sync settings saved!");
+            await this.triggerSync(false);
+            await this.refreshSyncModal();
+          }
+        } catch (err) {
+          console.error("Error saving sync settings:", err);
+          this.showToast("Failed to save sync settings");
+        }
+      });
+    }
+  },
+
+  async openSyncModal() {
+    const modal = document.getElementById("syncModal");
+    if (!modal) return;
+    modal.classList.add("open");
+    await this.refreshSyncModal();
+  },
+
+  closeSyncModal() {
+    const modal = document.getElementById("syncModal");
+    if (modal) modal.classList.remove("open");
+  },
+
+  async refreshSyncModal() {
+    if (!window.pywebview || !window.pywebview.api) return;
+    try {
+      const status = await window.pywebview.api.get_sync_status();
+      const pill = document.getElementById("syncModalStatusPill");
+      const webInput = document.getElementById("syncInputWebUrl");
+      const autoSyncCheck = document.getElementById("syncInputAutoSync");
+      const lastTime = document.getElementById("syncModalLastTime");
+      const modeText = document.getElementById("syncModalModeText");
+
+      if (pill) {
+        pill.textContent = (status.status || "ready").toUpperCase();
+        pill.className = "mono-chip";
+        if (status.status === "synced") pill.classList.add("lavender");
+      }
+
+      if (webInput && document.activeElement !== webInput) {
+        webInput.value = status.web_url || "";
+        if (!status.web_url && status.local_detected_url) {
+          webInput.placeholder = `Detected local companion: ${status.local_detected_url}`;
+        }
+      }
+
+      if (autoSyncCheck) {
+        autoSyncCheck.checked = Boolean(status.auto_sync !== false);
+      }
+
+      if (lastTime) {
+        lastTime.textContent = status.last_synced_at
+          ? new Date(status.last_synced_at).toLocaleTimeString() + " (" + new Date(status.last_synced_at).toLocaleDateString() + ")"
+          : "Never";
+      }
+
+      if (modeText) {
+        if (status.has_web_url) {
+          modeText.textContent = `Direct HTTP Sync (${status.web_url})`;
+        } else if (status.local_detected_url) {
+          modeText.textContent = `Local Auto-Detected (${status.local_detected_url})`;
+        } else if (status.has_key) {
+          modeText.textContent = "Supabase Cloud Sync";
+        } else {
+          modeText.textContent = "Local Only (Offline SQLite WAL)";
+        }
+      }
+    } catch (e) {
+      console.warn("Failed to refresh sync modal:", e);
+    }
+  },
 
   async initSync() {
     const badge = document.getElementById("syncStatusBadge");
@@ -305,30 +436,41 @@ window.HarnessApp = {
       const status = await window.pywebview.api.get_sync_status();
       this.updateSyncBadge(status.status);
 
-      // Bind click on badge
-      badge.onclick = async () => {
-        if (status.status === "unconfigured") {
-          await this.openJsonModal("sync_config");
-        } else {
-          await this.triggerSync(false);
-        }
+      // Bind click on badge to open the dedicated Sync Modal
+      badge.onclick = () => {
+        this.openSyncModal();
       };
 
-      // If configured, trigger a background pull/push on startup
-      if (status.has_key && status.auto_sync) {
-        await this.triggerSync(true);
+      const isConfigured = Boolean(status.has_key || status.has_web_url || status.local_detected_url);
+
+      // If configured, trigger a non-blocking background pull/push on startup
+      if (isConfigured && status.auto_sync) {
+        setTimeout(() => this.triggerSync(true), 300);
       }
 
-      // Schedule periodic background sync every 5 minutes
+      // Automatically sync on window focus (e.g. switching back from browser/mobile)
+      if (!this._focusSyncBound) {
+        this._focusSyncBound = true;
+        window.addEventListener("focus", async () => {
+          if (window.pywebview && window.pywebview.api) {
+            const cur = await window.pywebview.api.get_sync_status();
+            if ((cur.has_key || cur.has_web_url || cur.local_detected_url) && cur.auto_sync) {
+              await this.triggerSync(true);
+            }
+          }
+        });
+      }
+
+      // Schedule periodic background sync every 60 seconds
       if (this.syncTimer) clearInterval(this.syncTimer);
       this.syncTimer = setInterval(async () => {
         if (window.pywebview && window.pywebview.api) {
           const curStatus = await window.pywebview.api.get_sync_status();
-          if (curStatus.has_key && curStatus.auto_sync) {
+          if ((curStatus.has_key || curStatus.has_web_url || curStatus.local_detected_url) && curStatus.auto_sync) {
             await this.triggerSync(true);
           }
         }
-      }, 5 * 60 * 1000);
+      }, 60 * 1000);
     } catch (e) {
       console.warn("[Sync] Init failed:", e);
       this.updateSyncBadge("offline");
@@ -346,18 +488,18 @@ window.HarnessApp = {
     if (status === "syncing") {
       dot.classList.add("syncing");
       text.textContent = "Syncing...";
-      badge.title = "Synchronizing with Cloud / Other Device...";
+      badge.title = "Synchronizing with Cloud / Web Companion...";
     } else if (status === "synced" || status === "ready") {
       text.textContent = "Synced";
-      badge.title = "Laptop & Desktop in Sync (Click to Sync Now)";
+      badge.title = "Local Executable & Web in Sync (Click to configure or sync)";
     } else if (status === "unconfigured") {
       dot.classList.add("unconfigured");
       text.textContent = "Setup Sync";
-      badge.title = "Click to set up Supabase Cloud Sync Key";
+      badge.title = "Click to configure Web URL or Supabase Cloud Sync";
     } else {
       dot.classList.add("offline");
       text.textContent = "Offline";
-      badge.title = "Offline: Changes cached locally in SQLite (Click to Retry)";
+      badge.title = "Offline: Changes cached locally in SQLite (Click to configure or retry)";
     }
   },
 
@@ -373,10 +515,15 @@ window.HarnessApp = {
         if (!isBackground) {
           this.showToast(res.synced_count > 0 ? `Synced ${res.synced_count} updates` : "All devices in sync");
         }
-        // Refresh active view data quietly
-        if (this.currentView === "dashboard" && window.Dashboard) window.Dashboard.load();
-        if (this.currentView === "today" && window.Today) window.Today.load();
-        if (this.currentView === "tum" && window.Tum) window.Tum.load();
+        // Refresh active views if remote updates were incorporated
+        if (res.synced_count > 0 || !isBackground) {
+          if (this.currentView === "dashboard" && window.Dashboard) window.Dashboard.load();
+          if (this.currentView === "today" && window.Today) window.Today.load();
+          if (this.currentView === "tum" && window.Tum) window.Tum.load();
+          if (this.currentView === "projects" && window.Projects) window.Projects.load();
+          if (this.currentView === "body" && window.Body) window.Body.load();
+          if (this.currentView === "knowledge" && window.Knowledge) window.Knowledge.load();
+        }
       } else if (res.status === "unconfigured") {
         this.updateSyncBadge("unconfigured");
       } else {

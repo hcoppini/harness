@@ -7,7 +7,16 @@
 
 const KillListDrawer = {
   isOpen: false,
-  dateStr: new Date().toISOString().split("T")[0],
+  getLocalDateStr(d = new Date()) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  },
+  dateStr: (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })(),
   items: [],
   deliverables: [],
   paceVelocity: null,
@@ -93,7 +102,7 @@ const KillListDrawer = {
   },
 
   async open(dateStr = null) {
-    this.dateStr = dateStr || (window.Today ? window.Today.selectedDateStr : new Date().toISOString().split("T")[0]);
+    this.dateStr = dateStr || (window.Today ? window.Today.selectedDateStr : this.getLocalDateStr());
     const drawer = document.getElementById("killListDrawer");
     const backdrop = document.getElementById("killListBackdrop");
     if (!drawer) return;

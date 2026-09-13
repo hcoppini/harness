@@ -391,8 +391,9 @@ const Tum = {
     if (rawInput) rawInput.value = "";
     if (weightInput) weightInput.value = "1.0";
     if (catInput) catInput.value = "Sprawdzian";
-    if (descInput) descInput.value = "";
-    if (dateInput) dateInput.value = new Date().toISOString().split("T")[0];
+    const _d = new Date();
+    const _localDate = `${_d.getFullYear()}-${String(_d.getMonth() + 1).padStart(2, "0")}-${String(_d.getDate()).padStart(2, "0")}`;
+    if (dateInput) dateInput.value = _localDate;
 
     modal.classList.add("open");
     if (rawInput) rawInput.focus();

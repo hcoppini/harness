@@ -1,12 +1,37 @@
 import pytest
 import json
+import shutil
+from pathlib import Path
+from app.db import init_db, DEFAULT_DB_PATH
+from app.services import sync_service
 from server import app
 
 @pytest.fixture
-def client():
+def client(tmp_path, monkeypatch):
+    test_db = tmp_path / "test_server.db"
+    test_data = tmp_path / "data"
+    test_data.mkdir(parents=True, exist_ok=True)
+
+    if DEFAULT_DB_PATH.exists():
+        shutil.copy2(DEFAULT_DB_PATH, test_db)
+    else:
+        init_db(test_db)
+
+    src_data = DEFAULT_DB_PATH.parent
+    if src_data.exists():
+        for jf in src_data.glob("*.json"):
+            shutil.copy2(jf, test_data / jf.name)
+
+    monkeypatch.setenv("HARNESS_DB_PATH", str(test_db))
+    monkeypatch.setattr("app.db.DEFAULT_DB_PATH", test_db)
+    monkeypatch.setattr(sync_service, "DATA_DIR", test_data)
+    monkeypatch.setattr(sync_service, "CONFIG_FILE", test_data / "sync_config.json")
+    import server
+    monkeypatch.setattr(server, "DATA_DIR", test_data)
+
     app.config["TESTING"] = True
-    with app.test_client() as client:
-        yield client
+    with app.test_client() as c:
+        yield c
 
 def test_health_check(client):
     res = client.get("/api/health")
@@ -252,4 +277,183 @@ def test_static_routes_and_vercel_entrypoint(client):
     os.environ["VERCEL"] = "1"
     from api.index import app as vercel_app
     assert vercel_app is not None
+
+
+def test_mobile_companion_assets_and_tabs(client):
+    # Verify mobile HTML includes all 5 executive views and Kill List
+    res_mobile = client.get("/mobile")
+    assert res_mobile.status_code == 200
+    html = res_mobile.get_data(as_text=True)
+    assert "view-cockpit" in html
+    assert "view-today" in html
+    assert "view-tum" in html
+    assert "view-projects" in html
+    assert "view-body" in html
+    assert "mKillList" in html
+
+    # Verify mobile CSS includes editorial design system tokens
+    res_css = client.get("/mobile/app.css")
+    assert res_css.status_code == 200
+    css = res_css.get_data(as_text=True)
+    assert "--accent-lavender" in css
+    assert "--bg-canvas" in css
+
+    # Verify mobile JS includes extended mobile controller
+    res_js = client.get("/mobile/app.js")
+    assert res_js.status_code == 200
+    js = res_js.get_data(as_text=True)
+    assert "loadKillList" in js
+    assert "loadProjects" in js
+
+
+
+def test_sync_status_api(client):
+    res = client.get("/api/sync/status")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert "status" in data
+    assert "auto_sync" in data
+
+
+def test_sync_exchange_api(client):
+    import time
+    uid = int(time.time() * 1000) % 900000 + 100000
+    test_title = f"Direct Exchange Task {uid}"
+    payload = {
+        "client_time": "2026-09-12T22:30:00",
+        "last_synced_at": None,
+        "data": {
+            "tasks": [
+                {"id": uid, "title": test_title, "category": "Code", "is_tum": 1, "completed": 0, "date": "2026-09-12"}
+            ],
+            "daily_logs": [
+                {
+                    "date": "2099-09-01",
+                    "scratchpad": "Exchange Scratchpad Note",
+                    "wake_time": "06:45",
+                    "sleep_time": "22:30",
+                    "reflection_worked": "Sync logic implemented",
+                    "reflection_slipped": "",
+                    "reflection_tomorrow": "Rebuild exe",
+                    "completed_blocks": "06:45-07:30",
+                    "completed_exercises": "ex1",
+                }
+            ],
+            "kill_list_items": [
+                {
+                    "id": f"k{uid}",
+                    "date": "2026-09-12",
+                    "category": "Raw CS",
+                    "title": "Cross-sync test",
+                    "action_type": "workspace",
+                    "target_path": "c:/Users/heito/Desktop/harness",
+                    "target_spec": "tests",
+                    "completed": 1,
+                }
+            ],
+            "body_metrics": [
+                {
+                    "id": uid,
+                    "date": "2026-09-12",
+                    "weight_kg": 71.2,
+                    "calories_met": 1,
+                    "protein_met": 1,
+                    "notes": "Exchange weigh-in",
+                }
+            ],
+            "workouts": [
+                {
+                    "id": uid,
+                    "date": "2026-09-12",
+                    "workout_type": "Gym",
+                    "details": "Deadlift & Bench",
+                    "intensity": 8,
+                }
+            ],
+            "projects": [
+                {
+                    "id": uid,
+                    "name": "Sync Module",
+                    "description": "Cross device sync",
+                    "current_milestone": "Testing",
+                    "next_action": "Pytest",
+                    "status": "active",
+                }
+            ],
+        },
+    }
+
+    res = client.post(
+        "/api/sync/exchange",
+        data=json.dumps(payload),
+        content_type="application/json",
+    )
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["status"] == "ok"
+    assert data["synced_count"] >= 1
+    assert "data" in data
+    assert "tasks" in data["data"]
+    # Check that the exchanged task exists in the returned server data
+    task_titles = [t["title"] for t in data["data"]["tasks"]]
+    assert test_title in task_titles
+
+def test_dashboard_api_with_client_date(client):
+    res = client.get("/api/dashboard?date=2026-09-13")
+    assert res.status_code == 200
+    data = res.get_json()
+    assert data["heatmap"]["end_date"] == "2026-09-13"
+    assert len(data["upcoming"]) == 7
+    assert data["upcoming"][0]["date"] == "2026-09-14"
+
+def test_probe_local_server_guarded():
+    import os
+    from app.services import sync_service
+    os.environ["HARNESS_SERVER"] = "1"
+    assert sync_service.probe_local_server() is None
+
+def test_daily_log_update_and_persistence(client):
+    res = client.post(
+        "/api/today/log",
+        data=json.dumps({
+            "date": "2026-09-10",
+            "completed_blocks": "0,1,2,3",
+            "scratchpad": "Test scratchpad",
+        }),
+        content_type="application/json",
+    )
+    assert res.status_code == 200
+    today_res = client.get("/api/today?date=2026-09-10")
+    assert today_res.status_code == 200
+    today_data = today_res.get_json()
+    assert today_data["log"]["completed_blocks"] == "0,1,2,3"
+    assert today_data["log"]["scratchpad"] == "Test scratchpad"
+
+
+def test_four_day_selection_persistence_no_reset(client):
+    """Ensure that selecting routine blocks & gym exercises across Sep 10-13 persists and never resets each other."""
+    days_data = {
+        "2026-09-10": {"completed_blocks": "0,1,2,3,4,5,6,7", "completed_exercises": "0,1,2,3,4,5"},
+        "2026-09-11": {"completed_blocks": "0,1,2,3,4,5,6,7", "completed_exercises": ""},
+        "2026-09-12": {"completed_blocks": "0,1,2", "completed_exercises": ""},
+        "2026-09-13": {"completed_blocks": "0,1,2", "completed_exercises": ""},
+    }
+
+    # Post each day in sequence
+    for dt, payload in days_data.items():
+        res = client.post(
+            "/api/today/log",
+            data=json.dumps({"date": dt, **payload}),
+            content_type="application/json",
+        )
+        assert res.status_code == 200
+
+    # Verify each day independently retains its values without any cross-day overwrite
+    for dt, expected in days_data.items():
+        res = client.get(f"/api/today?date={dt}")
+        assert res.status_code == 200
+        data = res.get_json()
+        assert "log" in data
+        assert data["log"]["completed_blocks"] == expected["completed_blocks"]
+        assert data["log"]["completed_exercises"] == expected["completed_exercises"]
 

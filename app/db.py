@@ -20,11 +20,17 @@ else:
 
 DEFAULT_DB_PATH = DATA_DIR / "harness.db"
 
+_DATA_FILES_ENSURED = False
+
 
 def ensure_db_and_data_files(dest_path: Optional[Path] = None) -> None:
     """Ensures data directory, JSON files, and seed harness.db are populated before connection."""
+    global _DATA_FILES_ENSURED
     if dest_path is not None and dest_path != DEFAULT_DB_PATH:
         # Isolated test or custom database: do not copy production harness.db
+        return
+
+    if _DATA_FILES_ENSURED:
         return
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
@@ -56,9 +62,14 @@ def ensure_db_and_data_files(dest_path: Optional[Path] = None) -> None:
                 except Exception:
                     pass
 
+    _DATA_FILES_ENSURED = True
+
 
 def get_db_path() -> Path:
     """Returns the path to the SQLite database file."""
+    env_db = os.environ.get("HARNESS_DB_PATH")
+    if env_db:
+        return Path(env_db)
     ensure_db_and_data_files()
     return DEFAULT_DB_PATH
 
@@ -66,7 +77,8 @@ def get_db_path() -> Path:
 def get_connection(db_path: Optional[Path] = None) -> sqlite3.Connection:
     """Returns a SQLite connection configured with WAL mode and row factory."""
     path = db_path or get_db_path()
-    ensure_db_and_data_files(path)
+    if not os.environ.get("HARNESS_DB_PATH") and not _DATA_FILES_ENSURED:
+        ensure_db_and_data_files(path)
     conn = sqlite3.connect(str(path))
     conn.row_factory = sqlite3.Row
     # Enable WAL mode for high concurrency and zero locking issues
@@ -364,6 +376,16 @@ def init_db(db_path: Optional[Path] = None) -> None:
                     insert_sql = f"INSERT OR IGNORE INTO daily_logs ({', '.join(cols)}) VALUES ({placeholders})"
                     for r in rows:
                         cursor.execute(insert_sql, [r.get(c) for c in cols])
+                        if r.get("completed_blocks"):
+                            cursor.execute(
+                                "UPDATE daily_logs SET completed_blocks = ? WHERE date = ? AND (completed_blocks IS NULL OR completed_blocks = '')",
+                                (r["completed_blocks"], r["date"]),
+                            )
+                        if r.get("completed_exercises"):
+                            cursor.execute(
+                                "UPDATE daily_logs SET completed_exercises = ? WHERE date = ? AND (completed_exercises IS NULL OR completed_exercises = '')",
+                                (r["completed_exercises"], r["date"]),
+                            )
         except Exception as e:
             print(f"Warning: SEED_DATA initialization notice: {e}")
 

@@ -16,9 +16,21 @@ const Today = {
   completedExercises: new Set(),
   debounceTimer: null,
 
-  // Calendar Navigation (defaults to today)
-  currentDateStr: new Date().toISOString().split("T")[0],
-  selectedDateStr: new Date().toISOString().split("T")[0],
+  // Calendar Navigation (defaults to today in local timezone)
+  getLocalDateStr(d = new Date()) {
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  },
+  currentDateStr: (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })(),
+  selectedDateStr: (() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  })(),
   calDisplayYear: new Date().getFullYear(),
   calDisplayMonth: new Date().getMonth(), // 0-indexed
 
@@ -135,7 +147,7 @@ const Today = {
 
     if (btnTodayReset) {
       btnTodayReset.addEventListener("click", async () => {
-        const todayStr = new Date().toISOString().split("T")[0];
+        const todayStr = this.getLocalDateStr();
         const now = new Date();
         this.calDisplayYear = now.getFullYear();
         this.calDisplayMonth = now.getMonth();
@@ -208,7 +220,7 @@ const Today = {
       html += `<div class="mini-cal-day empty"></div>`;
     }
 
-    const todayStr = new Date().toISOString().split("T")[0];
+    const todayStr = this.getLocalDateStr();
 
     for (let d = 1; d <= daysInMonth; d++) {
       const monthStr = String(this.calDisplayMonth + 1).padStart(2, "0");

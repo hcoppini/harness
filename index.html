@@ -1038,6 +1038,78 @@
     </div>
   </div>
 
+  <!-- 5b. Dedicated Sync Setup & Status Modal -->
+  <div id="syncModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 460px;">
+      <div class="card-label-row" style="margin-bottom: 14px;">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary);">Cross-Device Sync Settings</h2>
+          <span id="syncModalStatusPill" class="mono-chip" style="font-size: 10px;">Checking...</span>
+        </div>
+        <button id="btnCloseSyncModal" class="drawer-close-btn">&times;</button>
+      </div>
+
+      <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 14px;">
+        Sync your daily tasks, SGH Kill List, workout logs, and TUM milestones across your Desktop PC, Laptop, and iPhone companion.
+      </div>
+
+      <form id="syncSettingsForm">
+        <div class="form-group">
+          <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <label class="form-label">WEB COMPANION / SERVER URL</label>
+            <button type="button" id="btnUseLocalSync" class="btn-link" style="font-size: 10px; color: var(--accent-lavender); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0;">
+              Use Local Server (:5000)
+            </button>
+          </div>
+          <input type="text" id="syncInputWebUrl" class="form-input" placeholder="http://localhost:5000 or https://your-domain.vercel.app" />
+          <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px;">
+            Target URL for the Harness Web Companion or Cloudflare tunnel.
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">SUPABASE ANON KEY (OPTIONAL)</label>
+          <input type="password" id="syncInputSupabaseKey" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
+          <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px;">
+            Direct cloud PostgreSQL replication via Supabase REST API.
+          </div>
+        </div>
+
+        <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
+          <input type="checkbox" id="syncInputAutoSync" style="accent-color: var(--accent-lavender); cursor: pointer;" />
+          <label for="syncInputAutoSync" style="font-size: 11px; color: var(--text-secondary); cursor: pointer; margin-bottom: 0;">
+            Enable automatic background sync (every 60s &amp; on focus)
+          </label>
+        </div>
+
+        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-hairline); border-radius: 6px; padding: 10px; margin-bottom: 16px; font-size: 11px;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+            <span style="color: var(--text-tertiary);">Last Synced:</span>
+            <span id="syncModalLastTime" style="font-family: var(--font-mono); color: var(--text-secondary);">Never</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-tertiary);">Mode:</span>
+            <span id="syncModalModeText" style="font-family: var(--font-mono); color: var(--text-secondary);">Offline-First (Local WAL)</span>
+          </div>
+        </div>
+
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+          <button type="button" id="btnSyncNowFromModal" class="btn-ghost-icon" style="padding: 7px 12px;">
+            Sync Now
+          </button>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" id="btnSyncOpenJsonHub" class="btn-ghost-icon" style="padding: 7px 10px; font-size: 10px;">
+              JSON Hub
+            </button>
+            <button type="submit" class="btn-primary" style="padding: 7px 14px;">
+              Save &amp; Connect
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- 6. Add Grade Modal (Real-Time Grade Ledger) -->
   <div id="addGradeModal" class="modal-overlay">
     <div class="modal-card" style="max-width: 480px;">

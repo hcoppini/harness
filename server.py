@@ -5,6 +5,7 @@ Deployable on Render, Railway, Fly.io, or run locally via Cloudflare Tunnel.
 """
 
 import os
+os.environ["HARNESS_SERVER"] = "1"
 import json
 from datetime import datetime
 from pathlib import Path
@@ -24,6 +25,7 @@ except Exception:
 BASE_DIR = Path(__file__).resolve().parent
 UI_DIR = BASE_DIR / "ui"
 MOBILE_DIR = BASE_DIR / "mobile"
+DATA_DIR = BASE_DIR / "data"
 
 app = Flask(__name__, static_folder=None)
 
@@ -165,10 +167,382 @@ def rpc_dispatcher(method_name):
     except Exception as e:
         return jsonify({"error": str(e), "status": "error"}), 500
 
+# --------------------------------------------------------------------------
+# Direct Cross-Device Sync Endpoints (Local Executable <-> Web Server)
+# --------------------------------------------------------------------------
+@app.route("/api/sync/status", methods=["GET"])
+def sync_status_endpoint():
+    return jsonify(api.get_sync_status())
+
+@app.route("/api/sync/exchange", methods=["POST"])
+def sync_exchange_endpoint():
+    """
+    Accepts local payload from desktop executable or client, merges it into the server database,
+    and returns latest merged state for all entities in a single atomic transaction.
+    """
+    payload = request.get_json(silent=True) or {}
+    client_data = payload.get("data", {})
+    from app.db import get_connection, DATA_DIR
+    conn = get_connection()
+    synced_count = 0
+    try:
+        cursor = conn.cursor()
+
+        # 1. Merge Tasks
+        for t in client_data.get("tasks", []):
+            t_id = t.get("id")
+            if not t_id:
+                continue
+            cursor.execute("SELECT id, completed FROM tasks WHERE id = ?", (t_id,))
+            loc = cursor.fetchone()
+            comp = 1 if t.get("completed") else 0
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO tasks (id, title, category, is_tum, completed, date, rollover_count, created_at, completed_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        t_id,
+                        t.get("title", ""),
+                        t.get("category", "personal"),
+                        1 if t.get("is_tum") else 0,
+                        comp,
+                        t.get("date", datetime.now().strftime("%Y-%m-%d")),
+                        t.get("rollover_count", 0),
+                        t.get("created_at"),
+                        t.get("completed_at"),
+                    ),
+                )
+                synced_count += 1
+            elif loc["completed"] != comp:
+                cursor.execute("UPDATE tasks SET completed = ? WHERE id = ?", (comp, t_id))
+                synced_count += 1
+
+        # 2. Merge Daily Logs
+        for dl in client_data.get("daily_logs", []):
+            dt = dl.get("date")
+            if not dt:
+                continue
+            cursor.execute("SELECT * FROM daily_logs WHERE date = ?", (dt,))
+            loc = cursor.fetchone()
+            rem_updated = dl.get("updated_at") or ""
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO daily_logs
+                    (date, scratchpad, wake_time, sleep_time, reflection_worked, reflection_slipped, reflection_tomorrow, completed_blocks, completed_exercises, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        dt,
+                        dl.get("scratchpad", "") or "",
+                        dl.get("wake_time", "") or "",
+                        dl.get("sleep_time", "") or "",
+                        dl.get("reflection_worked", "") or "",
+                        dl.get("reflection_slipped", "") or "",
+                        dl.get("reflection_tomorrow", "") or "",
+                        dl.get("completed_blocks", "") or "",
+                        dl.get("completed_exercises", "") or "",
+                        rem_updated or datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                    ),
+                )
+                synced_count += 1
+            else:
+                loc_dict = dict(loc)
+                loc_updated = loc_dict.get("updated_at") or ""
+
+                if rem_updated and loc_updated and rem_updated != loc_updated:
+                    if rem_updated > loc_updated:
+                        merged_b = dl.get("completed_blocks", "") or ""
+                        merged_e = dl.get("completed_exercises", "") or ""
+                        sp = dl.get("scratchpad") if dl.get("scratchpad") is not None else (loc_dict.get("scratchpad") or "")
+                        rw = dl.get("reflection_worked") or loc_dict.get("reflection_worked") or ""
+                        rs = dl.get("reflection_slipped") or loc_dict.get("reflection_slipped") or ""
+                        rt = dl.get("reflection_tomorrow") or loc_dict.get("reflection_tomorrow") or ""
+                        wt = dl.get("wake_time") or loc_dict.get("wake_time") or ""
+                        st = dl.get("sleep_time") or loc_dict.get("sleep_time") or ""
+                        target_updated = rem_updated
+                    else:
+                        merged_b = loc_dict.get("completed_blocks", "") or ""
+                        merged_e = loc_dict.get("completed_exercises", "") or ""
+                        sp = loc_dict.get("scratchpad") or dl.get("scratchpad") or ""
+                        rw = loc_dict.get("reflection_worked") or dl.get("reflection_worked") or ""
+                        rs = loc_dict.get("reflection_slipped") or dl.get("reflection_slipped") or ""
+                        rt = loc_dict.get("reflection_tomorrow") or dl.get("reflection_tomorrow") or ""
+                        wt = loc_dict.get("wake_time") or dl.get("wake_time") or ""
+                        st = loc_dict.get("sleep_time") or dl.get("sleep_time") or ""
+                        target_updated = loc_updated
+                else:
+                    loc_b = set(filter(None, (loc_dict.get("completed_blocks") or "").split(",")))
+                    rem_b = set(filter(None, (dl.get("completed_blocks") or "").split(",")))
+                    merged_b = ",".join(sorted(loc_b.union(rem_b)))
+
+                    loc_e = set(filter(None, (loc_dict.get("completed_exercises") or "").split(",")))
+                    rem_e = set(filter(None, (dl.get("completed_exercises") or "").split(",")))
+                    merged_e = ",".join(sorted(loc_e.union(rem_e)))
+
+                    sp = dl.get("scratchpad") if len(dl.get("scratchpad") or "") >= len(loc_dict.get("scratchpad") or "") else loc_dict.get("scratchpad")
+                    rw = dl.get("reflection_worked") if len(dl.get("reflection_worked", "") or "") >= len(loc_dict.get("reflection_worked", "") or "") else loc_dict.get("reflection_worked", "")
+                    rs = dl.get("reflection_slipped") if len(dl.get("reflection_slipped", "") or "") >= len(loc_dict.get("reflection_slipped", "") or "") else loc_dict.get("reflection_slipped", "")
+                    rt = dl.get("reflection_tomorrow") if len(dl.get("reflection_tomorrow", "") or "") >= len(loc_dict.get("reflection_tomorrow", "") or "") else loc_dict.get("reflection_tomorrow", "")
+                    wt = dl.get("wake_time") or loc_dict.get("wake_time") or ""
+                    st = dl.get("sleep_time") or loc_dict.get("sleep_time") or ""
+                    target_updated = rem_updated or loc_updated or datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+                if (
+                    merged_b != loc_dict.get("completed_blocks", "")
+                    or merged_e != loc_dict.get("completed_exercises", "")
+                    or sp != loc_dict.get("scratchpad", "")
+                    or rw != loc_dict.get("reflection_worked", "")
+                    or rs != loc_dict.get("reflection_slipped", "")
+                    or rt != loc_dict.get("reflection_tomorrow", "")
+                    or wt != loc_dict.get("wake_time", "")
+                    or st != loc_dict.get("sleep_time", "")
+                ):
+                    cursor.execute(
+                        """
+                        UPDATE daily_logs SET
+                            completed_blocks = ?, completed_exercises = ?, scratchpad = ?,
+                            reflection_worked = ?, reflection_slipped = ?, reflection_tomorrow = ?,
+                            wake_time = ?, sleep_time = ?, updated_at = ?
+                        WHERE date = ?
+                        """,
+                        (merged_b, merged_e, sp, rw, rs, rt, wt, st, target_updated, dt),
+                    )
+                    synced_count += 1
+
+        # 3. Merge Kill List Items
+        for kl in client_data.get("kill_list_items", []):
+            k_id = kl.get("id")
+            if not k_id:
+                continue
+            k_comp = 1 if kl.get("completed") else 0
+            cursor.execute("SELECT id, completed FROM kill_list_items WHERE id = ?", (k_id,))
+            loc = cursor.fetchone()
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO kill_list_items
+                    (id, date, category, title, action_type, target_path, target_spec, station_deliverable_id, completed)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        k_id,
+                        kl.get("date", ""),
+                        kl.get("category", "General"),
+                        kl.get("title", ""),
+                        kl.get("action_type", "url"),
+                        kl.get("target_path", ""),
+                        kl.get("target_spec", ""),
+                        kl.get("station_deliverable_id"),
+                        k_comp,
+                    ),
+                )
+                synced_count += 1
+            elif loc["completed"] != k_comp:
+                cursor.execute("UPDATE kill_list_items SET completed = ? WHERE id = ?", (k_comp, k_id))
+                synced_count += 1
+
+        # 4. Merge Station Deliverable Progress
+        for sdp in client_data.get("station_deliverable_progress", []):
+            d_id = sdp.get("deliverable_id")
+            if not d_id:
+                continue
+            rem_count = sdp.get("completed_count", 0)
+            rem_done = 1 if sdp.get("is_completed") else 0
+            cursor.execute("SELECT deliverable_id, completed_count, is_completed, total_required FROM station_deliverable_progress WHERE deliverable_id = ?", (d_id,))
+            loc = cursor.fetchone()
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO station_deliverable_progress
+                    (deliverable_id, station_id, stream, title, total_required, completed_count, unit_label, is_completed)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        d_id,
+                        sdp.get("station_id", "sep-2026"),
+                        sdp.get("stream", "code"),
+                        sdp.get("title", ""),
+                        sdp.get("total_required", 1),
+                        rem_count,
+                        sdp.get("unit_label", "reps"),
+                        rem_done,
+                    ),
+                )
+                synced_count += 1
+            else:
+                max_count = max(loc["completed_count"], rem_count)
+                is_done = 1 if (max_count >= loc["total_required"] or loc["is_completed"] or rem_done) else 0
+                if max_count != loc["completed_count"] or is_done != loc["is_completed"]:
+                    cursor.execute("UPDATE station_deliverable_progress SET completed_count = ?, is_completed = ? WHERE deliverable_id = ?", (max_count, is_done, d_id))
+                    synced_count += 1
+
+        # 5. Merge Body Metrics
+        for bm in client_data.get("body_metrics", []):
+            b_id = bm.get("id")
+            if not b_id:
+                continue
+            cursor.execute("SELECT id, weight_kg, notes FROM body_metrics WHERE id = ?", (b_id,))
+            loc = cursor.fetchone()
+            w = float(bm.get("weight_kg", 0))
+            cal = 1 if bm.get("calories_met") else 0
+            prot = 1 if bm.get("protein_met") else 0
+            notes = bm.get("notes", "") or ""
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO body_metrics (id, date, weight_kg, calories_met, protein_met, notes)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (b_id, bm.get("date", ""), w, cal, prot, notes),
+                )
+                synced_count += 1
+            elif loc["weight_kg"] != w or loc["notes"] != notes:
+                cursor.execute("UPDATE body_metrics SET weight_kg = ?, notes = ?, calories_met = ?, protein_met = ? WHERE id = ?", (w, notes, cal, prot, b_id))
+                synced_count += 1
+
+        # 6. Merge Workouts
+        for wo in client_data.get("workouts", []):
+            w_id = wo.get("id")
+            if not w_id:
+                continue
+            cursor.execute("SELECT id, workout_type, details, intensity FROM workouts WHERE id = ?", (w_id,))
+            loc = cursor.fetchone()
+            w_type = wo.get("workout_type", "Gym")
+            details = wo.get("details", "") or ""
+            intensity = int(wo.get("intensity", 7))
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO workouts (id, date, workout_type, details, intensity)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (w_id, wo.get("date", ""), w_type, details, intensity),
+                )
+                synced_count += 1
+            elif loc["details"] != details or loc["intensity"] != intensity or loc["workout_type"] != w_type:
+                cursor.execute("UPDATE workouts SET workout_type = ?, details = ?, intensity = ? WHERE id = ?", (w_type, details, intensity, w_id))
+                synced_count += 1
+
+        # 7. Merge Projects
+        for pr in client_data.get("projects", []):
+            p_id = pr.get("id")
+            if not p_id:
+                continue
+            cursor.execute("SELECT id, current_milestone, next_action, status FROM projects WHERE id = ?", (p_id,))
+            loc = cursor.fetchone()
+            milestone = pr.get("current_milestone", "") or ""
+            next_act = pr.get("next_action", "") or ""
+            status = pr.get("status", "active")
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO projects (id, name, description, local_path, github_url, current_milestone, next_action, deadline, notes, status)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        p_id,
+                        pr.get("name", ""),
+                        pr.get("description", "") or "",
+                        pr.get("local_path", "") or "",
+                        pr.get("github_url", "") or "",
+                        milestone,
+                        next_act,
+                        pr.get("deadline", "") or "",
+                        pr.get("notes", "") or "",
+                        status,
+                    ),
+                )
+                synced_count += 1
+            elif loc["current_milestone"] != milestone or loc["next_action"] != next_act or loc["status"] != status:
+                cursor.execute("UPDATE projects SET current_milestone = ?, next_action = ?, status = ? WHERE id = ?", (milestone, next_act, status, p_id))
+                synced_count += 1
+
+        # 8. Merge Metro Roadmap
+        if "metro_roadmap" in client_data and isinstance(client_data["metro_roadmap"], dict):
+            rem_metro = client_data["metro_roadmap"]
+            rem_stations = rem_metro.get("stations", [])
+            metro_file = DATA_DIR / "metro_roadmap.json"
+            if rem_stations and metro_file.exists():
+                try:
+                    with open(metro_file, "r", encoding="utf-8") as f:
+                        loc_metro = json.load(f)
+                    rem_map = {s.get("id"): s for s in rem_stations if s.get("id")}
+                    metro_changed = False
+                    for ls in loc_metro.get("stations", []):
+                        st_id = ls.get("id")
+                        if st_id in rem_map:
+                            rs = rem_map[st_id]
+                            loc_d = set(ls.get("completed_deliverables", []))
+                            rem_d = set(rs.get("completed_deliverables", []))
+                            merged_d = list(loc_d.union(rem_d))
+                            if merged_d != ls.get("completed_deliverables", []):
+                                ls["completed_deliverables"] = merged_d
+                                total_d = len(ls.get("deliverables", {}))
+                                if total_d > 0 and len(merged_d) >= total_d:
+                                    ls["status"] = "completed"
+                                metro_changed = True
+                                synced_count += 1
+                    if metro_changed:
+                        with open(metro_file, "w", encoding="utf-8") as f:
+                            json.dump(loc_metro, f, indent=2, ensure_ascii=False)
+                except Exception:
+                    pass
+
+        conn.commit()
+
+        # Query and return the full merged server state
+        def fetch_all(q):
+            try:
+                cursor.execute(q)
+                return [dict(r) for r in cursor.fetchall()]
+            except Exception:
+                return []
+
+        server_state = {
+            "tasks": fetch_all("SELECT * FROM tasks"),
+            "daily_logs": fetch_all("SELECT * FROM daily_logs"),
+            "kill_list_items": fetch_all("SELECT * FROM kill_list_items"),
+            "station_deliverable_progress": fetch_all("SELECT * FROM station_deliverable_progress"),
+            "body_metrics": fetch_all("SELECT * FROM body_metrics"),
+            "workouts": fetch_all("SELECT * FROM workouts"),
+            "projects": fetch_all("SELECT * FROM projects"),
+        }
+        metro_file = DATA_DIR / "metro_roadmap.json"
+        if metro_file.exists():
+            try:
+                with open(metro_file, "r", encoding="utf-8") as f:
+                    server_state["metro_roadmap"] = json.load(f)
+            except Exception:
+                server_state["metro_roadmap"] = {}
+
+        # Trigger background Supabase sync on server if configured
+        try:
+            cfg = sync_service.get_sync_config()
+            if cfg.get("supabase_key"):
+                import threading
+                threading.Thread(target=sync_service.sync_all, daemon=True).start()
+        except Exception:
+            pass
+
+        return jsonify({
+            "status": "ok",
+            "synced_count": synced_count,
+            "timestamp": datetime.now().isoformat(),
+            "data": server_state,
+        }), 200
+    except Exception as e:
+        return jsonify({"status": "error", "error": str(e)}), 500
+    finally:
+        conn.close()
+
 # --- Layer 0: Dashboard ---
 @app.route("/api/dashboard", methods=["GET"])
 def get_dashboard():
-    data = api.get_dashboard()
+    date_str = request.args.get("date")
+    data = api.get_dashboard(client_date=date_str)
     return jsonify(data)
 
 # --- Layer 1: Today ---

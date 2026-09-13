@@ -419,7 +419,7 @@ def get_upcoming_days(
     return upcoming
 
 
-def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
+def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None, client_date: Optional[str] = None) -> Dict[str, Any]:
     """
     Gathers all executive home page metrics: Heatmap, 7-day forecast,
     TUM progress, Body targets, and Active Projects next actions.
@@ -429,14 +429,14 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None) -> Dict[str
         conn = get_connection()
         close_conn = True
 
-    today_str = datetime.now().strftime("%Y-%m-%d")
-    heatmap = get_heatmap_data(conn=conn)
-    upcoming = get_upcoming_days(days_count=7, conn=conn)
+    today_str = client_date or datetime.now().strftime("%Y-%m-%d")
+    heatmap = get_heatmap_data(conn=conn, end_date=today_str)
+    upcoming = get_upcoming_days(days_count=7, start_date=today_str, conn=conn)
     tum_overview = tum_service.get_tum_overview(conn=conn)
     metro = tum_service.get_metro_roadmap()
     body_summary = body_service.get_weekly_workout_summary(conn=conn)
     body_history = body_service.get_body_metrics_history(limit=7, conn=conn)
-    projects = project_service.get_all_projects(conn=conn)
+    projects = project_service.get_all_projects(conn=conn, include_git=False)
 
     # Today's execution metrics
     today_tasks = today_service.get_today_tasks(today_str, conn=conn)

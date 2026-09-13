@@ -20,11 +20,32 @@ class HarnessAPI:
     def __init__(self):
         # Ensure database and tables are ready
         init_db()
+        self._last_sync_trigger = 0.0
+
+    def _trigger_auto_sync(self):
+        """Asynchronously triggers two-way sync if auto_sync is enabled and configured."""
+        import time
+        import threading
+        now = time.time()
+        if now - self._last_sync_trigger < 1.0:
+            return
+        self._last_sync_trigger = now
+
+        def _worker():
+            try:
+                from app.services import sync_service
+                cfg = sync_service.get_sync_config()
+                if cfg.get("auto_sync", True) and (cfg.get("web_url") or cfg.get("supabase_key")):
+                    sync_service.sync_all()
+            except Exception:
+                pass
+
+        threading.Thread(target=_worker, daemon=True).start()
 
     # --- Layer 0: DASHBOARD ---
-    def get_dashboard(self) -> Dict[str, Any]:
+    def get_dashboard(self, client_date: Optional[str] = None) -> Dict[str, Any]:
         """Returns heatmap matrix, upcoming 7-day forecast, and executive KPI summary."""
-        return dashboard_service.get_dashboard_summary()
+        return dashboard_service.get_dashboard_summary(client_date=client_date)
 
     # --- School, Homework & Quick Links ---
     def get_school_plan(self, date_str: Optional[str] = None, force_refresh: bool = False) -> Dict[str, Any]:
@@ -72,15 +93,21 @@ class HarnessAPI:
         source: str = "manual",
     ) -> Dict[str, Any]:
         from app.services import homework_service
-        return homework_service.add_homework(subject, title, due_date, priority, notes, source)
+        res = homework_service.add_homework(subject, title, due_date, priority, notes, source)
+        self._trigger_auto_sync()
+        return res
 
     def toggle_homework(self, hw_id: int) -> Dict[str, Any]:
         from app.services import homework_service
-        return homework_service.toggle_homework(hw_id)
+        res = homework_service.toggle_homework(hw_id)
+        self._trigger_auto_sync()
+        return res
 
     def delete_homework(self, hw_id: int) -> bool:
         from app.services import homework_service
-        return homework_service.delete_homework(hw_id)
+        res = homework_service.delete_homework(hw_id)
+        self._trigger_auto_sync()
+        return res
 
     def get_upcoming_exams(self) -> List[Dict[str, Any]]:
         from app.services import homework_service
@@ -88,19 +115,27 @@ class HarnessAPI:
 
     def add_exam(self, subject: str, title: str, exam_date: str, scope: str = "") -> Dict[str, Any]:
         from app.services import homework_service
-        return homework_service.add_exam(subject, title, exam_date, scope)
+        res = homework_service.add_exam(subject, title, exam_date, scope)
+        self._trigger_auto_sync()
+        return res
 
     def toggle_exam(self, exam_id: int, result_percentage: Optional[float] = None) -> bool:
         from app.services import homework_service
-        return homework_service.toggle_exam(exam_id, result_percentage)
+        res = homework_service.toggle_exam(exam_id, result_percentage)
+        self._trigger_auto_sync()
+        return res
 
     def delete_exam(self, exam_id: int) -> bool:
         from app.services import homework_service
-        return homework_service.delete_exam(exam_id)
+        res = homework_service.delete_exam(exam_id)
+        self._trigger_auto_sync()
+        return res
 
     def import_school_data(self, json_str: str) -> bool:
         from app.services import homework_service
-        return homework_service.import_school_data_json(json_str)
+        res = homework_service.import_school_data_json(json_str)
+        self._trigger_auto_sync()
+        return res
 
 
     # --- Layer 1: TODAY ---
@@ -118,16 +153,24 @@ class HarnessAPI:
         }
 
     def add_task(self, title: str, category: str = "personal", is_tum: bool = False, date_str: Optional[str] = None) -> Dict[str, Any]:
-        return today_service.add_task(title, category, is_tum, date_str)
+        res = today_service.add_task(title, category, is_tum, date_str)
+        self._trigger_auto_sync()
+        return res
 
     def toggle_task(self, task_id: int) -> Dict[str, Any]:
-        return today_service.toggle_task(task_id)
+        res = today_service.toggle_task(task_id)
+        self._trigger_auto_sync()
+        return res
 
     def delete_task(self, task_id: int) -> bool:
-        return today_service.delete_task(task_id)
+        res = today_service.delete_task(task_id)
+        self._trigger_auto_sync()
+        return res
 
     def rollover_tasks(self, target_date_str: Optional[str] = None) -> int:
-        return today_service.rollover_tasks(target_date_str)
+        res = today_service.rollover_tasks(target_date_str)
+        self._trigger_auto_sync()
+        return res
 
     def update_daily_log(
         self,
@@ -141,7 +184,7 @@ class HarnessAPI:
         completed_blocks: Optional[str] = None,
         completed_exercises: Optional[str] = None,
     ) -> Dict[str, Any]:
-        return today_service.update_daily_log(
+        res = today_service.update_daily_log(
             date_str=date_str,
             scratchpad=scratchpad,
             wake_time=wake_time,
@@ -152,6 +195,8 @@ class HarnessAPI:
             completed_blocks=completed_blocks,
             completed_exercises=completed_exercises,
         )
+        self._trigger_auto_sync()
+        return res
 
     # --- Kill List Drawer & Execution Engine (Harness 2.1) ---
     def get_kill_list(self, date_str: Optional[str] = None) -> Dict[str, Any]:
@@ -170,7 +215,7 @@ class HarnessAPI:
         date_str: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Adds an item to the Kill List (max 3 items per session)."""
-        return kill_list_controller.add_kill_item(
+        res = kill_list_controller.add_kill_item(
             category=category,
             title=title,
             action_type=action_type,
@@ -180,18 +225,26 @@ class HarnessAPI:
             quantity=quantity,
             date_str=date_str,
         )
+        self._trigger_auto_sync()
+        return res
 
     def complete_kill_item(self, item_id: str) -> Dict[str, Any]:
         """Marks kill item done and atomically increments connected station deliverable."""
-        return kill_list_controller.complete_kill_item(item_id)
+        res = kill_list_controller.complete_kill_item(item_id)
+        self._trigger_auto_sync()
+        return res
 
     def toggle_kill_item(self, item_id: str) -> Dict[str, Any]:
         """Toggles kill item done status and syncs station deliverable counter."""
-        return kill_list_controller.toggle_kill_item(item_id)
+        res = kill_list_controller.toggle_kill_item(item_id)
+        self._trigger_auto_sync()
+        return res
 
     def delete_kill_item(self, item_id: str) -> bool:
         """Deletes a kill item from the daily list."""
-        return kill_list_controller.delete_kill_item(item_id)
+        res = kill_list_controller.delete_kill_item(item_id)
+        self._trigger_auto_sync()
+        return res
 
     def launch_kill_item(self, action_type: str, target_path: str) -> Dict[str, Any]:
         """Directly triggers native OS / browser launcher for PDF, URL, or VS Code workspace."""
@@ -201,11 +254,15 @@ class HarnessAPI:
         self, deliverable_id: str, new_count: Optional[int] = None, delta: Optional[int] = None
     ) -> Dict[str, Any]:
         """Directly sets or adjusts countable progress on a Metro deliverable."""
-        return kill_list_controller.update_deliverable_progress(deliverable_id, new_count=new_count, delta=delta)
+        res = kill_list_controller.update_deliverable_progress(deliverable_id, new_count=new_count, delta=delta)
+        self._trigger_auto_sync()
+        return res
 
     def log_study_reps(self, deliverable_id: str, count: int, notes: str = "") -> Dict[str, Any]:
         """Registers positive study volume (e.g. 20 German words or 3 LeetCode problems)."""
-        return kill_list_controller.log_study_reps(deliverable_id, count=count, notes=notes)
+        res = kill_list_controller.log_study_reps(deliverable_id, count=count, notes=notes)
+        self._trigger_auto_sync()
+        return res
 
     # --- Layer 2: TUM & Metro ---
     def get_tum_overview(self) -> Dict[str, Any]:
@@ -222,7 +279,7 @@ class HarnessAPI:
         date_str: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Logs an individual grade (supports 4+, 17/17, 85%, np, bz), recalculating subject average instantly."""
-        return tum_service.add_grade_entry(
+        res = tum_service.add_grade_entry(
             subject=subject,
             semester=semester,
             raw_input=raw_input,
@@ -231,10 +288,14 @@ class HarnessAPI:
             description=description,
             date_str=date_str,
         )
+        self._trigger_auto_sync()
+        return res
 
     def delete_grade_entry(self, entry_id: int) -> bool:
         """Removes a grade entry and updates running average."""
-        return tum_service.delete_grade_entry(entry_id)
+        res = tum_service.delete_grade_entry(entry_id)
+        self._trigger_auto_sync()
+        return res
 
     def get_grade_entries(
         self, subject: Optional[str] = None, semester: Optional[int] = None
@@ -265,28 +326,40 @@ class HarnessAPI:
         percentage: Optional[float] = None,
         notes: Optional[str] = None,
     ) -> bool:
-        return tum_service.update_grade(grade_id, actual_grade, percentage, notes)
+        res = tum_service.update_grade(grade_id, actual_grade, percentage, notes)
+        self._trigger_auto_sync()
+        return res
 
     def update_matura(self, matura_id: int, current_mock_percentage: float, notes: Optional[str] = None) -> bool:
-        return tum_service.update_matura(matura_id, current_mock_percentage, notes)
+        res = tum_service.update_matura(matura_id, current_mock_percentage, notes)
+        self._trigger_auto_sync()
+        return res
 
     def update_language_status(self, level: str, status: str) -> bool:
-        return tum_service.update_language_status(level, status)
+        res = tum_service.update_language_status(level, status)
+        self._trigger_auto_sync()
+        return res
 
     def get_metro_roadmap(self) -> Dict[str, Any]:
         return tum_service.get_metro_roadmap()
 
     def update_station_status(self, station_id: str, status: str) -> bool:
-        return tum_service.update_station_status(station_id, status)
+        res = tum_service.update_station_status(station_id, status)
+        self._trigger_auto_sync()
+        return res
 
     def toggle_station_deliverable(self, station_id: str, deliverable_key: str) -> Dict[str, Any]:
-        return tum_service.toggle_station_deliverable(station_id, deliverable_key)
+        res = tum_service.toggle_station_deliverable(station_id, deliverable_key)
+        self._trigger_auto_sync()
+        return res
 
     def get_all_configs(self) -> Dict[str, Any]:
         return tum_service.get_all_configs()
 
     def import_config(self, config_type: str, json_content: str) -> bool:
-        return tum_service.import_config(config_type, json_content)
+        res = tum_service.import_config(config_type, json_content)
+        self._trigger_auto_sync()
+        return res
 
     # --- Layer 3: PROJECTS ---
     def get_projects(self) -> List[Dict[str, Any]]:
@@ -304,7 +377,7 @@ class HarnessAPI:
         notes: str = "",
         status: str = "active",
     ) -> Dict[str, Any]:
-        return project_service.add_project(
+        res = project_service.add_project(
             name=name,
             description=description,
             local_path=local_path,
@@ -315,6 +388,8 @@ class HarnessAPI:
             notes=notes,
             status=status,
         )
+        self._trigger_auto_sync()
+        return res
 
     def update_project(
         self,
@@ -329,7 +404,7 @@ class HarnessAPI:
         github_url: Optional[str] = None,
         notes: Optional[str] = None,
     ) -> bool:
-        return project_service.update_project(
+        res = project_service.update_project(
             project_id=project_id,
             name=name,
             description=description,
@@ -341,9 +416,13 @@ class HarnessAPI:
             github_url=github_url,
             notes=notes,
         )
+        self._trigger_auto_sync()
+        return res
 
     def delete_project(self, project_id: int) -> bool:
-        return project_service.delete_project(project_id)
+        res = project_service.delete_project(project_id)
+        self._trigger_auto_sync()
+        return res
 
     def open_project_folder(self, local_path: str) -> bool:
         return project_service.open_local_path(local_path)
@@ -373,7 +452,9 @@ class HarnessAPI:
         notes: str = "",
         date_str: Optional[str] = None,
     ) -> Dict[str, Any]:
-        return body_service.log_body_metric(weight_kg, calories_met, protein_met, notes, date_str)
+        res = body_service.log_body_metric(weight_kg, calories_met, protein_met, notes, date_str)
+        self._trigger_auto_sync()
+        return res
 
     def log_workout(
         self,
@@ -382,7 +463,9 @@ class HarnessAPI:
         intensity: int = 7,
         date_str: Optional[str] = None,
     ) -> Dict[str, Any]:
-        return body_service.log_workout(workout_type, details, intensity, date_str)
+        res = body_service.log_workout(workout_type, details, intensity, date_str)
+        self._trigger_auto_sync()
+        return res
 
     # --- Layer 5: KNOWLEDGE ---
     def get_knowledge(self, category: Optional[str] = None) -> List[Dict[str, Any]]:
@@ -396,12 +479,16 @@ class HarnessAPI:
         tags: str = "",
         item_id: Optional[int] = None,
     ) -> Dict[str, Any]:
-        return knowledge_service.save_knowledge_item(title, category, content, tags, item_id)
+        res = knowledge_service.save_knowledge_item(title, category, content, tags, item_id)
+        self._trigger_auto_sync()
+        return res
 
     def delete_knowledge_item(self, item_id: int) -> bool:
-        return knowledge_service.delete_knowledge_item(item_id)
+        res = knowledge_service.delete_knowledge_item(item_id)
+        self._trigger_auto_sync()
+        return res
 
-    # --- Cross-Device Cloud Sync ---
+    # --- Cross-Device Cloud & Web Sync ---
     def sync_now(self) -> Dict[str, Any]:
         from app.services import sync_service
         return sync_service.sync_all()
@@ -409,20 +496,58 @@ class HarnessAPI:
     def get_sync_status(self) -> Dict[str, Any]:
         from app.services import sync_service
         cfg = sync_service.get_sync_config()
-        status = "synced" if cfg.get("last_synced_at") else ("unconfigured" if not cfg.get("supabase_key") else "ready")
+        has_key = bool(cfg.get("supabase_key"))
+        has_web = bool(cfg.get("web_url"))
+        local_detected = sync_service.probe_local_server() if not has_web else None
+        configured = has_key or has_web or bool(local_detected)
+        status = "synced" if cfg.get("last_synced_at") else ("ready" if configured else "unconfigured")
         return {
             "status": status,
             "supabase_url": cfg.get("supabase_url", ""),
-            "has_key": bool(cfg.get("supabase_key")),
+            "has_key": has_key,
+            "web_url": cfg.get("web_url", ""),
+            "has_web_url": has_web,
+            "local_detected_url": local_detected or "",
             "last_synced_at": cfg.get("last_synced_at"),
             "auto_sync": cfg.get("auto_sync", True),
         }
+
+    def save_sync_settings(
+        self,
+        web_url: str = "",
+        supabase_key: str = "",
+        supabase_url: Optional[str] = None,
+        auto_sync: bool = True,
+    ) -> Dict[str, Any]:
+        """Saves Web URL and Supabase credentials in a single call."""
+        from app.services import sync_service
+        cfg = sync_service.get_sync_config()
+        if web_url is not None:
+            clean_web = web_url.strip()
+            if clean_web and not clean_web.startswith("http://") and not clean_web.startswith("https://"):
+                clean_web = f"http://{clean_web}"
+            cfg["web_url"] = clean_web.rstrip("/")
+        if supabase_key is not None:
+            cfg["supabase_key"] = supabase_key.strip()
+        if supabase_url:
+            cfg["supabase_url"] = supabase_url.strip().rstrip("/")
+        cfg["auto_sync"] = bool(auto_sync)
+        sync_service.save_sync_config(cfg)
+        return self.get_sync_status()
 
     def configure_sync(self, supabase_url: str, supabase_key: str, auto_sync: bool = True) -> bool:
         from app.services import sync_service
         cfg = sync_service.get_sync_config()
         cfg["supabase_url"] = supabase_url.strip()
         cfg["supabase_key"] = supabase_key.strip()
+        cfg["auto_sync"] = auto_sync
+        sync_service.save_sync_config(cfg)
+        return True
+
+    def configure_web_sync(self, web_url: str, auto_sync: bool = True) -> bool:
+        from app.services import sync_service
+        cfg = sync_service.get_sync_config()
+        cfg["web_url"] = web_url.strip().rstrip("/")
         cfg["auto_sync"] = auto_sync
         sync_service.save_sync_config(cfg)
         return True
