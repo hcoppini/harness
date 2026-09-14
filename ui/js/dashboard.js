@@ -226,7 +226,13 @@ window.Dashboard = {
     const scrollWrap = document.getElementById("heatmapScrollWrap");
     if (scrollWrap) {
       setTimeout(() => {
-        scrollWrap.scrollLeft = scrollWrap.scrollWidth;
+        const todayCell = container.querySelector(".cell-today");
+        if (todayCell) {
+          const cellLeft = todayCell.offsetLeft;
+          scrollWrap.scrollLeft = Math.max(0, cellLeft - 60);
+        } else {
+          scrollWrap.scrollLeft = 0;
+        }
       }, 50);
     }
 

@@ -180,7 +180,7 @@ def get_heatmap_data(
                 checked_routine_blocks = len(completed_indices)
                 for idx_str in sorted(completed_indices, key=lambda x: int(x) if x.isdigit() else 99):
                     if idx_str.isdigit() and int(idx_str) < len(sched_blocks):
-                        activities.append(f"✓ Routine: {sched_blocks[int(idx_str)]['focus']}")
+                        activities.append(f"[DONE] Routine: {sched_blocks[int(idx_str)]['focus']}")
 
             # B. Gym routine exercises (Tue / Thu)
             gym_routine = today_service.get_gym_routine_for_date(cur_str)
@@ -193,7 +193,7 @@ def get_heatmap_data(
                 checked_gym_exercises = len(completed_ex_indices)
                 for e_idx in sorted(completed_ex_indices, key=lambda x: int(x) if x.isdigit() else 99):
                     if e_idx.isdigit() and int(e_idx) < len(gym_exercises):
-                        activities.append(f"✓ Lift: {gym_exercises[int(e_idx)]['name']}")
+                        activities.append(f"[DONE] Lift: {gym_exercises[int(e_idx)]['name']}")
 
             # C. Custom Tasks & Kill List
             tasks_list = daily_tasks.get(cur_str, [])
@@ -203,15 +203,15 @@ def get_heatmap_data(
             for t in tasks_list:
                 if t["completed"]:
                     checked_tasks += 1
-                    activities.append(f"✓ Task: {t['title']}")
+                    activities.append(f"[DONE] Task: {t['title']}")
             for k in kill_list:
                 if k["completed"]:
                     checked_tasks += 1
-                    activities.append(f"✓ Kill List [{k['category']}]: {k['title']}")
+                    activities.append(f"[DONE] Kill List [{k['category']}]: {k['title']}")
 
             # D. Supplementary activities (Reflection & Logged Workouts)
             if dl.get("has_reflection", False):
-                activities.append("✓ Evening reflection audit completed")
+                activities.append("[DONE] Evening reflection audit completed")
 
             # Total boxes and checked boxes (Excludes Git Commits)
             total_boxes = total_routine_blocks + total_gym_exercises + total_tasks
@@ -225,9 +225,9 @@ def get_heatmap_data(
 
             # Map to Purple Brightness Levels:
             # - Level 0: 0 checked
-            # - Level 4: 100% of boxes checked for the day (e.g. 3/3, 8/8) -> Brightest Purple!
-            # - Level 3: >= 75% completed
-            # - Level 2: >= 40% completed
+            # - Level 4: 100% (or >= 85%) of boxes checked for the day -> Brightest Purple!
+            # - Level 3: >= 70% completed
+            # - Level 2: >= 35% completed
             # - Level 1: > 0 checked
             if total_boxes == 0:
                 if checked_boxes == 0:
@@ -247,9 +247,11 @@ def get_heatmap_data(
                     level = 4  # Brightest Purple on 100% completion!
                 else:
                     ratio = checked_boxes / total_boxes
-                    if ratio >= 0.75:
+                    if ratio >= 0.85:
+                        level = 4  # Brightest Purple for 85%+ completion
+                    elif ratio >= 0.70:
                         level = 3
-                    elif ratio >= 0.40:
+                    elif ratio >= 0.35:
                         level = 2
                     else:
                         level = 1

@@ -759,6 +759,126 @@ def sync_projects(conn: sqlite3.Connection) -> int:
 
 
 # =========================================================================
+# 8b. School Exams Sync
+# =========================================================================
+def sync_school_exams(conn: sqlite3.Connection) -> int:
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, subject, title, exam_date, scope, completed, result_percentage FROM school_exams")
+        local_exams = {row["id"]: dict(row) for row in cursor.fetchall()}
+    except (sqlite3.OperationalError, Exception):
+        return 0
+
+    remote_exams = _make_supabase_request("school_exams?select=*")
+    if remote_exams is None:
+        return 0
+
+    synced_count = 0
+    for re in remote_exams:
+        r_id = re.get("id")
+        if not r_id:
+            continue
+        r_comp = 1 if re.get("completed") else 0
+        r_res = re.get("result_percentage")
+        if r_id not in local_exams:
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO school_exams (id, subject, title, exam_date, scope, completed, result_percentage)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (r_id, re.get("subject", ""), re.get("title", ""), re.get("exam_date", ""), re.get("scope", ""), r_comp, r_res),
+            )
+            synced_count += 1
+        else:
+            loc = local_exams[r_id]
+            if loc["completed"] != r_comp or loc["result_percentage"] != r_res:
+                cursor.execute("UPDATE school_exams SET completed = ?, result_percentage = ? WHERE id = ?", (r_comp, r_res, r_id))
+                synced_count += 1
+
+    remote_ids = {re.get("id") for re in remote_exams if re.get("id")}
+    for l_id, loc in local_exams.items():
+        if l_id not in remote_ids:
+            _make_supabase_request(
+                "school_exams",
+                method="POST",
+                payload={
+                    "id": l_id,
+                    "subject": loc["subject"],
+                    "title": loc["title"],
+                    "exam_date": loc["exam_date"],
+                    "scope": loc["scope"] or "",
+                    "completed": bool(loc["completed"]),
+                    "result_percentage": loc["result_percentage"],
+                },
+                headers_extra={"Prefer": "resolution=merge-duplicates"},
+            )
+            synced_count += 1
+
+    conn.commit()
+    return synced_count
+
+
+# =========================================================================
+# 8c. Homework Items Sync
+# =========================================================================
+def sync_homework_items(conn: sqlite3.Connection) -> int:
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, subject, title, due_date, completed, source, priority, notes FROM homework_items")
+        local_hw = {row["id"]: dict(row) for row in cursor.fetchall()}
+    except (sqlite3.OperationalError, Exception):
+        return 0
+
+    remote_hw = _make_supabase_request("homework_items?select=*")
+    if remote_hw is None:
+        return 0
+
+    synced_count = 0
+    for rh in remote_hw:
+        r_id = rh.get("id")
+        if not r_id:
+            continue
+        r_comp = 1 if rh.get("completed") else 0
+        if r_id not in local_hw:
+            cursor.execute(
+                """
+                INSERT OR REPLACE INTO homework_items (id, subject, title, due_date, completed, source, priority, notes)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (r_id, rh.get("subject", ""), rh.get("title", ""), rh.get("due_date", ""), r_comp, rh.get("source", "manual"), rh.get("priority", 1), rh.get("notes", "")),
+            )
+            synced_count += 1
+        else:
+            loc = local_hw[r_id]
+            if loc["completed"] != r_comp:
+                cursor.execute("UPDATE homework_items SET completed = ? WHERE id = ?", (r_comp, r_id))
+                synced_count += 1
+
+    remote_ids = {rh.get("id") for rh in remote_hw if rh.get("id")}
+    for l_id, loc in local_hw.items():
+        if l_id not in remote_ids:
+            _make_supabase_request(
+                "homework_items",
+                method="POST",
+                payload={
+                    "id": l_id,
+                    "subject": loc["subject"],
+                    "title": loc["title"],
+                    "due_date": loc["due_date"],
+                    "completed": bool(loc["completed"]),
+                    "source": loc["source"] or "manual",
+                    "priority": loc["priority"] or 1,
+                    "notes": loc["notes"] or "",
+                },
+                headers_extra={"Prefer": "resolution=merge-duplicates"},
+            )
+            synced_count += 1
+
+    conn.commit()
+    return synced_count
+
+
+# =========================================================================
 # 9. Direct Web Server Synchronizer (Local Executable <-> Web Version HTTP)
 # =========================================================================
 def probe_local_server() -> Optional[str]:
@@ -1239,8 +1359,10 @@ def sync_all() -> Dict[str, Any]:
                 body_count = sync_body_metrics(conn)
                 workout_count = sync_workouts(conn)
                 project_count = sync_projects(conn)
+                exams_count = sync_school_exams(conn)
+                hw_count = sync_homework_items(conn)
 
-                total_synced += (tasks_count + logs_count + metro_count + kill_count + deliv_count + body_count + workout_count + project_count)
+                total_synced += (tasks_count + logs_count + metro_count + kill_count + deliv_count + body_count + workout_count + project_count + exams_count + hw_count)
             except Exception as se:
                 errors.append(f"Supabase: {se}")
 

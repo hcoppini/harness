@@ -125,3 +125,28 @@ def test_prune_expired_homework(test_db):
     cursor = test_db.cursor()
     cursor.execute("SELECT count(*) FROM homework_items WHERE due_date < '2026-09-13'")
     assert cursor.fetchone()[0] == 0
+
+
+def test_today_homework_retained_not_pruned(test_db):
+    # Homework due today (2026-09-14) must be strictly retained
+    homework_service.add_homework(
+        subject="Język polski",
+        title="Rozprawka",
+        due_date="2026-09-14",
+        conn=test_db,
+    )
+    upcoming = homework_service.get_upcoming_homework(conn=test_db, today_str="2026-09-14")
+    assert len(upcoming) == 1
+    assert upcoming[0]["due_date"] == "2026-09-14"
+    assert upcoming[0]["days_left"] == 0
+
+
+def test_sync_homework_items_and_exams(test_db, monkeypatch):
+    from app.services import sync_service
+    # Mock remote Supabase response
+    monkeypatch.setattr(sync_service, "_make_supabase_request", lambda endpoint, **kwargs: [])
+    hw_count = sync_service.sync_homework_items(test_db)
+    ex_count = sync_service.sync_school_exams(test_db)
+    assert isinstance(hw_count, int)
+    assert isinstance(ex_count, int)
+

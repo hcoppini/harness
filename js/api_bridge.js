@@ -29,6 +29,8 @@
       WORKOUTS: "harness_workouts_v3",
       PROJECTS: "harness_projects_v3",
       KNOWLEDGE: "harness_knowledge_v3",
+      HOMEWORK: "harness_homework_v3",
+      EXAMS: "harness_exams_v3",
     };
 
     const getStore = (key, defaultVal) => {
@@ -154,25 +156,29 @@
                 // Ensure recent days modified locally (e.g. Sep 10, 11, 12, 13) are accurately reflected in heatmap cells!
                 if (serverRes.heatmap && Array.isArray(serverRes.heatmap.weeks)) {
                   let runningContributions = 0;
+                  const localTasks = getStore(STORAGE_KEYS.TASKS, []);
+                  const localKill = getStore(STORAGE_KEYS.KILL_LIST, {});
+
                   serverRes.heatmap.weeks.forEach((w) => {
                     (w.days || []).forEach((d) => {
                       if (!d) return;
-                      if (localLogs[d.date]) {
-                        const lLog = localLogs[d.date];
-                        const bCount = (lLog.completed_blocks || "").split(",").map((s) => s.trim()).filter(Boolean).length;
-                        const eCount = (lLog.completed_exercises || "").split(",").map((s) => s.trim()).filter(Boolean).length;
-                        const checkedTotal = bCount + eCount;
-                        if (checkedTotal > d.count || (lLog._client_modified && checkedTotal !== d.count)) {
-                          d.count = checkedTotal;
-                          if (d.total_boxes === 0) {
-                            d.level = d.count === 0 ? 0 : d.count <= 2 ? 1 : d.count <= 4 ? 2 : d.count <= 6 ? 3 : 4;
-                          } else {
-                            if (d.count === 0) d.level = 0;
-                            else if (d.count >= d.total_boxes) d.level = 4;
-                            else {
-                              const ratio = d.count / d.total_boxes;
-                              d.level = ratio >= 0.75 ? 3 : ratio >= 0.4 ? 2 : 1;
-                            }
+                      const lLog = localLogs[d.date];
+                      const bCount = lLog ? (lLog.completed_blocks || "").split(",").map((s) => s.trim()).filter(Boolean).length : 0;
+                      const eCount = lLog ? (lLog.completed_exercises || "").split(",").map((s) => s.trim()).filter(Boolean).length : 0;
+                      const tCount = localTasks.filter((t) => t.date === d.date && t.completed).length;
+                      const kCount = (localKill[d.date] || []).filter((k) => k.completed).length;
+                      const checkedTotal = bCount + eCount + tCount + kCount;
+
+                      if (checkedTotal > d.count || (lLog && (lLog._client_modified || bCount > 0) && checkedTotal !== d.count)) {
+                        d.count = checkedTotal;
+                        if (d.total_boxes === 0) {
+                          d.level = d.count === 0 ? 0 : d.count <= 2 ? 1 : d.count <= 4 ? 2 : d.count <= 6 ? 3 : 4;
+                        } else {
+                          if (d.count === 0) d.level = 0;
+                          else if (d.count >= d.total_boxes) d.level = 4;
+                          else {
+                            const ratio = d.count / d.total_boxes;
+                            d.level = ratio >= 0.85 ? 4 : ratio >= 0.70 ? 3 : ratio >= 0.35 ? 2 : 1;
                           }
                         }
                       }
@@ -757,6 +763,271 @@
                 await rpcCall("configure_web_sync", [webUrl, autoSync]);
               } catch (e) {}
               return true;
+            };
+          }
+
+          // 4. Homework Operations
+          if (prop === "get_upcoming_homework") {
+            return async function (dateStr = null) {
+              const todayStr = dateStr || getLocalDateStr();
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("get_upcoming_homework", [todayStr]);
+              } catch (e) {}
+
+              let localHw = getStore(STORAGE_KEYS.HOMEWORK, null);
+
+              if (serverRes && Array.isArray(serverRes)) {
+                const hwMap = new Map();
+                if (Array.isArray(localHw)) {
+                  localHw.forEach((h) => hwMap.set(h.id, h));
+                }
+                serverRes.forEach((sh) => {
+                  const existing = hwMap.get(sh.id);
+                  if (existing) {
+                    hwMap.set(sh.id, { ...sh, completed: existing.completed });
+                  } else {
+                    hwMap.set(sh.id, sh);
+                  }
+                });
+                localHw = Array.from(hwMap.values());
+              }
+
+              if (!localHw) {
+                const sbRes = await supabaseRequest(`homework_items?select=*&due_date=gte.${todayStr}&order=due_date.asc`);
+                if (sbRes && Array.isArray(sbRes)) {
+                  localHw = sbRes.map((r) => ({
+                    id: r.id,
+                    subject: r.subject,
+                    title: r.title,
+                    due_date: r.due_date,
+                    completed: Boolean(r.completed),
+                    source: r.source || "vulcan",
+                    priority: r.priority || 1,
+                    notes: r.notes || "",
+                  }));
+                }
+              }
+
+              if (!Array.isArray(localHw)) localHw = [];
+
+              const todayDate = new Date(todayStr);
+              const validHw = [];
+              localHw.forEach((h) => {
+                if (!h.due_date) return;
+                if (h.due_date < todayStr) return; // Expired, auto-prune
+                const itemDate = new Date(h.due_date);
+                const diffTime = itemDate.getTime() - todayDate.getTime();
+                const daysLeft = Math.round(diffTime / (1000 * 3600 * 24));
+                validHw.push({
+                  ...h,
+                  days_left: daysLeft,
+                  completed: Boolean(h.completed),
+                });
+              });
+
+              setStore(STORAGE_KEYS.HOMEWORK, validHw);
+              return validHw.filter((h) => !h.completed);
+            };
+          }
+
+          if (prop === "toggle_homework") {
+            return async function (hwId) {
+              const localHw = getStore(STORAGE_KEYS.HOMEWORK, []);
+              const item = localHw.find((h) => h.id === hwId);
+              let newCompleted = false;
+              if (item) {
+                item.completed = !item.completed;
+                newCompleted = item.completed;
+                setStore(STORAGE_KEYS.HOMEWORK, localHw);
+                supabaseRequest(`homework_items?id=eq.${hwId}`, "PATCH", { completed: newCompleted });
+              }
+              rpcCall("toggle_homework", [hwId]).catch(() => {});
+              return { id: hwId, completed: newCompleted };
+            };
+          }
+
+          if (prop === "delete_homework") {
+            return async function (hwId) {
+              let localHw = getStore(STORAGE_KEYS.HOMEWORK, []);
+              localHw = localHw.filter((h) => h.id !== hwId);
+              setStore(STORAGE_KEYS.HOMEWORK, localHw);
+              rpcCall("delete_homework", [hwId]).catch(() => {});
+              supabaseRequest(`homework_items?id=eq.${hwId}`, "DELETE");
+              return true;
+            };
+          }
+
+          if (prop === "add_homework") {
+            return async function (subject, title, dueDate, priority = 1, notes = "", source = "manual") {
+              const localHw = getStore(STORAGE_KEYS.HOMEWORK, []);
+              const newId = Date.now();
+              const todayDate = new Date(getLocalDateStr());
+              const itemDate = new Date(dueDate);
+              const daysLeft = Math.round((itemDate - todayDate) / (1000 * 3600 * 24));
+
+              const newItem = {
+                id: newId,
+                subject,
+                title,
+                due_date: dueDate,
+                completed: false,
+                source,
+                priority: parseInt(priority, 10) || 1,
+                notes,
+                days_left: daysLeft,
+              };
+              localHw.push(newItem);
+              setStore(STORAGE_KEYS.HOMEWORK, localHw);
+
+              rpcCall("add_homework", [subject, title, dueDate, priority, notes, source]).catch(() => {});
+              supabaseRequest("homework_items", "POST", newItem);
+              return newItem;
+            };
+          }
+
+          // 5. School Exam Operations
+          if (prop === "get_upcoming_exams") {
+            return async function (limit = 15) {
+              const todayStr = getLocalDateStr();
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("get_upcoming_exams", [limit]);
+              } catch (e) {}
+
+              let localExams = getStore(STORAGE_KEYS.EXAMS, null);
+
+              if (serverRes && Array.isArray(serverRes)) {
+                const exMap = new Map();
+                if (Array.isArray(localExams)) {
+                  localExams.forEach((e) => exMap.set(e.id, e));
+                }
+                serverRes.forEach((se) => {
+                  const existing = exMap.get(se.id);
+                  if (existing) {
+                    exMap.set(se.id, { ...se, completed: existing.completed });
+                  } else {
+                    exMap.set(se.id, se);
+                  }
+                });
+                localExams = Array.from(exMap.values());
+              }
+
+              if (!localExams) {
+                const sbRes = await supabaseRequest(`school_exams?select=*&exam_date=gte.${todayStr}&order=exam_date.asc&limit=${limit}`);
+                if (sbRes && Array.isArray(sbRes)) {
+                  localExams = sbRes.map((r) => ({
+                    id: r.id,
+                    subject: r.subject,
+                    title: r.title,
+                    exam_date: r.exam_date,
+                    scope: r.scope || "",
+                    completed: Boolean(r.completed),
+                    result_percentage: r.result_percentage,
+                  }));
+                }
+              }
+
+              if (!Array.isArray(localExams)) localExams = [];
+
+              const todayDate = new Date(todayStr);
+              const validExams = localExams
+                .filter((e) => e.exam_date >= todayStr || !e.completed)
+                .map((e) => {
+                  const itemDate = new Date(e.exam_date);
+                  const daysLeft = Math.round((itemDate - todayDate) / (1000 * 3600 * 24));
+                  return {
+                    ...e,
+                    days_left: daysLeft,
+                    completed: Boolean(e.completed),
+                  };
+                });
+
+              setStore(STORAGE_KEYS.EXAMS, validExams);
+              return validExams.filter((e) => !e.completed);
+            };
+          }
+
+          if (prop === "delete_exam") {
+            return async function (examId) {
+              let localExams = getStore(STORAGE_KEYS.EXAMS, []);
+              localExams = localExams.filter((e) => e.id !== examId);
+              setStore(STORAGE_KEYS.EXAMS, localExams);
+              rpcCall("delete_exam", [examId]).catch(() => {});
+              supabaseRequest(`school_exams?id=eq.${examId}`, "DELETE");
+              return true;
+            };
+          }
+
+          if (prop === "toggle_exam") {
+            return async function (examId) {
+              const localExams = getStore(STORAGE_KEYS.EXAMS, []);
+              const item = localExams.find((e) => e.id === examId);
+              let newCompleted = false;
+              if (item) {
+                item.completed = !item.completed;
+                newCompleted = item.completed;
+                setStore(STORAGE_KEYS.EXAMS, localExams);
+                supabaseRequest(`school_exams?id=eq.${examId}`, "PATCH", { completed: newCompleted });
+              }
+              rpcCall("toggle_exam", [examId]).catch(() => {});
+              return { id: examId, completed: newCompleted };
+            };
+          }
+
+          if (prop === "add_exam") {
+            return async function (subject, title, examDate, scope = "", resultPercentage = null) {
+              const localExams = getStore(STORAGE_KEYS.EXAMS, []);
+              const newId = Date.now();
+              const todayDate = new Date(getLocalDateStr());
+              const itemDate = new Date(examDate);
+              const daysLeft = Math.round((itemDate - todayDate) / (1000 * 3600 * 24));
+
+              const newItem = {
+                id: newId,
+                subject,
+                title,
+                exam_date: examDate,
+                scope,
+                completed: false,
+                result_percentage: resultPercentage,
+                days_left: daysLeft,
+              };
+              localExams.push(newItem);
+              setStore(STORAGE_KEYS.EXAMS, localExams);
+
+              rpcCall("add_exam", [subject, title, examDate, scope, resultPercentage]).catch(() => {});
+              supabaseRequest("school_exams", "POST", newItem);
+              return newItem;
+            };
+          }
+
+          // 6. Vulcan Sync Bridge
+          if (prop === "sync_vulcan_data") {
+            return async function (dateStr = null, forceRefresh = false) {
+              try {
+                const serverRes = await rpcCall("sync_vulcan_data", [dateStr, forceRefresh]);
+                if (serverRes) {
+                  await apiProxy.get_upcoming_homework(dateStr);
+                  await apiProxy.get_upcoming_exams();
+                  return serverRes;
+                }
+              } catch (e) {}
+              return { status: "synced", mode: "cached", exams_synced: 0, homework_synced: 0 };
+            };
+          }
+
+          if (prop === "auto_sync_vulcan") {
+            return async function (dateStr = null) {
+              try {
+                const serverRes = await rpcCall("auto_sync_vulcan", [dateStr]);
+                if (serverRes) {
+                  await apiProxy.get_upcoming_homework(dateStr);
+                  await apiProxy.get_upcoming_exams();
+                  return serverRes;
+                }
+              } catch (e) {}
+              return null;
             };
           }
 

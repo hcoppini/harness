@@ -484,6 +484,12 @@ def test_harness_3_workload_and_kill_list_routes(client):
     assert len(wl_data["upcoming_exams"]) >= 4
 
     # 3. Enqueue Progressive Deliverable (LeetCode #5)
+    from app.db import get_connection
+    conn = get_connection()
+    conn.execute("DELETE FROM kill_list_items WHERE date = '2026-09-14'")
+    conn.commit()
+    conn.close()
+
     enq_res = client.post(
         "/api/kill-list/enqueue-progressive",
         data=json.dumps({"deliverable_id": "sep26_leetcode_15", "date": "2026-09-14"}),

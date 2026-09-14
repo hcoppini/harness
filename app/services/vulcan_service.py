@@ -615,22 +615,22 @@ def _fetch_live_vulcan_payload(cfg: Dict[str, Any], target_date: str) -> Optiona
     except Exception:
         curr_dt = datetime.now().date()
 
-    d_from = curr_dt.strftime("%Y-%m-%d")
+    d_from = (curr_dt - timedelta(days=14)).strftime("%Y-%m-%d")
     d_to = (curr_dt + timedelta(days=60)).strftime("%Y-%m-%d")
 
     # 1. Upcoming exams
     exams_url = f"{rest_url}/mobile/exam/byPupil?pupilId={pupil_id}&dateFrom={d_from}&dateTo={d_to}&lastSyncDate=1970-01-01%2001:00:00&lastId=-2147483648&pageSize=500"
-    raw_exams = make_hebe_request("GET", exams_url, None, fp, pk, pupil_id=pupil_id, timeout=8)
+    raw_exams = make_hebe_request("GET", exams_url, None, fp, pk, pupil_id=pupil_id, timeout=12)
 
     # 2. Homework
     hw_url = f"{rest_url}/mobile/homework/byPupil?pupilId={pupil_id}&dateFrom={d_from}&dateTo={d_to}&lastSyncDate=1970-01-01%2001:00:00&lastId=-2147483648&pageSize=500"
-    raw_hw = make_hebe_request("GET", hw_url, None, fp, pk, pupil_id=pupil_id, timeout=8)
+    raw_hw = make_hebe_request("GET", hw_url, None, fp, pk, pupil_id=pupil_id, timeout=12)
 
     # 3. Grades
     raw_grades = None
     if unit_id and period_id:
         grades_url = f"{rest_url}/mobile/grade/byPupil?unitId={unit_id}&pupilId={pupil_id}&periodId={period_id}&lastSyncDate=1970-01-01%2001:00:00&lastId=-2147483648&pageSize=500"
-        raw_grades = make_hebe_request("GET", grades_url, None, fp, pk, pupil_id=pupil_id, timeout=8)
+        raw_grades = make_hebe_request("GET", grades_url, None, fp, pk, pupil_id=pupil_id, timeout=12)
 
     normalized_exams = []
     if isinstance(raw_exams, list):
@@ -638,7 +638,8 @@ def _fetch_live_vulcan_payload(cfg: Dict[str, Any], target_date: str) -> Optiona
             subj = e.get("Subject", {}).get("Name", "General") if isinstance(e.get("Subject"), dict) else "General"
             e_type = e.get("Type", "Sprawdzian")
             content = e.get("Content", "")
-            deadline = (e.get("DeadlineAt") or e.get("DateAt") or target_date)[:10]
+            dl_val = e.get("DeadlineAt") or (e.get("Deadline", {}).get("Date") if isinstance(e.get("Deadline"), dict) else e.get("Deadline")) or e.get("DateAt") or target_date
+            deadline = str(dl_val)[:10]
             weight = 3 if any(w in e_type.lower() for w in ["sprawdzian", "klasowa", "praca"]) else (2 if "kartkówka" in e_type.lower() else 1)
             normalized_exams.append({
                 "subject": subj,
@@ -654,7 +655,8 @@ def _fetch_live_vulcan_payload(cfg: Dict[str, Any], target_date: str) -> Optiona
         for h in raw_hw:
             subj = h.get("Subject", {}).get("Name", "General") if isinstance(h.get("Subject"), dict) else "General"
             content = h.get("Content", "Zadanie domowe")
-            deadline = (h.get("DeadlineAt") or h.get("DateAt") or target_date)[:10]
+            dl_val = h.get("DeadlineAt") or (h.get("Deadline", {}).get("Date") if isinstance(h.get("Deadline"), dict) else h.get("Deadline")) or h.get("DateAt") or target_date
+            deadline = str(dl_val)[:10]
             if deadline < today_iso:
                 continue  # Deadline reached, skip obsolete overdue homework
             normalized_hw.append({
