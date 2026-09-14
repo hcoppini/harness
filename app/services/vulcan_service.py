@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
 from app.db import get_connection, DATA_DIR
+from engine.grade_parser import parse_polish_grade, calculate_subject_average
 
 CONFIG_FILE = DATA_DIR / "vulcan_config.json"
 
@@ -30,6 +31,8 @@ DEFAULT_CONFIG = {
     "token": "",
     "registered_device": None,
     "last_synced_at": None,
+    "last_daily_sync_date": None,
+    "sync_time_daily": "15:00",
     "demo_mode": True,  # True provides realistic TM1 Liceum Class 3 schedule data
 }
 
@@ -673,10 +676,22 @@ def _fetch_live_vulcan_payload(cfg: Dict[str, Any], target_date: str) -> Optiona
             col = g.get("Column", {}) if isinstance(col := g.get("Column"), dict) else {}
             subj = col.get("Subject", {}).get("Name", "General") if isinstance(col.get("Subject"), dict) else "General"
             val = g.get("Value")
-            raw_input = g.get("ContentRaw") or g.get("Content") or "5"
+            num = g.get("Numerator")
+            den = g.get("Denominator")
+            if num is not None and den is not None:
+                raw_input = f"{num}/{den}"
+            else:
+                raw_input = g.get("ContentRaw") or g.get("Content") or (str(val) if val is not None else "5")
             weight = float(col.get("Weight", 1.0))
-            cat = col.get("Category", {}).get("Name", "Ocena") if isinstance(col.get("Category"), dict) else "Ocena"
-            desc = g.get("Comment") or col.get("Name", "")
+            cat = col.get("Category", {}).get("Name", "Bieżące") if isinstance(col.get("Category"), dict) else "Bieżące"
+            col_name = (col.get("Name") or "").strip()
+            comment = (g.get("Comment") or "").strip()
+            if col_name and comment:
+                desc = f"{col_name} ({comment})"
+            elif col_name:
+                desc = col_name
+            else:
+                desc = comment
             g_date = (g.get("DateAt") or g.get("CreatedAt") or target_date)[:10]
             normalized_grades.append({
                 "subject": subj,
@@ -784,35 +799,92 @@ def sync_vulcan_data(
             )
             hw_synced += 1
 
-    # 3. Merge grades
+    # 3. Merge grades into Grade Ledger (tum_grade_entries & tum_grades)
+    affected_subjects = set()
     for g in payload.get("grades", []):
         subj = g.get("subject", "General").strip()
         sem = int(g.get("semester", 1))
-        raw = g.get("raw_input", "5")
-        num = g.get("numeric_value")
+        raw = str(g.get("raw_input", "5")).strip()
         weight = float(g.get("weight", 1.0))
-        cat = g.get("category", "Sprawdzian")
-        desc = g.get("description", "")
+        cat = g.get("category", "Sprawdzian").strip()
+        desc = g.get("description", "").strip()
         g_date = g.get("date", target_date)
+
+        parsed = parse_polish_grade(raw)
+        num = g.get("numeric_value")
+        if num is None and parsed.get("numeric_value") is not None:
+            num = parsed["numeric_value"]
+        elif num is not None:
+            try:
+                num = float(num)
+            except Exception:
+                num = None
+
+        counts = 1 if (parsed.get("counts_in_average") and weight > 0.0) else 0
 
         cursor.execute(
             """
             SELECT id FROM tum_grade_entries 
-            WHERE subject = ? AND semester = ? AND description = ? AND date = ?
+            WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) 
+              AND semester = ? 
+              AND (description = ? OR (description = '' AND raw_input = ?))
+              AND date = ?
             """,
-            (subj, sem, desc, g_date),
+            (subj, sem, desc, raw, g_date),
         )
         existing = cursor.fetchone()
-        if not existing:
+        if existing:
+            cursor.execute(
+                """
+                UPDATE tum_grade_entries
+                SET raw_input = ?, numeric_value = ?, weight = ?, category = ?, counts_in_average = ?
+                WHERE id = ?
+                """,
+                (raw, num, weight, cat, counts, existing["id"]),
+            )
+        else:
             cursor.execute(
                 """
                 INSERT INTO tum_grade_entries 
                 (subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (subj, sem, raw, num, weight, cat, desc, g_date),
+                (subj, sem, raw, num, weight, cat, desc, g_date, counts),
             )
             grades_synced += 1
+
+        affected_subjects.add((subj, sem))
+
+    # Recalculate running averages and update tum_grades for affected subjects
+    for subj, sem in affected_subjects:
+        cursor.execute(
+            "SELECT id FROM tum_grades WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) AND semester = ?",
+            (subj, sem),
+        )
+        if not cursor.fetchone():
+            cursor.execute(
+                "INSERT INTO tum_grades (subject, semester, target_grade, actual_grade) VALUES (?, ?, 5.0, NULL)",
+                (subj, sem),
+            )
+
+        cursor.execute(
+            """
+            SELECT * FROM tum_grade_entries 
+            WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) AND semester = ?
+            """,
+            (subj, sem),
+        )
+        rows = cursor.fetchall()
+        entries = [dict(r) for r in rows]
+        running_avg = calculate_subject_average(entries)
+        cursor.execute(
+            """
+            UPDATE tum_grades 
+            SET actual_grade = ? 
+            WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) AND semester = ?
+            """,
+            (running_avg, subj, sem),
+        )
 
     conn.commit()
 
@@ -833,18 +905,109 @@ def sync_vulcan_data(
     }
 
 
+def check_and_run_daily_3pm_sync(
+    conn: Optional[sqlite3.Connection] = None,
+    force: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """
+    Checks if current local time is 15:00 (3pm) or later and today's scheduled 3pm sync
+    has not yet executed. If due (or force=True), syncs homework, exams, and grades,
+    updates the grades ledger, and records completion in config.
+    """
+    cfg = get_vulcan_config()
+    if not cfg.get("enabled", True):
+        return None
+
+    now = datetime.now()
+    today_str = now.strftime("%Y-%m-%d")
+
+    sync_time = cfg.get("sync_time_daily", "15:00")
+    try:
+        target_h, target_m = [int(p) for p in sync_time.split(":")[:2]]
+    except Exception:
+        target_h, target_m = 15, 0
+
+    is_due = (now.hour > target_h) or (now.hour == target_h and now.minute >= target_m)
+    last_daily = cfg.get("last_daily_sync_date")
+
+    if force or (is_due and last_daily != today_str):
+        sync_res = sync_vulcan_data(client_date=today_str, force_refresh=True, conn=conn)
+        cfg["last_daily_sync_date"] = today_str
+        save_vulcan_config(cfg)
+        return sync_res
+
+    return None
+
+
+_SCHEDULER_THREAD = None
+_SCHEDULER_STOP = False
+
+
+def start_vulcan_daily_scheduler() -> None:
+    """Spawns background daemon thread to monitor and fire 3:00 PM daily sync."""
+    global _SCHEDULER_THREAD, _SCHEDULER_STOP
+    import threading
+    import time
+
+    if _SCHEDULER_THREAD is not None and _SCHEDULER_THREAD.is_alive():
+        return
+
+    _SCHEDULER_STOP = False
+
+    def _loop():
+        while not _SCHEDULER_STOP:
+            try:
+                check_and_run_daily_3pm_sync()
+            except Exception:
+                pass
+            time.sleep(30)
+
+    _SCHEDULER_THREAD = threading.Thread(target=_loop, name="VulcanDailyScheduler", daemon=True)
+    _SCHEDULER_THREAD.start()
+
+
+def setup_windows_scheduled_sync(target_time: str = "15:00") -> bool:
+    """Registers or updates Windows Task Scheduler task to run daily at 3:00 PM."""
+    import subprocess
+    base_dir = Path(__file__).resolve().parent.parent.parent
+    bat_path = base_dir / "scripts" / "sync_vulcan_daily.bat"
+    if not bat_path.exists():
+        return False
+
+    cmd = [
+        "schtasks",
+        "/Create",
+        "/SC", "DAILY",
+        "/TN", "HarnessDaily3pmVulcanSync",
+        "/TR", f'"{bat_path}"',
+        "/ST", target_time,
+        "/F",
+    ]
+    try:
+        res = subprocess.run(cmd, capture_output=True, text=True)
+        return res.returncode == 0
+    except Exception:
+        return False
+
+
 def auto_sync_vulcan_if_needed(
     client_date: Optional[str] = None,
     max_age_minutes: int = 20,
     conn: Optional[sqlite3.Connection] = None,
 ) -> Optional[Dict[str, Any]]:
     """
-    Silently checks and auto-syncs Vulcan in the background if configured
-    and the last sync was performed more than max_age_minutes ago.
+    Silently checks and auto-syncs Vulcan in the background:
+    1. Checks if 3pm daily scheduled sync is due today and runs it immediately.
+    2. Otherwise syncs if last sync was performed more than max_age_minutes ago.
     """
     cfg = get_vulcan_config()
     if not cfg.get("enabled", True):
         return None
+
+    # First check 3pm daily milestone
+    daily_res = check_and_run_daily_3pm_sync(conn=conn)
+    if daily_res is not None:
+        return daily_res
 
     # Check last sync timestamp
     last_synced = cfg.get("last_synced_at")

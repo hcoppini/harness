@@ -25,6 +25,7 @@ except Exception:
 try:
     from app.services import vulcan_service
     vulcan_service.auto_sync_vulcan_if_needed()
+    vulcan_service.start_vulcan_daily_scheduler()
 except Exception:
     pass
 
@@ -540,6 +541,35 @@ def sync_exchange_endpoint():
                 cursor.execute("UPDATE homework_items SET completed = ? WHERE id = ?", (h_comp, h_id))
                 synced_count += 1
 
+        # 11. Merge TUM Grade Entries
+        for ge in client_data.get("tum_grade_entries", []):
+            g_id = ge.get("id")
+            if not g_id:
+                continue
+            cursor.execute("SELECT id FROM tum_grade_entries WHERE id = ?", (g_id,))
+            loc = cursor.fetchone()
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO tum_grade_entries
+                    (id, subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        g_id,
+                        ge.get("subject", ""),
+                        int(ge.get("semester", 1)),
+                        ge.get("raw_input", ""),
+                        ge.get("numeric_value"),
+                        float(ge.get("weight", 1.0)),
+                        ge.get("category", "Grade"),
+                        ge.get("description", ""),
+                        ge.get("date", ""),
+                        1 if ge.get("counts_in_average") else 0,
+                    ),
+                )
+                synced_count += 1
+
         conn.commit()
 
         # Query and return the full merged server state
@@ -557,6 +587,8 @@ def sync_exchange_endpoint():
             "station_deliverable_progress": fetch_all("SELECT * FROM station_deliverable_progress"),
             "school_exams": fetch_all("SELECT * FROM school_exams"),
             "homework_items": fetch_all("SELECT * FROM homework_items"),
+            "tum_grade_entries": fetch_all("SELECT * FROM tum_grade_entries"),
+            "tum_grades": fetch_all("SELECT * FROM tum_grades"),
             "body_metrics": fetch_all("SELECT * FROM body_metrics"),
             "workouts": fetch_all("SELECT * FROM workouts"),
             "projects": fetch_all("SELECT * FROM projects"),

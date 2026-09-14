@@ -196,3 +196,70 @@ def test_vulcan_status_and_disconnect(test_db, tmp_path, monkeypatch):
     assert status3["mode"] == "demo_tm1"
     assert status3["is_connected"] is False
 
+
+def test_vulcan_grades_sync_and_ledger_update(test_db):
+    test_date = "2026-09-14"
+    res = vulcan_service.sync_vulcan_data(client_date=test_date, conn=test_db)
+    assert res["status"] == "synced"
+    assert res["grades_synced"] >= 2
+
+    # Verify tum_grade_entries table is populated
+    cursor = test_db.cursor()
+    cursor.execute("SELECT * FROM tum_grade_entries ORDER BY id ASC")
+    entries = [dict(r) for r in cursor.fetchall()]
+    assert len(entries) >= 2
+
+    math_entry = next((e for e in entries if e["subject"] == "Matematyka"), None)
+    assert math_entry is not None
+    assert math_entry["raw_input"] == "5+"
+    assert math_entry["numeric_value"] == 5.5
+
+    # Verify tum_grades actual_grade running average was automatically updated
+    cursor.execute("SELECT * FROM tum_grades WHERE subject = 'Matematyka' AND semester = 1")
+    math_grade = dict(cursor.fetchone())
+    assert math_grade["actual_grade"] == 5.5
+
+    cursor.execute("SELECT * FROM tum_grades WHERE subject = 'Informatyka' AND semester = 1")
+    cs_grade = dict(cursor.fetchone())
+    assert cs_grade["actual_grade"] == 6.0
+
+
+def test_vulcan_daily_3pm_sync_trigger(test_db, monkeypatch):
+    from unittest.mock import MagicMock
+    from datetime import datetime
+
+    # 1. Simulate 2:30 PM (before 3:00 PM) -> Should NOT trigger
+    fake_2pm = datetime(2026, 9, 14, 14, 30, 0)
+    mock_dt = MagicMock()
+    mock_dt.now.return_value = fake_2pm
+    mock_dt.fromisoformat = datetime.fromisoformat
+    mock_dt.strptime = datetime.strptime
+    monkeypatch.setattr(vulcan_service, "datetime", mock_dt)
+
+    res_early = vulcan_service.check_and_run_daily_3pm_sync(conn=test_db)
+    assert res_early is None
+
+    # 2. Simulate 3:05 PM (after 3:00 PM, first time today) -> Should trigger
+    fake_3pm = datetime(2026, 9, 14, 15, 5, 0)
+    mock_dt.now.return_value = fake_3pm
+
+    res_due = vulcan_service.check_and_run_daily_3pm_sync(conn=test_db)
+    assert res_due is not None
+    assert res_due["status"] == "synced"
+
+    cfg = vulcan_service.get_vulcan_config()
+    assert cfg["last_daily_sync_date"] == "2026-09-14"
+
+    # 3. Simulate 4:00 PM on same day -> Already ran today, should return None
+    fake_4pm = datetime(2026, 9, 14, 16, 0, 0)
+    mock_dt.now.return_value = fake_4pm
+
+    res_already_ran = vulcan_service.check_and_run_daily_3pm_sync(conn=test_db)
+    assert res_already_ran is None
+
+    # 4. Force trigger -> Should run even if already ran today
+    res_forced = vulcan_service.check_and_run_daily_3pm_sync(conn=test_db, force=True)
+    assert res_forced is not None
+    assert res_forced["status"] == "synced"
+
+

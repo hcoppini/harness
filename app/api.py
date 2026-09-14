@@ -617,11 +617,25 @@ class HarnessAPI:
         return res
 
     def auto_sync_vulcan(self, client_date: Optional[str] = None) -> Optional[Dict[str, Any]]:
-        """Silently auto-syncs Vulcan if configured and last sync is older than 20 minutes."""
+        """Silently auto-syncs Vulcan if configured and last sync is older than 20 minutes or 3pm due."""
         from app.services import vulcan_service
         res = vulcan_service.auto_sync_vulcan_if_needed(client_date)
         if res:
             self._trigger_auto_sync()
         return res
+
+    def check_daily_vulcan_sync(self, force: bool = False) -> Optional[Dict[str, Any]]:
+        """Checks and runs 3:00 PM scheduled sync if due today."""
+        from app.services import vulcan_service
+        res = vulcan_service.check_and_run_daily_3pm_sync(force=force)
+        if res:
+            self._trigger_auto_sync()
+        return res
+
+    def setup_windows_vulcan_sync(self, target_time: str = "15:00") -> bool:
+        """Registers Windows Task Scheduler 3:00 PM daily task."""
+        from app.services import vulcan_service
+        return vulcan_service.setup_windows_scheduled_sync(target_time)
+
 
 

@@ -33,6 +33,8 @@ Thumbs.db
 
 # Private credentials & local school sync tokens
 data/vulcan_config.json
+*.log
+data/*.log
 
 
 

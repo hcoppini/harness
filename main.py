@@ -33,6 +33,8 @@ def main():
         try:
             from app.services import vulcan_service
             vulcan_service.auto_sync_vulcan_if_needed()
+            vulcan_service.start_vulcan_daily_scheduler()
+            vulcan_service.setup_windows_scheduled_sync()
         except Exception:
             pass
 

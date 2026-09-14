@@ -47,6 +47,7 @@ const Today = {
     if (!this._vulcanSyncInterval) {
       this._vulcanSyncInterval = setInterval(() => this.silentAutoSyncVulcan(), 20 * 60 * 1000);
     }
+    this.initDaily3pmVulcanSync();
   },
 
   bindEvents() {
@@ -780,11 +781,56 @@ const Today = {
           await this.loadHomeworkAndExams();
           if (window.KillListDrawer) await window.KillListDrawer.load();
           if (window.Dashboard) await window.Dashboard.load();
+          if (window.Tum) await window.Tum.load();
         }
       }
     } catch (err) {
       console.warn("Silent Vulcan auto-sync check:", err);
     }
+  },
+
+  initDaily3pmVulcanSync() {
+    const check3pm = async () => {
+      const now = new Date();
+      const todayStr = now.toISOString().slice(0, 10);
+      const isPast3pm = now.getHours() > 15 || (now.getHours() === 15 && now.getMinutes() >= 0);
+      const last3pmDate = localStorage.getItem("harness_vulcan_3pm_last_date");
+
+      if (isPast3pm && last3pmDate !== todayStr) {
+        try {
+          if (window.pywebview && window.pywebview.api) {
+            const apiMethod = window.pywebview.api.check_daily_vulcan_sync || window.pywebview.api.auto_sync_vulcan;
+            if (apiMethod) {
+              const res = await apiMethod();
+              if (res && (res.status === "synced" || res.status !== "fresh")) {
+                localStorage.setItem("harness_vulcan_3pm_last_date", todayStr);
+                await this.loadHomeworkAndExams();
+                if (window.Dashboard) await window.Dashboard.load();
+                if (window.Tum) await window.Tum.load();
+                if (window.KillListDrawer) await window.KillListDrawer.load();
+                if (window.HarnessApp && window.HarnessApp.showToast) {
+                  window.HarnessApp.showToast("Vulcan 3:00 PM Auto-Sync completed: homework and grades updated.");
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn("Daily 3pm Vulcan sync error:", e);
+        }
+      }
+    };
+
+    check3pm();
+
+    if (!this._daily3pmCheckInterval) {
+      this._daily3pmCheckInterval = setInterval(check3pm, 60 * 1000);
+    }
+
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) {
+        check3pm();
+      }
+    });
   },
 
   async loadHomeworkAndExams() {
@@ -1145,11 +1191,15 @@ const Today = {
         if (window.MetroMap) {
           await window.MetroMap.load();
         }
+        if (window.Tum) {
+          await window.Tum.load();
+        }
         const examsCount = res && res.exams_synced !== undefined ? res.exams_synced : 0;
         const hwCount = res && res.homework_synced !== undefined ? res.homework_synced : 0;
+        const gradesCount = res && res.grades_synced !== undefined ? res.grades_synced : 0;
         const mode = res && res.mode === "live" ? "Live Account" : "TM1 Simulator";
         if (window.HarnessApp && window.HarnessApp.showToast) {
-          window.HarnessApp.showToast(`Vulcan Synced [${mode}]: ${examsCount} exams, ${hwCount} homework.`);
+          window.HarnessApp.showToast(`Vulcan Synced [${mode}]: ${examsCount} exams, ${hwCount} homework, ${gradesCount} grades.`);
         }
       }
     } catch (err) {

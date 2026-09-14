@@ -1010,10 +1010,13 @@
                 if (serverRes) {
                   await apiProxy.get_upcoming_homework(dateStr);
                   await apiProxy.get_upcoming_exams();
+                  if (apiProxy.get_tum_overview) {
+                    await apiProxy.get_tum_overview();
+                  }
                   return serverRes;
                 }
               } catch (e) {}
-              return { status: "synced", mode: "cached", exams_synced: 0, homework_synced: 0 };
+              return { status: "synced", mode: "cached", exams_synced: 0, homework_synced: 0, grades_synced: 0 };
             };
           }
 
@@ -1024,6 +1027,26 @@
                 if (serverRes) {
                   await apiProxy.get_upcoming_homework(dateStr);
                   await apiProxy.get_upcoming_exams();
+                  if (apiProxy.get_tum_overview) {
+                    await apiProxy.get_tum_overview();
+                  }
+                  return serverRes;
+                }
+              } catch (e) {}
+              return null;
+            };
+          }
+
+          if (prop === "check_daily_vulcan_sync") {
+            return async function (force = false) {
+              try {
+                const serverRes = await rpcCall("check_daily_vulcan_sync", [force]);
+                if (serverRes) {
+                  await apiProxy.get_upcoming_homework();
+                  await apiProxy.get_upcoming_exams();
+                  if (apiProxy.get_tum_overview) {
+                    await apiProxy.get_tum_overview();
+                  }
                   return serverRes;
                 }
               } catch (e) {}
