@@ -743,6 +743,18 @@ def sync_vulcan_data(
             payload = None
 
     if payload is None:
+        import os
+        if os.environ.get("VERCEL") or os.environ.get("HARNESS_SERVER"):
+            from datetime import datetime
+            return {
+                "status": "skipped",
+                "message": "Demo mode disabled on server to prevent overwriting real data.",
+                "exams_synced": 0,
+                "homework_synced": 0,
+                "grades_synced": 0,
+                "mode": "demo_skipped",
+                "timestamp": datetime.now().isoformat(),
+            }
         payload = _get_demo_school_data(target_date)
 
     exams_synced = 0

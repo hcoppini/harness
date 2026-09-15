@@ -896,6 +896,233 @@ def probe_local_server() -> Optional[str]:
 
 
 
+
+# =========================================================================
+# 8d. TUM Grades Sync
+# =========================================================================
+def sync_tum_grades(conn) -> int:
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, subject, semester, target_grade, actual_grade, percentage, notes FROM tum_grades")
+        local_items = {row["id"]: dict(row) for row in cursor.fetchall()}
+    except Exception:
+        return 0
+
+    remote_items = _make_supabase_request("tum_grades?select=*")
+    if remote_items is None:
+        return 0
+
+    synced_count = 0
+    for re in remote_items:
+        r_id = re.get("id")
+        if not r_id:
+            continue
+        if r_id not in local_items:
+            cursor.execute(
+                "INSERT OR REPLACE INTO tum_grades (id, subject, semester, target_grade, actual_grade, percentage, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                (r_id, re.get("subject"), re.get("semester"), re.get("target_grade"), re.get("actual_grade"), re.get("percentage"), re.get("notes"))
+            )
+            synced_count += 1
+        else:
+            loc = local_items[r_id]
+            if loc["actual_grade"] != re.get("actual_grade") or loc["percentage"] != re.get("percentage") or loc["target_grade"] != re.get("target_grade"):
+                cursor.execute(
+                    "UPDATE tum_grades SET target_grade = ?, actual_grade = ?, percentage = ?, notes = ? WHERE id = ?",
+                    (re.get("target_grade"), re.get("actual_grade"), re.get("percentage"), re.get("notes"), r_id)
+                )
+                synced_count += 1
+
+    remote_ids = {re.get("id") for re in remote_items if re.get("id")}
+    for l_id, loc in local_items.items():
+        if l_id not in remote_ids:
+            _make_supabase_request(
+                "tum_grades",
+                method="POST",
+                payload=loc,
+                headers_extra={"Prefer": "resolution=merge-duplicates"},
+            )
+            synced_count += 1
+    conn.commit()
+    return synced_count
+
+def sync_tum_grade_entries(conn) -> int:
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average FROM tum_grade_entries")
+        local_items = {row["id"]: dict(row) for row in cursor.fetchall()}
+    except Exception:
+        return 0
+
+    remote_items = _make_supabase_request("tum_grade_entries?select=*")
+    if remote_items is None:
+        return 0
+
+    synced_count = 0
+    for re in remote_items:
+        r_id = re.get("id")
+        if not r_id:
+            continue
+        if r_id not in local_items:
+            cursor.execute(
+                "INSERT OR REPLACE INTO tum_grade_entries (id, subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                (r_id, re.get("subject"), re.get("semester"), re.get("raw_input"), re.get("numeric_value"), re.get("weight"), re.get("category"), re.get("description"), re.get("date"), 1 if re.get("counts_in_average") else 0)
+            )
+            synced_count += 1
+        else:
+            pass # entries are mostly append-only, but we can do full merge if needed.
+
+    remote_ids = {re.get("id") for re in remote_items if re.get("id")}
+    for l_id, loc in local_items.items():
+        if l_id not in remote_ids:
+            payload = dict(loc)
+            payload["counts_in_average"] = bool(payload["counts_in_average"])
+            _make_supabase_request(
+                "tum_grade_entries",
+                method="POST",
+                payload=payload,
+                headers_extra={"Prefer": "resolution=merge-duplicates"},
+            )
+            synced_count += 1
+    conn.commit()
+    return synced_count
+
+def sync_tum_matura(conn) -> int:
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, subject, target_percentage, current_mock_percentage, notes FROM tum_matura")
+        local_items = {row["id"]: dict(row) for row in cursor.fetchall()}
+    except Exception:
+        return 0
+
+    remote_items = _make_supabase_request("tum_matura?select=*")
+    if remote_items is None:
+        return 0
+
+    synced_count = 0
+    for re in remote_items:
+        r_id = re.get("id")
+        if not r_id:
+            continue
+        if r_id not in local_items:
+            cursor.execute(
+                "INSERT OR REPLACE INTO tum_matura (id, subject, target_percentage, current_mock_percentage, notes) VALUES (?, ?, ?, ?, ?)",
+                (r_id, re.get("subject"), re.get("target_percentage"), re.get("current_mock_percentage"), re.get("notes"))
+            )
+            synced_count += 1
+        else:
+            loc = local_items[r_id]
+            if loc["current_mock_percentage"] != re.get("current_mock_percentage"):
+                cursor.execute(
+                    "UPDATE tum_matura SET current_mock_percentage = ? WHERE id = ?",
+                    (re.get("current_mock_percentage"), r_id)
+                )
+                synced_count += 1
+
+    remote_ids = {re.get("id") for re in remote_items if re.get("id")}
+    for l_id, loc in local_items.items():
+        if l_id not in remote_ids:
+            _make_supabase_request(
+                "tum_matura",
+                method="POST",
+                payload=loc,
+                headers_extra={"Prefer": "resolution=merge-duplicates"},
+            )
+            synced_count += 1
+    conn.commit()
+    return synced_count
+
+def sync_tum_language(conn) -> int:
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT id, level, target_date, status, milestone_description FROM tum_language")
+        local_items = {row["id"]: dict(row) for row in cursor.fetchall()}
+    except Exception:
+        return 0
+
+    remote_items = _make_supabase_request("tum_language?select=*")
+    if remote_items is None:
+        return 0
+
+    synced_count = 0
+    for re in remote_items:
+        r_id = re.get("id")
+        if not r_id:
+            continue
+        if r_id not in local_items:
+            cursor.execute(
+                "INSERT OR REPLACE INTO tum_language (id, level, target_date, status, milestone_description) VALUES (?, ?, ?, ?, ?)",
+                (r_id, re.get("level"), re.get("target_date"), re.get("status"), re.get("milestone_description"))
+            )
+            synced_count += 1
+        else:
+            loc = local_items[r_id]
+            if loc["status"] != re.get("status"):
+                cursor.execute(
+                    "UPDATE tum_language SET status = ? WHERE id = ?",
+                    (re.get("status"), r_id)
+                )
+                synced_count += 1
+
+    remote_ids = {re.get("id") for re in remote_items if re.get("id")}
+    for l_id, loc in local_items.items():
+        if l_id not in remote_ids:
+            _make_supabase_request(
+                "tum_language",
+                method="POST",
+                payload=loc,
+                headers_extra={"Prefer": "resolution=merge-duplicates"},
+            )
+            synced_count += 1
+    conn.commit()
+    return synced_count
+
+import json
+from pathlib import Path
+
+def sync_app_settings() -> int:
+    synced_count = 0
+    
+    # vulcan_config
+    vulcan_path = Path("C:/Users/Home/Desktop/harness/data/vulcan_config.json")
+    remote_items = _make_supabase_request("app_settings?select=*")
+    if remote_items is None:
+        return 0
+        
+    remote_settings = {item["key"]: item["value"] for item in remote_items if "key" in item}
+    
+    # Download from Supabase to local if local is missing on Vercel
+    import os
+    if "vulcan_config" in remote_settings:
+        if not vulcan_path.exists() or os.environ.get("VERCEL"):
+            try:
+                vulcan_path.parent.mkdir(parents=True, exist_ok=True)
+                with open(vulcan_path, "w", encoding="utf-8") as f:
+                    json.dump(remote_settings["vulcan_config"], f, indent=2)
+                synced_count += 1
+            except Exception:
+                pass
+                
+    # Upload from local to Supabase if local exists and is desktop
+    if vulcan_path.exists() and not os.environ.get("VERCEL"):
+        try:
+            with open(vulcan_path, "r", encoding="utf-8") as f:
+                local_vulcan = json.load(f)
+            
+            # If changed or missing on remote
+            if "vulcan_config" not in remote_settings or remote_settings["vulcan_config"] != local_vulcan:
+                _make_supabase_request(
+                    "app_settings",
+                    method="POST",
+                    payload={"key": "vulcan_config", "value": local_vulcan},
+                    headers_extra={"Prefer": "resolution=merge-duplicates"},
+                )
+                synced_count += 1
+        except Exception:
+            pass
+            
+    return synced_count
+
+
 def sync_with_web_server(conn: sqlite3.Connection, cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     """Exchanges all local updates directly with a deployed Harness Web server."""
     if cfg is None:
@@ -1361,8 +1588,13 @@ def sync_all() -> Dict[str, Any]:
                 project_count = sync_projects(conn)
                 exams_count = sync_school_exams(conn)
                 hw_count = sync_homework_items(conn)
+                tum_gr_count = sync_tum_grades(conn)
+                tum_ge_count = sync_tum_grade_entries(conn)
+                tum_ma_count = sync_tum_matura(conn)
+                tum_la_count = sync_tum_language(conn)
+                set_count = sync_app_settings()
 
-                total_synced += (tasks_count + logs_count + metro_count + kill_count + deliv_count + body_count + workout_count + project_count + exams_count + hw_count)
+                total_synced += (tasks_count + logs_count + metro_count + kill_count + deliv_count + body_count + workout_count + project_count + exams_count + hw_count + tum_gr_count + tum_ge_count + tum_ma_count + tum_la_count + set_count)
             except Exception as se:
                 errors.append(f"Supabase: {se}")
 

@@ -58,11 +58,6 @@ def api_options(path):
 # --------------------------------------------------------------------------
 @app.route("/")
 def index():
-    # If mobile user agent, default to mobile companion
-    user_agent = request.headers.get("User-Agent", "").lower()
-    is_mobile = any(m in user_agent for m in ["iphone", "ipad", "android", "mobile"])
-    if is_mobile and (MOBILE_DIR / "index.html").exists():
-        return send_file(MOBILE_DIR / "index.html")
     return send_file(UI_DIR / "index.html")
 
 @app.route("/mobile")

@@ -1613,3 +1613,76 @@ body {
   }
 }
 
+
+
+/* ==========================================================================
+   MOBILE RESPONSIVE OVERRIDES (Harness Unified Experience)
+   ========================================================================== */
+@media (max-width: 768px) {
+  .app-header {
+    flex-wrap: wrap;
+    height: auto;
+    padding: 10px 16px;
+    gap: 12px;
+  }
+  
+  .nav-tabs {
+    order: 3;
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 4px;
+    justify-content: flex-start;
+  }
+  
+  .header-right {
+    flex-grow: 1;
+    justify-content: flex-end;
+  }
+  
+  .main-content {
+    padding: 16px;
+    height: calc(100vh - 100px);
+  }
+  
+  .dashboard-layout,
+  .today-layout,
+  .projects-grid,
+  .knowledge-layout,
+  .metro-viewport,
+  .body-layout {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .executive-cockpit-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .heatmap-grid {
+    overflow-x: auto;
+  }
+  
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+  
+  .kill-list-card,
+  .cockpit-card,
+  .stat-card {
+    width: 100%;
+  }
+
+  /* Make forms and inputs full width */
+  .quick-capture-form,
+  .input-group,
+  .knowledge-form {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  /* Fix sticky headers */
+  .section-header {
+    position: static;
+  }
+}
