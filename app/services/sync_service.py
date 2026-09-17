@@ -879,26 +879,7 @@ def sync_homework_items(conn: sqlite3.Connection) -> int:
 
 
 # =========================================================================
-# 9. Direct Web Server Synchronizer (Local Executable <-> Web Version HTTP)
-# =========================================================================
-def probe_local_server() -> Optional[str]:
-    """Probes if a local Harness companion web server is running on localhost:5000."""
-    if os.environ.get("HARNESS_SERVER") or os.environ.get("VERCEL"):
-        return None
-    try:
-        req = urllib.request.Request("http://127.0.0.1:5000/api/health", headers={"Accept": "application/json"})
-        with urllib.request.urlopen(req, timeout=0.25) as resp:
-            if resp.status == 200:
-                return "http://127.0.0.1:5000"
-    except Exception:
-        pass
-    return None
-
-
-
-
-# =========================================================================
-# 8d. TUM Grades Sync
+# 8d. TUM Grades & Curriculum Sync
 # =========================================================================
 def sync_tum_grades(conn) -> int:
     try:
@@ -945,6 +926,7 @@ def sync_tum_grades(conn) -> int:
     conn.commit()
     return synced_count
 
+
 def sync_tum_grade_entries(conn) -> int:
     try:
         cursor = conn.cursor()
@@ -969,7 +951,7 @@ def sync_tum_grade_entries(conn) -> int:
             )
             synced_count += 1
         else:
-            pass # entries are mostly append-only, but we can do full merge if needed.
+            pass
 
     remote_ids = {re.get("id") for re in remote_items if re.get("id")}
     for l_id, loc in local_items.items():
@@ -985,6 +967,7 @@ def sync_tum_grade_entries(conn) -> int:
             synced_count += 1
     conn.commit()
     return synced_count
+
 
 def sync_tum_matura(conn) -> int:
     try:
@@ -1031,6 +1014,7 @@ def sync_tum_matura(conn) -> int:
     conn.commit()
     return synced_count
 
+
 def sync_tum_language(conn) -> int:
     try:
         cursor = conn.cursor()
@@ -1076,39 +1060,33 @@ def sync_tum_language(conn) -> int:
     conn.commit()
     return synced_count
 
-import json
-from pathlib import Path
 
 def sync_app_settings() -> int:
     synced_count = 0
-    
-    # vulcan_config
-    vulcan_path = Path("C:/Users/Home/Desktop/harness/data/vulcan_config.json")
+    vulcan_path = DATA_DIR / "vulcan_config.json"
     remote_items = _make_supabase_request("app_settings?select=*")
     if remote_items is None:
         return 0
-        
+
     remote_settings = {item["key"]: item["value"] for item in remote_items if "key" in item}
-    
-    # Download from Supabase to local if local is missing on Vercel
-    import os
+
     if "vulcan_config" in remote_settings:
         if not vulcan_path.exists() or os.environ.get("VERCEL"):
             try:
                 vulcan_path.parent.mkdir(parents=True, exist_ok=True)
                 with open(vulcan_path, "w", encoding="utf-8") as f:
+                    import json
                     json.dump(remote_settings["vulcan_config"], f, indent=2)
                 synced_count += 1
             except Exception:
                 pass
-                
-    # Upload from local to Supabase if local exists and is desktop
+
     if vulcan_path.exists() and not os.environ.get("VERCEL"):
         try:
+            import json
             with open(vulcan_path, "r", encoding="utf-8") as f:
                 local_vulcan = json.load(f)
-            
-            # If changed or missing on remote
+
             if "vulcan_config" not in remote_settings or remote_settings["vulcan_config"] != local_vulcan:
                 _make_supabase_request(
                     "app_settings",
@@ -1119,8 +1097,25 @@ def sync_app_settings() -> int:
                 synced_count += 1
         except Exception:
             pass
-            
+
     return synced_count
+
+# =========================================================================
+# 9. Direct Web Server Synchronizer (Local Executable <-> Web Version HTTP)
+# =========================================================================
+def probe_local_server() -> Optional[str]:
+    """Probes if a local Harness companion web server is running on localhost:5000."""
+    if os.environ.get("HARNESS_SERVER") or os.environ.get("VERCEL"):
+        return None
+    try:
+        req = urllib.request.Request("http://127.0.0.1:5000/api/health", headers={"Accept": "application/json"})
+        with urllib.request.urlopen(req, timeout=0.25) as resp:
+            if resp.status == 200:
+                return "http://127.0.0.1:5000"
+    except Exception:
+        pass
+    return None
+
 
 
 def sync_with_web_server(conn: sqlite3.Connection, cfg: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
@@ -1155,6 +1150,10 @@ def sync_with_web_server(conn: sqlite3.Connection, cfg: Optional[Dict[str, Any]]
     local_data["body_metrics"] = fetch_all("SELECT * FROM body_metrics")
     local_data["workouts"] = fetch_all("SELECT * FROM workouts")
     local_data["projects"] = fetch_all("SELECT * FROM projects")
+    local_data["tum_grade_entries"] = fetch_all("SELECT * FROM tum_grade_entries")
+    local_data["tum_grades"] = fetch_all("SELECT * FROM tum_grades")
+    local_data["tum_matura"] = fetch_all("SELECT * FROM tum_matura")
+    local_data["tum_language"] = fetch_all("SELECT * FROM tum_language")
 
     metro_file = DATA_DIR / "metro_roadmap.json"
     if metro_file.exists():
@@ -1532,6 +1531,93 @@ def sync_with_web_server(conn: sqlite3.Connection, cfg: Optional[Dict[str, Any]]
                 cursor.execute("UPDATE homework_items SET completed = ? WHERE id = ?", (h_comp, h_id))
                 synced_count += 1
 
+        # 11. TUM Grade Entries
+    if "tum_grade_entries" in remote_data:
+        for ge in remote_data["tum_grade_entries"]:
+            g_id = ge.get("id")
+            if not g_id:
+                continue
+            cursor.execute("SELECT id FROM tum_grade_entries WHERE id = ?", (g_id,))
+            loc = cursor.fetchone()
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO tum_grade_entries
+                    (id, subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        g_id,
+                        ge.get("subject", ""),
+                        int(ge.get("semester", 1)),
+                        ge.get("raw_input", ""),
+                        ge.get("numeric_value"),
+                        float(ge.get("weight", 1.0)),
+                        ge.get("category", "Grade"),
+                        ge.get("description", ""),
+                        ge.get("date", ""),
+                        1 if ge.get("counts_in_average") else 0,
+                    ),
+                )
+                synced_count += 1
+
+    # 12. TUM Grades
+    if "tum_grades" in remote_data:
+        for tg in remote_data["tum_grades"]:
+            tg_id = tg.get("id")
+            if not tg_id:
+                continue
+            cursor.execute("SELECT id, actual_grade, percentage, target_grade FROM tum_grades WHERE id = ?", (tg_id,))
+            loc = cursor.fetchone()
+            if not loc:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO tum_grades (id, subject, semester, target_grade, actual_grade, percentage, notes) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    (tg_id, tg.get("subject"), int(tg.get("semester", 1)), float(tg.get("target_grade", 5.0)), tg.get("actual_grade"), tg.get("percentage"), tg.get("notes", ""))
+                )
+                synced_count += 1
+            elif loc["actual_grade"] != tg.get("actual_grade") or loc["percentage"] != tg.get("percentage") or loc["target_grade"] != tg.get("target_grade"):
+                cursor.execute(
+                    "UPDATE tum_grades SET target_grade = ?, actual_grade = ?, percentage = ?, notes = ? WHERE id = ?",
+                    (tg.get("target_grade"), tg.get("actual_grade"), tg.get("percentage"), tg.get("notes", ""), tg_id)
+                )
+                synced_count += 1
+
+    # 13. TUM Matura
+    if "tum_matura" in remote_data:
+        for tm in remote_data["tum_matura"]:
+            tm_id = tm.get("id")
+            if not tm_id:
+                continue
+            cursor.execute("SELECT id, current_mock_percentage FROM tum_matura WHERE id = ?", (tm_id,))
+            loc = cursor.fetchone()
+            if not loc:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO tum_matura (id, subject, target_percentage, current_mock_percentage, notes) VALUES (?, ?, ?, ?, ?)",
+                    (tm_id, tm.get("subject"), float(tm.get("target_percentage", 90.0)), float(tm.get("current_mock_percentage", 0.0)), tm.get("notes", ""))
+                )
+                synced_count += 1
+            elif loc["current_mock_percentage"] != tm.get("current_mock_percentage"):
+                cursor.execute("UPDATE tum_matura SET current_mock_percentage = ? WHERE id = ?", (tm.get("current_mock_percentage"), tm_id))
+                synced_count += 1
+
+    # 14. TUM Language
+    if "tum_language" in remote_data:
+        for tl in remote_data["tum_language"]:
+            tl_id = tl.get("id")
+            if not tl_id:
+                continue
+            cursor.execute("SELECT id, status FROM tum_language WHERE id = ?", (tl_id,))
+            loc = cursor.fetchone()
+            if not loc:
+                cursor.execute(
+                    "INSERT OR REPLACE INTO tum_language (id, level, target_date, status, milestone_description) VALUES (?, ?, ?, ?, ?)",
+                    (tl_id, tl.get("level"), tl.get("target_date"), tl.get("status", "pending"), tl.get("milestone_description", ""))
+                )
+                synced_count += 1
+            elif loc["status"] != tl.get("status"):
+                cursor.execute("UPDATE tum_language SET status = ? WHERE id = ?", (tl.get("status"), tl_id))
+                synced_count += 1
+
     conn.commit()
     return {"status": "synced", "synced_count": synced_count, "timestamp": datetime.now().isoformat()}
 
@@ -1588,6 +1674,7 @@ def sync_all() -> Dict[str, Any]:
                 project_count = sync_projects(conn)
                 exams_count = sync_school_exams(conn)
                 hw_count = sync_homework_items(conn)
+
                 tum_gr_count = sync_tum_grades(conn)
                 tum_ge_count = sync_tum_grade_entries(conn)
                 tum_ma_count = sync_tum_matura(conn)

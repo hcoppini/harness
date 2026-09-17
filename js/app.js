@@ -72,7 +72,7 @@ window.HarnessApp = {
   },
 
   bindNavigation() {
-    const tabs = document.querySelectorAll("#navTabs .nav-tab");
+    const tabs = document.querySelectorAll("#navTabs .nav-tab, #mobileBottomNav .mobile-nav-tab");
     tabs.forEach((tab) => {
       tab.addEventListener("click", () => {
         const view = tab.getAttribute("data-view");
@@ -82,9 +82,19 @@ window.HarnessApp = {
   },
 
   switchView(viewName) {
-    if (!viewName || viewName === this.currentView) return;
+    if (!viewName) return;
 
+    // Desktop nav tabs
     document.querySelectorAll("#navTabs .nav-tab").forEach((tab) => {
+      if (tab.getAttribute("data-view") === viewName) {
+        tab.classList.add("active");
+      } else {
+        tab.classList.remove("active");
+      }
+    });
+
+    // Mobile dock tabs
+    document.querySelectorAll("#mobileBottomNav .mobile-nav-tab").forEach((tab) => {
       if (tab.getAttribute("data-view") === viewName) {
         tab.classList.add("active");
       } else {
@@ -101,6 +111,11 @@ window.HarnessApp = {
     });
 
     this.currentView = viewName;
+
+    // Scroll to top on view change
+    const mainContent = document.querySelector(".main-content");
+    if (mainContent) mainContent.scrollTop = 0;
+    window.scrollTo({ top: 0, behavior: "instant" });
 
     // Refresh view data
     if (viewName === "dashboard" && window.Dashboard) window.Dashboard.load();

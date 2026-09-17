@@ -387,28 +387,22 @@ const Today = {
     }
     blocksContainer.innerHTML = blocks
       .map((block, idx) => {
-        const isDeepWork = block.type === "deep_work" || (block.focus && block.focus.includes("SGH Library"));
-        const isChecked = this.completedBlocks.has(String(idx));
+        const isDeepWork = block.type === "deep_work" || (block.focus && (block.focus.includes("Deep Work") || block.focus.includes("SGH Library")));
         return `
           <div 
             class="routine-block ${isDeepWork ? "deep-work clickable" : ""}"
-            ${isDeepWork ? `onclick="if (!event.target.classList.contains('check-dot')) { if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}'); }"` : ""}
+            ${isDeepWork ? `onclick="if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');"` : ""}
             ${isDeepWork ? 'title="Click to open SGH Library Kill List Drawer"' : ""}
-            style="${isDeepWork ? "cursor: pointer;" : ""}"
+            style="${isDeepWork ? "cursor: pointer; border-left: 3px solid var(--accent-lavender);" : ""}"
           >
-            <div 
-              class="check-dot ${isChecked ? "checked" : ""}" 
-              onclick="event.stopPropagation(); Today.toggleRoutineBlock(${idx})"
-              title="Check off routine block"
-            ></div>
-            <div class="routine-time">${block.time}</div>
-            <div class="routine-info">
-              <div class="routine-focus" style="${isChecked ? "text-decoration: line-through; color: var(--text-tertiary);" : ""}">${this.escapeHtml(block.focus)}</div>
-              <div class="routine-activity">${this.escapeHtml(block.activity)}</div>
+            <div class="routine-time" style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: ${isDeepWork ? "var(--accent-lavender)" : "var(--text-secondary)"}; width: 85px; flex-shrink: 0;">${block.time}</div>
+            <div class="routine-info" style="flex: 1; min-width: 0;">
+              <div class="routine-focus" style="font-size: 13px; font-weight: 600; color: ${isDeepWork ? "var(--text-primary)" : "var(--text-secondary)"};">${this.escapeHtml(block.focus)}</div>
+              <div class="routine-activity" style="font-size: 11px; color: var(--text-tertiary);">${this.escapeHtml(block.activity)}</div>
             </div>
             ${
               isDeepWork
-                ? `<button class="btn-ghost-icon" onclick="event.stopPropagation(); if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');" style="color: var(--accent-lavender); border-color: rgba(196, 181, 253, 0.35); font-family: var(--font-mono); font-size: 10px; padding: 2px 7px; letter-spacing: 0.03em;" title="Open Kill List Drawer">Kill List</button>`
+                ? `<button class="btn-primary" onclick="event.stopPropagation(); if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; letter-spacing: 0.03em;" title="Open Kill List Drawer">⚡ Kill List</button>`
                 : ""
             }
           </div>
@@ -456,21 +450,38 @@ const Today = {
     }
 
     card.style.display = "block";
-    if (titleEl) titleEl.textContent = `STRUCTURED LIFT • ${this.gymRoutine.name}`;
-
     const exercises = this.gymRoutine.exercises || [];
+    const allCompleted = exercises.length > 0 && exercises.every((_, idx) => this.completedExercises.has(String(idx)));
+
+    if (titleEl) {
+      titleEl.innerHTML = `
+        <div style="display: flex; align-items: center; justify-content: space-between; width: 100%;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <div 
+              class="check-dot ${allCompleted ? "checked" : ""}" 
+              onclick="Today.toggleWholeWorkout()"
+              title="1-Click: Mark entire workout completed"
+              style="cursor: pointer; flex-shrink: 0;"
+            ></div>
+            <span style="color: var(--accent-lavender); font-weight: 700; cursor: pointer;" onclick="Today.toggleWholeWorkout()">
+              STRUCTURED LIFT • ${this.escapeHtml(this.gymRoutine.name)}
+            </span>
+          </div>
+          <button type="button" class="btn-ghost-icon" onclick="Today.toggleWholeWorkout()" style="font-size: 9px; padding: 2px 7px; color: ${allCompleted ? "#6ee7b7" : "var(--accent-lavender)"}; border-color: ${allCompleted ? "rgba(110,231,183,0.3)" : "rgba(196,181,253,0.3)"};">
+            ${allCompleted ? "✓ COMPLETED" : "1-CLICK COMPLETE"}
+          </button>
+        </div>
+      `;
+    }
+
     exercisesContainer.innerHTML = exercises
       .map((ex, idx) => {
         const isChecked = this.completedExercises.has(String(idx));
         return `
           <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <div 
-                class="check-dot ${isChecked ? "checked" : ""}" 
-                onclick="Today.toggleGymExercise(${idx})"
-                title="Mark exercise complete"
-              ></div>
-              <span style="font-weight: 500; color: ${isChecked ? "var(--text-tertiary); text-decoration: line-through;" : "var(--text-primary);"}">
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); width: 16px;">#${idx + 1}</span>
+              <span style="font-weight: 500; color: ${allCompleted || isChecked ? "var(--text-tertiary); text-decoration: line-through;" : "var(--text-primary);"}">
                 ${this.escapeHtml(ex.name)}
               </span>
             </div>
@@ -481,6 +492,37 @@ const Today = {
         `;
       })
       .join("");
+  },
+
+  async toggleWholeWorkout() {
+    if (!this.gymRoutine) return;
+    const exercises = this.gymRoutine.exercises || [];
+    const allCompleted = exercises.length > 0 && exercises.every((_, idx) => this.completedExercises.has(String(idx)));
+
+    if (allCompleted) {
+      this.completedExercises.clear();
+    } else {
+      exercises.forEach((_, idx) => this.completedExercises.add(String(idx)));
+    }
+    this.renderGymCard();
+
+    const strVal = Array.from(this.completedExercises).join(",");
+    try {
+      if (window.pywebview && window.pywebview.api) {
+        await window.pywebview.api.update_daily_log(
+          this.selectedDateStr,
+          null, null, null, null, null, null,
+          null,
+          strVal
+        );
+      }
+      if (window.Dashboard) window.Dashboard.load();
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast(allCompleted ? "Workout reset" : "Workout marked completed");
+      }
+    } catch (err) {
+      console.error("Error toggling whole workout:", err);
+    }
   },
 
   async toggleGymExercise(idx) {
@@ -1057,8 +1099,13 @@ const Today = {
     const completed = items.filter((i) => i.completed).length;
 
     if (countBadge) {
-      countBadge.textContent = `${completed} / ${total} Done (${total}/3 Active)`;
-      countBadge.className = total >= 3 ? "mono-chip done" : "mono-chip lavender";
+      if (total > 0 && total < 3) {
+        countBadge.innerHTML = `${completed} / ${total} Done <span onclick="KillListDrawer.autoPopulate()" style="cursor:pointer; color:var(--accent-lavender); font-weight:700; text-decoration:underline; margin-left:4px;" title="Auto-fill remaining slots">[+ Auto-Fill]</span>`;
+        countBadge.className = "mono-chip lavender";
+      } else {
+        countBadge.textContent = `${completed} / ${total} Done`;
+        countBadge.className = total >= 3 && completed >= total ? "mono-chip done" : "mono-chip lavender";
+      }
     }
     if (headerBadge) {
       headerBadge.textContent = `${completed}/${total}`;
@@ -1067,36 +1114,13 @@ const Today = {
     if (!container) return;
 
     if (total === 0) {
-      let leetCodeLabel = "Next LeetCode (Problem #5)";
-      let mathLabel = "Next Math R (Zad. 1–5)";
-      let germanLabel = "+20 German Anki";
-
-      if (window.KillListDrawer && Array.isArray(window.KillListDrawer.deliverables)) {
-        const lcDeliv = window.KillListDrawer.deliverables.find((d) => d.deliverable_id === "sep26_leetcode_15");
-        if (lcDeliv && lcDeliv.next_spec && lcDeliv.next_spec.title) {
-          leetCodeLabel = lcDeliv.next_spec.title.replace("LeetCode: ", "");
-        }
-        const mathDeliv = window.KillListDrawer.deliverables.find((d) => d.deliverable_id === "sep26_math_diag");
-        if (mathDeliv && mathDeliv.next_spec && mathDeliv.next_spec.target_spec) {
-          const specPart = mathDeliv.next_spec.target_spec.split("(")[0].trim();
-          mathLabel = `Math R (${specPart})`;
-        }
-      }
-
       container.innerHTML = `
-        <div style="padding: 10px 12px; text-align: center; color: var(--text-secondary); font-size: 11px; border: 1px dashed rgba(196, 181, 253, 0.2); border-radius: 4px; background: rgba(196, 181, 253, 0.02);">
-          <div style="font-weight: 600; color: var(--accent-lavender); margin-bottom: 6px;">Zero Active SGH Tasks — 1-Click Sequential Launch:</div>
-          <div style="display: flex; justify-content: center; flex-wrap: wrap; gap: 6px;">
-            <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.enqueueProgressive('sep26_leetcode_15')" style="font-size: 10px; padding: 3px 8px; color: #7dd3fc; border-color: rgba(125, 211, 252, 0.35);">
-              ${this.escapeHtml(leetCodeLabel)}
-            </button>
-            <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.enqueueProgressive('sep26_math_diag')" style="font-size: 10px; padding: 3px 8px; color: #c4b5fd; border-color: rgba(196, 181, 253, 0.35);">
-              ${this.escapeHtml(mathLabel)}
-            </button>
-            <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.quickLogStudy('sep26_german_anki', 20, '20 Anki vocabulary words')" style="font-size: 10px; padding: 3px 8px; color: #6ee7b7; border-color: rgba(110, 231, 183, 0.35);">
-              ${this.escapeHtml(germanLabel)}
-            </button>
-          </div>
+        <div style="padding: 14px 16px; text-align: center; border: 1px dashed rgba(196, 181, 253, 0.25); border-radius: 6px; background: rgba(196, 181, 253, 0.02);">
+          <div style="font-weight: 700; color: var(--accent-lavender); font-size: 12px; margin-bottom: 4px;">Zero Decisions Required • Session Ready</div>
+          <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">Auto-populate pulls your 3 highest-leverage tasks (Exam defense, unassisted LeetCode, Math R / German).</div>
+          <button type="button" class="btn-primary" onclick="KillListDrawer.autoPopulate()" style="padding: 8px 18px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; margin: 0 auto;">
+            <span>⚡ Auto-Populate 3 Deep Work Targets</span>
+          </button>
         </div>
       `;
       return;

@@ -55,9 +55,7 @@
         "Physical": "Weight 68.5 kg, daily protein floor at 140g."
       },
       "next_action": "Solve LeetCode Problem #5 without AI and trace variables by hand.",
-      "completed_deliverables": [
-        "Physical"
-      ]
+      "completed_deliverables": []
     },
     {
       "id": "oct-2026",

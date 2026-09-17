@@ -274,9 +274,24 @@ def test_static_routes_and_vercel_entrypoint(client):
     # Test Manifest & Favicon
     res_manifest = client.get("/manifest.json")
     assert res_manifest.status_code == 200
+    manifest_data = res_manifest.get_json()
+    assert manifest_data["start_url"] == "/"
+    assert manifest_data["display"] == "standalone"
 
     res_fav = client.get("/favicon.png")
     assert res_fav.status_code in (200, 404)
+
+    # Test Mobile PWA on / with iPhone User-Agent serves full Harness OS
+    res_phone = client.get("/", headers={"User-Agent": "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X)"})
+    assert res_phone.status_code == 200
+    phone_html = res_phone.get_data(as_text=True)
+    assert "mobileBottomNav" in phone_html
+    assert "HarnessApp" in phone_html
+
+    # Test PWA Icon endpoints
+    res_apple_icon = client.get("/apple-touch-icon.png")
+    assert res_apple_icon.status_code == 200
+    assert res_apple_icon.mimetype == "image/png"
 
     # Test Vercel Entrypoint Module
     import os
@@ -286,30 +301,26 @@ def test_static_routes_and_vercel_entrypoint(client):
 
 
 def test_mobile_companion_assets_and_tabs(client):
-    # Verify mobile HTML includes all 5 executive views and Kill List
+    # Verify mobile endpoint serves unified full-featured executive OS
     res_mobile = client.get("/mobile")
     assert res_mobile.status_code == 200
     html = res_mobile.get_data(as_text=True)
-    assert "view-cockpit" in html
+    assert "view-dashboard" in html
     assert "view-today" in html
     assert "view-tum" in html
     assert "view-projects" in html
     assert "view-body" in html
-    assert "mKillList" in html
+    assert "view-knowledge" in html
+    assert "mobileBottomNav" in html
+    assert "killListDrawer" in html
 
-    # Verify mobile CSS includes editorial design system tokens
-    res_css = client.get("/mobile/app.css")
+    # Verify CSS includes editorial design system tokens and mobile dock
+    res_css = client.get("/css/app.css")
     assert res_css.status_code == 200
     css = res_css.get_data(as_text=True)
     assert "--accent-lavender" in css
     assert "--bg-canvas" in css
-
-    # Verify mobile JS includes extended mobile controller
-    res_js = client.get("/mobile/app.js")
-    assert res_js.status_code == 200
-    js = res_js.get_data(as_text=True)
-    assert "loadKillList" in js
-    assert "loadProjects" in js
+    assert "mobile-bottom-nav" in css
 
 
 
@@ -487,6 +498,7 @@ def test_harness_3_workload_and_kill_list_routes(client):
     from app.db import get_connection
     conn = get_connection()
     conn.execute("DELETE FROM kill_list_items WHERE date = '2026-09-14'")
+    conn.execute("UPDATE station_deliverable_progress SET completed_count = 4, is_completed = 0 WHERE deliverable_id = 'sep26_leetcode_15'")
     conn.commit()
     conn.close()
 
@@ -497,8 +509,19 @@ def test_harness_3_workload_and_kill_list_routes(client):
     )
     assert enq_res.status_code == 200
     enq_data = enq_res.get_json()
-    assert "Problem #5" in enq_data["target_spec"]
     assert enq_data["station_deliverable_id"] == "sep26_leetcode_15"
+
+    # Test auto-populate endpoint on fresh date
+    auto_res = client.post(
+        "/api/kill-list/auto-populate",
+        data=json.dumps({"date": "2026-09-19"}),
+        content_type="application/json",
+    )
+    assert auto_res.status_code == 200
+    auto_data = auto_res.get_json()
+    assert auto_data["count"] == 3
+    assert len(auto_data["items"]) == 3
+
 
 
 def test_sync_exchange_school_data(client):

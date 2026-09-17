@@ -2,11 +2,17 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>HARNESS // Executive OS</title>
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Harness">
+  <meta name="theme-color" content="#050505">
+  <meta name="description" content="Executive OS & Personal Execution Tracker for TUM Heilbronn Aspirants">
+  <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/png" href="favicon.png">
-  <link rel="apple-touch-icon" href="favicon.png">
-  <link rel="stylesheet" href="css/app.css?v=3.5">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="stylesheet" href="css/app.css?v=4.0">
 </head>
 <body>
 
@@ -49,6 +55,9 @@
 
     <!-- Header Right Controls -->
     <div class="header-right">
+      <button id="btnMobileKillList" class="btn-ghost-icon mobile-only-btn" title="Open SGH Kill List" onclick="window.KillListDrawer ? window.KillListDrawer.open() : null">
+        <span>⚡ Kill</span>
+      </button>
       <button id="syncStatusBadge" class="sync-badge" title="Click to sync Laptop and PC">
         <span class="sync-dot" id="syncDot"></span>
         <span class="sync-text" id="syncStatusText">Synced</span>
@@ -210,7 +219,7 @@
         </div>
 
         <!-- 4. PRIORITY RADAR ROW (Homework & Upcoming Exams) -->
-        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+        <div class="priority-radar-grid">
           <!-- Due Homework -->
           <div class="monotone-card" style="margin-bottom: 0;">
             <div class="card-label-row">
@@ -428,7 +437,7 @@
               <span class="card-label">Quick Links Launchpad</span>
               <button id="btnAddNewLinkModal" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ Add Link</button>
             </div>
-            <div id="easyLinksContainer" style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin-top: 4px;">
+            <div id="easyLinksContainer" class="easy-links-grid">
               <!-- Easy links rendered dynamically -->
             </div>
           </div>
@@ -541,7 +550,7 @@
             </div>
           </div>
 
-          <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; font-family: var(--font-mono);">
+          <div class="aptitude-score-grid">
             <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
               <div style="font-size: 9px; color: var(--text-tertiary);">GERMAN GPA (1.0-4.0)</div>
               <div id="tumGermanGpaVal" style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">--</div>
@@ -584,7 +593,7 @@
               </button>
             </div>
 
-            <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; font-family: var(--font-mono);">
+            <div class="simulator-slider-grid">
               <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                   <span style="font-size: 9px; color: var(--text-tertiary);">OVERALL GPA (65%)</span>
@@ -790,7 +799,7 @@
         <button id="btnNewNote" class="btn-primary">+ New Note</button>
       </div>
 
-      <div style="display: grid; grid-template-columns: 280px 1fr; gap: 20px; height: calc(100vh - 160px);">
+      <div class="knowledge-main-grid">
         <!-- Notes Sidebar -->
         <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-md); overflow-y: auto;">
           <div id="knowledgeListContainer">
@@ -1363,7 +1372,12 @@
           Today
         </div>
       </div>
-      <button id="closeKillListBtn" class="drawer-close-btn">&times;</button>
+      <div style="display: flex; align-items: center; gap: 8px;">
+        <button type="button" class="btn-primary" onclick="KillListDrawer.autoPopulate()" style="font-size: 11px; padding: 4px 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Auto-populate optimal deep work targets">
+          <span>⚡</span><span>Auto-Fill 3 Targets</span>
+        </button>
+        <button id="closeKillListBtn" class="drawer-close-btn">&times;</button>
+      </div>
     </div>
 
     <!-- Station Pace Velocity (Ghost Beacon) Container -->
@@ -1435,6 +1449,7 @@
         <button type="submit" class="btn-primary" style="padding: 7px 14px; font-size: 11px; white-space: nowrap; font-weight: 600;">
           + Enqueue
         </button>
+      </form>
     </div>
   </div>
 
@@ -1457,18 +1472,66 @@
   <!-- Notification Toast Container -->
   <div id="toastContainer" class="toast-container"></div>
 
+  <!-- Mobile Bottom Dock Navigation (Phone Viewport) -->
+  <nav id="mobileBottomNav" class="mobile-bottom-nav">
+    <button class="mobile-nav-tab active" data-view="dashboard" aria-label="Dashboard">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="9"></rect>
+        <rect x="14" y="3" width="7" height="5"></rect>
+        <rect x="14" y="12" width="7" height="9"></rect>
+        <rect x="3" y="16" width="7" height="5"></rect>
+      </svg>
+      <span class="mobile-tab-label">Cockpit</span>
+    </button>
+    <button class="mobile-nav-tab" data-view="today" aria-label="Today">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+      <span class="mobile-tab-label">Today</span>
+    </button>
+    <button class="mobile-nav-tab" data-view="tum" aria-label="TUM Metro">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="4" y1="9" x2="20" y2="9"></line>
+        <line x1="4" y1="15" x2="20" y2="15"></line>
+        <line x1="10" y1="3" x2="8" y2="21"></line>
+        <line x1="16" y1="3" x2="14" y2="21"></line>
+      </svg>
+      <span class="mobile-tab-label">TUM '28</span>
+    </button>
+    <button class="mobile-nav-tab" data-view="projects" aria-label="Projects">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+      </svg>
+      <span class="mobile-tab-label">Builds</span>
+    </button>
+    <button class="mobile-nav-tab" data-view="body" aria-label="Body">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+      </svg>
+      <span class="mobile-tab-label">Body</span>
+    </button>
+    <button class="mobile-nav-tab" data-view="knowledge" aria-label="Knowledge Vault">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      </svg>
+      <span class="mobile-tab-label">Vault</span>
+    </button>
+  </nav>
+
   <!-- App Script Modules -->
-  <script src="js/api_bridge.js?v=3.5"></script>
-  <script src="js/metro.js?v=3.5"></script>
-  <script src="js/dashboard.js?v=3.5"></script>
-  <script src="js/today.js?v=3.5"></script>
-  <script src="js/tum.js?v=3.5"></script>
-  <script src="js/projects.js?v=3.5"></script>
-  <script src="js/body.js?v=3.5"></script>
-  <script src="js/knowledge.js?v=3.5"></script>
-  <script src="js/focus_timer.js?v=3.5"></script>
-  <script src="js/command_palette.js?v=3.5"></script>
-  <script src="js/kill_list.js?v=3.5"></script>
-  <script src="js/app.js?v=3.5"></script>
+  <script src="js/api_bridge.js?v=4.0"></script>
+  <script src="js/metro.js?v=4.0"></script>
+  <script src="js/dashboard.js?v=4.0"></script>
+  <script src="js/today.js?v=4.0"></script>
+  <script src="js/tum.js?v=4.0"></script>
+  <script src="js/projects.js?v=4.0"></script>
+  <script src="js/body.js?v=4.0"></script>
+  <script src="js/knowledge.js?v=4.0"></script>
+  <script src="js/focus_timer.js?v=4.0"></script>
+  <script src="js/command_palette.js?v=4.0"></script>
+  <script src="js/kill_list.js?v=4.0"></script>
+  <script src="js/app.js?v=4.0"></script>
 </body>
 </html>

@@ -773,3 +773,139 @@ def log_study_reps(
 ) -> Dict[str, Any]:
     """Logs positive study reps (words, problems, exercises) directly into deliverable progress."""
     return update_deliverable_progress(deliverable_id, delta=count, conn=conn)
+
+
+def auto_populate_kill_list(
+    date_str: Optional[str] = None,
+    station_id: str = "sep-2026",
+    conn: Optional[sqlite3.Connection] = None,
+) -> Dict[str, Any]:
+    """
+    Zero-Decision Auto-Populator for the daily Kill List.
+    Eliminates decision friction by automatically filling up to 3 optimal deep work targets:
+      Slot 1: Acute School Exam defense (if exam in <= 5 days) OR Core Math R deliverable.
+      Slot 2: Unassisted Coding / Algorithmic deliverable (LeetCode #N).
+      Slot 3: German vocabulary (Anki / Nicos Weg A2) or secondary focus.
+    """
+    target_date = date_str or datetime.now().strftime("%Y-%m-%d")
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT COUNT(*) AS cnt FROM kill_list_items WHERE date = ?", (target_date,))
+    count = cursor.fetchone()["cnt"]
+    if count >= 3:
+        res = get_kill_list(target_date, conn=conn)
+        if close_conn:
+            conn.close()
+        return res
+
+    # Fetch existing items to prevent duplicate categories/deliverables
+    cursor.execute(
+        "SELECT station_deliverable_id, title, category FROM kill_list_items WHERE date = ?",
+        (target_date,),
+    )
+    existing_rows = cursor.fetchall()
+    existing_deliv_ids = {r["station_deliverable_id"] for r in existing_rows if r["station_deliverable_id"]}
+    existing_titles = {r["title"].lower() for r in existing_rows}
+    existing_cats = {r["category"].lower() for r in existing_rows}
+
+    # 1. Check acute upcoming exams in the next 5 days
+    from app.services import homework_service
+    upcoming_exams = homework_service.get_upcoming_exams(conn=conn, limit=5, today_str=target_date)
+    acute_exams = [
+        e for e in upcoming_exams
+        if not e["completed"] and 0 <= e.get("days_left", 99) <= 5
+        and not any(e["subject"].lower() in t for t in existing_titles)
+        and "exam prep" not in existing_cats
+    ]
+
+    if acute_exams and count < 3:
+        exam_to_prep = acute_exams[0]
+        try:
+            enqueue_exam_prep(exam_to_prep["id"], date_str=target_date, conn=conn)
+            count += 1
+            existing_cats.add("exam prep")
+        except Exception:
+            pass
+
+    # 2. Fetch station deliverables for active station
+    station_delivs = get_station_deliverables(station_id, conn=conn)
+
+    # Slot: Math R
+    if count < 3:
+        math_delivs = [
+            d for d in station_delivs
+            if "math" in d["deliverable_id"].lower()
+            and not d["is_completed"]
+            and d["deliverable_id"] not in existing_deliv_ids
+            and "math r" not in existing_cats
+        ]
+        if math_delivs:
+            try:
+                enqueue_progressive_deliverable(math_delivs[0]["deliverable_id"], date_str=target_date, conn=conn)
+                count += 1
+                existing_deliv_ids.add(math_delivs[0]["deliverable_id"])
+                existing_cats.add("math r")
+            except Exception:
+                pass
+
+    # Slot: LeetCode / Unassisted Algorithms
+    if count < 3:
+        code_delivs = [
+            d for d in station_delivs
+            if any(k in d["deliverable_id"].lower() for k in ["leetcode", "code", "algo"])
+            and not d["is_completed"]
+            and d["deliverable_id"] not in existing_deliv_ids
+            and "algorithms" not in existing_cats
+        ]
+        if code_delivs:
+            try:
+                enqueue_progressive_deliverable(code_delivs[0]["deliverable_id"], date_str=target_date, conn=conn)
+                count += 1
+                existing_deliv_ids.add(code_delivs[0]["deliverable_id"])
+                existing_cats.add("algorithms")
+            except Exception:
+                pass
+
+    # Slot: German / Language
+    if count < 3:
+        lang_delivs = [
+            d for d in station_delivs
+            if any(k in d["deliverable_id"].lower() for k in ["german", "anki", "lang"])
+            and not d["is_completed"]
+            and d["deliverable_id"] not in existing_deliv_ids
+            and "german" not in existing_cats
+        ]
+        if lang_delivs:
+            try:
+                enqueue_progressive_deliverable(lang_delivs[0]["deliverable_id"], date_str=target_date, conn=conn)
+                count += 1
+                existing_deliv_ids.add(lang_delivs[0]["deliverable_id"])
+                existing_cats.add("german")
+            except Exception:
+                pass
+
+    # Fallback: Any other incomplete station deliverable
+    if count < 3:
+        other_delivs = [
+            d for d in station_delivs
+            if not d["is_completed"] and d["deliverable_id"] not in existing_deliv_ids
+        ]
+        for d in other_delivs:
+            if count >= 3:
+                break
+            try:
+                enqueue_progressive_deliverable(d["deliverable_id"], date_str=target_date, conn=conn)
+                count += 1
+                existing_deliv_ids.add(d["deliverable_id"])
+            except Exception:
+                pass
+
+    res = get_kill_list(target_date, conn=conn)
+    if close_conn:
+        conn.close()
+    return res
+

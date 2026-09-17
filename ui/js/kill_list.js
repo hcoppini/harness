@@ -183,9 +183,14 @@ const KillListDrawer = {
     if (itemsContainer) {
       if (count === 0) {
         itemsContainer.innerHTML = `
-          <div style="background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.08); border-radius: 6px; padding: 20px 16px; text-align: center; color: var(--text-tertiary); font-size: 12px;">
-            <div style="font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Zero-AI Deep Work Session Ready</div>
-            <div>Select a 1-click Metro item below or enqueue an upcoming school exam prep.</div>
+          <div style="background: rgba(196, 181, 253, 0.03); border: 1px dashed rgba(196, 181, 253, 0.25); border-radius: 6px; padding: 22px 16px; text-align: center;">
+            <div style="font-weight: 700; color: var(--accent-lavender); font-size: 13px; margin-bottom: 6px;">Zero Decision Mode • Session Ready</div>
+            <div style="color: var(--text-secondary); font-size: 11px; margin-bottom: 14px; line-height: 1.4;">
+              Don't waste cognitive energy deciding what to do. Auto-populate your 3 optimal deep work targets instantly.
+            </div>
+            <button type="button" class="btn-primary" onclick="KillListDrawer.autoPopulate()" style="padding: 8px 18px; font-size: 12px; font-weight: 700; margin: 0 auto; display: inline-flex; align-items: center; gap: 6px;">
+              <span>⚡</span><span>Auto-Populate 3 Targets</span>
+            </button>
           </div>
         `;
       } else {
@@ -435,6 +440,22 @@ const KillListDrawer = {
       }
     } catch (err) {
       console.error("Error deleting kill item:", err);
+    }
+  },
+
+  async autoPopulate() {
+    try {
+      if (!window.pywebview || !window.pywebview.api) return;
+      await window.pywebview.api.auto_populate_kill_list(this.dateStr);
+      await this.load();
+      if (window.Today) await window.Today.load(this.dateStr);
+      if (window.Dashboard) await window.Dashboard.load();
+      if (window.MetroMap) await window.MetroMap.load();
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast("⚡ 3 High-Impact Targets Auto-Populated");
+      }
+    } catch (err) {
+      console.error("Error auto-populating kill list:", err);
     }
   },
 

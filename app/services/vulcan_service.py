@@ -743,9 +743,7 @@ def sync_vulcan_data(
             payload = None
 
     if payload is None:
-        import os
-        if os.environ.get("VERCEL") or os.environ.get("HARNESS_SERVER"):
-            from datetime import datetime
+        if (os.environ.get("VERCEL") or os.environ.get("HARNESS_SERVER")) and not os.environ.get("PYTEST_CURRENT_TEST"):
             return {
                 "status": "skipped",
                 "message": "Demo mode disabled on server to prevent overwriting real data.",

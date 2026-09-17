@@ -222,3 +222,25 @@ def test_enqueue_exam_prep(test_db):
     assert "Ruch jednostajny" in kill_item["target_spec"]
 
 
+def test_auto_populate_kill_list_zero_decision(test_db):
+    test_date = "2026-09-18"
+    # Ensure initially empty
+    init_res = kill_list_controller.get_kill_list(test_date, conn=test_db)
+    assert init_res["count"] == 0
+
+    # Auto-populate without any prior manual choices
+    auto_res = kill_list_controller.auto_populate_kill_list(test_date, conn=test_db)
+    assert auto_res["count"] == 3
+    assert len(auto_res["items"]) == 3
+
+    categories = [i["category"].lower() for i in auto_res["items"]]
+    assert any("math" in c for c in categories)
+    assert any("algo" in c or "code" in c for c in categories)
+    assert any("german" in c or "anki" in c for c in categories)
+
+    # Calling auto_populate again when full is idempotent and safe
+    second_res = kill_list_controller.auto_populate_kill_list(test_date, conn=test_db)
+    assert second_res["count"] == 3
+
+
+

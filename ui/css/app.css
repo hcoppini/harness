@@ -738,6 +738,44 @@ body {
   line-height: 1.35;
 }
 
+/* Priority Radar Grid */
+.priority-radar-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* Quick Links Launchpad Grid */
+.easy-links-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+/* TUM Bavarian Aptitude & What-If Simulator Grids */
+.aptitude-score-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  font-family: var(--font-mono);
+}
+
+.simulator-slider-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  font-family: var(--font-mono);
+}
+
+/* Knowledge Layer Main Grid */
+.knowledge-main-grid {
+  display: grid;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
+  height: calc(100vh - 160px);
+}
+
 /* --------------------------------------------------------------------------
    1. TODAY LAYER (Daily Execution)
    -------------------------------------------------------------------------- */
@@ -816,8 +854,9 @@ body {
   margin-top: 1px;
 }
 
-/* Checkbox Style (Minimalist 14px Square) */
+/* Checkbox Style (Minimalist Square with Responsive Touch Hit Target) */
 .check-dot {
+  position: relative;
   width: 14px;
   height: 14px;
   border: 1.5px solid rgba(255, 255, 255, 0.22);
@@ -830,6 +869,15 @@ body {
   transition: all 0.12s ease;
   background: transparent;
   box-sizing: border-box;
+}
+
+.check-dot::before {
+  content: "";
+  position: absolute;
+  top: -8px;
+  bottom: -8px;
+  left: -8px;
+  right: -8px;
 }
 
 .check-dot:hover {
@@ -1525,6 +1573,82 @@ body {
 }
 
 /* ==========================================================================
+   Mobile Bottom Dock Navigation & Editorial PWA Design System
+   ========================================================================== */
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  background: rgba(8, 9, 11, 0.92);
+  backdrop-filter: blur(28px) saturate(190%);
+  -webkit-backdrop-filter: blur(28px) saturate(190%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 1000;
+  justify-content: space-around;
+  align-items: center;
+  user-select: none;
+}
+
+.mobile-nav-tab {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: #71717a;
+  cursor: pointer;
+  padding: 6px 0;
+  transition: all 0.15s ease;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.mobile-tab-icon {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  transition: transform 0.15s ease, stroke 0.15s ease;
+}
+
+.mobile-tab-label {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  transition: color 0.15s ease;
+}
+
+.mobile-nav-tab:active {
+  transform: scale(0.92);
+}
+
+.mobile-nav-tab.active {
+  color: var(--accent-lavender, #d8b4fe);
+}
+
+.mobile-nav-tab.active .mobile-tab-icon {
+  stroke: var(--accent-lavender, #d8b4fe);
+  transform: translateY(-1px);
+}
+
+.mobile-nav-tab.active .mobile-tab-label {
+  color: #ffffff;
+  font-weight: 600;
+}
+
+.mobile-only-btn {
+  display: none !important;
+}
+
+/* ==========================================================================
    Responsive Viewport Fallbacks (Tablets, Foldables & Mobile Windows)
    ========================================================================== */
 @media (max-width: 960px) {
@@ -1532,28 +1656,6 @@ body {
     overflow-y: auto !important;
     height: auto !important;
     min-height: 100vh;
-  }
-
-  .app-header {
-    padding: 0 14px;
-    height: auto;
-    min-height: 52px;
-    flex-wrap: wrap;
-    gap: 8px;
-    padding-top: 8px;
-    padding-bottom: 8px;
-  }
-
-  .nav-tabs {
-    overflow-x: auto;
-    white-space: nowrap;
-    scrollbar-width: none;
-    max-width: 100%;
-    padding-bottom: 4px;
-  }
-
-  .nav-tabs::-webkit-scrollbar {
-    display: none;
   }
 
   .main-content {
@@ -1588,101 +1690,281 @@ body {
   .body-grid {
     grid-template-columns: 1fr !important;
   }
+
+  .priority-radar-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .aptitude-score-grid,
+  .simulator-slider-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+
+  .knowledge-main-grid {
+    grid-template-columns: 1fr !important;
+    height: auto !important;
+  }
 }
 
-@media (max-width: 640px) {
-  .executive-cockpit-grid {
-    grid-template-columns: 1fr !important;
+/* ==========================================================================
+   Comprehensive Mobile Phone Layout (iOS / Android PWA <= 768px)
+   ========================================================================== */
+@media (max-width: 768px) {
+  body {
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100vh;
+    padding-bottom: 0;
+  }
+
+  /* Show Bottom Navigation Dock, Hide Header Desktop Nav & Status Footer */
+  .mobile-bottom-nav {
+    display: flex !important;
+  }
+
+  .nav-tabs {
+    display: none !important;
+  }
+
+  .app-footer {
+    display: none !important;
+  }
+
+  .mobile-only-btn {
+    display: inline-flex !important;
+  }
+
+  /* Compact Native-Feel App Header with Safe-Area Notch Inset */
+  .app-header {
+    height: auto !important;
+    min-height: 48px;
+    padding: max(8px, env(safe-area-inset-top, 0px)) 14px 8px 14px !important;
+    background: rgba(5, 5, 5, 0.95);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    position: sticky;
+    top: 0;
+    z-index: 100;
   }
 
   .brand-caption, .brand-divider {
     display: none;
   }
 
-  .header-right {
-    gap: 6px;
-  }
-
   #btnOpenJsonModal {
     display: none;
   }
 
-  .modal-content, .json-modal-content {
-    width: 94vw !important;
-    padding: 16px !important;
+  #currentDatePill {
+    display: none;
   }
-}
 
-
-
-/* ==========================================================================
-   MOBILE RESPONSIVE OVERRIDES (Harness Unified Experience)
-   ========================================================================== */
-@media (max-width: 768px) {
-  .app-header {
-    flex-wrap: wrap;
-    height: auto;
-    padding: 10px 16px;
-    gap: 12px;
-  }
-  
-  .nav-tabs {
-    order: 3;
-    width: 100%;
-    overflow-x: auto;
-    padding-bottom: 4px;
-    justify-content: flex-start;
-  }
-  
   .header-right {
-    flex-grow: 1;
-    justify-content: flex-end;
+    gap: 8px;
   }
-  
+
+  /* Responsive Main Viewport with Bottom Dock Spacing */
   .main-content {
-    padding: 16px;
-    height: calc(100vh - 100px);
+    overflow-y: visible !important;
+    height: auto !important;
+    padding: 12px 14px calc(76px + env(safe-area-inset-bottom, 0px)) !important;
+    -webkit-overflow-scrolling: touch;
   }
-  
-  .dashboard-layout,
-  .today-layout,
-  .projects-grid,
-  .knowledge-layout,
-  .metro-viewport,
-  .body-layout {
-    grid-template-columns: 1fr !important;
+
+  .view-section {
+    padding: 6px 0 24px !important;
+    max-width: 100% !important;
   }
-  
+
+  .section-header {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    margin-bottom: 14px !important;
+  }
+
+  .section-headline {
+    font-size: 19px !important;
+    line-height: 1.25 !important;
+  }
+
+  .section-caption {
+    font-size: 11px !important;
+    line-height: 1.4 !important;
+  }
+
+  /* Single-Column Stack for Cockpit, Today, Projects, Body */
   .executive-cockpit-grid {
     grid-template-columns: 1fr !important;
-  }
-  
-  .heatmap-grid {
-    overflow-x: auto;
-  }
-  
-  .section-header {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 12px;
-  }
-  
-  .kill-list-card,
-  .cockpit-card,
-  .stat-card {
-    width: 100%;
+    gap: 10px !important;
   }
 
-  /* Make forms and inputs full width */
-  .quick-capture-form,
-  .input-group,
-  .knowledge-form {
-    flex-direction: column;
-    align-items: stretch;
+  .dashboard-layout {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
   }
-  
-  /* Fix sticky headers */
-  .section-header {
-    position: static;
+
+  .today-layout {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+  }
+
+  .projects-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .body-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .knowledge-layout, .knowledge-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* TUM Metro Roadmap Layer on Mobile */
+  #view-tum.active {
+    height: auto !important;
+    min-height: calc(100vh - 140px) !important;
+    overflow: visible !important;
+    padding: 6px 0 24px !important;
+  }
+
+  .metro-viewport {
+    height: 520px !important;
+    min-height: 460px !important;
+  }
+
+  .metro-toolbar {
+    height: auto !important;
+    padding: 10px 12px !important;
+    flex-wrap: wrap !important;
+    gap: 8px !important;
+  }
+
+  .metro-filters {
+    overflow-x: auto !important;
+    max-width: 100% !important;
+    white-space: nowrap !important;
+    padding-bottom: 4px !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .metro-scroll-container {
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+    cursor: default !important;
+  }
+
+  /* Full-Screen Mobile Station Drawer */
+  .station-drawer {
+    width: 100% !important;
+    max-width: 100vw !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    z-index: 1050 !important;
+    border-left: none !important;
+    padding: 20px 16px !important;
+  }
+
+  /* Full-Screen Mobile Kill List Drawer */
+  .kill-list-drawer {
+    width: 100% !important;
+    max-width: 100vw !important;
+    top: 0 !important;
+    bottom: 0 !important;
+    right: 0 !important;
+    left: 0 !important;
+    z-index: 1050 !important;
+    border-left: none !important;
+    padding: 20px 16px !important;
+  }
+
+  /* Touch-Friendly Modals */
+  .modal-content, .modal-card, .json-modal-content {
+    width: calc(100vw - 24px) !important;
+    max-width: 480px !important;
+    max-height: 85vh !important;
+    padding: 16px !important;
+    margin: 12px auto !important;
+  }
+
+  /* Priority Radar Mobile Stack */
+  .priority-radar-grid {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  /* TUM Grids Tablet/Mobile */
+  .aptitude-score-grid,
+  .simulator-slider-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  /* Knowledge Layer Mobile */
+  .knowledge-main-grid {
+    grid-template-columns: 1fr !important;
+    gap: 14px !important;
+    height: auto !important;
+  }
+
+  /* Horizontal forecast reel swipe on mobile */
+  .upcoming-reel {
+    display: flex !important;
+    overflow-x: auto !important;
+    scroll-snap-type: x mandatory !important;
+    -webkit-overflow-scrolling: touch !important;
+    gap: 10px !important;
+    padding-bottom: 6px !important;
+  }
+
+  .forecast-day-card {
+    flex: 0 0 160px !important;
+    min-width: 160px !important;
+    scroll-snap-align: start !important;
+  }
+
+  /* Heatmap touch horizontal scroll on mobile */
+  .heatmap-container {
+    min-width: 720px !important;
+  }
+
+  .heatmap-scroll-wrap {
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  /* Touch-optimized task checkboxes */
+  .check-dot {
+    width: 18px !important;
+    height: 18px !important;
+    border-radius: 4px !important;
+  }
+
+  .check-dot.checked::after {
+    width: 5px !important;
+    height: 9px !important;
+    border-width: 0 2px 2px 0 !important;
+    transform: rotate(45deg) translate(-0.5px, -1px) !important;
   }
 }
+
+/* ==========================================================================
+   Small Mobile Devices (iPhone SE / Small Androids <= 480px)
+   ========================================================================== */
+@media (max-width: 480px) {
+  .aptitude-score-grid,
+  .simulator-slider-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .easy-links-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+

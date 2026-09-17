@@ -7,11 +7,11 @@ from typing import List, Dict, Any, Optional
 from app.db import get_connection
 
 
-def _calculate_days_left(target_date_str: str) -> int:
+def _calculate_days_left(target_date_str: str, current_date_str: Optional[str] = None) -> int:
     """Calculates days remaining until target date (0 = Today, negative = overdue)."""
     try:
         target = datetime.strptime(target_date_str, "%Y-%m-%d").date()
-        today = datetime.now().date()
+        today = datetime.strptime(current_date_str, "%Y-%m-%d").date() if current_date_str else datetime.now().date()
         return (target - today).days
     except Exception:
         return 0
@@ -70,7 +70,7 @@ def get_upcoming_homework(
     rows = cursor.fetchall()
     items = []
     for r in rows:
-        days_left = _calculate_days_left(r["due_date"])
+        days_left = _calculate_days_left(r["due_date"], current_date)
         items.append({
             "id": r["id"],
             "subject": r["subject"],
@@ -118,7 +118,7 @@ def get_homework_for_date(date_str: Optional[str] = None, conn: Optional[sqlite3
             "source": r["source"] or "manual",
             "priority": r["priority"],
             "notes": r["notes"] or "",
-            "days_left": _calculate_days_left(r["due_date"]),
+            "days_left": _calculate_days_left(r["due_date"], target_date),
         })
 
     if close_conn:
@@ -214,14 +214,18 @@ def delete_homework(hw_id: int, conn: Optional[sqlite3.Connection] = None) -> bo
     return deleted
 
 
-def get_upcoming_exams(conn: Optional[sqlite3.Connection] = None, limit: int = 15) -> List[Dict[str, Any]]:
+def get_upcoming_exams(
+    conn: Optional[sqlite3.Connection] = None,
+    limit: int = 15,
+    today_str: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     """Returns upcoming school exams, tests, and mock maturas."""
     close_conn = False
     if conn is None:
         conn = get_connection()
         close_conn = True
 
-    today_str = datetime.now().strftime("%Y-%m-%d")
+    current_date = today_str or datetime.now().strftime("%Y-%m-%d")
     cursor = conn.cursor()
     cursor.execute(
         """
@@ -230,7 +234,7 @@ def get_upcoming_exams(conn: Optional[sqlite3.Connection] = None, limit: int = 1
         ORDER BY exam_date ASC
         LIMIT ?
         """,
-        (today_str, limit),
+        (current_date, limit),
     )
     rows = cursor.fetchall()
     exams = []
@@ -243,7 +247,7 @@ def get_upcoming_exams(conn: Optional[sqlite3.Connection] = None, limit: int = 1
             "scope": r["scope"] or "",
             "completed": bool(r["completed"]),
             "result_percentage": r["result_percentage"],
-            "days_left": _calculate_days_left(r["exam_date"]),
+            "days_left": _calculate_days_left(r["exam_date"], current_date),
         })
 
     if close_conn:

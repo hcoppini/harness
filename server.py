@@ -31,7 +31,6 @@ except Exception:
 
 BASE_DIR = Path(__file__).resolve().parent
 UI_DIR = BASE_DIR / "ui"
-MOBILE_DIR = BASE_DIR / "mobile"
 DATA_DIR = BASE_DIR / "data"
 
 app = Flask(__name__, static_folder=None)
@@ -58,30 +57,73 @@ def api_options(path):
 # --------------------------------------------------------------------------
 @app.route("/")
 def index():
+    # Always serve the unified full-fledged Harness OS for both desktop and mobile
     return send_file(UI_DIR / "index.html")
 
 @app.route("/mobile")
 @app.route("/mobile/")
 def mobile_index():
-    if (MOBILE_DIR / "index.html").exists():
-        return send_file(MOBILE_DIR / "index.html")
     return send_file(UI_DIR / "index.html")
 
 @app.route("/manifest.json")
 def pwa_manifest():
-    if (MOBILE_DIR / "manifest.json").exists():
-        return send_file(MOBILE_DIR / "manifest.json", mimetype="application/manifest+json")
-    return jsonify({"name": "Harness", "display": "standalone"})
+    if (UI_DIR / "manifest.json").exists():
+        return send_file(UI_DIR / "manifest.json", mimetype="application/manifest+json")
+    if (BASE_DIR / "manifest.json").exists():
+        return send_file(BASE_DIR / "manifest.json", mimetype="application/manifest+json")
+    return jsonify({
+        "name": "HARNESS // Executive OS",
+        "short_name": "Harness",
+        "description": "Executive OS & Personal Execution Tracker for TUM Heilbronn Aspirants",
+        "start_url": "/",
+        "display": "standalone",
+        "background_color": "#050505",
+        "theme_color": "#050505"
+    })
+
+@app.route("/apple-touch-icon.png")
+def apple_touch_icon():
+    if (UI_DIR / "apple-touch-icon.png").exists():
+        return send_file(UI_DIR / "apple-touch-icon.png", mimetype="image/png")
+    if (BASE_DIR / "apple-touch-icon.png").exists():
+        return send_file(BASE_DIR / "apple-touch-icon.png", mimetype="image/png")
+    if (UI_DIR / "favicon.png").exists():
+        return send_file(UI_DIR / "favicon.png", mimetype="image/png")
+    return "", 404
+
+@app.route("/icon-192.png")
+def icon_192():
+    if (UI_DIR / "icon-192.png").exists():
+        return send_file(UI_DIR / "icon-192.png", mimetype="image/png")
+    if (BASE_DIR / "icon-192.png").exists():
+        return send_file(BASE_DIR / "icon-192.png", mimetype="image/png")
+    return "", 404
+
+@app.route("/icon-512.png")
+def icon_512():
+    if (UI_DIR / "icon-512.png").exists():
+        return send_file(UI_DIR / "icon-512.png", mimetype="image/png")
+    if (BASE_DIR / "icon-512.png").exists():
+        return send_file(BASE_DIR / "icon-512.png", mimetype="image/png")
+    return "", 404
 
 @app.route("/sw.js")
 def service_worker():
-    if (MOBILE_DIR / "sw.js").exists():
-        return send_file(MOBILE_DIR / "sw.js", mimetype="application/javascript")
+    if (UI_DIR / "sw.js").exists():
+        return send_file(UI_DIR / "sw.js", mimetype="application/javascript")
+    if (BASE_DIR / "sw.js").exists():
+        return send_file(BASE_DIR / "sw.js", mimetype="application/javascript")
     return "", 404
 
 @app.route("/mobile/<path:filename>")
 def mobile_static(filename):
-    return send_from_directory(MOBILE_DIR, filename)
+    if (UI_DIR / filename).exists():
+        return send_from_directory(UI_DIR, filename)
+    if (BASE_DIR / filename).exists():
+        return send_from_directory(BASE_DIR, filename)
+    if (UI_DIR / "favicon.png").exists():
+        return send_file(UI_DIR / "favicon.png")
+    return jsonify({"status": "redirected"}), 200
 
 @app.route("/css/<path:filename>")
 def css_static(filename):
@@ -565,6 +607,69 @@ def sync_exchange_endpoint():
                 )
                 synced_count += 1
 
+        # 12. Merge TUM Target Grades
+        for tg in client_data.get("tum_grades", []):
+            tg_id = tg.get("id")
+            if not tg_id:
+                continue
+            cursor.execute("SELECT id, actual_grade, percentage, target_grade FROM tum_grades WHERE id = ?", (tg_id,))
+            loc = cursor.fetchone()
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO tum_grades (id, subject, semester, target_grade, actual_grade, percentage, notes)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (tg_id, tg.get("subject"), int(tg.get("semester", 1)), float(tg.get("target_grade", 5.0)), tg.get("actual_grade"), tg.get("percentage"), tg.get("notes", ""))
+                )
+                synced_count += 1
+            elif loc["actual_grade"] != tg.get("actual_grade") or loc["percentage"] != tg.get("percentage") or loc["target_grade"] != tg.get("target_grade"):
+                cursor.execute(
+                    "UPDATE tum_grades SET target_grade = ?, actual_grade = ?, percentage = ?, notes = ? WHERE id = ?",
+                    (tg.get("target_grade"), tg.get("actual_grade"), tg.get("percentage"), tg.get("notes", ""), tg_id)
+                )
+                synced_count += 1
+
+        # 13. Merge TUM Matura
+        for tm in client_data.get("tum_matura", []):
+            tm_id = tm.get("id")
+            if not tm_id:
+                continue
+            cursor.execute("SELECT id, current_mock_percentage FROM tum_matura WHERE id = ?", (tm_id,))
+            loc = cursor.fetchone()
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO tum_matura (id, subject, target_percentage, current_mock_percentage, notes)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (tm_id, tm.get("subject"), float(tm.get("target_percentage", 90.0)), float(tm.get("current_mock_percentage", 0.0)), tm.get("notes", ""))
+                )
+                synced_count += 1
+            elif loc["current_mock_percentage"] != tm.get("current_mock_percentage"):
+                cursor.execute("UPDATE tum_matura SET current_mock_percentage = ? WHERE id = ?", (tm.get("current_mock_percentage"), tm_id))
+                synced_count += 1
+
+        # 14. Merge TUM Language
+        for tl in client_data.get("tum_language", []):
+            tl_id = tl.get("id")
+            if not tl_id:
+                continue
+            cursor.execute("SELECT id, status FROM tum_language WHERE id = ?", (tl_id,))
+            loc = cursor.fetchone()
+            if not loc:
+                cursor.execute(
+                    """
+                    INSERT OR REPLACE INTO tum_language (id, level, target_date, status, milestone_description)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (tl_id, tl.get("level"), tl.get("target_date"), tl.get("status", "pending"), tl.get("milestone_description", ""))
+                )
+                synced_count += 1
+            elif loc["status"] != tl.get("status"):
+                cursor.execute("UPDATE tum_language SET status = ? WHERE id = ?", (tl.get("status"), tl_id))
+                synced_count += 1
+
         conn.commit()
 
         # Query and return the full merged server state
@@ -584,6 +689,8 @@ def sync_exchange_endpoint():
             "homework_items": fetch_all("SELECT * FROM homework_items"),
             "tum_grade_entries": fetch_all("SELECT * FROM tum_grade_entries"),
             "tum_grades": fetch_all("SELECT * FROM tum_grades"),
+            "tum_matura": fetch_all("SELECT * FROM tum_matura"),
+            "tum_language": fetch_all("SELECT * FROM tum_language"),
             "body_metrics": fetch_all("SELECT * FROM body_metrics"),
             "workouts": fetch_all("SELECT * FROM workouts"),
             "projects": fetch_all("SELECT * FROM projects"),
@@ -736,6 +843,13 @@ def enqueue_exam_prep():
     exam_id = int(payload.get("exam_id", 0))
     date_str = payload.get("date")
     res = api.enqueue_exam_prep(exam_id, date_str)
+    return jsonify(res)
+
+@app.route("/api/kill-list/auto-populate", methods=["POST"])
+def auto_populate_kill_list_route():
+    payload = request.get_json(silent=True) or {}
+    date_str = payload.get("date")
+    res = api.auto_populate_kill_list(date_str)
     return jsonify(res)
 
 # --- Harness 3.0: Adaptive Workload Governor & Vulcan UONET+ ---

@@ -271,6 +271,12 @@ class HarnessAPI:
         self._trigger_auto_sync()
         return res
 
+    def auto_populate_kill_list(self, date_str: Optional[str] = None) -> Dict[str, Any]:
+        """Auto-populates daily Kill List with up to 3 optimal targets (exam defense, LeetCode, Math/German)."""
+        res = kill_list_controller.auto_populate_kill_list(date_str)
+        self._trigger_auto_sync()
+        return res
+
     # --- Layer 2: TUM & Metro ---
     def get_tum_overview(self) -> Dict[str, Any]:
         return tum_service.get_tum_overview()
