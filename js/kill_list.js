@@ -490,6 +490,21 @@ const KillListDrawer = {
     }
   },
 
+  async enqueueHomeworkPrep(hwId) {
+    try {
+      if (!window.pywebview || !window.pywebview.api) return;
+      await window.pywebview.api.enqueue_homework_prep(hwId, this.dateStr);
+      await this.load();
+      if (window.Today) await window.Today.load(this.dateStr);
+      if (window.Dashboard) await window.Dashboard.load();
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast("Enqueued homework to Kill List");
+      }
+    } catch (err) {
+      alert(err.message || "Failed to enqueue homework");
+    }
+  },
+
   async quickLogStudy(deliverableId, count = 1, notes = "") {
     try {
       if (window.pywebview && window.pywebview.api) {

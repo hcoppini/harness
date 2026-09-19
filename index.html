@@ -18,7 +18,7 @@
 
   <!-- Top App Header -->
   <header class="app-header">
-    <div class="brand-wrap" onclick="window.HarnessApp.switchView('dashboard')">
+    <div class="brand-wrap" onclick="window.HarnessApp.switchView('today')">
       <div class="brand-mark"></div>
       <span class="brand-title">HARNESS</span>
       <span class="brand-divider">/</span>
@@ -27,36 +27,24 @@
 
     <!-- Navigation Tabs -->
     <nav class="nav-tabs" id="navTabs">
-      <button class="nav-tab active" data-view="dashboard">
-        <span>Dashboard</span>
-        <span class="key-pill">0</span>
-      </button>
-      <button class="nav-tab" data-view="today">
-        <span>Today</span>
+      <button class="nav-tab active" data-view="today">
+        <span>Daily</span>
         <span class="key-pill">1</span>
       </button>
-      <button class="nav-tab" data-view="tum">
-        <span>TUM Metro</span>
+      <button class="nav-tab" data-view="study">
+        <span>Study</span>
         <span class="key-pill">2</span>
       </button>
-      <button class="nav-tab" data-view="projects">
-        <span>Projects</span>
+      <button class="nav-tab" data-view="tum">
+        <span>TUM '28</span>
         <span class="key-pill">3</span>
-      </button>
-      <button class="nav-tab" data-view="body">
-        <span>Body</span>
-        <span class="key-pill">4</span>
-      </button>
-      <button class="nav-tab" data-view="knowledge">
-        <span>Knowledge</span>
-        <span class="key-pill">5</span>
       </button>
     </nav>
 
     <!-- Header Right Controls -->
     <div class="header-right">
       <button id="btnMobileKillList" class="btn-ghost-icon mobile-only-btn" title="Open SGH Kill List" onclick="window.KillListDrawer ? window.KillListDrawer.open() : null">
-        <span>⚡ Kill</span>
+        <span>[KILL]</span>
       </button>
       <button id="syncStatusBadge" class="sync-badge" title="Click to sync Laptop and PC">
         <span class="sync-dot" id="syncDot"></span>
@@ -78,7 +66,7 @@
     <!-- ====================================================================
          0. DASHBOARD LAYER (Executive Cockpit, Trajectory Gauges, Heatmap)
          ==================================================================== -->
-    <section id="view-dashboard" class="view-section active">
+    <section id="view-dashboard" class="view-section" style="display:none;" hidden>
       <div class="section-header">
         <div>
           <h1 class="section-headline">Executive Cockpit</h1>
@@ -249,7 +237,7 @@
     <!-- ====================================================================
          1. TODAY LAYER (Daily Routine, Mini-Calendar, Timetable)
          ==================================================================== -->
-    <section id="view-today" class="view-section">
+    <section id="view-today" class="view-section active">
       <div class="section-header">
         <div>
           <h1 class="section-headline">Daily Execution</h1>
@@ -257,7 +245,7 @@
         </div>
         <div style="display: flex; gap: 8px;">
           <button id="btnOpenKillList" class="btn-ghost-icon" title="Open Kill List Drawer (SGH Library Deep Work)">
-            <span style="color: var(--accent-lavender); font-weight: 700; letter-spacing: 0.04em;">Kill List</span>
+            <span style="font-weight: 700; letter-spacing: 0.04em;">Kill List</span>
             <span class="key-pill" id="todayKillListBadge">0/3</span>
           </button>
           <button id="btnRollover" class="btn-ghost-icon" title="Carry forward pending tasks from prior days (R)">
@@ -270,6 +258,93 @@
       <div class="today-layout">
         <!-- Left Column: Automated Routine & Tasks -->
         <div>
+          <!-- Dynamic "Right Now" Execution Banner -->
+          <div id="dynamicNowBanner" class="now-banner" style="margin-bottom: 14px; background: var(--bg-surface-elevated); border: 1px solid var(--border-medium); border-radius: var(--radius-sm); padding: 12px 14px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="now-pulse-dot"></span>
+                <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.08em; text-transform: uppercase;">
+                  RIGHT NOW &bull; <span id="nowCurrentClock">--:--</span>
+                </span>
+              </div>
+              <span id="nowTimeRemainingPill" class="mono-chip" style="font-size: 9px; padding: 2px 6px;">-- min left</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px;">
+              <div>
+                <div id="nowBlockTitle" style="font-size: 14px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em;">
+                  Detecting routine...
+                </div>
+                <div id="nowBlockFocus" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                  Checking current schedule
+                </div>
+              </div>
+              <div id="nowBlockActionArea"></div>
+            </div>
+          </div>
+
+          <!-- United Study Session Card (Single Daily Study Protocol) -->
+          <div id="unitedStudyCard" class="monotone-card" style="margin-bottom: 14px; border: 1px solid var(--border-medium); background: var(--bg-surface);">
+            <div class="card-label-row" style="margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="card-label" style="font-weight: 700; font-size: 11px; letter-spacing: 0.06em; color: var(--text-primary);">UNITED STUDY PROTOCOL</span>
+                <span id="unitedStudyProgressBadge" class="mono-chip" style="font-size: 9px;">0/3 Completed</span>
+              </div>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">90m Total Output</span>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Step 1: School Defense -->
+              <div class="study-protocol-step" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm);">
+                <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                  <div id="checkStudySchool" class="check-dot" onclick="Today.toggleStudyBlock('study_school')" title="Toggle School Defense completion" style="cursor: pointer; flex-shrink: 0;"></div>
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-primary);">[1. SCHOOL DEFENSE]</span>
+                      <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Homework &amp; Next-Day Class Prep</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
+                      Clear homework backlog &bull; 15-min preview so you are never surprised (Fizyka/Matma)
+                    </div>
+                  </div>
+                </div>
+                <span class="key-pill" style="font-size: 9px; flex-shrink: 0;">25 MIN</span>
+              </div>
+
+              <!-- Step 2: Matura R Planimetria -->
+              <div class="study-protocol-step" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm);">
+                <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                  <div id="checkStudyMatura" class="check-dot" onclick="Today.toggleStudyBlock('study_matura')" title="Toggle Matura R completion" style="cursor: pointer; flex-shrink: 0;"></div>
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-primary);">[2. MATURA R]</span>
+                      <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Planimetria: Koła i okręgi</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
+                      Twierdzenie o stycznej i siecznej &bull; Arkusze maturalne &bull; Strict proof derivation
+                    </div>
+                  </div>
+                </div>
+                <span class="key-pill" style="font-size: 9px; flex-shrink: 0;">35 MIN</span>
+              </div>
+
+              <!-- Step 3: LeetCode Syntax & Algorithms -->
+              <div class="study-protocol-step" style="display: flex; align-items: center; justify-content: space-between; padding: 8px 10px; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm);">
+                <div style="display: flex; align-items: center; gap: 10px; min-width: 0;">
+                  <div id="checkStudyCode" class="check-dot" onclick="Today.toggleStudyBlock('study_code')" title="Toggle LeetCode completion" style="cursor: pointer; flex-shrink: 0;"></div>
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                      <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-primary);">[3. LEETCODE]</span>
+                      <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">Daily Algorithm Rep #5</span>
+                    </div>
+                    <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
+                      Syntax correctness &bull; Array &amp; string manipulations &bull; Clean algorithmic execution
+                    </div>
+                  </div>
+                </div>
+                <span class="key-pill" style="font-size: 9px; flex-shrink: 0;">25 MIN</span>
+              </div>
+            </div>
+          </div>
           <!-- Schedule Banner -->
           <div class="schedule-banner" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
             <div style="display: flex; align-items: center; gap: 8px;">
@@ -331,6 +406,27 @@
           <!-- Custom Tasks Checklist -->
           <div id="customTaskList">
             <!-- Dynamic task items -->
+          </div>
+
+          <!-- Evening Honesty Diary Card -->
+          <div class="monotone-card" style="margin-top: 14px; border: 1px solid var(--border-medium);">
+            <div class="card-label-row" style="margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="card-label" style="font-weight: 700; font-size: 11px; letter-spacing: 0.06em; color: var(--text-primary);">EVENING HONESTY DIARY</span>
+                <span class="mono-chip" id="honestyDiarySavePill" style="font-size: 9px;">Auto-saving</span>
+              </div>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Zero Rationalizations</span>
+            </div>
+            <p style="font-size: 11px; color: var(--text-tertiary); margin-bottom: 8px; line-height: 1.4;">
+              Did I drift today? Was the 60-minute honest output delivered? What actually happened?
+            </p>
+            <textarea 
+              id="reflectionWorked" 
+              class="form-textarea" 
+              placeholder="Record the raw truth here. No intellectual excuses, no architecture escapes..."
+              spellcheck="false"
+              style="width: 100%; height: 95px; font-family: var(--font-sans); font-size: 12px; line-height: 1.5; resize: vertical;"
+            ></textarea>
           </div>
 
           <!-- Scratchpad Card -->
@@ -401,34 +497,28 @@
             </div>
           </div>
 
-          <!-- Homework & Exam Radar Card -->
-          <div class="monotone-card">
-            <div class="card-label-row">
+          <!-- Academic Radar Link Card -->
+          <div class="monotone-card" onclick="window.HarnessApp.switchView('study')" style="cursor: pointer; border: 1px solid var(--border-medium);">
+            <div class="card-label-row" style="margin-bottom: 6px;">
               <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="card-label">Homework &amp; Exams</span>
-                <span id="homeworkTotalCountBadge" class="mono-chip lavender" style="font-size: 9px;">0 Synced</span>
+                <span class="card-label" style="font-weight: 700; color: var(--text-primary);">ACADEMIC RADAR</span>
+                <span id="homeworkTotalCountBadge" class="mono-chip" style="font-size: 9px;">Vulcan</span>
               </div>
-              <div style="display: flex; gap: 4px; align-items: center;">
-                <button id="btnAddHomeworkBtn" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ HW</button>
-                <button id="btnAddExamBtn" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ Exam</button>
-              </div>
+              <span style="font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono);">Open Study &rarr;</span>
             </div>
-            
-            <div style="margin-top: 6px;">
-              <div id="homeworkItemsList" style="display: flex; flex-direction: column; gap: 6px; max-height: 280px; overflow-y: auto; padding-right: 4px;">
-                <!-- Homework items rendered dynamically -->
-              </div>
+            <p style="font-size: 11px; color: var(--text-tertiary); line-height: 1.4; margin-bottom: 8px;">
+              Sprawdziany, kartkówki &amp; daily homework tracked with automated Vulcan sync.
+            </p>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn-ghost-icon" onclick="event.stopPropagation(); Today.openAddExamModal();" style="font-size: 10px; padding: 2px 7px;">+ Exam</button>
+              <button type="button" class="btn-ghost-icon" onclick="event.stopPropagation(); Today.openAddHomeworkModal();" style="font-size: 10px; padding: 2px 7px;">+ HW</button>
             </div>
-
-            <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--border-hairline);">
-              <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                <span class="card-label" style="font-size: 9px;">Upcoming Tests &amp; Mocks</span>
-                <span id="examsTotalCountBadge" style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary);">0</span>
-              </div>
-              <div id="upcomingExamsList" style="display: flex; flex-direction: column; gap: 4px; max-height: 180px; overflow-y: auto; padding-right: 4px;">
-                <!-- Exam items rendered dynamically -->
-              </div>
-            </div>
+            <!-- Retain hidden containers so background today.js calls don't error -->
+            <div id="homeworkItemsList" style="display: none;"></div>
+            <div id="upcomingExamsList" style="display: none;"></div>
+            <span id="examsTotalCountBadge" style="display: none;">0</span>
+            <button id="btnAddHomeworkBtn" style="display: none;"></button>
+            <button id="btnAddExamBtn" style="display: none;"></button>
           </div>
 
           <!-- Quick Launch Links Card -->
@@ -439,6 +529,105 @@
             </div>
             <div id="easyLinksContainer" class="easy-links-grid">
               <!-- Easy links rendered dynamically -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================================================================
+         1.5 STUDY & RADAR LAYER (Official Vulcan Tests, Real Homework, TUM GPA)
+         ==================================================================== -->
+    <section id="view-study" class="view-section">
+      <div class="section-header">
+        <div>
+          <h1 class="section-headline">Academic Radar &amp; TUM Aptitude</h1>
+          <p class="section-caption">Official Vulcan upcoming exams, homework deliverables, and TUM Bavaria GPA standing.</p>
+        </div>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button class="btn-ghost-icon" onclick="Today.syncVulcan()" title="Sync live exams and homework from Vulcan">
+            <span>Sync Vulcan</span>
+          </button>
+          <button class="btn-ghost-icon" onclick="Today.openAddExamModal()" title="Add Exam">
+            <span>+ Exam</span>
+          </button>
+          <button class="btn-ghost-icon" onclick="Today.openAddHomeworkModal()" title="Add Homework">
+            <span>+ Homework</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="study-layout">
+        <!-- Left Column: Upcoming Exams & Homework -->
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- Upcoming Exams Card -->
+          <div class="monotone-card">
+            <div class="card-label-row" style="margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="card-label" style="font-weight: 700; color: var(--text-primary);">UPCOMING EXAMS &amp; KARTKÓWKI</span>
+                <span id="studyExamsCountBadge" class="mono-chip" style="font-size: 9px;">0 Scheduled</span>
+              </div>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Vulcan UONET+</span>
+            </div>
+            <div id="studyExamsList" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Rendered dynamically by study.js -->
+            </div>
+          </div>
+
+          <!-- Homework Deliverables Card -->
+          <div class="monotone-card">
+            <div class="card-label-row" style="margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="card-label" style="font-weight: 700; color: var(--text-primary);">ACTIVE HOMEWORK DELIVERABLES</span>
+                <span id="studyHomeworkCountBadge" class="mono-chip" style="font-size: 9px;">0 Tasks</span>
+              </div>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Zero Backlog</span>
+            </div>
+            <div id="studyHomeworkList" style="display: flex; flex-direction: column; gap: 6px;">
+              <!-- Rendered dynamically by study.js -->
+            </div>
+          </div>
+        </div>
+
+        <!-- Right Column: TUM GPA Standing & Subject Breakdown -->
+        <div style="display: flex; flex-direction: column; gap: 14px;">
+          <!-- TUM Aptitude Summary Card -->
+          <div class="monotone-card">
+            <div class="card-label-row" style="margin-bottom: 10px;">
+              <span class="card-label" style="font-weight: 700; color: var(--text-primary);">TUM HEILBRONN APTITUDE STATUS</span>
+              <span class="mono-chip" style="font-size: 9px;">B.Sc. Management &amp; Data Science</span>
+            </div>
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px;">
+              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 10px 12px;">
+                <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); text-transform: uppercase;">RUNNING GPA</div>
+                <div id="studyCurrentGpaVal" style="font-size: 24px; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); margin-top: 2px;">--</div>
+                <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">Target: 5.00+ for TUM 1.0</div>
+              </div>
+              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 10px 12px;">
+                <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); text-transform: uppercase;">DIRECT ADMISSION</div>
+                <div style="font-size: 24px; font-weight: 700; color: var(--text-primary); font-family: var(--font-mono); margin-top: 2px;">&ge; 78 pts</div>
+                <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">Stage 1 Cutoff Threshold</div>
+              </div>
+            </div>
+
+            <!-- STEM Subject Weights -->
+            <div style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-tertiary); margin-bottom: 8px; letter-spacing: 0.05em; text-transform: uppercase;">
+              Subject Ledger (Grade 3 Semester 1)
+            </div>
+            <div id="studySubjectGradesList" style="display: flex; flex-direction: column; gap: 6px;">
+              <!-- Rendered dynamically by study.js -->
+            </div>
+          </div>
+
+          <!-- Academic Defense Principles -->
+          <div class="monotone-card" style="background: var(--bg-surface-elevated); border-color: var(--border-hairline);">
+            <div class="card-label-row" style="margin-bottom: 8px;">
+              <span class="card-label" style="font-weight: 700; color: var(--text-primary);">DEFENSE PRINCIPLES</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 6px; font-size: 11px; color: var(--text-secondary); line-height: 1.4;">
+              <div>&bull; <strong style="color: var(--text-primary);">Pre-emptive review:</strong> 15-minute preview of next day's lessons eliminates classroom anxiety.</div>
+              <div>&bull; <strong style="color: var(--text-primary);">No homework drift:</strong> School assignments executed on the same day received.</div>
+              <div>&bull; <strong style="color: var(--text-primary);">Automated Vulcan sync:</strong> Headless sync runs daily at 14:15 and 17:00 via GitHub Actions.</div>
             </div>
           </div>
         </div>
@@ -670,7 +859,7 @@
     <!-- ====================================================================
          3. PROJECTS LAYER (Builds, Workspaces & Competitions)
          ==================================================================== -->
-    <section id="view-projects" class="view-section">
+    <section id="view-projects" class="view-section" style="display:none;" hidden>
       <div class="section-header">
         <div>
           <h1 class="section-headline">Active Projects &amp; Workspaces</h1>
@@ -696,7 +885,7 @@
     <!-- ====================================================================
          4. BODY / LIFE LAYER (Machine Maintenance & Gym)
          ==================================================================== -->
-    <section id="view-body" class="view-section">
+    <section id="view-body" class="view-section" style="display:none;" hidden>
       <div class="section-header">
         <div>
           <h1 class="section-headline">Machine Maintenance</h1>
@@ -790,7 +979,7 @@
     <!-- ====================================================================
          5. KNOWLEDGE LAYER (Algorithm Ledger & Reflection)
          ==================================================================== -->
-    <section id="view-knowledge" class="view-section">
+    <section id="view-knowledge" class="view-section" style="display:none;" hidden>
       <div class="section-header">
         <div>
           <h1 class="section-headline">Knowledge &amp; Reflection</h1>
@@ -843,7 +1032,7 @@
               <span id="reflectionSavePill" class="mono-chip">Auto-saving</span>
             </div>
             <div style="display: flex; flex-direction: column; gap: 6px;">
-              <input type="text" id="reflectionWorked" class="form-input" placeholder="1. What worked today?" />
+              <input type="text" id="reflectionWorkedKnowledge" class="form-input" placeholder="1. What worked today?" />
               <input type="text" id="reflectionSlipped" class="form-input" placeholder="2. Where did I slip / lose focus?" />
               <input type="text" id="reflectionTomorrow" class="form-input" placeholder="3. What single adjustment tomorrow?" />
             </div>
@@ -1374,7 +1563,7 @@
       </div>
       <div style="display: flex; align-items: center; gap: 8px;">
         <button type="button" class="btn-primary" onclick="KillListDrawer.autoPopulate()" style="font-size: 11px; padding: 4px 10px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;" title="Auto-populate optimal deep work targets">
-          <span>⚡</span><span>Auto-Fill 3 Targets</span>
+          <span>Auto-Fill 3 Targets</span>
         </button>
         <button id="closeKillListBtn" class="drawer-close-btn">&times;</button>
       </div>
@@ -1474,23 +1663,21 @@
 
   <!-- Mobile Bottom Dock Navigation (Phone Viewport) -->
   <nav id="mobileBottomNav" class="mobile-bottom-nav">
-    <button class="mobile-nav-tab active" data-view="dashboard" aria-label="Dashboard">
-      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7" height="9"></rect>
-        <rect x="14" y="3" width="7" height="5"></rect>
-        <rect x="14" y="12" width="7" height="9"></rect>
-        <rect x="3" y="16" width="7" height="5"></rect>
-      </svg>
-      <span class="mobile-tab-label">Cockpit</span>
-    </button>
-    <button class="mobile-nav-tab" data-view="today" aria-label="Today">
+    <button class="mobile-nav-tab active" data-view="today" aria-label="Daily">
       <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"></circle>
         <polyline points="12 6 12 12 16 14"></polyline>
       </svg>
-      <span class="mobile-tab-label">Today</span>
+      <span class="mobile-tab-label">Daily</span>
     </button>
-    <button class="mobile-nav-tab" data-view="tum" aria-label="TUM Metro">
+    <button class="mobile-nav-tab" data-view="study" aria-label="Study">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      </svg>
+      <span class="mobile-tab-label">Study</span>
+    </button>
+    <button class="mobile-nav-tab" data-view="tum" aria-label="TUM '28">
       <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="4" y1="9" x2="20" y2="9"></line>
         <line x1="4" y1="15" x2="20" y2="15"></line>
@@ -1499,31 +1686,13 @@
       </svg>
       <span class="mobile-tab-label">TUM '28</span>
     </button>
-    <button class="mobile-nav-tab" data-view="projects" aria-label="Projects">
-      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
-      </svg>
-      <span class="mobile-tab-label">Builds</span>
-    </button>
-    <button class="mobile-nav-tab" data-view="body" aria-label="Body">
-      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
-      </svg>
-      <span class="mobile-tab-label">Body</span>
-    </button>
-    <button class="mobile-nav-tab" data-view="knowledge" aria-label="Knowledge Vault">
-      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-      </svg>
-      <span class="mobile-tab-label">Vault</span>
-    </button>
   </nav>
 
   <!-- App Script Modules -->
   <script src="js/api_bridge.js?v=4.0"></script>
   <script src="js/metro.js?v=4.0"></script>
   <script src="js/dashboard.js?v=4.0"></script>
+  <script src="js/study.js?v=4.0"></script>
   <script src="js/today.js?v=4.0"></script>
   <script src="js/tum.js?v=4.0"></script>
   <script src="js/projects.js?v=4.0"></script>

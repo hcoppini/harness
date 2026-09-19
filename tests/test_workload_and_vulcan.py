@@ -263,3 +263,64 @@ def test_vulcan_daily_3pm_sync_trigger(test_db, monkeypatch):
     assert res_forced["status"] == "synced"
 
 
+def test_vulcan_live_mode_offline_never_injects_demo_exams(test_db, monkeypatch):
+    """Verifies that accounts with registered devices never fall back to fake demo data when offline."""
+    cfg = {
+        "enabled": True,
+        "demo_mode": False,
+        "registered_device": {"device_id": "test-device"},
+    }
+    monkeypatch.setattr(vulcan_service, "get_vulcan_config", lambda: cfg)
+    # Simulate network failure
+    monkeypatch.setattr(vulcan_service, "_fetch_live_vulcan_payload", lambda c, d: None)
+
+    res = vulcan_service.sync_vulcan_data(client_date="2026-09-19", conn=test_db)
+    assert res["status"] == "offline"
+    assert res["mode"] == "live_offline"
+
+    # Confirm no fake exams were added
+    cursor = test_db.cursor()
+    cursor.execute("SELECT COUNT(*) AS cnt FROM school_exams WHERE title LIKE '%Trygonometria%'")
+    assert cursor.fetchone()["cnt"] == 0
+
+
+def test_enqueue_homework_prep(test_db):
+    """Verifies 1-click enqueuing of urgent homework into the Kill List."""
+    from app.services import homework_service
+    hw = homework_service.add_homework(
+        subject="Fizyka",
+        title="Prezentacja: Termodynamika",
+        due_date="2026-09-20",
+        priority=2,
+        conn=test_db,
+    )
+    test_date = "2026-09-19"
+    item = kill_list_controller.enqueue_homework_prep(hw["id"], date_str=test_date, conn=test_db)
+    assert item["category"] == "Homework"
+    assert "Termodynamika" in item["title"]
+    assert item["date"] == test_date
+
+
+def test_multi_obligation_adaptive_kill_list(test_db):
+    """Verifies that high academic load (multiple exams + urgent homework) dynamically allocates up to 2 school slots + 1 TUM anchor."""
+    from app.services import homework_service
+    test_date = "2026-09-19"
+
+    # Add 2 exams due within 3 days
+    homework_service.add_exam("Informatyka", "Sprawdzian: C++ i Algorytmy", "2026-09-21", conn=test_db)
+    homework_service.add_exam("Matematyka", "Kartkówka: Ciągi", "2026-09-22", conn=test_db)
+    # Add 1 urgent homework due tomorrow
+    homework_service.add_homework("Fizyka", "Zadania z optyki", "2026-09-20", priority=2, conn=test_db)
+
+    res = kill_list_controller.auto_populate_kill_list(test_date, conn=test_db)
+    items = res["items"]
+    assert len(items) == 3
+
+    categories = [i["category"] for i in items]
+    # School defense should take 2 slots (Homework + Exam Prep)
+    assert "Homework" in categories
+    assert "Exam Prep" in categories
+    # Third slot MUST be a TUM anchor (Math R, Algorithms, or German)
+    assert any(c in ["Math R", "Algorithms", "German"] for c in categories)
+
+

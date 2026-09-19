@@ -159,6 +159,18 @@ const MetroMap = {
       if (window.pywebview.api.get_station_pace_velocity) {
         this.paceVelocity = await window.pywebview.api.get_station_pace_velocity("sep-2026") || null;
       }
+      if (window.pywebview.api.get_upcoming_exams) {
+        const rawExams = await window.pywebview.api.get_upcoming_exams();
+        this.upcomingExams = (rawExams || []).filter((e) => {
+          const t = ((e.title || "") + " " + (e.scope || "")).toLowerCase();
+          return (
+            !t.includes("trygonometria") &&
+            !t.includes("kinematyka") &&
+            !t.includes("wyszukiwania") &&
+            !t.includes("powstanie styczniowe")
+          );
+        });
+      }
       this.render();
       setTimeout(() => this.scrollToBeacon(), 200);
     } catch (err) {
@@ -506,7 +518,35 @@ const MetroMap = {
       </div>
     `;
 
-    canvasWrap.innerHTML = phaseHeadersHtml + svgHtml + cardsHtml + beaconTooltipHtml;
+    // Upcoming Exams Milestone Pins along the timeline (HTML Layer)
+    let examPinsHtml = "";
+    if (this.upcomingExams && this.upcomingExams.length > 0) {
+      const nowMs = new Date().getTime();
+      examPinsHtml = this.upcomingExams
+        .map((ex, i) => {
+          const exDate = new Date(ex.exam_date);
+          const diffDays = Math.ceil((exDate.getTime() - nowMs) / (1000 * 60 * 60 * 24));
+          const pinOffset = (i * 95) - ((this.upcomingExams.length - 1) * 45);
+          const pinX = Math.max(startX, Math.min(startX + totalTrackLength, currentX + pinOffset));
+          const pinY = spineY - 78;
+          const label = `${ex.subject.slice(0, 4)}: ${ex.exam_date.slice(5)}`;
+          const dueTag = diffDays <= 1 ? "SOON" : `${diffDays}d`;
+
+          return `
+            <div style="position: absolute; left: ${pinX}px; top: ${pinY}px; transform: translateX(-50%); z-index: 40; pointer-events: auto;">
+              <div style="background: var(--bg-surface-elevated); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: var(--radius-xs); padding: 3px 8px; font-size: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 6px; white-space: nowrap;" title="${this.escapeHtml(ex.title)} - ${this.escapeHtml(ex.scope || '')}">
+                <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--text-primary); background: rgba(255, 255, 255, 0.1); padding: 1px 4px; border-radius: 2px;">[EXAM]</span>
+                <span style="font-weight: 600; color: var(--text-primary); font-family: var(--font-mono);">${this.escapeHtml(label)}</span>
+                <span class="key-pill" style="font-size: 8px; padding: 1px 4px;">${dueTag}</span>
+              </div>
+              <div style="width: 1px; height: 16px; border-left: 1px dashed rgba(255, 255, 255, 0.35); margin: 0 auto;"></div>
+            </div>
+          `;
+        })
+        .join("");
+    }
+
+    canvasWrap.innerHTML = phaseHeadersHtml + svgHtml + cardsHtml + beaconTooltipHtml + examPinsHtml;
   },
 
   selectStation(stationId) {

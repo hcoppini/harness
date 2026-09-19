@@ -3,7 +3,7 @@
  */
 
 window.HarnessApp = {
-  currentView: "dashboard",
+  currentView: "today",
   activeJsonTab: "schedules",
   allConfigs: null,
   initialized: false,
@@ -49,18 +49,23 @@ window.HarnessApp = {
     try {
       if (window.FocusTimer) window.FocusTimer.init();
       if (window.CommandPalette) window.CommandPalette.init();
-      // Render active layer (Dashboard) immediately for instant startup
+      
+      // Render active layer (Daily) immediately for instant execution
+      if (window.Today) await window.Today.init();
+      if (window.Study) await window.Study.init();
       if (window.Dashboard) await window.Dashboard.init();
 
       // Initialize secondary layers asynchronously without blocking UI render
       Promise.allSettled([
-        window.Today ? window.Today.init() : Promise.resolve(),
         window.KillListDrawer ? window.KillListDrawer.init() : Promise.resolve(),
         window.Tum ? window.Tum.init() : Promise.resolve(),
         window.Projects ? window.Projects.init() : Promise.resolve(),
         window.Body ? window.Body.init() : Promise.resolve(),
         window.Knowledge ? window.Knowledge.init() : Promise.resolve(),
       ]).catch((err) => console.warn("[App] Background layers init error:", err));
+
+      // Ensure view starts on Daily
+      this.switchView("today");
 
       // Non-blocking background sync initialization
       setTimeout(() => {
@@ -120,6 +125,7 @@ window.HarnessApp = {
     // Refresh view data
     if (viewName === "dashboard" && window.Dashboard) window.Dashboard.load();
     if (viewName === "today" && window.Today) window.Today.load();
+    if (viewName === "study" && window.Study) window.Study.load();
     if (viewName === "tum" && window.Tum) {
       window.Tum.load();
       if (window.MetroMap) window.MetroMap.load();
@@ -153,24 +159,18 @@ window.HarnessApp = {
         return;
       }
 
-      if (e.key === "0" || e.key === "`") {
-        e.preventDefault();
-        this.switchView("dashboard");
-      } else if (e.key === "1") {
+      if (e.key === "1") {
         e.preventDefault();
         this.switchView("today");
       } else if (e.key === "2") {
         e.preventDefault();
-        this.switchView("tum");
+        this.switchView("study");
       } else if (e.key === "3") {
         e.preventDefault();
-        this.switchView("projects");
-      } else if (e.key === "4") {
+        this.switchView("tum");
+      } else if (e.key === "0" || e.key === "`") {
         e.preventDefault();
-        this.switchView("body");
-      } else if (e.key === "5") {
-        e.preventDefault();
-        this.switchView("knowledge");
+        this.switchView("today");
       }
 
       if (e.key === "n" || e.key === "N") {

@@ -308,9 +308,15 @@
             return async function (title, category = "personal", isTum = false, dateStr = null) {
               const dt = dateStr || getLocalDateStr();
               const localTasks = getStore(STORAGE_KEYS.TASKS, []);
-              const newId = Date.now();
-              const newTask = {
-                id: newId,
+              let serverTask = null;
+              try {
+                serverTask = await rpcCall("add_task", [title, category, isTum, dt]);
+              } catch (e) {
+                console.warn("[Harness Bridge] add_task RPC notice:", e.message);
+              }
+
+              const newTask = serverTask || {
+                id: Date.now(),
                 title,
                 category,
                 is_tum: isTum ? 1 : 0,
@@ -321,10 +327,8 @@
               localTasks.unshift(newTask);
               setStore(STORAGE_KEYS.TASKS, localTasks);
 
-              // Background sync
-              rpcCall("add_task", [title, category, isTum, dt]).catch(() => {});
               supabaseRequest("tasks", "POST", {
-                id: newId,
+                id: newTask.id,
                 title,
                 category,
                 is_tum: isTum,
@@ -339,23 +343,41 @@
           if (prop === "toggle_task") {
             return async function (taskId) {
               const localTasks = getStore(STORAGE_KEYS.TASKS, []);
-              const task = localTasks.find((t) => t.id === taskId);
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("toggle_task", [taskId]);
+              } catch (e) {
+                console.warn("[Harness Bridge] toggle_task RPC notice:", e.message);
+              }
+
+              const task = localTasks.find((t) => t.id == taskId);
+              if (serverRes && serverRes.completed !== undefined) {
+                if (task) task.completed = serverRes.completed;
+                setStore(STORAGE_KEYS.TASKS, localTasks);
+                supabaseRequest(`tasks?id=eq.${taskId}`, "PATCH", { completed: Boolean(serverRes.completed) });
+                return serverRes;
+              }
+
               if (task) {
                 task.completed = task.completed ? 0 : 1;
                 setStore(STORAGE_KEYS.TASKS, localTasks);
                 supabaseRequest(`tasks?id=eq.${taskId}`, "PATCH", { completed: Boolean(task.completed) });
+                return task;
               }
-              rpcCall("toggle_task", [taskId]).catch(() => {});
-              return task || { success: true };
+              return { id: taskId, completed: 1 };
             };
           }
 
           if (prop === "delete_task") {
             return async function (taskId) {
+              try {
+                await rpcCall("delete_task", [taskId]);
+              } catch (e) {
+                console.warn("[Harness Bridge] delete_task RPC notice:", e.message);
+              }
               let localTasks = getStore(STORAGE_KEYS.TASKS, []);
-              localTasks = localTasks.filter((t) => t.id !== taskId);
+              localTasks = localTasks.filter((t) => t.id != taskId);
               setStore(STORAGE_KEYS.TASKS, localTasks);
-              rpcCall("delete_task", [taskId]).catch(() => {});
               supabaseRequest(`tasks?id=eq.${taskId}`, "DELETE");
               return true;
             };
@@ -436,7 +458,14 @@
               const dt = dateStr || getLocalDateStr();
               const localKillMap = getStore(STORAGE_KEYS.KILL_LIST, {});
               const list = localKillMap[dt] || [];
-              const newItem = {
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("add_kill_item", [category, title, actionType, targetPath, targetSpec, deliverableId, dt]);
+              } catch (e) {
+                console.warn("[Harness Bridge] add_kill_item RPC notice:", e.message);
+              }
+
+              const newItem = (serverRes && serverRes.item) ? serverRes.item : {
                 id: `kill_${Date.now()}`,
                 date: dt,
                 category,
@@ -451,20 +480,26 @@
               localKillMap[dt] = list;
               setStore(STORAGE_KEYS.KILL_LIST, localKillMap);
 
-              rpcCall("add_kill_item", [category, title, actionType, targetPath, targetSpec, deliverableId, dt]).catch(() => {});
               supabaseRequest("kill_list_items", "POST", newItem);
-              return { success: true, item: newItem };
+              return serverRes || { success: true, item: newItem };
             };
           }
 
           if (prop === "toggle_kill_item") {
             return async function (itemId) {
               const localKillMap = getStore(STORAGE_KEYS.KILL_LIST, {});
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("toggle_kill_item", [itemId]);
+              } catch (e) {
+                console.warn("[Harness Bridge] toggle_kill_item RPC notice:", e.message);
+              }
+
               let targetItem = null;
               for (const dt in localKillMap) {
-                const item = localKillMap[dt].find((i) => i.id === itemId);
+                const item = localKillMap[dt].find((i) => i.id == itemId);
                 if (item) {
-                  item.completed = item.completed ? 0 : 1;
+                  item.completed = (serverRes?.item?.completed !== undefined) ? serverRes.item.completed : (item.completed ? 0 : 1);
                   targetItem = item;
                   break;
                 }
@@ -473,21 +508,71 @@
               if (targetItem) {
                 supabaseRequest(`kill_list_items?id=eq.${itemId}`, "PATCH", { completed: Boolean(targetItem.completed) });
               }
-              rpcCall("toggle_kill_item", [itemId]).catch(() => {});
-              return { success: true, item: targetItem };
+              return serverRes || { success: true, item: targetItem };
             };
           }
 
           if (prop === "delete_kill_item") {
             return async function (itemId) {
+              try {
+                await rpcCall("delete_kill_item", [itemId]);
+              } catch (e) {
+                console.warn("[Harness Bridge] delete_kill_item RPC notice:", e.message);
+              }
               const localKillMap = getStore(STORAGE_KEYS.KILL_LIST, {});
               for (const dt in localKillMap) {
-                localKillMap[dt] = localKillMap[dt].filter((i) => i.id !== itemId);
+                localKillMap[dt] = localKillMap[dt].filter((i) => i.id != itemId);
               }
               setStore(STORAGE_KEYS.KILL_LIST, localKillMap);
-              rpcCall("delete_kill_item", [itemId]).catch(() => {});
               supabaseRequest(`kill_list_items?id=eq.${itemId}`, "DELETE");
               return { success: true };
+            };
+          }
+
+          if (prop === "auto_populate_kill_list") {
+            return async function (dateStr = null) {
+              const dt = dateStr || getLocalDateStr();
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("auto_populate_kill_list", [dt]);
+              } catch (e) {
+                console.warn("[Harness Bridge] auto_populate_kill_list RPC notice:", e.message);
+              }
+              if (serverRes && Array.isArray(serverRes.items)) {
+                const localKillMap = getStore(STORAGE_KEYS.KILL_LIST, {});
+                localKillMap[dt] = serverRes.items;
+                setStore(STORAGE_KEYS.KILL_LIST, localKillMap);
+                return serverRes;
+              }
+              return await apiProxy.get_kill_list(dt);
+            };
+          }
+
+          if (prop === "enqueue_homework_prep") {
+            return async function (hwId, dateStr = null) {
+              const dt = dateStr || getLocalDateStr();
+              try {
+                const res = await rpcCall("enqueue_homework_prep", [hwId, dt]);
+                await apiProxy.get_kill_list(dt);
+                return res;
+              } catch (e) {
+                console.warn("[Harness Bridge] enqueue_homework_prep RPC notice:", e.message);
+                return { success: false, error: e.message };
+              }
+            };
+          }
+
+          if (prop === "enqueue_exam_prep") {
+            return async function (examId, dateStr = null) {
+              const dt = dateStr || getLocalDateStr();
+              try {
+                const res = await rpcCall("enqueue_exam_prep", [examId, dt]);
+                await apiProxy.get_kill_list(dt);
+                return res;
+              } catch (e) {
+                console.warn("[Harness Bridge] enqueue_exam_prep RPC notice:", e.message);
+                return { success: false, error: e.message };
+              }
             };
           }
 
@@ -834,25 +919,35 @@
           if (prop === "toggle_homework") {
             return async function (hwId) {
               const localHw = getStore(STORAGE_KEYS.HOMEWORK, []);
-              const item = localHw.find((h) => h.id === hwId);
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("toggle_homework", [hwId]);
+              } catch (e) {
+                console.warn("[Harness Bridge] toggle_homework RPC notice:", e.message);
+              }
+
+              const item = localHw.find((h) => h.id == hwId);
               let newCompleted = false;
               if (item) {
-                item.completed = !item.completed;
+                item.completed = (serverRes && serverRes.completed !== undefined) ? Boolean(serverRes.completed) : !item.completed;
                 newCompleted = item.completed;
                 setStore(STORAGE_KEYS.HOMEWORK, localHw);
                 supabaseRequest(`homework_items?id=eq.${hwId}`, "PATCH", { completed: newCompleted });
               }
-              rpcCall("toggle_homework", [hwId]).catch(() => {});
-              return { id: hwId, completed: newCompleted };
+              return serverRes || { id: hwId, completed: newCompleted };
             };
           }
 
           if (prop === "delete_homework") {
             return async function (hwId) {
+              try {
+                await rpcCall("delete_homework", [hwId]);
+              } catch (e) {
+                console.warn("[Harness Bridge] delete_homework RPC notice:", e.message);
+              }
               let localHw = getStore(STORAGE_KEYS.HOMEWORK, []);
-              localHw = localHw.filter((h) => h.id !== hwId);
+              localHw = localHw.filter((h) => h.id != hwId);
               setStore(STORAGE_KEYS.HOMEWORK, localHw);
-              rpcCall("delete_homework", [hwId]).catch(() => {});
               supabaseRequest(`homework_items?id=eq.${hwId}`, "DELETE");
               return true;
             };
@@ -861,13 +956,19 @@
           if (prop === "add_homework") {
             return async function (subject, title, dueDate, priority = 1, notes = "", source = "manual") {
               const localHw = getStore(STORAGE_KEYS.HOMEWORK, []);
-              const newId = Date.now();
+              let serverHw = null;
+              try {
+                serverHw = await rpcCall("add_homework", [subject, title, dueDate, priority, notes, source]);
+              } catch (e) {
+                console.warn("[Harness Bridge] add_homework RPC notice:", e.message);
+              }
+
               const todayDate = new Date(getLocalDateStr());
               const itemDate = new Date(dueDate);
               const daysLeft = Math.round((itemDate - todayDate) / (1000 * 3600 * 24));
 
-              const newItem = {
-                id: newId,
+              const newItem = serverHw || {
+                id: Date.now(),
                 subject,
                 title,
                 due_date: dueDate,
@@ -880,7 +981,6 @@
               localHw.push(newItem);
               setStore(STORAGE_KEYS.HOMEWORK, localHw);
 
-              rpcCall("add_homework", [subject, title, dueDate, priority, notes, source]).catch(() => {});
               supabaseRequest("homework_items", "POST", newItem);
               return newItem;
             };
@@ -929,6 +1029,11 @@
               }
 
               if (!Array.isArray(localExams)) localExams = [];
+              localExams = localExams.filter((e) => {
+                const text = ((e.title || "") + " " + (e.scope || "")).toLowerCase();
+                return !text.includes("trygonometria") && !text.includes("kinematyka") && !text.includes("wyszukiwania") && !text.includes("powstanie styczniowe");
+              });
+              setStore(STORAGE_KEYS.EXAMS, localExams);
 
               const todayDate = new Date(todayStr);
               const validExams = localExams
@@ -950,19 +1055,30 @@
 
           if (prop === "delete_exam") {
             return async function (examId) {
+              try {
+                await rpcCall("delete_exam", [examId]);
+              } catch (e) {
+                console.warn("[Harness Bridge] delete_exam RPC notice:", e.message);
+              }
               let localExams = getStore(STORAGE_KEYS.EXAMS, []);
-              localExams = localExams.filter((e) => e.id !== examId);
+              localExams = localExams.filter((e) => e.id != examId);
               setStore(STORAGE_KEYS.EXAMS, localExams);
-              rpcCall("delete_exam", [examId]).catch(() => {});
               supabaseRequest(`school_exams?id=eq.${examId}`, "DELETE");
               return true;
             };
           }
 
           if (prop === "toggle_exam") {
-            return async function (examId) {
+            return async function (examId, resultPercentage = null) {
               const localExams = getStore(STORAGE_KEYS.EXAMS, []);
-              const item = localExams.find((e) => e.id === examId);
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("toggle_exam", [examId, resultPercentage]);
+              } catch (e) {
+                console.warn("[Harness Bridge] toggle_exam RPC notice:", e.message);
+              }
+
+              const item = localExams.find((e) => e.id == examId);
               let newCompleted = false;
               if (item) {
                 item.completed = !item.completed;
@@ -970,8 +1086,7 @@
                 setStore(STORAGE_KEYS.EXAMS, localExams);
                 supabaseRequest(`school_exams?id=eq.${examId}`, "PATCH", { completed: newCompleted });
               }
-              rpcCall("toggle_exam", [examId]).catch(() => {});
-              return { id: examId, completed: newCompleted };
+              return serverRes || { id: examId, completed: newCompleted };
             };
           }
 

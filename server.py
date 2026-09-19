@@ -845,6 +845,14 @@ def enqueue_exam_prep():
     res = api.enqueue_exam_prep(exam_id, date_str)
     return jsonify(res)
 
+@app.route("/api/kill-list/enqueue-homework-prep", methods=["POST"])
+def enqueue_homework_prep():
+    payload = request.get_json(silent=True) or {}
+    hw_id = int(payload.get("homework_id", 0))
+    date_str = payload.get("date")
+    res = api.enqueue_homework_prep(hw_id, date_str)
+    return jsonify(res)
+
 @app.route("/api/kill-list/auto-populate", methods=["POST"])
 def auto_populate_kill_list_route():
     payload = request.get_json(silent=True) or {}

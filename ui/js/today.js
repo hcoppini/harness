@@ -48,6 +48,12 @@ const Today = {
       this._vulcanSyncInterval = setInterval(() => this.silentAutoSyncVulcan(), 20 * 60 * 1000);
     }
     this.initDaily3pmVulcanSync();
+
+    // Dynamic "Right Now" Execution Banner
+    this.updateNowBanner();
+    if (!this._nowBannerInterval) {
+      this._nowBannerInterval = setInterval(() => this.updateNowBanner(), 30 * 1000);
+    }
   },
 
   bindEvents() {
@@ -185,6 +191,12 @@ const Today = {
       scratchpad.addEventListener("input", () => this.debounceSaveDailyLog());
     }
 
+    // Evening Honesty Diary auto-save
+    const refWorked = document.getElementById("reflectionWorked");
+    if (refWorked) {
+      refWorked.addEventListener("input", () => this.debounceSaveDailyLog());
+    }
+
     // Sleep inputs
     const wakeInput = document.getElementById("wakeTimeInput");
     const sleepInput = document.getElementById("sleepTimeInput");
@@ -305,6 +317,8 @@ const Today = {
       this.renderSchedule();
       this.renderGymCard();
       this.renderTasks();
+      this.renderUnitedStudyCard();
+      this.updateNowBanner();
 
       // Refresh Kill List items and render inline on Today view
       if (window.pywebview && window.pywebview.api && window.pywebview.api.get_kill_list) {
@@ -388,21 +402,28 @@ const Today = {
     blocksContainer.innerHTML = blocks
       .map((block, idx) => {
         const isDeepWork = block.type === "deep_work" || (block.focus && (block.focus.includes("Deep Work") || block.focus.includes("SGH Library")));
+        const isChecked = this.completedBlocks.has(String(idx));
         return `
           <div 
-            class="routine-block ${isDeepWork ? "deep-work clickable" : ""}"
+            class="routine-block ${isDeepWork ? "deep-work clickable" : ""} ${isChecked ? "completed" : ""}"
             ${isDeepWork ? `onclick="if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');"` : ""}
             ${isDeepWork ? 'title="Click to open SGH Library Kill List Drawer"' : ""}
-            style="${isDeepWork ? "cursor: pointer; border-left: 3px solid var(--accent-lavender);" : ""}"
+            style="display: flex; align-items: center; gap: 10px; ${isDeepWork ? "cursor: pointer; border-left: 3px solid var(--accent-lavender);" : ""} ${isChecked ? "opacity: 0.65;" : ""}"
           >
-            <div class="routine-time" style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: ${isDeepWork ? "var(--accent-lavender)" : "var(--text-secondary)"}; width: 85px; flex-shrink: 0;">${block.time}</div>
+            <div 
+              class="check-dot ${isChecked ? "checked" : ""}" 
+              onclick="event.stopPropagation(); Today.toggleRoutineBlock(${idx})" 
+              title="${isChecked ? "Mark incomplete" : "Check off routine block"}"
+              style="cursor: pointer; flex-shrink: 0;"
+            ></div>
+            <div class="routine-time" style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: ${isDeepWork ? "var(--accent-lavender)" : "var(--text-secondary)"}; width: 85px; flex-shrink: 0; text-decoration: ${isChecked ? "line-through" : "none"};">${block.time}</div>
             <div class="routine-info" style="flex: 1; min-width: 0;">
-              <div class="routine-focus" style="font-size: 13px; font-weight: 600; color: ${isDeepWork ? "var(--text-primary)" : "var(--text-secondary)"};">${this.escapeHtml(block.focus)}</div>
+              <div class="routine-focus" style="font-size: 13px; font-weight: 600; color: ${isDeepWork ? "var(--text-primary)" : "var(--text-secondary)"}; text-decoration: ${isChecked ? "line-through" : "none"};">${this.escapeHtml(block.focus)}</div>
               <div class="routine-activity" style="font-size: 11px; color: var(--text-tertiary);">${this.escapeHtml(block.activity)}</div>
             </div>
             ${
               isDeepWork
-                ? `<button class="btn-primary" onclick="event.stopPropagation(); if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; letter-spacing: 0.03em;" title="Open Kill List Drawer">⚡ Kill List</button>`
+                ? `<button class="btn-primary" onclick="event.stopPropagation(); if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; letter-spacing: 0.03em;" title="Open Kill List Drawer">[KILL LIST]</button>`
                 : ""
             }
           </div>
@@ -468,7 +489,7 @@ const Today = {
             </span>
           </div>
           <button type="button" class="btn-ghost-icon" onclick="Today.toggleWholeWorkout()" style="font-size: 9px; padding: 2px 7px; color: ${allCompleted ? "#6ee7b7" : "var(--accent-lavender)"}; border-color: ${allCompleted ? "rgba(110,231,183,0.3)" : "rgba(196,181,253,0.3)"};">
-            ${allCompleted ? "✓ COMPLETED" : "1-CLICK COMPLETE"}
+            ${allCompleted ? "[DONE]" : "1-CLICK COMPLETE"}
           </button>
         </div>
       `;
@@ -480,8 +501,14 @@ const Today = {
         return `
           <div style="display: flex; align-items: center; justify-content: space-between; padding: 6px 0; border-bottom: 1px solid rgba(255,255,255,0.04); font-size: 12px;">
             <div style="display: flex; align-items: center; gap: 8px;">
+              <div 
+                class="check-dot ${allCompleted || isChecked ? "checked" : ""}" 
+                onclick="Today.toggleGymExercise(${idx})" 
+                title="Mark exercise complete"
+                style="cursor: pointer; flex-shrink: 0;"
+              ></div>
               <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); width: 16px;">#${idx + 1}</span>
-              <span style="font-weight: 500; color: ${allCompleted || isChecked ? "var(--text-tertiary); text-decoration: line-through;" : "var(--text-primary);"}">
+              <span style="font-weight: 500; color: ${allCompleted || isChecked ? "var(--text-tertiary); text-decoration: line-through;" : "var(--text-primary);"} cursor: pointer;" onclick="Today.toggleGymExercise(${idx})">
                 ${this.escapeHtml(ex.name)}
               </span>
             </div>
@@ -597,8 +624,10 @@ const Today = {
   async toggleTask(taskId) {
     try {
       const res = await window.pywebview.api.toggle_task(taskId);
-      const target = this.tasks.find((t) => t.id === taskId);
-      if (target) target.completed = res.completed;
+      const target = this.tasks.find((t) => t.id == taskId);
+      if (target) {
+        target.completed = res && res.completed !== undefined ? res.completed : (target.completed ? 0 : 1);
+      }
       this.renderTasks();
       if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
@@ -632,11 +661,17 @@ const Today = {
   debounceSaveDailyLog() {
     clearTimeout(this.debounceTimer);
     const pill = document.getElementById("scratchpadSavePill");
+    const diaryPill = document.getElementById("honestyDiarySavePill");
     if (pill) pill.textContent = "Saving...";
+    if (diaryPill) diaryPill.textContent = "Saving...";
 
     this.debounceTimer = setTimeout(async () => {
       await this.saveDailyLog();
       if (pill) pill.textContent = "Saved";
+      if (diaryPill) diaryPill.textContent = "Saved";
+      setTimeout(() => {
+        if (diaryPill) diaryPill.textContent = "Auto-saving";
+      }, 1500);
     }, 400);
   },
 
@@ -662,6 +697,160 @@ const Today = {
       }
     } catch (err) {
       console.error("Error saving daily log:", err);
+    }
+  },
+
+  updateNowBanner() {
+    const banner = document.getElementById("dynamicNowBanner");
+    const clockEl = document.getElementById("nowCurrentClock");
+    const titleEl = document.getElementById("nowBlockTitle");
+    const focusEl = document.getElementById("nowBlockFocus");
+    const remPill = document.getElementById("nowTimeRemainingPill");
+    const actionArea = document.getElementById("nowBlockActionArea");
+
+    if (!banner || !clockEl || !titleEl || !focusEl) return;
+
+    const now = new Date();
+    const hours = now.getHours();
+    const minutes = now.getMinutes();
+    const currentMins = hours * 60 + minutes;
+    const timeStr = `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+    clockEl.textContent = timeStr;
+
+    const dayOfWeek = now.getDay(); // 0 = Sun, 1 = Mon, ... 6 = Sat
+    const isSunday = dayOfWeek === 0;
+    const isSaturday = dayOfWeek === 6;
+
+    let period = null;
+
+    if (isSunday) {
+      if (currentMins < 9 * 60) {
+        period = { name: "Morning Sleep & Reset", focus: "Full recovery & nervous system restoration", endMins: 9 * 60 };
+      } else if (currentMins < 14 * 60) {
+        period = { name: "Active Rest & Light Walk", focus: "Mental clarity, hydration, and nutritional reset", endMins: 14 * 60 };
+      } else if (currentMins < 18 * 60) {
+        period = { name: "Weekly Strategic Review", focus: "Review school week ahead, upcoming Vulcan tests & calendar", endMins: 18 * 60 };
+      } else {
+        period = { name: "Early Evening Wind-down", focus: "Prepare bag, uniform, and 8h sleep floor for Monday", endMins: 22 * 60 };
+      }
+    } else if (isSaturday) {
+      if (currentMins < 9 * 60) {
+        period = { name: "Morning Wake & Fuel", focus: "Clean breakfast, hydration, zero-screen wakefulness", endMins: 9 * 60 };
+      } else if (currentMins < 13 * 60) {
+        period = { name: "TUM Metro Deep Sprint", focus: "Algorithm exercises, code practice & mathematics focus", endMins: 13 * 60, action: "Kill List" };
+      } else if (currentMins < 17 * 60) {
+        period = { name: "Matura R Problem Solving", focus: "Planimetria & high-weight exam arkusz practice", endMins: 17 * 60 };
+      } else {
+        period = { name: "Evening Recovery & Reflection", focus: "Honesty diary, recovery walk, wind-down", endMins: 22 * 60 };
+      }
+    } else {
+      if (currentMins < 7 * 60 + 45) {
+        period = { name: "Morning Discipline & Commute", focus: "Breakfast, hydration, transit to Technikum Mechatroniczne (TM1)", endMins: 7 * 60 + 45 };
+      } else if (currentMins < 14 * 60 + 15) {
+        period = { name: "School Instruction @ TM1", focus: "Classroom presence, defense on questions, note capture", endMins: 14 * 60 + 15 };
+      } else if (currentMins < 15 * 60) {
+        period = { name: "Post-School Transit & Fuel", focus: "Rapid commute to library / workstation & high-energy meal", endMins: 15 * 60 };
+      } else if (currentMins < 18 * 60) {
+        period = { name: "SGH Library Deep Work Session", focus: "United Study Protocol: School Defense (25m) -> Matura R (35m) -> LeetCode (25m)", endMins: 18 * 60, action: "Kill List" };
+      } else if (currentMins < 20 * 60) {
+        period = { name: "Physical Training / Boxing", focus: "Boxing workout, hypertrophy progression or evening dinner", endMins: 20 * 60 };
+      } else if (currentMins < 22 * 60) {
+        period = { name: "Honesty Diary & Tomorrow Lock", focus: "Log honest 60m output, review next day timetable, lock bedtime", endMins: 22 * 60 };
+      } else {
+        period = { name: "Sleep Floor (8h Recovery)", focus: "Screens off, bedroom cooled, preparing for 06:45 wake", endMins: 24 * 60 };
+      }
+    }
+
+    titleEl.textContent = period.name;
+    focusEl.textContent = period.focus;
+
+    if (period.endMins) {
+      const diff = period.endMins - currentMins;
+      if (diff > 0) {
+        const diffHrs = Math.floor(diff / 60);
+        const diffMins = diff % 60;
+        remPill.textContent = diffHrs > 0 ? `${diffHrs}h ${diffMins}m left` : `${diffMins}m left`;
+      } else {
+        remPill.textContent = "Block Ending";
+      }
+    } else {
+      remPill.textContent = "Active";
+    }
+
+    if (actionArea) {
+      if (period.action === "Kill List") {
+        actionArea.innerHTML = `<button type="button" class="btn-primary" onclick="if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');" style="font-size: 10px; padding: 3px 8px; font-family: var(--font-mono);">[KILL LIST]</button>`;
+      } else {
+        actionArea.innerHTML = "";
+      }
+    }
+  },
+
+  async toggleStudyBlock(blockKey) {
+    if (this.completedBlocks.has(blockKey)) {
+      this.completedBlocks.delete(blockKey);
+    } else {
+      this.completedBlocks.add(blockKey);
+    }
+    this.renderUnitedStudyCard();
+
+    const strVal = Array.from(this.completedBlocks).join(",");
+    try {
+      if (window.pywebview && window.pywebview.api) {
+        await window.pywebview.api.update_daily_log(
+          this.selectedDateStr,
+          null, null, null, null, null, null,
+          strVal,
+          null
+        );
+      }
+    } catch (err) {
+      console.error("[Today] Error persisting study block:", err);
+    }
+  },
+
+  renderUnitedStudyCard() {
+    const schoolDot = document.getElementById("checkStudySchool");
+    const maturaDot = document.getElementById("checkStudyMatura");
+    const codeDot = document.getElementById("checkStudyCode");
+    const badge = document.getElementById("unitedStudyProgressBadge");
+
+    const schoolDone = this.completedBlocks.has("study_school");
+    const maturaDone = this.completedBlocks.has("study_matura");
+    const codeDone = this.completedBlocks.has("study_code");
+
+    if (schoolDot) {
+      if (schoolDone) {
+        schoolDot.classList.add("checked");
+      } else {
+        schoolDot.classList.remove("checked");
+      }
+    }
+    if (maturaDot) {
+      if (maturaDone) {
+        maturaDot.classList.add("checked");
+      } else {
+        maturaDot.classList.remove("checked");
+      }
+    }
+    if (codeDot) {
+      if (codeDone) {
+        codeDot.classList.add("checked");
+      } else {
+        codeDot.classList.remove("checked");
+      }
+    }
+
+    const count = (schoolDone ? 1 : 0) + (maturaDone ? 1 : 0) + (codeDone ? 1 : 0);
+    if (badge) {
+      badge.textContent = `${count}/3 Completed`;
+      if (count === 3) {
+        badge.style.background = "#ffffff";
+        badge.style.color = "#000000";
+      } else {
+        badge.style.background = "";
+        badge.style.color = "";
+      }
     }
   },
 
@@ -1117,9 +1306,9 @@ const Today = {
       container.innerHTML = `
         <div style="padding: 14px 16px; text-align: center; border: 1px dashed rgba(196, 181, 253, 0.25); border-radius: 6px; background: rgba(196, 181, 253, 0.02);">
           <div style="font-weight: 700; color: var(--accent-lavender); font-size: 12px; margin-bottom: 4px;">Zero Decisions Required • Session Ready</div>
-          <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">Auto-populate pulls your 3 highest-leverage tasks (Exam defense, unassisted LeetCode, Math R / German).</div>
+          <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 12px;">Auto-populate dynamically balances Exam Defense, Urgent Homework, and TUM Heilbronn milestones based on this week's commitments.</div>
           <button type="button" class="btn-primary" onclick="KillListDrawer.autoPopulate()" style="padding: 8px 18px; font-size: 11px; font-weight: 700; display: inline-flex; align-items: center; gap: 6px; margin: 0 auto;">
-            <span>⚡ Auto-Populate 3 Deep Work Targets</span>
+            <span>Auto-Populate 3 Deep Work Targets</span>
           </button>
         </div>
       `;

@@ -47,6 +47,13 @@ def get_vulcan_config() -> Dict[str, Any]:
         except Exception:
             pass
 
+    env_config_json = os.environ.get("VULCAN_CONFIG_JSON")
+    if env_config_json:
+        try:
+            cfg.update(json.loads(env_config_json))
+        except Exception:
+            pass
+
     env_token = os.environ.get("VULCAN_TOKEN")
     env_user = os.environ.get("VULCAN_USER")
     if env_token:
@@ -741,6 +748,17 @@ def sync_vulcan_data(
             payload = _fetch_live_vulcan_payload(cfg, target_date)
         except Exception:
             payload = None
+
+    if is_live and payload is None:
+        return {
+            "status": "offline",
+            "message": "Live Vulcan fetch unreachable or timed out. Retaining existing cached school data.",
+            "exams_synced": 0,
+            "homework_synced": 0,
+            "grades_synced": 0,
+            "mode": "live_offline",
+            "timestamp": datetime.now().isoformat(),
+        }
 
     if payload is None:
         if (os.environ.get("VERCEL") or os.environ.get("HARNESS_SERVER")) and not os.environ.get("PYTEST_CURRENT_TEST"):

@@ -401,6 +401,46 @@ def enqueue_exam_prep(
     return res
 
 
+def enqueue_homework_prep(
+    hw_id: int,
+    date_str: Optional[str] = None,
+    conn: Optional[sqlite3.Connection] = None,
+) -> Dict[str, Any]:
+    """1-click enqueues an urgent school homework assignment into the Kill List."""
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM homework_items WHERE id = ?", (hw_id,))
+    row = cursor.fetchone()
+    if not row:
+        if close_conn:
+            conn.close()
+        raise ValueError(f"Homework {hw_id} not found")
+
+    priority_val = row["priority"] if "priority" in row.keys() else 1
+    target_spec = f"Due: {row['due_date']} (Priority {priority_val})"
+    title = f"Homework: {row['subject']} - {row['title']}"
+
+    res = add_kill_item(
+        category="Homework",
+        title=title,
+        action_type="url",
+        target_path="https://uonetplus.vulcan.net.pl",
+        target_spec=target_spec,
+        station_deliverable_id=None,
+        quantity=1,
+        date_str=date_str,
+        conn=conn,
+    )
+
+    if close_conn:
+        conn.close()
+    return res
+
+
 def complete_kill_item(item_id: str, conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
     """Marks daily item done and increments connected active station deliverable atomically."""
     close_conn = False
@@ -812,7 +852,7 @@ def auto_populate_kill_list(
     existing_titles = {r["title"].lower() for r in existing_rows}
     existing_cats = {r["category"].lower() for r in existing_rows}
 
-    # 1. Check acute upcoming exams in the next 5 days
+    # 1. Dynamically adapt school defense slots to weekly test volume and homework deadlines
     from app.services import homework_service
     upcoming_exams = homework_service.get_upcoming_exams(conn=conn, limit=5, today_str=target_date)
     acute_exams = [
@@ -822,14 +862,61 @@ def auto_populate_kill_list(
         and "exam prep" not in existing_cats
     ]
 
-    if acute_exams and count < 3:
-        exam_to_prep = acute_exams[0]
+    all_hw = homework_service.get_upcoming_homework(conn=conn, today_str=target_date)
+    urgent_hw = [
+        h for h in all_hw
+        if not h["completed"] and 0 <= h.get("days_left", 99) <= 2
+        and not any(h["title"].lower() in t for t in existing_titles)
+        and "homework" not in existing_cats
+    ]
+
+    # Academic density determination:
+    # If 2+ acute school commitments (multiple tests or test + urgent homework), allocate up to 2 slots
+    # to academic defense while preserving at least 1 slot for TUM anchor (Math R or LeetCode).
+    school_slots_max = 2 if (len(acute_exams) >= 2 or (acute_exams and urgent_hw) or len(urgent_hw) >= 2) else (1 if (acute_exams or urgent_hw) else 0)
+    school_slots_used = 0
+
+    # Urgent homework due today/tomorrow gets immediate defense
+    if urgent_hw and (not acute_exams or urgent_hw[0].get("days_left", 99) <= acute_exams[0].get("days_left", 99)):
+        hw_item = urgent_hw[0]
+        if count < 3 and school_slots_used < school_slots_max:
+            try:
+                enqueue_homework_prep(hw_item["id"], date_str=target_date, conn=conn)
+                count += 1
+                school_slots_used += 1
+                existing_cats.add("homework")
+                existing_titles.add(hw_item["title"].lower())
+            except Exception:
+                pass
+
+    # Acute upcoming exams
+    for ex in acute_exams:
+        if count >= 3 or school_slots_used >= school_slots_max:
+            break
         try:
-            enqueue_exam_prep(exam_to_prep["id"], date_str=target_date, conn=conn)
+            enqueue_exam_prep(ex["id"], date_str=target_date, conn=conn)
             count += 1
+            school_slots_used += 1
             existing_cats.add("exam prep")
+            existing_titles.add(ex["subject"].lower())
         except Exception:
             pass
+
+    # Remaining urgent homework if school defense capacity remains
+    if count < 3 and school_slots_used < school_slots_max:
+        for hw_item in urgent_hw:
+            if count >= 3 or school_slots_used >= school_slots_max:
+                break
+            if hw_item["title"].lower() in existing_titles:
+                continue
+            try:
+                enqueue_homework_prep(hw_item["id"], date_str=target_date, conn=conn)
+                count += 1
+                school_slots_used += 1
+                existing_cats.add("homework")
+                existing_titles.add(hw_item["title"].lower())
+            except Exception:
+                pass
 
     # 2. Fetch station deliverables for active station
     station_delivs = get_station_deliverables(station_id, conn=conn)

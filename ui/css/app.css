@@ -1573,6 +1573,54 @@ body {
 }
 
 /* ==========================================================================
+   Dynamic "Right Now" Banner & United Study Protocol Styles
+   ========================================================================== */
+.now-banner {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-medium);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  position: relative;
+  overflow: hidden;
+}
+
+.now-pulse-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ffffff;
+  display: inline-block;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+  animation: nowPulse 2s infinite ease-in-out;
+}
+
+@keyframes nowPulse {
+  0%, 100% {
+    transform: scale(0.9);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
+  }
+}
+
+.study-protocol-step {
+  transition: background 0.12s ease, border-color 0.12s ease;
+}
+
+.study-protocol-step:hover {
+  border-color: var(--border-focus);
+}
+
+.study-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+/* ==========================================================================
    Mobile Bottom Dock Navigation & Editorial PWA Design System
    ========================================================================== */
 .mobile-bottom-nav {
@@ -1805,7 +1853,7 @@ body {
     gap: 14px !important;
   }
 
-  .today-layout {
+  .today-layout, .study-layout {
     grid-template-columns: 1fr !important;
     gap: 14px !important;
   }

@@ -586,6 +586,12 @@ class HarnessAPI:
         self._trigger_auto_sync()
         return res
 
+    def enqueue_homework_prep(self, hw_id: int, date_str: Optional[str] = None) -> Dict[str, Any]:
+        from engine import kill_list_controller
+        res = kill_list_controller.enqueue_homework_prep(hw_id, date_str)
+        self._trigger_auto_sync()
+        return res
+
     def sync_vulcan_data(self, client_date: Optional[str] = None, force_refresh: bool = False) -> Dict[str, Any]:
         from app.services import vulcan_service
         res = vulcan_service.sync_vulcan_data(client_date, force_refresh)
