@@ -97,7 +97,7 @@ window.Study = {
           : "";
 
         return `
-          <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 9px 12px;">
+          <div id="study-exam-${ex.id}" data-exam-id="${ex.id}" class="study-exam-card" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 9px 12px; transition: outline 0.2s ease;">
             <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
               <div>
                 <div style="display: flex; align-items: center; gap: 6px;">

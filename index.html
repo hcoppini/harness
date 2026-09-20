@@ -7,18 +7,21 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Harness">
-  <meta name="theme-color" content="#050505">
+  <meta name="theme-color" content="#FFFFFF">
   <meta name="description" content="Executive OS & Personal Execution Tracker for TUM Heilbronn Aspirants">
   <link rel="manifest" href="/manifest.json">
   <link rel="icon" type="image/png" href="favicon.png">
   <link rel="apple-touch-icon" href="apple-touch-icon.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="css/app.css?v=4.0">
 </head>
 <body>
 
   <!-- Top App Header -->
   <header class="app-header">
-    <div class="brand-wrap" onclick="window.HarnessApp.switchView('today')">
+    <div class="brand-wrap" onclick="window.HarnessApp.switchView('dashboard')">
       <div class="brand-mark"></div>
       <span class="brand-title">HARNESS</span>
       <span class="brand-divider">/</span>
@@ -27,7 +30,11 @@
 
     <!-- Navigation Tabs -->
     <nav class="nav-tabs" id="navTabs">
-      <button class="nav-tab active" data-view="today">
+      <button class="nav-tab active" data-view="dashboard">
+        <span>Cockpit</span>
+        <span class="key-pill">0</span>
+      </button>
+      <button class="nav-tab" data-view="today">
         <span>Daily</span>
         <span class="key-pill">1</span>
       </button>
@@ -43,6 +50,10 @@
 
     <!-- Header Right Controls -->
     <div class="header-right">
+      <button id="btnToggleTheme" class="btn-ghost-icon theme-toggle-btn" title="Toggle Light/Dark Monochrome">
+        <span id="themeToggleIcon">🌙</span>
+        <span id="themeToggleText">DARK</span>
+      </button>
       <button id="btnMobileKillList" class="btn-ghost-icon mobile-only-btn" title="Open SGH Kill List" onclick="window.KillListDrawer ? window.KillListDrawer.open() : null">
         <span>[KILL]</span>
       </button>
@@ -66,14 +77,14 @@
     <!-- ====================================================================
          0. DASHBOARD LAYER (Executive Cockpit, Trajectory Gauges, Heatmap)
          ==================================================================== -->
-    <section id="view-dashboard" class="view-section" style="display:none;" hidden>
+    <section id="view-dashboard" class="view-section active">
       <div class="section-header">
         <div>
           <h1 class="section-headline">Executive Cockpit</h1>
-          <p class="section-caption">High-signal trajectory: daily execution velocity, TUM Heilbronn readiness, and habit consistency.</p>
+          <p class="section-caption">High-signal trajectory: daily execution velocity, school defense balance, and TUM Heilbronn readiness.</p>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <div class="mono-chip lavender" id="dashboardStreakPill" title="Consecutive execution streak" style="padding: 4px 8px;">
+          <div class="mono-chip" id="dashboardStreakPill" title="Consecutive execution streak" style="padding: 4px 8px;">
             <span id="streakCountVal">0</span>d streak
           </div>
           <button id="btnRefreshDashboard" class="btn-ghost-icon" title="Refresh Dashboard Data">
@@ -83,13 +94,13 @@
       </div>
 
       <div class="dashboard-layout">
-        <!-- 1. TOP EXECUTIVE COCKPIT GAUGES -->
-        <div class="executive-cockpit-grid">
+        <!-- 1. TOP EXECUTIVE COCKPIT GAUGES (3-Card Executive Grid) -->
+        <div class="executive-kpi-grid">
           <!-- Gauge 1: Today's Execution Velocity -->
           <div class="cockpit-card" onclick="window.HarnessApp.switchView('today')" style="cursor: pointer;">
             <div class="cockpit-header">
               <span class="cockpit-title">Today's Velocity</span>
-              <span class="mono-chip lavender" id="dashTodayRoutineTag">Schedule</span>
+              <span class="mono-chip" id="dashTodayRoutineTag">Schedule</span>
             </div>
             <div>
               <div class="cockpit-value" id="dashTodayProgressVal">0%</div>
@@ -102,10 +113,31 @@
             </div>
           </div>
 
-          <!-- Gauge 2: TUM Heilbronn Admissions Readiness -->
+          <!-- Gauge 2: Academic Balance Status (School vs Matura) -->
+          <div class="cockpit-card" onclick="window.HarnessApp.switchView('study')" style="cursor: pointer;">
+            <div class="cockpit-header">
+              <span class="cockpit-title">Academic Balance</span>
+              <span class="mono-chip" id="dashWorkloadModeBadge">CRUISE</span>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+              <div>
+                <div class="card-label">NEAREST EXAM</div>
+                <div class="cockpit-value" id="dashNearestExamVal" style="font-size: 18px; margin-top: 2px;">Clean Horizon</div>
+              </div>
+              <div style="text-align: right;">
+                <div class="card-label">OBLIGATIONS</div>
+                <div class="cockpit-value" id="dashSchoolObligationsVal" style="font-size: 18px; margin-top: 2px;">0 Tests • 0 HW</div>
+              </div>
+            </div>
+            <div class="cockpit-subtitle" id="dashWorkloadDesc">
+              Academic pressure calibrated. SGH blocks active.
+            </div>
+          </div>
+
+          <!-- Gauge 3: TUM '28 Admissions Readiness -->
           <div class="cockpit-card" onclick="window.HarnessApp.switchView('tum')" style="cursor: pointer;">
             <div class="cockpit-header">
-              <span class="cockpit-title">TUM Admissions</span>
+              <span class="cockpit-title">TUM '28 Readiness</span>
               <span class="mono-chip" id="dashGermanLevel">A2 Active</span>
             </div>
             <div style="display: flex; justify-content: space-between; align-items: baseline;">
@@ -114,62 +146,31 @@
                 <div class="cockpit-value" id="dashOverallGpa" style="font-size: 18px; margin-top: 2px;">--</div>
               </div>
               <div style="text-align: right;">
-                <div class="card-label">MATURA MOCKS</div>
-                <div class="cockpit-value" id="dashMaturaAvg" style="font-size: 18px; margin-top: 2px;">--%</div>
+                <div class="card-label">PROJECTED TUM SCORE</div>
+                <div class="cockpit-value" id="dashTumScoreVal" style="font-size: 18px; margin-top: 2px;">90 pts</div>
               </div>
             </div>
             <div class="cockpit-subtitle" id="dashActiveStationName">
-              Station: Pure Syntax
-            </div>
-          </div>
-
-          <!-- Gauge 3: Body / Mass & Workouts -->
-          <div class="cockpit-card" onclick="window.HarnessApp.switchView('body')" style="cursor: pointer;">
-            <div class="cockpit-header">
-              <span class="cockpit-title">Physique &amp; Mass</span>
-              <span class="mono-chip" style="font-family: var(--font-mono);">80.0 kg Goal</span>
-            </div>
-            <div>
-              <div style="display: flex; justify-content: space-between; align-items: baseline;">
-                <div class="cockpit-value" id="dashWeightVal" style="font-size: 18px;">68.0 kg</div>
-              </div>
-              <div class="progress-bar-track">
-                <div class="progress-bar-fill" id="dashWeightProgressFill" style="width: 0%;"></div>
-              </div>
-            </div>
-            <div class="cockpit-subtitle" id="dashWorkoutsSummaryText">
-              Boxing 0/3 • Gym 0/4 • Run 0/2
-            </div>
-          </div>
-
-          <!-- Gauge 4: Active Builds & Next Action -->
-          <div class="cockpit-card" onclick="window.HarnessApp.switchView('projects')" style="cursor: pointer;">
-            <div class="cockpit-header">
-              <span class="cockpit-title">Active Sprints</span>
-              <span class="mono-chip lavender">Workspace</span>
-            </div>
-            <div class="cockpit-value" id="dashProjectsCount">4 Builds</div>
-            <div class="cockpit-subtitle" id="dashTopProjectNextAction" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              Review next immediate milestone
+              Station: Pure Syntax (SEP '26)
             </div>
           </div>
         </div>
 
-        <!-- 2. DAILY EXECUTION HEATMAP -->
+        <!-- 2. DAILY EXECUTION HEATMAP (Forward Sep 1 -> Horizon, Inverted Monochrome) -->
         <div class="monotone-card heatmap-card">
           <div class="heatmap-header-row">
             <div>
-              <span class="heatmap-title" id="heatmapContributionsCount">Daily Execution Pulse</span>
-              <div class="heatmap-subtitle">Historical habit density: routines, gym protocols, and tasks</div>
+              <span class="heatmap-title" id="heatmapContributionsCount">Forward Execution Horizon</span>
+              <div class="heatmap-subtitle">Forward execution horizon (from Sep 1, 2026). Pitch black indicates 100% completed days.</div>
             </div>
             <div class="heatmap-legend">
-              <span>Less</span>
-              <div class="legend-square lvl-0" title="0 checked"></div>
-              <div class="legend-square lvl-1" title="1-2 checked"></div>
-              <div class="legend-square lvl-2" title="3-4 checked"></div>
-              <div class="legend-square lvl-3" title="5-6 checked"></div>
-              <div class="legend-square lvl-4" title="7+ checked (100%)"></div>
-              <span>More</span>
+              <span>0% (White)</span>
+              <div class="legend-square lvl-0" title="0% / White"></div>
+              <div class="legend-square lvl-1" title="Low completion"></div>
+              <div class="legend-square lvl-2" title="Medium completion"></div>
+              <div class="legend-square lvl-3" title="High completion"></div>
+              <div class="legend-square lvl-4" title="100% Pitch Black"></div>
+              <span>100% (Pitch Black)</span>
             </div>
           </div>
 
@@ -237,7 +238,7 @@
     <!-- ====================================================================
          1. TODAY LAYER (Daily Routine, Mini-Calendar, Timetable)
          ==================================================================== -->
-    <section id="view-today" class="view-section active">
+    <section id="view-today" class="view-section">
       <div class="section-header">
         <div>
           <h1 class="section-headline">Daily Execution</h1>
@@ -1663,19 +1664,28 @@
 
   <!-- Mobile Bottom Dock Navigation (Phone Viewport) -->
   <nav id="mobileBottomNav" class="mobile-bottom-nav">
-    <button class="mobile-nav-tab active" data-view="today" aria-label="Daily">
+    <button class="mobile-nav-tab active" data-view="dashboard" aria-label="Cockpit">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7"></rect>
+        <rect x="14" y="3" width="7" height="7"></rect>
+        <rect x="14" y="14" width="7" height="7"></rect>
+        <rect x="3" y="14" width="7" height="7"></rect>
+      </svg>
+      <span class="mobile-tab-label">0 Cockpit</span>
+    </button>
+    <button class="mobile-nav-tab" data-view="today" aria-label="Daily">
       <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"></circle>
         <polyline points="12 6 12 12 16 14"></polyline>
       </svg>
-      <span class="mobile-tab-label">Daily</span>
+      <span class="mobile-tab-label">1 Daily</span>
     </button>
     <button class="mobile-nav-tab" data-view="study" aria-label="Study">
       <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
       </svg>
-      <span class="mobile-tab-label">Study</span>
+      <span class="mobile-tab-label">2 Study</span>
     </button>
     <button class="mobile-nav-tab" data-view="tum" aria-label="TUM '28">
       <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1684,7 +1694,7 @@
         <line x1="10" y1="3" x2="8" y2="21"></line>
         <line x1="16" y1="3" x2="14" y2="21"></line>
       </svg>
-      <span class="mobile-tab-label">TUM '28</span>
+      <span class="mobile-tab-label">3 TUM '28</span>
     </button>
   </nav>
 

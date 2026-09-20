@@ -3,12 +3,13 @@
  */
 
 window.HarnessApp = {
-  currentView: "today",
+  currentView: "dashboard",
   activeJsonTab: "schedules",
   allConfigs: null,
   initialized: false,
 
   init() {
+    this.initTheme();
     this.bindNavigation();
     this.bindKeybindings();
     this.bindModals();
@@ -45,15 +46,48 @@ window.HarnessApp = {
     }, 100);
   },
 
+  initTheme() {
+    const saved = localStorage.getItem("harness_theme") || "light";
+    this.applyTheme(saved);
+
+    const btn = document.getElementById("btnToggleTheme");
+    if (btn) {
+      btn.addEventListener("click", () => this.toggleTheme());
+    }
+  },
+
+  applyTheme(theme) {
+    if (theme === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+    } else {
+      document.documentElement.removeAttribute("data-theme");
+    }
+    localStorage.setItem("harness_theme", theme);
+    const btn = document.getElementById("btnToggleTheme");
+    if (btn) {
+      const icon = btn.querySelector("#themeToggleIcon");
+      const text = btn.querySelector("#themeToggleText");
+      if (icon) icon.textContent = theme === "dark" ? "☀️" : "🌙";
+      if (text) text.textContent = theme === "dark" ? "LIGHT" : "DARK";
+    }
+  },
+
+  toggleTheme() {
+    const current = document.documentElement.getAttribute("data-theme") === "dark" ? "dark" : "light";
+    const next = current === "dark" ? "light" : "dark";
+    this.applyTheme(next);
+    if (window.HarnessApp) this.showToast(`Switched to ${next} monochrome`);
+  },
+
   async initAllLayers() {
     try {
       if (window.FocusTimer) window.FocusTimer.init();
       if (window.CommandPalette) window.CommandPalette.init();
       
-      // Render active layer (Daily) immediately for instant execution
+      // Render 0 Cockpit and primary layers immediately
+      if (window.Dashboard) await window.Dashboard.init();
       if (window.Today) await window.Today.init();
       if (window.Study) await window.Study.init();
-      if (window.Dashboard) await window.Dashboard.init();
 
       // Initialize secondary layers asynchronously without blocking UI render
       Promise.allSettled([
@@ -64,8 +98,8 @@ window.HarnessApp = {
         window.Knowledge ? window.Knowledge.init() : Promise.resolve(),
       ]).catch((err) => console.warn("[App] Background layers init error:", err));
 
-      // Ensure view starts on Daily
-      this.switchView("today");
+      // Ensure view starts on 0 Cockpit
+      this.switchView("dashboard");
 
       // Non-blocking background sync initialization
       setTimeout(() => {
@@ -170,7 +204,7 @@ window.HarnessApp = {
         this.switchView("tum");
       } else if (e.key === "0" || e.key === "`") {
         e.preventDefault();
-        this.switchView("today");
+        this.switchView("dashboard");
       }
 
       if (e.key === "n" || e.key === "N") {

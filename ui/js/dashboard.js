@@ -86,7 +86,7 @@ window.Dashboard = {
   renderCockpitGauges() {
     const metrics = this.data.metrics || {};
     const velocity = this.data.today_velocity || {};
-    const projects = this.data.projects || [];
+    const acBalance = this.data.academic_balance || {};
 
     // Streak
     const streakVal = document.getElementById("streakCountVal");
@@ -94,7 +94,7 @@ window.Dashboard = {
       streakVal.textContent = metrics.current_streak || 0;
     }
 
-    // Gauge 1: Today's Velocity
+    // 1. Today's Execution Velocity
     const todayPctVal = document.getElementById("dashTodayProgressVal");
     const todayBar = document.getElementById("dashTodayProgressBar");
     const todayRoutineLabel = document.getElementById("dashTodayRoutineLabel");
@@ -103,12 +103,41 @@ window.Dashboard = {
     if (todayPctVal) todayPctVal.textContent = `${pct}%`;
     if (todayBar) todayBar.style.width = `${pct}%`;
     if (todayRoutineLabel) {
-      todayRoutineLabel.textContent = `${velocity.checked_boxes || 0}/${velocity.total_boxes || 0} boxes completed • ${velocity.schedule_name || "Daily routine"}`;
+      todayRoutineLabel.textContent = `${velocity.checked_boxes || 0}/${velocity.total_boxes || 0} boxes checked • ${velocity.schedule_name || "Daily routine"}`;
     }
 
-    // Gauge 2: TUM Admissions Readiness
+    // 2. Academic Balance Status (School vs Matura)
+    const modeBadge = document.getElementById("dashWorkloadModeBadge");
+    const nearestExamEl = document.getElementById("dashNearestExamVal");
+    const obligationsEl = document.getElementById("dashSchoolObligationsVal");
+    const workloadDescEl = document.getElementById("dashWorkloadDesc");
+
+    if (modeBadge) {
+      modeBadge.textContent = acBalance.mode || "CRUISE";
+      modeBadge.className = `mono-chip ${acBalance.badge_class || ""}`;
+    }
+    if (nearestExamEl) {
+      if (acBalance.nearest_exam) {
+        const ex = acBalance.nearest_exam;
+        const dueText = ex.days_left === 0 ? "TODAY" : ex.days_left === 1 ? "TOMORROW" : `in ${ex.days_left}d`;
+        nearestExamEl.textContent = `[${ex.subject}] ${dueText}`;
+        nearestExamEl.title = `${ex.title} (${ex.exam_date})`;
+      } else {
+        nearestExamEl.textContent = "Clean Horizon";
+      }
+    }
+    if (obligationsEl) {
+      const examsCount = acBalance.total_exams_count || 0;
+      const hwCount = acBalance.urgent_homework_count || 0;
+      obligationsEl.textContent = `${examsCount} Tests • ${hwCount} Urgent HW`;
+    }
+    if (workloadDescEl) {
+      workloadDescEl.textContent = acBalance.description || "Academic pressure is calibrated. SGH blocks active.";
+    }
+
+    // 3. TUM '28 Admissions Velocity
     const gpaEl = document.getElementById("dashOverallGpa");
-    const maturaEl = document.getElementById("dashMaturaAvg");
+    const tumScoreEl = document.getElementById("dashTumScoreVal");
     const germanEl = document.getElementById("dashGermanLevel");
     const stName = document.getElementById("dashActiveStationName");
 
@@ -117,41 +146,12 @@ window.Dashboard = {
       const de = metrics.bavarian_gpa ? ` (DE: ${Number(metrics.bavarian_gpa).toFixed(2)})` : "";
       gpaEl.textContent = `${pl}${de}`;
     }
-    if (maturaEl) maturaEl.textContent = `${(metrics.avg_matura_mock || 0.0).toFixed(0)}%`;
+    if (tumScoreEl) {
+      tumScoreEl.textContent = `${(metrics.tum_score || 90.0).toFixed(0)} pts`;
+    }
     if (germanEl) germanEl.textContent = metrics.german_stage || "A2 Active";
     if (stName) {
-      stName.textContent = `Station: ${metrics.active_station?.name || "Pure Syntax"}`;
-    }
-
-    // Gauge 3: Body & Physique
-    const weightVal = document.getElementById("dashWeightVal");
-    const weightFill = document.getElementById("dashWeightProgressFill");
-    const workoutsText = document.getElementById("dashWorkoutsSummaryText");
-
-    const curWeight = metrics.latest_weight || 68.0;
-    const targetWeight = metrics.target_weight || 80.0;
-    if (weightVal) weightVal.textContent = `${curWeight.toFixed(1)} kg`;
-
-    if (weightFill) {
-      const weightPct = Math.max(0, Math.min(100, ((curWeight - 68.0) / (80.0 - 68.0)) * 100));
-      weightFill.style.width = `${weightPct}%`;
-    }
-
-    const wouts = metrics.weekly_workouts || {};
-    const boxCount = wouts.boxing ? `${wouts.boxing.count}/${wouts.boxing.target}` : "0/3";
-    const gymCount = wouts.gym ? `${wouts.gym.count}/${wouts.gym.target}` : "0/4";
-    const runCount = wouts.running ? `${wouts.running.count}/${wouts.running.target}` : "0/2";
-    if (workoutsText) {
-      workoutsText.textContent = `Boxing ${boxCount} • Gym ${gymCount} • Run ${runCount}`;
-    }
-
-    // Gauge 4: Active Builds
-    const projCountEl = document.getElementById("dashProjectsCount");
-    const topProjNext = document.getElementById("dashTopProjectNextAction");
-
-    if (projCountEl) projCountEl.textContent = `${projects.length} Active Builds`;
-    if (topProjNext && projects.length > 0) {
-      topProjNext.textContent = `Next: ${projects[0].next_action || projects[0].current_milestone || "Execute sprint"}`;
+      stName.textContent = `Station: ${metrics.active_station?.name || "Pure Syntax"} (${metrics.active_station?.month || "SEP '26"})`;
     }
   },
 
@@ -202,16 +202,24 @@ window.Dashboard = {
           const level = day.level || 0;
           const count = day.count || 0;
           const totalBoxes = day.total_boxes || 0;
+          const unchecked = day.unchecked_count || 0;
           const dateStr = day.date || "";
           const isTodayClass = day.is_today ? " cell-today" : "";
           const isFutureClass = day.is_future ? " cell-future" : "";
+          const hasExamClass = day.has_exam ? " has-exam" : "";
+          const hasHwClass = day.has_homework ? " has-homework" : "";
+
           html += `
             <div 
-              class="heatmap-cell lvl-${level}${isTodayClass}${isFutureClass}" 
+              class="heatmap-cell lvl-${level}${isTodayClass}${isFutureClass}${hasExamClass}${hasHwClass}" 
               data-date="${dateStr}"
               data-count="${count}"
               data-total="${totalBoxes}"
+              data-unchecked="${unchecked}"
               data-level="${level}"
+              data-is-future="${day.is_future ? "1" : "0"}"
+              data-has-exam="${day.has_exam ? "1" : "0"}"
+              data-has-hw="${day.has_homework ? "1" : "0"}"
               data-display="${day.display_date || dateStr}"
             ></div>
           `;
@@ -262,18 +270,22 @@ window.Dashboard = {
 
         const count = dayInfo.count || 0;
         const total = dayInfo.total_boxes || 0;
+        const unchecked = dayInfo.unchecked_count || 0;
         const displayDate = dayInfo.display_date || dateStr;
         const activities = dayInfo.activities || [];
         const isFuture = dayInfo.is_future;
 
         let statusBadge = "";
         if (isFuture) {
-          statusBadge = `<span style="color: var(--text-tertiary); font-size: 10px;">(Upcoming)</span>`;
-        } else if (total > 0 && count >= total) {
-          statusBadge = `<span style="color: var(--accent-purple-light); font-weight: 700; font-size: 11px;">100% (All ${total} Done!)</span>`;
+          if (dayInfo.has_exam || dayInfo.has_homework) {
+            statusBadge = `<span style="color: var(--text-primary); font-weight: 700; font-size: 10px;">[Exam / Deadline Scheduled]</span>`;
+          } else {
+            statusBadge = `<span style="color: var(--text-tertiary); font-size: 10px;">(Future Date)</span>`;
+          }
+        } else if (total > 0 && unchecked === 0) {
+          statusBadge = `<span style="color: var(--text-primary); font-weight: 700; font-size: 11px;">100% Done (0 unchecked • Deep Black)</span>`;
         } else if (total > 0) {
-          const pct = Math.round((count / total) * 100);
-          statusBadge = `<span style="color: var(--text-secondary); font-size: 11px;">${count}/${total} (${pct}%)</span>`;
+          statusBadge = `<span style="color: var(--text-secondary); font-size: 11px;">${count}/${total} checked (${unchecked} unchecked)</span>`;
         } else {
           statusBadge = `<span style="color: var(--text-secondary); font-size: 11px;">${count} completed</span>`;
         }
@@ -293,7 +305,7 @@ window.Dashboard = {
             tipContent += `<div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">+ ${activities.length - 6} more</div>`;
           }
         } else {
-          tipContent += `<div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">${isFuture ? "Scheduled routine pending" : "No activity recorded"}</div>`;
+          tipContent += `<div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">${isFuture ? "Clean horizon" : "No activity recorded"}</div>`;
         }
 
         tooltip.innerHTML = tipContent;

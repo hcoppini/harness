@@ -1,17 +1,23 @@
 """
-Harness 3.0 Adaptive Workload Governor.
-Analyzes school exam pressure, computes cognitive load, and dynamically shapes
-daily SGH Library deep work blocks and week schedules to prevent burnout and ace exams.
+Harness 3.0 Autonomous Academic Workload Governor.
+Analyzes school exam pressure, subject grade vulnerabilities, task archetypes (e.g. essays, exams),
+and dynamically shapes daily SGH Library deep work blocks and weekend schedules.
+Unifies school-first defense with long-term Matura Rozszerzona & TUM Heilbronn mastery.
 """
 
+import re
 import sqlite3
 from datetime import datetime, timedelta
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Tuple
 
 from app.db import get_connection
 from engine import kill_list_controller
+from engine import grade_parser
 
 TIER_1_KEYWORDS = ["matematyka", "informatyka", "angielski", "math", "cs", "algorithm"]
+ESSAY_KEYWORDS = ["esej", "rozprawka", "wypracowanie", "tekst", "opowiadanie", "charakterystyka", "analiza literacka", "praca pisemna"]
+EXAM_MAJOR_KEYWORDS = ["sprawdzian", "praca klasowa", "test diagnostyczny", "arkusz", "matura", "egzamin"]
+QUIZ_KEYWORDS = ["kartkówka", "kartkowka", "odpowiedź", "odpowiedz ustna", "wejściówka"]
 
 
 def _is_tier_1(subject: str) -> bool:
@@ -20,13 +26,192 @@ def _is_tier_1(subject: str) -> bool:
     return any(k in s for k in TIER_1_KEYWORDS)
 
 
+def classify_obligation(item: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Classifies an academic obligation (homework or exam) into semantic archetypes:
+    - type: 'essay', 'presentation', 'major_exam', 'quiz', 'homework'
+    - is_writing_heavy: bool
+    - is_stem: bool
+    - title_clean: str
+    """
+    subject = (item.get("subject") or "").strip()
+    title = (item.get("title") or "").strip()
+    desc = (item.get("description") or item.get("scope") or "").strip()
+    combined = f"{subject} {title} {desc}".lower()
+
+    is_writing = any(k in combined for k in ESSAY_KEYWORDS)
+    is_major = any(k in combined for k in EXAM_MAJOR_KEYWORDS)
+    is_quiz = any(k in combined for k in QUIZ_KEYWORDS)
+    is_pres = "prezentacja" in combined or "projekt" in combined
+    is_stem = _is_tier_1(subject) or any(k in combined for k in ["fizyka", "chemia", "biologia"])
+
+    if is_writing:
+        ob_type = "essay"
+    elif is_pres:
+        ob_type = "presentation"
+    elif is_major:
+        ob_type = "major_exam"
+    elif is_quiz:
+        ob_type = "quiz"
+    else:
+        ob_type = "homework"
+
+    return {
+        "type": ob_type,
+        "is_writing_heavy": is_writing or is_pres,
+        "is_stem": is_stem,
+        "subject": subject,
+        "title": title,
+    }
+
+
+def get_subject_vulnerabilities(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Dict[str, Any]]:
+    """
+    Queries tum_grade_entries to calculate live running GPAs and vulnerability flags per subject.
+    A subject with GPA < 3.8 or any recent grade <= 2.0 is marked vulnerable.
+    """
+    close_conn = False
+    if conn is None:
+        conn = get_connection()
+        close_conn = True
+
+    cursor = conn.cursor()
+    try:
+        cursor.execute("SELECT subject, raw_input, numeric_value, weight, date FROM tum_grade_entries ORDER BY date ASC")
+        rows = cursor.fetchall()
+    except Exception:
+        rows = []
+
+    subject_entries: Dict[str, List[Dict[str, Any]]] = {}
+    for r in rows:
+        subj = r["subject"]
+        if not subj:
+            continue
+        val = r["numeric_value"]
+        raw = r["raw_input"]
+        if val is None and raw:
+            parsed = grade_parser.parse_polish_grade(raw)
+            val = parsed.get("numeric_value")
+        weight = float(r["weight"] or 1.0)
+        subject_entries.setdefault(subj, []).append({
+            "numeric_value": val,
+            "weight": weight,
+            "counts_in_average": val is not None,
+            "raw_grade": raw,
+            "date": r["date"],
+        })
+
+    vulnerabilities: Dict[str, Dict[str, Any]] = {}
+    for subj, entries in subject_entries.items():
+        avg = grade_parser.calculate_subject_average(entries)
+        has_low_grade = any(e.get("numeric_value") is not None and e["numeric_value"] <= 2.5 for e in entries)
+        is_vulnerable = (avg is not None and avg < 3.8) or has_low_grade
+        vulnerabilities[subj] = {
+            "subject": subj,
+            "gpa": round(avg, 2) if avg is not None else 4.0,
+            "is_vulnerable": is_vulnerable,
+            "entries_count": len(entries),
+            "has_low_grade": has_low_grade,
+        }
+
+    if close_conn:
+        conn.close()
+
+    return vulnerabilities
+
+
+def generate_phased_study_action(
+    obligation: Dict[str, Any],
+    days_left: int,
+    subject_gpa: Optional[float] = None,
+) -> Dict[str, Any]:
+    """
+    Synthesizes concrete step-by-step guidance tailored to task archetype,
+    days remaining until deadline, and current subject standing.
+    """
+    classification = classify_obligation(obligation)
+    ob_type = classification["type"]
+    subject = obligation.get("subject", "School")
+    title = obligation.get("title", "")
+    scope = obligation.get("scope", obligation.get("description", ""))
+
+    is_vuln = subject_gpa is not None and subject_gpa < 3.8
+    vuln_tag = f" [Grade Risk: {subject_gpa:.1f} GPA]" if is_vuln else ""
+
+    if ob_type == "essay":
+        if days_left <= 1:
+            stage = "Final Polish & Submission"
+            focus = f"Deep Work • Polish Essay: Final Review ({subject})"
+            activity = (
+                f"[Essay Sprint // {stage}{vuln_tag}] 30m verify thesis alignment, textual quotes & bibliography + "
+                f"40m polish syntax, transition sentences & argument flow + 20m final formatting and word count check."
+            )
+        elif days_left == 2:
+            stage = "Drafting Sprint"
+            focus = f"Deep Work • Essay Drafting: {subject}"
+            activity = (
+                f"[Essay Sprint // {stage}{vuln_tag}] 40m draft core thesis & body paragraphs 1-2 + "
+                f"45m integrate direct textual citations & analysis + 25m draft conclusion and review cohesion."
+            )
+        else:
+            stage = "Outline & Textual Research"
+            focus = f"Deep Work • Essay Structure & Thesis: {subject}"
+            activity = (
+                f"[Essay Prep // {stage}{vuln_tag}] 35m analyze prompt, formulate central thesis & select 3 arguments + "
+                f"45m extract literary quotes and supporting evidence from source texts."
+            )
+    elif ob_type == "major_exam":
+        if days_left <= 1:
+            stage = "T-1 Rapid Error Blitz & Formula Mastery"
+            focus = f"Deep Work • {subject} Exam: Error Blitz"
+            activity = (
+                f"[Exam Sprint // {stage}{vuln_tag}] 50m targeted formula recall & review past homework error log + "
+                f"40m timed past-paper questions on {scope or title[:35]}."
+            )
+        elif days_left <= 3:
+            stage = "T-3 High-Intensity Problem Drill"
+            focus = f"Deep Work • {subject} Exam Prep"
+            activity = (
+                f"[Exam Sprint // {stage}{vuln_tag}] 60m solve 8 targeted exam problem sets ({scope or title[:35]}) + "
+                f"30m self-correction and formula derivation."
+            )
+        else:
+            stage = "T-5 Concept Mapping"
+            focus = f"Deep Work • {subject} Concept Review"
+            activity = (
+                f"[Exam Prep // {stage}{vuln_tag}] 45m core theorem/concept mapping + 45m progressive diagnostic problems."
+            )
+    elif ob_type == "quiz":
+        stage = "Quick Active Recall"
+        focus = f"Deep Work • {subject} Kartkówka Drill"
+        activity = (
+            f"[Quiz Sprint // {stage}{vuln_tag}] 30m rapid active recall flashcards/formulas ({title}) + "
+            f"25m practice exercises."
+        )
+    else:  # homework / presentation
+        stage = "Submission Clearance"
+        focus = f"Deep Work • Homework Clearance: {subject}"
+        activity = (
+            f"[Homework Sprint // {stage}{vuln_tag}] 45m complete {title} requirements + "
+            f"30m answer verification and submission readiness."
+        )
+
+    return {
+        "stage": stage,
+        "focus": focus,
+        "activity": activity,
+        "is_school_dedicated": True,
+        "obligation_type": ob_type,
+    }
+
+
 def get_workload_analysis(
     target_date_str: Optional[str] = None,
     conn: Optional[sqlite3.Connection] = None,
 ) -> Dict[str, Any]:
     """
     Evaluates upcoming academic commitments over the active horizon (next 10 days for exams, next 7 days for homework).
-    Calculates composite academic pressure score and determines operational mode (Cruise vs Balanced vs Surge).
+    Incorporates subject grade vulnerability to calculate the composite academic pressure score.
     """
     close_conn = False
     if conn is None:
@@ -37,8 +222,10 @@ def get_workload_analysis(
     end_dt = target_dt + timedelta(days=10)
     hw_end_dt = target_dt + timedelta(days=7)
 
+    vulnerabilities = get_subject_vulnerabilities(conn=conn)
+
     cursor = conn.cursor()
-    
+
     # 1. Fetch upcoming exams
     cursor.execute(
         """
@@ -52,8 +239,8 @@ def get_workload_analysis(
 
     tier_1_exams = []
     tier_2_exams = []
-    immediate_exams = []  # Due in <= 2 days
-    week_exams = []       # Due in <= 5 days
+    immediate_exams = []
+    week_exams = []
 
     for e in exams:
         try:
@@ -64,6 +251,9 @@ def get_workload_analysis(
 
         e["days_left"] = days_left
         e["is_tier_1"] = _is_tier_1(e["subject"])
+        subj_vuln = vulnerabilities.get(e["subject"], {})
+        e["is_vulnerable"] = subj_vuln.get("is_vulnerable", False)
+        e["subject_gpa"] = subj_vuln.get("gpa", 4.0)
 
         if days_left <= 2:
             immediate_exams.append(e)
@@ -86,8 +276,8 @@ def get_workload_analysis(
     )
     homework = [dict(r) for r in cursor.fetchall()]
 
-    urgent_homework = []  # Due in 0-1 days (today or tomorrow)
-    active_homework = []  # Due in 2-5 days
+    urgent_homework = []
+    active_homework = []
 
     for h in homework:
         try:
@@ -96,6 +286,12 @@ def get_workload_analysis(
         except Exception:
             days_left = 0
         h["days_left"] = days_left
+        classification = classify_obligation(h)
+        h["is_essay"] = (classification["type"] == "essay")
+        subj_vuln = vulnerabilities.get(h["subject"], {})
+        h["is_vulnerable"] = subj_vuln.get("is_vulnerable", False)
+        h["subject_gpa"] = subj_vuln.get("gpa", 4.0)
+
         if days_left <= 1:
             urgent_homework.append(h)
         elif days_left <= 5:
@@ -105,15 +301,25 @@ def get_workload_analysis(
     # - Tier 1 exam: 2.5 pts
     # - Tier 2 exam: 1.0 pt
     # - Immediate exam (<= 2 days): +2.0 pts
+    # - Vulnerable subject exam (GPA < 3.8): +2.0 pts booster
     # - Multiple exams this week booster: +1.5 pts per additional exam beyond the first
     # - Urgent homework (due today/tomorrow): +1.5 pts each
+    # - Active essay (due in <= 3 days): +2.0 pts booster
     # - Active homework (due in 2-5 days): +0.5 pts each
     score = (len(tier_1_exams) * 2.5) + (len(tier_2_exams) * 1.0)
     if immediate_exams:
         score += 2.0
+    for e in exams:
+        if e.get("is_vulnerable"):
+            score += 1.5
     if len(week_exams) > 1:
         score += (len(week_exams) - 1) * 1.5
     score += (len(urgent_homework) * 1.5)
+    for h in homework:
+        if h.get("is_essay") and h.get("days_left", 99) <= 3:
+            score += 2.0
+        elif h.get("is_vulnerable") and h.get("days_left", 99) <= 3:
+            score += 1.0
     score += (len(active_homework) * 0.5)
 
     if score <= 2.5:
@@ -154,6 +360,7 @@ def get_workload_analysis(
         "urgent_homework_count": len(urgent_homework),
         "urgent_homework": urgent_homework,
         "active_homework": active_homework,
+        "vulnerabilities": vulnerabilities,
     }
 
 
@@ -163,9 +370,9 @@ def synthesize_adaptive_schedule(
     conn: Optional[sqlite3.Connection] = None,
 ) -> Dict[str, Any]:
     """
-    Takes the static base routine and dynamically synthesizes the deep work session
-    to match real-time test density and urgent homework deadlines without
-    violating commute, gym, or recovery constraints.
+    Takes the static base routine and dynamically shapes the daily plan and study blocks
+    depending on upcoming tests, essays, homework deadlines, and live subject grades.
+    Weekend schedules automatically inject focused study blocks when upcoming obligations demand defense.
     """
     schedule = dict(base_schedule)
     blocks = [dict(b) for b in schedule.get("blocks", [])]
@@ -173,14 +380,66 @@ def synthesize_adaptive_schedule(
 
     schedule["workload"] = analysis
 
-    # If no upcoming exams and no urgent homework, return standard pre-calibrated schedule
-    has_academic_commitments = bool(analysis["upcoming_exams"]) or bool(analysis.get("urgent_homework"))
-    if analysis["mode"] == "CRUISE" and not has_academic_commitments:
+    target_dt = datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else datetime.now().date()
+    weekday = target_dt.weekday()  # Monday=0, ... Saturday=5, Sunday=6
+    is_weekend = weekday in (5, 6)
+
+    exams = analysis.get("upcoming_exams", [])
+    homework = analysis.get("urgent_homework", []) + analysis.get("active_homework", [])
+
+    # Identify acute writing tasks (essays due in <= 3 days)
+    acute_essays = [h for h in homework if h.get("is_essay") and h.get("days_left", 99) <= 3]
+    # Identify acute exams (exams due in <= 3 days)
+    acute_exams = [e for e in exams if e.get("days_left", 99) <= 3]
+
+    # --------------------------------------------------------------------------
+    # 1. WEEKEND ADAPTATION: Inject structured study blocks if heavy load looms
+    # --------------------------------------------------------------------------
+    if is_weekend:
+        # Check if tests or essays are scheduled for the coming week (days_left <= 5)
+        impending_obligations = [e for e in exams if e.get("days_left", 99) <= 5] + [
+            h for h in homework if h.get("days_left", 99) <= 5 and (h.get("is_essay") or h.get("is_vulnerable"))
+        ]
+
+        if impending_obligations or analysis["mode"] in ("BALANCED", "SURGE"):
+            primary_ob = impending_obligations[0] if impending_obligations else (exams[0] if exams else (homework[0] if homework else None))
+            if primary_ob:
+                phased = generate_phased_study_action(
+                    primary_ob,
+                    days_left=primary_ob.get("days_left", 2),
+                    subject_gpa=primary_ob.get("subject_gpa")
+                )
+                time_slot = "14:30 - 16:00" if weekday == 5 else "16:00 - 17:30"
+                weekend_block = {
+                    "time": time_slot,
+                    "focus": f"Weekend Deep Work • {primary_ob['subject']} Defense",
+                    "type": "study_block",
+                    "activity": phased["activity"],
+                    "is_school_dedicated": True,
+                    "is_surge": analysis["mode"] == "SURGE",
+                }
+
+                # Insert cleanly before evening/recovery blocks
+                inserted = False
+                for idx, b in enumerate(blocks):
+                    if b.get("type") in ("free", "recovery", "social"):
+                        blocks.insert(idx, weekend_block)
+                        inserted = True
+                        break
+                if not inserted:
+                    blocks.append(weekend_block)
+
         schedule["blocks"] = blocks
         return schedule
 
-    exams = analysis["upcoming_exams"]
-    urgent_hw = analysis.get("urgent_homework", [])
+    # --------------------------------------------------------------------------
+    # 2. WEEKDAY SGH DEEP WORK SHAPING
+    # --------------------------------------------------------------------------
+    # If no upcoming exams and no urgent homework, return standard pre-calibrated schedule
+    has_academic_commitments = bool(exams) or bool(homework)
+    if analysis["mode"] == "CRUISE" and not has_academic_commitments:
+        schedule["blocks"] = blocks
+        return schedule
 
     for b in blocks:
         is_deep_work = b.get("type") == "deep_work" or "SGH Library" in b.get("focus", "")
@@ -189,47 +448,66 @@ def synthesize_adaptive_schedule(
 
         b["is_surge"] = (analysis["mode"] == "SURGE")
 
-        # Case 1: Multiple exams in the near week (2+ upcoming)
-        if len(exams) >= 2:
+        # Scenario A: Acute Essay Due in <= 2 days (e.g. Essay due after tomorrow -> Tomorrow dedicated to essay)
+        if acute_essays:
+            top_essay = acute_essays[0]
+            phased = generate_phased_study_action(
+                top_essay,
+                days_left=top_essay.get("days_left", 1),
+                subject_gpa=top_essay.get("subject_gpa")
+            )
+            b["focus"] = phased["focus"]
+            b["activity"] = phased["activity"]
+            b["is_school_dedicated"] = True
+
+        # Scenario B: Acute Exam Due in <= 2 days
+        elif acute_exams:
+            top_exam = acute_exams[0]
+            phased = generate_phased_study_action(
+                top_exam,
+                days_left=top_exam.get("days_left", 1),
+                subject_gpa=top_exam.get("subject_gpa")
+            )
+            b["focus"] = phased["focus"]
+            b["activity"] = phased["activity"]
+            b["is_school_dedicated"] = True
+
+        # Scenario C: Multiple Exams in Near Horizon (2+ upcoming)
+        elif len(exams) >= 2:
             e1, e2 = exams[0], exams[1]
             b["focus"] = f"Deep Work • Dual Defense: {e1['subject']} + {e2['subject']}"
             b["activity"] = (
-                f"[{analysis['mode']} // Dual Exam Split] 45m {e1['subject']} ({e1['title']}) + "
-                f"45m {e2['subject']} ({e2['title']}) + 30m TUM anchor problem set."
+                f"[{analysis['mode']} // Dual Defense] 50m {e1['subject']} ({e1['title']}) problem drill + "
+                f"45m {e2['subject']} ({e2['title']}) concept check + 25m TUM LeetCode anchor."
             )
-        # Case 2: Single acute exam + urgent homework
-        elif exams and urgent_hw:
+            b["is_school_dedicated"] = True
+
+        # Scenario D: Single Exam + Urgent Homework
+        elif exams and analysis.get("urgent_homework"):
             e = exams[0]
-            hw = urgent_hw[0]
+            hw = analysis["urgent_homework"][0]
             b["focus"] = f"Deep Work • {e['subject']} Prep + [{hw['subject']}] Homework"
             b["activity"] = (
-                f"[{analysis['mode']} // Exam & Submission Split] 40m clear {hw['subject']} homework ({hw['title'][:35]}) + "
-                f"50m {e['subject']} past paper & formulas + 30m TUM sprint."
+                f"[{analysis['mode']} // Exam & Submission Split] 45m clear {hw['subject']} assignment ({hw['title'][:35]}) + "
+                f"55m {e['subject']} past paper & formula drill."
             )
-        # Case 3: Urgent homework only (no exams in next 10 days)
-        elif not exams and urgent_hw:
-            hw = urgent_hw[0]
-            b["focus"] = f"Deep Work • Homework Sprint: [{hw['subject']}]"
-            b["activity"] = (
-                f"[{analysis['mode']} // Homework Clearance] 50m complete {hw['subject']} assignment ({hw['title'][:40]}) + "
-                f"40m TUM LeetCode / Math R sprint."
-            )
-        # Case 4: Single exam
+            b["is_school_dedicated"] = True
+
+        # Scenario E: Urgent Homework Only
+        elif analysis.get("urgent_homework"):
+            hw = analysis["urgent_homework"][0]
+            phased = generate_phased_study_action(hw, days_left=hw.get("days_left", 1), subject_gpa=hw.get("subject_gpa"))
+            b["focus"] = phased["focus"]
+            b["activity"] = phased["activity"]
+            b["is_school_dedicated"] = True
+
+        # Scenario F: General Exam Further Out (3-10 days)
         elif exams:
             prio_exam = exams[0]
-            days_left = prio_exam.get("days_left", 1)
-            if days_left <= 1:
-                stage = "T-1 Error Blitz & Formula Mastery"
-                prep_focus = f"60m {prio_exam['subject']} ({prio_exam['title']}) past arkusz + 30m rapid formula recall."
-            elif days_left <= 3:
-                stage = "T-3 Focused Problem Sets"
-                prep_focus = f"50m {prio_exam['subject']} problem sets ({prio_exam.get('scope', 'Core topics')[:40]}...) + 40m LeetCode drill."
-            else:
-                stage = "T-5 Concept Mapping"
-                prep_focus = f"45m {prio_exam['subject']} concept review + 45m Math R problem sets."
-
-            b["activity"] = f"[{analysis['mode']} // {stage}] {prep_focus} Commute cutoff locked at 16:30 for evening recovery."
-            b["focus"] = f"{b.get('focus', 'Deep Work')} • {prio_exam['subject']} Prep"
+            phased = generate_phased_study_action(prio_exam, days_left=prio_exam.get("days_left", 4), subject_gpa=prio_exam.get("subject_gpa"))
+            b["focus"] = phased["focus"]
+            b["activity"] = phased["activity"]
+            b["is_school_dedicated"] = (analysis["mode"] == "SURGE" or prio_exam.get("is_vulnerable", False))
 
     schedule["blocks"] = blocks
     return schedule
@@ -240,9 +518,9 @@ def get_recommended_kill_items(
     conn: Optional[sqlite3.Connection] = None,
 ) -> List[Dict[str, Any]]:
     """
-    Generates the top 3 high-impact actionable items for today's library session.
-    Automatically prioritizes impending school exams, next sequential LeetCode problem,
-    and progressive Math R problem sets.
+    Generates the top actionable items for today's library session.
+    Automatically prioritizes impending school exams, urgent essays/homework,
+    next sequential LeetCode problem, and progressive Math R problem sets.
     """
     close_conn = False
     if conn is None:
@@ -252,14 +530,15 @@ def get_recommended_kill_items(
     analysis = get_workload_analysis(date_str, conn=conn)
     recommendations = []
 
-    # 1. Urgent homework (due today/tomorrow)
-    if analysis.get("urgent_homework"):
-        for hw in analysis["urgent_homework"][:2]:
+    # 1. Urgent essays or homework (due in <= 2 days)
+    urgent_hw = analysis.get("urgent_homework", []) + [h for h in analysis.get("active_homework", []) if h.get("is_essay")]
+    if urgent_hw:
+        for hw in urgent_hw[:2]:
             recommendations.append({
                 "type": "homework_prep",
                 "homework_id": hw["id"],
                 "category": hw["subject"],
-                "title": f"Homework: [{hw['subject']}] {hw['title']}",
+                "title": f"{'Essay' if hw.get('is_essay') else 'Homework'}: [{hw['subject']}] {hw['title']}",
                 "target_spec": f"Due: {hw['due_date']} (Priority {hw.get('priority', 1)})",
                 "quantity": 1,
                 "action_type": "url",
@@ -267,7 +546,7 @@ def get_recommended_kill_items(
                 "days_left": hw["days_left"],
             })
 
-    # 2. Impending exam prep (if in Surge or Balanced)
+    # 2. Impending exam prep
     if analysis["upcoming_exams"]:
         for ex in analysis["upcoming_exams"][:2]:
             scope_desc = f" ({ex.get('scope', '')[:35]}...)" if ex.get("scope") else ""
@@ -283,7 +562,7 @@ def get_recommended_kill_items(
                 "days_left": ex["days_left"],
             })
 
-    # 2. Sequential Metro deliverable progression (LeetCode & Math R)
+    # 3. Sequential Metro deliverable progression (LeetCode & Math R)
     deliverables = kill_list_controller.get_station_deliverables("sep-2026", conn=conn)
     for d in deliverables:
         d_id = d["deliverable_id"]
@@ -316,7 +595,6 @@ def get_recommended_kill_items(
                 "stream": d["stream"],
             })
 
-    # Cap to top 4 recommendations
     if close_conn:
         conn.close()
 

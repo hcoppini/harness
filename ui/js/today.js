@@ -401,8 +401,9 @@ const Today = {
     }
     blocksContainer.innerHTML = blocks
       .map((block, idx) => {
-        const isDeepWork = block.type === "deep_work" || (block.focus && (block.focus.includes("Deep Work") || block.focus.includes("SGH Library")));
+        const isDeepWork = block.type === "deep_work" || block.type === "study_block" || (block.focus && (block.focus.includes("Deep Work") || block.focus.includes("SGH Library") || block.focus.includes("Weekend Deep Work") || block.focus.includes("Weekend Focus")));
         const isChecked = this.completedBlocks.has(String(idx));
+        const schoolBadge = block.is_school_dedicated ? `<span class="mono-chip" style="font-size: 9px; padding: 1px 5px; margin-left: 6px;">School First</span>` : "";
         return `
           <div 
             class="routine-block ${isDeepWork ? "deep-work clickable" : ""} ${isChecked ? "completed" : ""}"
@@ -418,7 +419,10 @@ const Today = {
             ></div>
             <div class="routine-time" style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: ${isDeepWork ? "var(--accent-lavender)" : "var(--text-secondary)"}; width: 85px; flex-shrink: 0; text-decoration: ${isChecked ? "line-through" : "none"};">${block.time}</div>
             <div class="routine-info" style="flex: 1; min-width: 0;">
-              <div class="routine-focus" style="font-size: 13px; font-weight: 600; color: ${isDeepWork ? "var(--text-primary)" : "var(--text-secondary)"}; text-decoration: ${isChecked ? "line-through" : "none"};">${this.escapeHtml(block.focus)}</div>
+              <div class="routine-focus" style="font-size: 13px; font-weight: 600; color: ${isDeepWork ? "var(--text-primary)" : "var(--text-secondary)"}; text-decoration: ${isChecked ? "line-through" : "none"}; display: flex; align-items: center;">
+                <span>${this.escapeHtml(block.focus)}</span>
+                ${schoolBadge}
+              </div>
               <div class="routine-activity" style="font-size: 11px; color: var(--text-tertiary);">${this.escapeHtml(block.activity)}</div>
             </div>
             ${

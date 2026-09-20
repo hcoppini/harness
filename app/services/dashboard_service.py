@@ -35,12 +35,12 @@ def get_heatmap_data(
     include_git: bool = False,
 ) -> Dict[str, Any]:
     """
-    Builds the daily execution heatmap matrix starting from August 30, 2026 (or custom start_date)
-    and covering the 365-day annual cycle forward spanning the full dashboard width.
-    Contributions and brightness levels are tied directly to how many boxes
-    were checked on that day (routine blocks + tasks + gym exercises).
-    Git commits are excluded from checked boxes.
-    100% completion (e.g. 3/3, 8/8) produces Level 4: The Brightest Lavender Purple.
+    Builds the daily execution heatmap matrix starting from September 1, 2026 (or custom start_date)
+    and covering the forward cycle across the screen.
+    Contributions and brightness levels follow the user specification:
+    - 100% completion (all boxes checked, 0 unchecked) produces Level 4: Pitch Black (#000000).
+    - Cells get progressively brighter for each unchecked box (Level 3 -> Level 2 -> Level 1 -> Level 0).
+    - Future cells are clean neutral with indicator dots on days with scheduled school exams or homework.
     """
     close_conn = False
     if conn is None:
@@ -53,15 +53,15 @@ def get_heatmap_data(
     today_dt = datetime.strptime(end_date, "%Y-%m-%d") if end_date else datetime.now()
     today_str = today_dt.strftime("%Y-%m-%d")
 
-    # Start date: defaults to August 30, 2026
-    start_date_str = start_date or "2026-08-30"
+    # Start date: defaults to September 1, 2026
+    start_date_str = start_date or "2026-09-01"
     start_dt = datetime.strptime(start_date_str, "%Y-%m-%d")
 
     # Align start to Sunday of inception week (Sunday=0, Monday=1... Saturday=6)
     start_sunday_offset = (start_dt.weekday() + 1) % 7
     aligned_start_dt = start_dt - timedelta(days=start_sunday_offset)
 
-    # 90-day forward window from start date aligned to the end of the final week (Saturday)
+    # Forward window from aligned start date aligned to the end of the final week (Saturday)
     raw_end_dt = aligned_start_dt + timedelta(days=days)
     end_sunday_offset = (raw_end_dt.weekday() + 1) % 7
     final_end_dt = raw_end_dt + timedelta(days=(6 - end_sunday_offset))
@@ -128,12 +128,37 @@ def get_heatmap_data(
             f"Workout: {r['workout_type'].capitalize()} - {r['details']} (Intensity {r['intensity']}/10)"
         )
 
-    # Pre-fetch kill list items
+    # 4. Fetch kill list items
     cursor.execute("SELECT date, title, category, completed FROM kill_list_items")
     daily_kill_items: Dict[str, List[Dict[str, Any]]] = {}
     for kr in cursor.fetchall():
         kd = kr["date"]
         daily_kill_items.setdefault(kd, []).append(dict(kr))
+
+    # 5. Fetch upcoming school exams and homework across the range for future indicator dots
+    try:
+        cursor.execute(
+            "SELECT id, subject, title, exam_date, scope FROM school_exams WHERE exam_date >= ? AND exam_date <= ? AND completed = 0",
+            (aligned_start_str, final_end_date_str),
+        )
+        exam_rows = cursor.fetchall()
+    except Exception:
+        exam_rows = []
+    future_exams_map: Dict[str, List[Dict[str, Any]]] = {}
+    for er in exam_rows:
+        future_exams_map.setdefault(er["exam_date"], []).append(dict(er))
+
+    try:
+        cursor.execute(
+            "SELECT id, subject, title, due_date, priority FROM homework_items WHERE due_date >= ? AND due_date <= ? AND completed = 0",
+            (aligned_start_str, final_end_date_str),
+        )
+        hw_rows = cursor.fetchall()
+    except Exception:
+        hw_rows = []
+    future_hw_map: Dict[str, List[Dict[str, Any]]] = {}
+    for hr in hw_rows:
+        future_hw_map.setdefault(hr["due_date"], []).append(dict(hr))
 
     # Build weekly columns
     weeks_list = []
@@ -213,7 +238,7 @@ def get_heatmap_data(
             if dl.get("has_reflection", False):
                 activities.append("[DONE] Evening reflection audit completed")
 
-            # Total boxes and checked boxes (Excludes Git Commits)
+            # Total boxes and checked boxes
             total_boxes = total_routine_blocks + total_gym_exercises + total_tasks
             checked_boxes = checked_routine_blocks + checked_gym_exercises + checked_tasks
 
@@ -223,51 +248,60 @@ def get_heatmap_data(
             if current_iter_dt <= today_dt:
                 total_contributions += checked_boxes
 
-            # Map to Purple Brightness Levels:
-            # - Level 0: 0 checked
-            # - Level 4: 100% (or >= 85%) of boxes checked for the day -> Brightest Purple!
-            # - Level 3: >= 70% completed
-            # - Level 2: >= 35% completed
-            # - Level 1: > 0 checked
-            if total_boxes == 0:
-                if checked_boxes == 0:
-                    level = 0
-                elif checked_boxes <= 2:
-                    level = 1
-                elif checked_boxes <= 4:
-                    level = 2
-                elif checked_boxes <= 6:
-                    level = 3
-                else:
-                    level = 4
-            else:
-                if checked_boxes == 0:
-                    level = 0
-                elif checked_boxes >= total_boxes:
-                    level = 4  # Brightest Purple on 100% completion!
-                else:
-                    ratio = checked_boxes / total_boxes
-                    if ratio >= 0.85:
-                        level = 4  # Brightest Purple for 85%+ completion
-                    elif ratio >= 0.70:
-                        level = 3
-                    elif ratio >= 0.35:
-                        level = 2
-                    else:
-                        level = 1
-
             is_future = (current_iter_dt > today_dt)
             is_today = (cur_str == today_str)
+
+            day_exams = future_exams_map.get(cur_str, [])
+            has_exam = len(day_exams) > 0
+            day_hw = future_hw_map.get(cur_str, [])
+            has_homework = len(day_hw) > 0
+
+            # Map to Monochrome Inverted Levels:
+            # - Level 4: 100% completed (all boxes checked, 0 unchecked) -> Super Dark Pitch Black (#000000)
+            # - Level 3: 1 unchecked box (or >= 75% completed) -> Dark Charcoal (#333333)
+            # - Level 2: 2-3 unchecked boxes (or >= 40% completed) -> Mid Gray (#777777)
+            # - Level 1: > 0 checked boxes -> Light Gray (#bbbbbb)
+            # - Level 0: 0 checked boxes / empty -> Brightest / Ivory (#f0f0f0)
+            if is_future:
+                level = 0
+                if has_exam:
+                    for ex in day_exams:
+                        activities.append(f"[UPCOMING TEST] {ex['subject']}: {ex['title']}")
+                if has_homework:
+                    for hw in day_hw:
+                        activities.append(f"[HOMEWORK DUE] {hw['subject']}: {hw['title']}")
+            else:
+                unchecked_boxes = max(0, total_boxes - checked_boxes)
+                if total_boxes == 0:
+                    level = 4 if checked_boxes > 0 else 0
+                else:
+                    if checked_boxes == 0:
+                        level = 0
+                    elif unchecked_boxes == 0 or checked_boxes >= total_boxes:
+                        level = 4  # Super dark black for 100% completion!
+                    elif unchecked_boxes == 1 or (checked_boxes / total_boxes >= 0.75):
+                        level = 3  # Dark charcoal
+                    elif unchecked_boxes <= 3 or (checked_boxes / total_boxes >= 0.40):
+                        level = 2  # Mid gray
+                    else:
+                        level = 1  # Light gray
 
             week_days.append({
                 "date": cur_str,
                 "count": checked_boxes,
                 "total_boxes": total_boxes,
+                "unchecked_count": max(0, total_boxes - checked_boxes) if not is_future else 0,
                 "level": level,
                 "day_name": current_iter_dt.strftime("%A"),
                 "display_date": current_iter_dt.strftime("%b %d, %Y"),
                 "is_today": is_today,
                 "is_future": is_future,
+                "has_exam": has_exam,
+                "exam_count": len(day_exams),
+                "exams": day_exams,
+                "has_homework": has_homework,
+                "homework_count": len(day_hw),
+                "homework": day_hw,
                 "activities": activities,
             })
 
@@ -502,9 +536,26 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None, client_date
     upcoming_homework = homework_service.get_upcoming_homework(conn=conn, limit=5)
     upcoming_exams = homework_service.get_upcoming_exams(conn=conn, limit=5)
 
+    from engine import workload_governor
+    workload_analysis = workload_governor.get_workload_analysis(target_date_str=today_str, conn=conn)
+    nearest_exam = upcoming_exams[0] if upcoming_exams else None
+    school_obligations_count = len(upcoming_exams) + len(upcoming_homework)
+
     summary = {
         "heatmap": heatmap,
         "upcoming": upcoming,
+        "academic_balance": {
+            "mode": workload_analysis.get("mode", "CRUISE"),
+            "mode_label": workload_analysis.get("mode_label", "Cruise Mode"),
+            "badge_class": workload_analysis.get("badge_class", "optimal"),
+            "workload_score": workload_analysis.get("workload_score", 0.0),
+            "nearest_exam": nearest_exam,
+            "school_obligations_count": school_obligations_count,
+            "urgent_homework_count": workload_analysis.get("urgent_homework_count", 0),
+            "total_exams_count": workload_analysis.get("total_exams", 0),
+            "week_exams_count": workload_analysis.get("week_exams_count", 0),
+            "description": workload_analysis.get("description", ""),
+        },
         "today_velocity": {
             "total_boxes": total_today_boxes,
             "checked_boxes": checked_today_boxes,

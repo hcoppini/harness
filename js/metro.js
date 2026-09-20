@@ -392,7 +392,38 @@ const MetroMap = {
       }
     });
 
-    // SVG Base Lines (Main Spine, Grid, Tee Pins, Jagged Streams, Circles & Dots)
+    // School Test Micro-Dots on Main Spine Line
+    let svgSchoolTestDotsHtml = "";
+    if (this.upcomingExams && this.upcomingExams.length > 0) {
+      const nowMs = now.getTime();
+      this.upcomingExams.forEach((exam) => {
+        try {
+          const exDate = new Date(exam.exam_date + "T12:00:00");
+          if (exDate >= startDate && exDate <= endDate) {
+            const elapsed = exDate.getTime() - startDate.getTime();
+            const totalMs = endDate.getTime() - startDate.getTime();
+            const ratio = elapsed / totalMs;
+            const testX = startX + ratio * totalTrackLength;
+            const diffDays = Math.ceil((exDate.getTime() - nowMs) / (1000 * 60 * 60 * 24));
+            const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "TOMORROW" : diffDays > 0 ? `in ${diffDays}d` : `${Math.abs(diffDays)}d ago`;
+
+            svgSchoolTestDotsHtml += `
+              <g class="metro-test-dot" data-id="${exam.id}" data-subject="${this.escapeHtml(exam.subject)}" data-title="${this.escapeHtml(exam.title)}" data-date="${exam.exam_date}" data-due="${dueLabel}" data-scope="${this.escapeHtml(exam.scope || '')}" style="cursor: pointer; pointer-events: all;">
+                <circle cx="${testX}" cy="${spineY}" r="6.5" fill="var(--bg-canvas)" stroke="var(--text-primary)" stroke-width="1.5" opacity="0.9">
+                  <animate attributeName="r" values="5;8.5;5" dur="2.5s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values="0.9;0.25;0.9" dur="2.5s" repeatCount="indefinite"/>
+                </circle>
+                <circle cx="${testX}" cy="${spineY}" r="3.2" fill="var(--text-primary)" stroke="var(--bg-canvas)" stroke-width="1" />
+              </g>
+            `;
+          }
+        } catch (err) {
+          console.warn("[Metro] Error plotting test dot:", err);
+        }
+      });
+    }
+
+    // SVG Base Lines (Main Spine, Grid, Tee Pins, Jagged Streams, Circles, Test Dots)
     let svgHtml = `
       <svg width="${totalWidth}" height="520" style="position: absolute; top: 0; left: 0; pointer-events: none;">
         <!-- Phase Vertical Grid Lines -->
@@ -414,27 +445,30 @@ const MetroMap = {
 
         <!-- Singular Central Main Spine Line -->
         <line x1="${startX - 20}" y1="${spineY}" x2="${startX + totalTrackLength + 30}" y2="${spineY}" 
-              stroke="#27272a" stroke-width="5" stroke-linecap="round" />
+              stroke="var(--border-medium)" stroke-width="4" stroke-linecap="round" />
 
         <!-- Main Spine Reached / Completed Fill -->
         ${
           currentX > startX
-            ? `<line x1="${startX - 20}" y1="${spineY}" x2="${currentX}" y2="${spineY}" stroke="var(--accent-lavender)" stroke-width="4" stroke-linecap="round" />`
+            ? `<line x1="${startX - 20}" y1="${spineY}" x2="${currentX}" y2="${spineY}" stroke="var(--text-primary)" stroke-width="4" stroke-linecap="round" />`
             : ""
         }
 
         <!-- Station Circles on Main Spine -->
         ${svgStationCirclesHtml}
 
+        <!-- School Test Micro-Dots on Main Spine -->
+        ${svgSchoolTestDotsHtml}
+
         <!-- Symmetrical Branch Dots below Stations -->
         ${svgBranchDotsHtml}
 
         <!-- Real-Time Day Beacon on Spine -->
-        <circle cx="${currentX}" cy="${spineY}" r="7" fill="none" stroke="var(--accent-lavender)" stroke-width="1.5" opacity="0.8">
+        <circle cx="${currentX}" cy="${spineY}" r="7" fill="none" stroke="var(--text-primary)" stroke-width="1.5" opacity="0.8">
           <animate attributeName="r" values="7;13;7" dur="2s" repeatCount="indefinite"/>
           <animate attributeName="opacity" values="0.8;0.15;0.8" dur="2s" repeatCount="indefinite"/>
         </circle>
-        <circle cx="${currentX}" cy="${spineY}" r="4" fill="#ffffff" stroke="var(--accent-lavender)" stroke-width="2" />
+        <circle cx="${currentX}" cy="${spineY}" r="4" fill="var(--bg-canvas)" stroke="var(--text-primary)" stroke-width="2" />
       </svg>
     `;
 
@@ -518,35 +552,80 @@ const MetroMap = {
       </div>
     `;
 
-    // Upcoming Exams Milestone Pins along the timeline (HTML Layer)
-    let examPinsHtml = "";
-    if (this.upcomingExams && this.upcomingExams.length > 0) {
-      const nowMs = new Date().getTime();
-      examPinsHtml = this.upcomingExams
-        .map((ex, i) => {
-          const exDate = new Date(ex.exam_date);
-          const diffDays = Math.ceil((exDate.getTime() - nowMs) / (1000 * 60 * 60 * 24));
-          const pinOffset = (i * 95) - ((this.upcomingExams.length - 1) * 45);
-          const pinX = Math.max(startX, Math.min(startX + totalTrackLength, currentX + pinOffset));
-          const pinY = spineY - 78;
-          const label = `${ex.subject.slice(0, 4)}: ${ex.exam_date.slice(5)}`;
-          const dueTag = diffDays <= 1 ? "SOON" : `${diffDays}d`;
+    canvasWrap.innerHTML = phaseHeadersHtml + svgHtml + cardsHtml + beaconTooltipHtml;
+    this.attachTestDotEvents();
+  },
 
-          return `
-            <div style="position: absolute; left: ${pinX}px; top: ${pinY}px; transform: translateX(-50%); z-index: 40; pointer-events: auto;">
-              <div style="background: var(--bg-surface-elevated); border: 1px solid rgba(255, 255, 255, 0.2); border-radius: var(--radius-xs); padding: 3px 8px; font-size: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.8); display: flex; align-items: center; gap: 6px; white-space: nowrap;" title="${this.escapeHtml(ex.title)} - ${this.escapeHtml(ex.scope || '')}">
-                <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--text-primary); background: rgba(255, 255, 255, 0.1); padding: 1px 4px; border-radius: 2px;">[EXAM]</span>
-                <span style="font-weight: 600; color: var(--text-primary); font-family: var(--font-mono);">${this.escapeHtml(label)}</span>
-                <span class="key-pill" style="font-size: 8px; padding: 1px 4px;">${dueTag}</span>
-              </div>
-              <div style="width: 1px; height: 16px; border-left: 1px dashed rgba(255, 255, 255, 0.35); margin: 0 auto;"></div>
-            </div>
-          `;
-        })
-        .join("");
+  attachTestDotEvents() {
+    let tooltip = document.getElementById("metroTestTooltip");
+    if (!tooltip) {
+      tooltip = document.createElement("div");
+      tooltip.id = "metroTestTooltip";
+      tooltip.className = "metro-test-tooltip";
+      tooltip.style.display = "none";
+      document.body.appendChild(tooltip);
     }
 
-    canvasWrap.innerHTML = phaseHeadersHtml + svgHtml + cardsHtml + beaconTooltipHtml + examPinsHtml;
+    document.querySelectorAll(".metro-test-dot").forEach((dot) => {
+      dot.addEventListener("mouseenter", (e) => {
+        const subj = dot.getAttribute("data-subject");
+        const title = dot.getAttribute("data-title");
+        const dateStr = dot.getAttribute("data-date");
+        const due = dot.getAttribute("data-due");
+        const scope = dot.getAttribute("data-scope");
+
+        let content = `
+          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+            <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-primary);">[${subj}]</span>
+            <span style="font-size: 12px; font-weight: 700; color: var(--text-primary);">${title}</span>
+            <span class="key-pill" style="font-size: 9px; padding: 1px 5px;">${due}</span>
+          </div>
+          <div style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary);">${dateStr}</div>
+        `;
+        if (scope) {
+          content += `<div style="font-size: 10px; color: var(--text-secondary); margin-top: 3px; max-width: 260px;">${scope}</div>`;
+        }
+        content += `<div style="font-size: 9px; color: var(--text-muted); margin-top: 4px; font-style: italic;">Click to open in Study ledger</div>`;
+
+        tooltip.innerHTML = content;
+        tooltip.style.display = "block";
+        this.positionTestTooltip(e, tooltip);
+      });
+
+      dot.addEventListener("mousemove", (e) => {
+        this.positionTestTooltip(e, tooltip);
+      });
+
+      dot.addEventListener("mouseleave", () => {
+        tooltip.style.display = "none";
+      });
+
+      dot.addEventListener("click", () => {
+        const id = dot.getAttribute("data-id");
+        this.handleTestDotClick(id);
+      });
+    });
+  },
+
+  positionTestTooltip(e, tooltip) {
+    const x = e.clientX + 12;
+    const y = e.clientY - 12;
+    tooltip.style.left = `${x}px`;
+    tooltip.style.top = `${y}px`;
+  },
+
+  handleTestDotClick(examId) {
+    if (window.HarnessApp) {
+      window.HarnessApp.switchView("study");
+      setTimeout(() => {
+        const el = document.querySelector(`[data-exam-id="${examId}"]`) || document.getElementById("studyExamsList");
+        if (el) {
+          el.scrollIntoView({ behavior: "smooth", block: "center" });
+          el.style.outline = "2px solid var(--text-primary)";
+          setTimeout(() => { el.style.outline = ""; }, 2500);
+        }
+      }, 150);
+    }
   },
 
   selectStation(stationId) {
