@@ -46,7 +46,7 @@ def main():
             width=1220,
             height=850,
             min_size=(920, 620),
-            background_color="#0a0c10",
+            background_color="#FFFFFF",
         )
 
         # Launch event loop
