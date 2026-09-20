@@ -1,5 +1,5 @@
-// Harness Executive OS - Universal Unified Service Worker (v4.5)
-const CACHE_NAME = 'harness-unified-v4.5';
+// Harness Executive OS - Universal Unified Service Worker (v5.0 Monochrome)
+const CACHE_NAME = 'harness-monochrome-v5.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -8,19 +8,20 @@ const STATIC_ASSETS = [
   '/apple-touch-icon.png',
   '/icon-192.png',
   '/icon-512.png',
-  '/css/app.css?v=4.5',
-  '/js/api_bridge.js?v=4.5',
-  '/js/metro.js?v=4.5',
-  '/js/dashboard.js?v=4.5',
-  '/js/today.js?v=4.5',
-  '/js/tum.js?v=4.5',
-  '/js/projects.js?v=4.5',
-  '/js/body.js?v=4.5',
-  '/js/knowledge.js?v=4.5',
-  '/js/focus_timer.js?v=4.5',
-  '/js/command_palette.js?v=4.5',
-  '/js/kill_list.js?v=4.5',
-  '/js/app.js?v=4.5'
+  '/css/app.css?v=5.0',
+  '/js/api_bridge.js?v=5.0',
+  '/js/metro.js?v=5.0',
+  '/js/dashboard.js?v=5.0',
+  '/js/study.js?v=5.0',
+  '/js/today.js?v=5.0',
+  '/js/tum.js?v=5.0',
+  '/js/projects.js?v=5.0',
+  '/js/body.js?v=5.0',
+  '/js/knowledge.js?v=5.0',
+  '/js/focus_timer.js?v=5.0',
+  '/js/command_palette.js?v=5.0',
+  '/js/kill_list.js?v=5.0',
+  '/js/app.js?v=5.0'
 ];
 
 self.addEventListener('install', (event) => {
@@ -48,6 +49,12 @@ self.addEventListener('activate', (event) => {
     })
   );
   self.clients.claim();
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {

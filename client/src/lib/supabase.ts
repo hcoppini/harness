@@ -2,8 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createClient } from '@supabase/supabase-js';
 
 // Default Supabase config (Can be set via env or dynamically in Settings)
-export const DEFAULT_SUPABASE_URL = process.env.EXPO_PUBLIC_SUPABASE_URL || '';
-export const DEFAULT_SUPABASE_ANON_KEY = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
+export const DEFAULT_SUPABASE_URL = (process.env as any).EXPO_PUBLIC_SUPABASE_URL || '';
+export const DEFAULT_SUPABASE_ANON_KEY = (process.env as any).EXPO_PUBLIC_SUPABASE_ANON_KEY || '';
 
 export let supabase: any = null;
 

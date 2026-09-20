@@ -1927,7 +1927,8 @@ body {
     height: auto !important;
     min-height: 48px;
     padding: max(8px, env(safe-area-inset-top, 0px)) 14px 8px 14px !important;
-    background: rgba(5, 5, 5, 0.95);
+    background: rgba(255, 255, 255, 0.95) !important;
+    border-bottom: 1px solid var(--border-hairline) !important;
     backdrop-filter: blur(20px);
     -webkit-backdrop-filter: blur(20px);
     position: sticky;
@@ -1982,6 +1983,7 @@ body {
   }
 
   /* Single-Column Stack for Cockpit, Today, Projects, Body */
+  .executive-kpi-grid,
   .executive-cockpit-grid {
     grid-template-columns: 1fr !important;
     gap: 10px !important;

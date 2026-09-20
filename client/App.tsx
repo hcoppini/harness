@@ -20,7 +20,6 @@ import {
   getLocalMetro,
   saveLocalMetro,
   DEFAULT_SCHEDULE,
-  DEFAULT_GYM_PROTOCOL,
   TaskItem,
   DailyLog,
   MetroStation,
@@ -28,10 +27,19 @@ import {
 import { supabase } from './src/lib/supabase';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const IS_DESKTOP = Platform.OS === 'web' && SCREEN_WIDTH > 768;
+
+interface SchoolObligation {
+  id: string;
+  type: 'exam' | 'homework';
+  subject: string;
+  topic: string;
+  date: string;
+  daysLeft: number;
+}
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'cockpit' | 'today' | 'metro' | 'body'>('cockpit');
+  // Navigation: 0 Cockpit, 1 Daily, 2 Study, 3 TUM '28
+  const [activeTab, setActiveTab] = useState<'cockpit' | 'daily' | 'study' | 'tum'>('cockpit');
   const [todayStr] = useState<string>(() => new Date().toISOString().split('T')[0]);
 
   // Data State
@@ -45,12 +53,16 @@ export default function App() {
     completed_exercises: '',
   });
   const [metroStations, setMetroStations] = useState<MetroStation[]>([]);
-  const [weightInput, setWeightInput] = useState('');
-  const [calSurplus, setCalSurplus] = useState(true);
-  const [proteinMet, setProteinMet] = useState(true);
-  const [syncStatus, setSyncStatus] = useState<'CONNECTED' | 'OFFLINE READY'>('OFFLINE READY');
+  const [syncStatus, setSyncStatus] = useState<'LIVE' | 'OFFLINE'>('OFFLINE');
   const [toastMsg, setToastMsg] = useState<string | null>(null);
-  const [selectedDayInfo, setSelectedDayInfo] = useState<string | null>(null);
+  const [selectedHeatmapDay, setSelectedHeatmapDay] = useState<string | null>(null);
+
+  // School Obligations (Vulcan / Local)
+  const [obligations] = useState<SchoolObligation[]>([
+    { id: 'ex-1', type: 'exam', subject: 'Matematyka R', topic: 'Rachunek różniczkowy i pochodne', date: '2026-09-24', daysLeft: 4 },
+    { id: 'ex-2', type: 'exam', subject: 'Informatyka', topic: 'Struktury danych & algorytmy grafowe', date: '2026-10-02', daysLeft: 12 },
+    { id: 'hw-1', type: 'homework', subject: 'Język Niemiecki', topic: 'Esej przygotowawczy B2 (Umwelt)', date: '2026-09-22', daysLeft: 2 },
+  ]);
 
   useEffect(() => {
     loadInitialData();
@@ -58,7 +70,7 @@ export default function App() {
 
   const showToast = (msg: string) => {
     setToastMsg(msg);
-    setTimeout(() => setToastMsg(null), 2000);
+    setTimeout(() => setToastMsg(null), 2200);
   };
 
   const triggerHaptic = (type: 'light' | 'medium' | 'success' = 'light') => {
@@ -79,7 +91,7 @@ export default function App() {
     setMetroStations(localMetro);
 
     if (supabase) {
-      setSyncStatus('CONNECTED');
+      setSyncStatus('LIVE');
       try {
         const { data: remoteTasks } = await supabase.from('tasks').select('*').order('id', { ascending: false });
         if (remoteTasks && remoteTasks.length > 0) {
@@ -105,7 +117,7 @@ export default function App() {
   };
 
   // --------------------------------------------------------------------------
-  // Routine & Tasks
+  // Routine & Tasks Handlers
   // --------------------------------------------------------------------------
   const toggleBlock = async (idx: number) => {
     triggerHaptic('medium');
@@ -130,31 +142,6 @@ export default function App() {
       await supabase.from('daily_logs').upsert(updatedLog);
     }
     showToast('Block updated');
-  };
-
-  const toggleExercise = async (idx: number) => {
-    triggerHaptic('medium');
-    const current = new Set(
-      dailyLog.completed_exercises.split(',').map((s) => s.trim()).filter(Boolean)
-    );
-    const key = String(idx);
-    if (current.has(key)) {
-      current.delete(key);
-    } else {
-      current.add(key);
-    }
-
-    const updatedLog: DailyLog = {
-      ...dailyLog,
-      completed_exercises: Array.from(current).join(','),
-    };
-    setDailyLog(updatedLog);
-    await saveLocalDailyLog(updatedLog);
-
-    if (supabase) {
-      await supabase.from('daily_logs').upsert(updatedLog);
-    }
-    showToast('Exercise logged');
   };
 
   const handleAddTask = async () => {
@@ -267,26 +254,148 @@ export default function App() {
   const completedCount = completedBlocksSet.size;
   const velocityPct = totalBlocks > 0 ? Math.round((completedCount / totalBlocks) * 100) : 0;
 
+  // Upcoming School Exams Count
+  const upcomingExams = obligations.filter((o) => o.type === 'exam');
+  const upcomingHW = obligations.filter((o) => o.type === 'homework');
+  const nearestExam = upcomingExams.length > 0 ? upcomingExams[0] : null;
+
+  // --------------------------------------------------------------------------
+  // Forward Inverted Heatmap Generator (Sep 1 Onwards)
+  // Logic: 100% completed day = Pitch Black (#000000).
+  // Incomplete / future days = Brighter (#525252, #a3a3a3, #d4d4d4, #f5f5f5)
+  // --------------------------------------------------------------------------
+  const renderForwardInvertedHeatmap = () => {
+    // Generate 16 forward weeks starting from Sep 1, 2026
+    const startDate = new Date(2026, 8, 1); // 2026-09-01
+    const weeksCount = 16;
+    const weeks: { date: Date; dateStr: string; level: number; label: string }[][] = [];
+
+    let curDate = new Date(startDate);
+    // Align to Monday of that week
+    const dayOfWeek = (curDate.getDay() + 6) % 7;
+    curDate.setDate(curDate.getDate() - dayOfWeek);
+
+    for (let w = 0; w < weeksCount; w++) {
+      const weekDays = [];
+      for (let d = 0; d < 7; d++) {
+        const dStr = curDate.toISOString().split('T')[0];
+        const isSepPast = curDate < new Date();
+        const isToday = dStr === todayStr;
+
+        // Inverted density calculation:
+        // Level 4 (darkest black #000000): 100% done
+        // Level 3 (#404040): 75% done
+        // Level 2 (#737373): 50% done
+        // Level 1 (#d4d4d4): 25% done
+        // Level 0 (#f5f5f5): upcoming or unchecked
+        let level = 0;
+        let desc = 'Upcoming horizon day';
+
+        if (isToday) {
+          if (velocityPct >= 90) level = 4;
+          else if (velocityPct >= 60) level = 3;
+          else if (velocityPct >= 30) level = 2;
+          else if (velocityPct > 0) level = 1;
+          else level = 0;
+          desc = `Today (${dStr}): ${velocityPct}% velocity (${completedCount}/${totalBlocks} blocks done)`;
+        } else if (isSepPast) {
+          // Simulated past Sep days
+          const pseudo = (curDate.getDate() * 7 + w * 3) % 5;
+          level = pseudo;
+          desc = `${dStr}: ${level === 4 ? '100% done (Full execution)' : `${level * 25}% completed`}`;
+        }
+
+        weekDays.push({
+          date: new Date(curDate),
+          dateStr: dStr,
+          level,
+          label: desc,
+        });
+
+        curDate.setDate(curDate.getDate() + 1);
+      }
+      weeks.push(weekDays);
+    }
+
+    // Inverted colors: Super dark black for completed, brighter for unchecked
+    const invertedShades = ['#f5f5f5', '#d4d4d4', '#737373', '#404040', '#000000'];
+
+    return (
+      <View style={styles.card}>
+        <View style={styles.cardHeaderRow}>
+          <View>
+            <Text style={styles.cardSectionTitle}>Execution Horizon Pulse</Text>
+            <Text style={styles.cardSectionSubtitle}>Forward inverted heatmap from Sep 1 onwards</Text>
+          </View>
+          <View style={styles.heatmapLegend}>
+            <Text style={styles.legendText}>Incomplete</Text>
+            <View style={[styles.legendBox, { backgroundColor: '#f5f5f5' }]} />
+            <View style={[styles.legendBox, { backgroundColor: '#d4d4d4' }]} />
+            <View style={[styles.legendBox, { backgroundColor: '#737373' }]} />
+            <View style={[styles.legendBox, { backgroundColor: '#404040' }]} />
+            <View style={[styles.legendBox, { backgroundColor: '#000000' }]} />
+            <Text style={styles.legendText}>Done</Text>
+          </View>
+        </View>
+
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 14 }}>
+          <View style={{ flexDirection: 'row', gap: 4, paddingBottom: 6 }}>
+            {weeks.map((week, wIdx) => (
+              <View key={wIdx} style={{ flexDirection: 'column', gap: 4 }}>
+                {week.map((day, dIdx) => (
+                  <TouchableOpacity
+                    key={dIdx}
+                    style={[
+                      styles.heatCell,
+                      { backgroundColor: invertedShades[day.level] },
+                      day.level === 4 && styles.heatCellDone,
+                      day.dateStr === todayStr && styles.heatCellToday,
+                    ]}
+                    onPress={() => {
+                      triggerHaptic('light');
+                      setSelectedHeatmapDay(day.label);
+                    }}
+                    activeOpacity={0.7}
+                  />
+                ))}
+              </View>
+            ))}
+          </View>
+        </ScrollView>
+
+        {selectedHeatmapDay && (
+          <View style={styles.dayInfoPill}>
+            <Text style={styles.dayInfoText}>{selectedHeatmapDay}</Text>
+          </View>
+        )}
+      </View>
+    );
+  };
+
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="light-content" backgroundColor="#08090c" />
+      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
 
-      {/* Centered Device Wrapper for Desktop / Tablet */}
+      {/* Main Container */}
       <View style={styles.viewportContainer}>
 
         {/* ==================================================================
-             TOP LUXURY HEADER
+             TOP MINIMALIST MONOCHROME HEADER
              ================================================================== */}
         <View style={styles.header}>
           <View style={styles.brandRow}>
-            {/* 2-Shard Lavender Ice Pick Icon */}
-            <View style={styles.icePickIconBox}>
-              <View style={styles.shardBlade} />
-              <View style={styles.shardHandle} />
+            {/* Minimalist Monochrome Mark */}
+            <View style={styles.brandMark}>
+              <View style={styles.brandMarkInner} />
             </View>
             <View>
               <Text style={styles.brandTitle}>HARNESS</Text>
-              <Text style={styles.brandSubtitle}>EXECUTIVE OS</Text>
+              <Text style={styles.brandSubtitle}>
+                {activeTab === 'cockpit' && '0 COCKPIT'}
+                {activeTab === 'daily' && '1 DAILY'}
+                {activeTab === 'study' && '2 STUDY'}
+                {activeTab === 'tum' && "3 TUM '28"}
+              </Text>
             </View>
           </View>
 
@@ -314,272 +423,231 @@ export default function App() {
         >
 
           {/* ================================================================
-               LAYER 0: COCKPIT / DASHBOARD
+               LAYER 0: COCKPIT / LANDING PAGE
                ================================================================ */}
           {activeTab === 'cockpit' && (
             <View>
-              {/* Top 2x2 Executive Trajectory Grid */}
+              {/* 3 Executive KPI Cards */}
               <View style={styles.cockpitGrid}>
                 {/* Gauge 1: Today's Execution Velocity */}
                 <TouchableOpacity
                   style={styles.gaugeCard}
-                  onPress={() => setActiveTab('today')}
+                  onPress={() => setActiveTab('daily')}
                   activeOpacity={0.8}
                 >
                   <View style={styles.gaugeHeader}>
                     <Text style={styles.gaugeLabel}>TODAY'S VELOCITY</Text>
-                    <View style={styles.pillLavender}>
-                      <Text style={styles.pillLavenderText}>SCHEDULE A</Text>
+                    <View style={styles.pillBlack}>
+                      <Text style={styles.pillBlackText}>SCHEDULE A</Text>
                     </View>
                   </View>
                   <Text style={styles.gaugeValueBig}>{velocityPct}%</Text>
                   <View style={styles.progressTrack}>
                     <View style={[styles.progressFill, { width: `${velocityPct}%` }]} />
                   </View>
-                  <Text style={styles.gaugeSubtext}>{completedCount}/{totalBlocks} blocks done</Text>
+                  <Text style={styles.gaugeSubtext}>{completedCount}/{totalBlocks} blocks completed</Text>
                 </TouchableOpacity>
 
-                {/* Gauge 2: TUM Heilbronn Readiness */}
+                {/* Gauge 2: Academic Balance Status */}
                 <TouchableOpacity
                   style={styles.gaugeCard}
-                  onPress={() => setActiveTab('metro')}
+                  onPress={() => setActiveTab('study')}
                   activeOpacity={0.8}
                 >
                   <View style={styles.gaugeHeader}>
-                    <Text style={styles.gaugeLabel}>TUM ADMISSIONS</Text>
-                    <View style={styles.pillGold}>
-                      <Text style={styles.pillGoldText}>GERMAN A2</Text>
+                    <Text style={styles.gaugeLabel}>ACADEMIC BALANCE</Text>
+                    <View style={styles.pillOutline}>
+                      <Text style={styles.pillOutlineText}>CRUISE</Text>
+                    </View>
+                  </View>
+                  <View style={{ marginTop: 6 }}>
+                    <Text style={styles.gaugeValueMedium}>
+                      {nearestExam ? `${nearestExam.daysLeft}d: ${nearestExam.subject}` : 'Clean Horizon'}
+                    </Text>
+                    <Text style={styles.gaugeSubtext}>
+                      {upcomingExams.length} Tests • {upcomingHW.length} Homework
+                    </Text>
+                  </View>
+                  <Text style={[styles.gaugeSubtext, { marginTop: 10 }]} numberOfLines={1}>
+                    Academic pressure calibrated. SGH blocks active.
+                  </Text>
+                </TouchableOpacity>
+
+                {/* Gauge 3: TUM '28 Admissions Readiness */}
+                <TouchableOpacity
+                  style={styles.gaugeCard}
+                  onPress={() => setActiveTab('tum')}
+                  activeOpacity={0.8}
+                >
+                  <View style={styles.gaugeHeader}>
+                    <Text style={styles.gaugeLabel}>TUM '28 READINESS</Text>
+                    <View style={styles.pillBlack}>
+                      <Text style={styles.pillBlackText}>GERMAN C1</Text>
                     </View>
                   </View>
                   <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginTop: 4 }}>
                     <Text style={styles.gaugeValueMedium}>GPA 4.85</Text>
                     <Text style={styles.gaugeValueMedium}>92% MOCK</Text>
                   </View>
-                  <Text style={[styles.gaugeSubtext, { marginTop: 12 }]} numberOfLines={1}>
-                    Active: Pure Syntax Launch
+                  <Text style={[styles.gaugeSubtext, { marginTop: 10 }]}>
+                    Direct Admission Track (&gt;70 pts)
                   </Text>
                 </TouchableOpacity>
-
-                {/* Gauge 3: Body / Hypertrophy */}
-                <TouchableOpacity
-                  style={styles.gaugeCard}
-                  onPress={() => setActiveTab('body')}
-                  activeOpacity={0.8}
-                >
-                  <View style={styles.gaugeHeader}>
-                    <Text style={styles.gaugeLabel}>PHYSIQUE &amp; MASS</Text>
-                    <Text style={styles.monoSubLabel}>80.0 kg Goal</Text>
-                  </View>
-                  <Text style={styles.gaugeValueBig}>68.5 <Text style={{ fontSize: 13, color: '#9aa0a6' }}>kg</Text></Text>
-                  <Text style={styles.gaugeSubtext}>Gym 4/4 • Boxing 3/3</Text>
-                </TouchableOpacity>
-
-                {/* Gauge 4: Active Sprint */}
-                <View style={styles.gaugeCard}>
-                  <View style={styles.gaugeHeader}>
-                    <Text style={styles.gaugeLabel}>ACTIVE SPRINT</Text>
-                    <View style={styles.pillLavender}>
-                      <Text style={styles.pillLavenderText}>SIGG 24</Text>
-                    </View>
-                  </View>
-                  <Text style={styles.gaugeValueMedium} numberOfLines={1}>GPW Scanner</Text>
-                  <Text style={[styles.gaugeSubtext, { marginTop: 8 }]} numberOfLines={2}>
-                    Next: Backtest intraday momentum spikes
-                  </Text>
-                </View>
               </View>
 
-              {/* GitHub-Style Execution Heatmap Card */}
+              {/* Forward Inverted Heatmap */}
+              {renderForwardInvertedHeatmap()}
+
+              {/* SGH / Matura Kill List Quick Horizon */}
               <View style={styles.card}>
                 <View style={styles.cardHeaderRow}>
                   <View>
-                    <Text style={styles.cardSectionTitle}>Daily Execution Pulse</Text>
-                    <Text style={styles.cardSectionSubtitle}>Historical habit density: routines, gym, and tasks</Text>
+                    <Text style={styles.cardSectionTitle}>Active Priority Horizon</Text>
+                    <Text style={styles.cardSectionSubtitle}>Daily high-conviction deliverables</Text>
                   </View>
-                  <View style={styles.heatmapLegend}>
-                    <Text style={styles.legendText}>Less</Text>
-                    <View style={[styles.legendBox, { backgroundColor: '#161b22' }]} />
-                    <View style={[styles.legendBox, { backgroundColor: '#0e4429' }]} />
-                    <View style={[styles.legendBox, { backgroundColor: '#006d32' }]} />
-                    <View style={[styles.legendBox, { backgroundColor: '#26a641' }]} />
-                    <View style={[styles.legendBox, { backgroundColor: '#39d353' }]} />
-                    <Text style={styles.legendText}>More</Text>
-                  </View>
+                  <TouchableOpacity onPress={() => setActiveTab('daily')}>
+                    <Text style={styles.cardActionLink}>Open Daily &rarr;</Text>
+                  </TouchableOpacity>
                 </View>
 
-                {/* Scrollable 52-Week Green Grid */}
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 12 }}>
-                  <View style={{ flexDirection: 'row', gap: 3 }}>
-                    {Array.from({ length: 28 }).map((_, wIdx) => (
-                      <View key={wIdx} style={{ flexDirection: 'column', gap: 3 }}>
-                        {Array.from({ length: 7 }).map((_, dIdx) => {
-                          const isRecent = wIdx >= 24;
-                          let level = 0;
-                          if (isRecent && (dIdx === 1 || dIdx === 3)) level = 4;
-                          else if (isRecent && dIdx === 5) level = 3;
-                          else if (isRecent && dIdx === 2) level = 2;
-                          else if (wIdx >= 20) level = 1;
-
-                          const greenColors = ['#161b22', '#0e4429', '#006d32', '#26a641', '#39d353'];
-                          return (
-                            <TouchableOpacity
-                              key={dIdx}
-                              style={[
-                                styles.heatCell,
-                                { backgroundColor: greenColors[level] },
-                                level === 4 && styles.heatCellGlow,
-                              ]}
-                              onPress={() => {
-                                triggerHaptic('light');
-                                setSelectedDayInfo(`Week ${wIdx + 1}, Day ${dIdx + 1}: ${level > 0 ? `${level * 2} blocks completed` : 'Rest day'}`);
-                              }}
-                              activeOpacity={0.7}
-                            />
-                          );
-                        })}
-                      </View>
-                    ))}
+                <View style={{ marginTop: 10, gap: 8 }}>
+                  <View style={styles.horizonItem}>
+                    <View style={styles.horizonBullet} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.horizonTitle}>Solve 3 CKE Math R Derivative Integrals</Text>
+                      <Text style={styles.horizonMeta}>Math R • Class 3 Syllabus</Text>
+                    </View>
                   </View>
-                </ScrollView>
-                {selectedDayInfo && (
-                  <Text style={styles.dayInfoPill}>{selectedDayInfo}</Text>
-                )}
-              </View>
-
-              {/* Tomorrow's Strategic Forecast Card */}
-              <View style={styles.card}>
-                <View style={styles.cardHeaderRow}>
-                  <Text style={styles.cardSectionTitle}>Upcoming Tomorrow</Text>
-                  <View style={styles.pillLavender}>
-                    <Text style={styles.pillLavenderText}>SCHEDULE A</Text>
+                  <View style={styles.horizonItem}>
+                    <View style={styles.horizonBullet} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.horizonTitle}>German C1 Mittelstufe Audio Drill (Goethe)</Text>
+                      <Text style={styles.horizonMeta}>German C1 • 45 min deep immersion</Text>
+                    </View>
                   </View>
-                </View>
-                <View style={styles.forecastBox}>
-                  <Text style={styles.forecastTitle}>Liceum + SGH Library TUM Deep Work</Text>
-                  <Text style={styles.forecastDetail}>
-                    • 14:45 - 17:30: Pure C++/Python Syntax fluency &amp; German B1 Anki
-                  </Text>
-                  <Text style={styles.forecastDetail}>
-                    • 18:00 - 19:30: Upper Hypertrophy Protocol • 140g+ Target Protein
-                  </Text>
+                  <View style={styles.horizonItem}>
+                    <View style={styles.horizonBullet} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.horizonTitle}>Pure Syntax: LeetCode Graph Traversal</Text>
+                      <Text style={styles.horizonMeta}>TUM Code • C++ Autonomous</Text>
+                    </View>
+                  </View>
                 </View>
               </View>
             </View>
           )}
 
           {/* ================================================================
-               LAYER 1: TODAY (Routine Blocks & Tasks)
+               LAYER 1: DAILY PLAN & VARYING STUDY BLOCKS
                ================================================================ */}
-          {activeTab === 'today' && (
+          {activeTab === 'daily' && (
             <View>
-              {/* Quick Task Creation Input */}
-              <View style={styles.quickTaskBox}>
-                <TextInput
-                  style={styles.quickTaskInput}
-                  placeholder="+ Add one-off task..."
-                  placeholderTextColor="#5f6368"
-                  value={newTaskTitle}
-                  onChangeText={setNewTaskTitle}
-                  onSubmitEditing={handleAddTask}
-                />
-                <View style={{ flexDirection: 'row', gap: 6, alignItems: 'center' }}>
-                  <TouchableOpacity
-                    style={[styles.catBadge, taskCategory === 'TUM' && styles.catBadgeActive]}
-                    onPress={() => setTaskCategory('TUM')}
-                  >
-                    <Text style={[styles.catBadgeText, taskCategory === 'TUM' && styles.catBadgeTextActive]}>TUM</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={styles.quickAddBtn}
-                    onPress={handleAddTask}
-                    activeOpacity={0.8}
-                  >
-                    <Text style={styles.quickAddBtnText}>Add</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Daily Schedule Routine Blocks */}
+              {/* Daily Schedule Blocks */}
               <View style={styles.card}>
                 <View style={styles.cardHeaderRow}>
                   <View>
                     <Text style={styles.cardSectionTitle}>{DEFAULT_SCHEDULE.name}</Text>
-                    <Text style={styles.cardSectionSubtitle}>Strict time boxes &amp; exit cutoffs</Text>
+                    <Text style={styles.cardSectionSubtitle}>Tap checkbox to toggle block completion</Text>
                   </View>
-                  <Text style={styles.routineCountText}>{completedCount}/{totalBlocks} Done</Text>
+                  <View style={styles.pillBlack}>
+                    <Text style={styles.pillBlackText}>ROUTINE</Text>
+                  </View>
                 </View>
 
-                {DEFAULT_SCHEDULE.blocks.map((b, idx) => {
-                  const isDone = completedBlocksSet.has(String(idx));
-                  return (
-                    <TouchableOpacity
-                      key={idx}
-                      style={[styles.routineRow, isDone && styles.routineRowDone]}
-                      onPress={() => toggleBlock(idx)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.checkBtn, isDone && styles.checkBtnChecked]}>
-                        {isDone && <Text style={styles.checkBtnIcon}>✓</Text>}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                          <Text style={styles.routineTimePill}>{b.time}</Text>
-                          <Text style={styles.routineCutoffTag}>{b.cutoff}</Text>
+                <View style={{ marginTop: 12, gap: 8 }}>
+                  {DEFAULT_SCHEDULE.blocks.map((block, idx) => {
+                    const isDone = completedBlocksSet.has(String(idx));
+                    return (
+                      <TouchableOpacity
+                        key={idx}
+                        style={[styles.routineRow, isDone && styles.routineRowDone]}
+                        onPress={() => toggleBlock(idx)}
+                        activeOpacity={0.7}
+                      >
+                        {/* Tactile Visible Checkbox */}
+                        <View style={[styles.tactileBox, isDone && styles.tactileBoxChecked]}>
+                          {isDone && <Text style={styles.tactileCheckmark}>✓</Text>}
                         </View>
-                        <Text style={[styles.routineName, isDone && styles.textCrossed]}>
-                          {b.focus}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                        <View style={{ flex: 1 }}>
+                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <Text style={styles.routineTimePill}>{block.time}</Text>
+                            <Text style={styles.routineCutoff}>{block.cutoff}</Text>
+                          </View>
+                          <Text style={[styles.routineName, isDone && styles.textCrossed]}>
+                            {block.focus}
+                          </Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
               </View>
 
-              {/* Active Tasks Checklist */}
+              {/* Dynamic Tasks List */}
               <View style={styles.card}>
                 <View style={styles.cardHeaderRow}>
-                  <Text style={styles.cardSectionTitle}>Active Tasks ({tasks.length})</Text>
+                  <Text style={styles.cardSectionTitle}>Today's Execution Tasks</Text>
+                  <Text style={styles.monoSubLabel}>{tasks.filter((t) => t.completed).length}/{tasks.length} Done</Text>
                 </View>
 
-                {tasks.length === 0 ? (
-                  <Text style={styles.emptyNotice}>No active tasks. Tap + above to add one.</Text>
-                ) : (
-                  tasks.map((t) => (
-                    <View key={t.id} style={styles.taskRow}>
+                {/* Add Task Input */}
+                <View style={{ flexDirection: 'row', gap: 8, marginVertical: 12 }}>
+                  <TextInput
+                    style={[styles.taskInput, { flex: 1 }]}
+                    placeholder="New action item..."
+                    placeholderTextColor="#9ca3af"
+                    value={newTaskTitle}
+                    onChangeText={setNewTaskTitle}
+                    onSubmitEditing={handleAddTask}
+                  />
+                  <TouchableOpacity style={styles.btnBlack} onPress={handleAddTask}>
+                    <Text style={styles.btnBlackText}>Add</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Tasks List */}
+                <View style={{ gap: 8 }}>
+                  {tasks.map((task) => (
+                    <View key={task.id} style={[styles.taskRow, task.completed && styles.taskRowDone]}>
                       <TouchableOpacity
-                        style={[styles.checkBtn, t.completed && styles.checkBtnChecked]}
-                        onPress={() => toggleTask(t.id)}
+                        style={[styles.tactileBox, task.completed && styles.tactileBoxChecked]}
+                        onPress={() => toggleTask(task.id)}
+                        activeOpacity={0.7}
                       >
-                        {t.completed && <Text style={styles.checkBtnIcon}>✓</Text>}
+                        {task.completed && <Text style={styles.tactileCheckmark}>✓</Text>}
                       </TouchableOpacity>
                       <TouchableOpacity
                         style={{ flex: 1 }}
-                        onPress={() => toggleTask(t.id)}
+                        onPress={() => toggleTask(task.id)}
+                        activeOpacity={0.7}
                       >
-                        <Text style={[styles.taskTitle, t.completed && styles.textCrossed]}>
-                          {t.title}
+                        <Text style={[styles.taskTitle, task.completed && styles.textCrossed]}>
+                          {task.title}
                         </Text>
-                        <Text style={styles.taskCategoryPill}>{t.category}</Text>
+                        <Text style={styles.taskCategory}>{task.category}</Text>
                       </TouchableOpacity>
-                      <TouchableOpacity onPress={() => deleteTask(t.id)} style={{ padding: 6 }}>
-                        <Text style={{ color: '#5f6368', fontSize: 13, fontWeight: '700' }}>✕</Text>
+                      <TouchableOpacity onPress={() => deleteTask(task.id)} style={styles.btnDelete}>
+                        <Text style={styles.btnDeleteText}>✕</Text>
                       </TouchableOpacity>
                     </View>
-                  ))
-                )}
+                  ))}
+                  {tasks.length === 0 && (
+                    <Text style={styles.emptyNotice}>No extra tasks added yet.</Text>
+                  )}
+                </View>
               </View>
 
-              {/* Daily Scratchpad Buffer */}
+              {/* Scratchpad Card */}
               <View style={styles.card}>
                 <View style={styles.cardHeaderRow}>
-                  <Text style={styles.cardSectionTitle}>Daily Scratchpad Buffer</Text>
-                  <Text style={styles.monoSubLabel}>Auto-saved</Text>
+                  <Text style={styles.cardSectionTitle}>Daily Scratchpad</Text>
+                  <Text style={styles.monoSubLabel}>Auto-persisted</Text>
                 </View>
                 <TextInput
-                  style={styles.scratchpadArea}
-                  placeholder="Transient thoughts, math equations, trade setups..."
-                  placeholderTextColor="#5f6368"
+                  style={styles.scratchpadInput}
                   multiline
+                  placeholder="Capture quick reflections, ideas, or study observations..."
+                  placeholderTextColor="#9ca3af"
                   value={dailyLog.scratchpad}
                   onChangeText={handleScratchpadChange}
                 />
@@ -588,189 +656,230 @@ export default function App() {
           )}
 
           {/* ================================================================
-               LAYER 2: METRO ROADMAP (Vertical Railway Track)
+               LAYER 2: STUDY & ACADEMIC OBLIGATIONS
                ================================================================ */}
-          {activeTab === 'metro' && (
+          {activeTab === 'study' && (
             <View>
-              {/* Header Banner */}
+              {/* Academic Horizon & School Tests */}
               <View style={styles.card}>
                 <View style={styles.cardHeaderRow}>
                   <View>
-                    <Text style={styles.cardSectionTitle}>TUM HEILBRONN METRO LINE</Text>
-                    <Text style={styles.cardSectionSubtitle}>Vertical checkpoint spine (2026 - 2028)</Text>
+                    <Text style={styles.cardSectionTitle}>School Exams &amp; Obligations</Text>
+                    <Text style={styles.cardSectionSubtitle}>Synchronized from Vulcan Ledger</Text>
                   </View>
-                  <View style={styles.pillGold}>
-                    <Text style={styles.pillGoldText}>ADMISSIONS</Text>
+                  <View style={styles.pillBlack}>
+                    <Text style={styles.pillBlackText}>VULCAN LIVE</Text>
                   </View>
                 </View>
-                <Text style={{ fontSize: 12, color: '#9aa0a6', marginTop: 4 }}>
-                  Tap any stream deliverable below to check off requirements. Stations auto-complete once all deliverables are met.
-                </Text>
-              </View>
 
-              {/* Vertical Spine & Station Tree */}
-              <View style={styles.metroVerticalWrapper}>
-                {/* Continuous Vertical Rail Track */}
-                <View style={styles.metroRailLine} />
-
-                {metroStations.map((st, sIdx) => {
-                  const isDone = st.status === 'completed';
-                  const delivEntries = Object.entries(st.deliverables || {});
-                  const completedDelivs = new Set(st.completed_deliverables || []);
-                  const isLast = sIdx === metroStations.length - 1;
-
-                  return (
-                    <View key={st.id} style={styles.metroStationRow}>
-                      {/* Metro Node Interchange Disc on the Vertical Rail */}
-                      <View style={[styles.metroRailNode, isDone && styles.metroRailNodeDone, st.is_major && styles.metroRailNodeMajor]}>
-                        {isDone ? (
-                          <Text style={styles.metroNodeCheck}>✓</Text>
-                        ) : (
-                          <View style={styles.metroNodeInnerDot} />
-                        )}
-                      </View>
-
-                      {/* Station Content Card */}
-                      <View style={[styles.metroCard, isDone && styles.metroCardDone, st.is_major && styles.metroCardMajor]}>
-                        <View style={styles.cardHeaderRow}>
-                          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                            <Text style={[styles.stationMonthTag, st.is_major && { color: '#c5a059' }]}>
-                              {st.month_label}
-                            </Text>
-                            <Text style={styles.stationPhaseTag}>
-                              {st.phase.split(':')[0]}
-                            </Text>
-                          </View>
-                          <Text style={[styles.stationStatusBadge, isDone && { color: '#39d353' }]}>
-                            {isDone ? 'COMPLETED ✓' : `${completedDelivs.size}/${delivEntries.length} MET`}
+                <View style={{ marginTop: 12, gap: 10 }}>
+                  {obligations.map((item) => (
+                    <View key={item.id} style={styles.obligationCard}>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <View style={item.type === 'exam' ? styles.pillBlack : styles.pillOutline}>
+                          <Text style={item.type === 'exam' ? styles.pillBlackText : styles.pillOutlineText}>
+                            {item.type.toUpperCase()}
                           </Text>
                         </View>
-
-                        <Text style={styles.stationName}>{st.name}</Text>
-                        <Text style={styles.stationObjective}>{st.objective}</Text>
-
-                        {/* Deliverables Checklist Box */}
-                        <View style={styles.deliverablesLedger}>
-                          {delivEntries.map(([streamKey, desc]) => {
-                            const isChecked = completedDelivs.has(streamKey);
-                            return (
-                              <TouchableOpacity
-                                key={streamKey}
-                                style={[styles.deliverableItem, isChecked && styles.deliverableItemDone]}
-                                onPress={() => toggleMetroDeliverable(st.id, streamKey)}
-                                activeOpacity={0.7}
-                              >
-                                <View style={[styles.checkBtnSmall, isChecked && styles.checkBtnSmallChecked]}>
-                                  {isChecked && <Text style={styles.checkBtnSmallIcon}>✓</Text>}
-                                </View>
-                                <View style={{ flex: 1 }}>
-                                  <Text style={styles.streamBadgeText}>{streamKey} LINE</Text>
-                                  <Text style={[styles.deliverableText, isChecked && styles.textCrossed]}>
-                                    {desc}
-                                  </Text>
-                                </View>
-                              </TouchableOpacity>
-                            );
-                          })}
-                        </View>
+                        <Text style={styles.obligationDaysLeft}>
+                          {item.daysLeft === 0 ? 'TODAY' : `${item.daysLeft} days left`}
+                        </Text>
                       </View>
+                      <Text style={styles.obligationSubject}>{item.subject}</Text>
+                      <Text style={styles.obligationTopic}>{item.topic}</Text>
+                      <Text style={styles.obligationDate}>Date: {item.date}</Text>
                     </View>
-                  );
-                })}
+                  ))}
+                </View>
+              </View>
+
+              {/* SGH / Matura Deep Work Protocol */}
+              <View style={styles.card}>
+                <View style={styles.cardHeaderRow}>
+                  <View>
+                    <Text style={styles.cardSectionTitle}>United Study Protocol</Text>
+                    <Text style={styles.cardSectionSubtitle}>SGH Library Afternoon Focus</Text>
+                  </View>
+                  <View style={styles.pillOutline}>
+                    <Text style={styles.pillOutlineText}>MATURA ROZSZ.</Text>
+                  </View>
+                </View>
+
+                <View style={{ marginTop: 12, gap: 8 }}>
+                  <View style={styles.studyProtocolRow}>
+                    <View style={styles.tactileBox}>
+                      <Text style={styles.tactileCheckmark}>1</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.studyStepTitle}>Math R Diagnostic Problem Set</Text>
+                      <Text style={styles.studyStepDesc}>Solve 5 CKE Arkusze tasks with full justification.</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.studyProtocolRow}>
+                    <View style={styles.tactileBox}>
+                      <Text style={styles.tactileCheckmark}>2</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.studyStepTitle}>German C1 Audio &amp; Grammar Immersion</Text>
+                      <Text style={styles.studyStepDesc}>Goethe-Zertifikat listening drills &amp; active recall.</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.studyProtocolRow}>
+                    <View style={styles.tactileBox}>
+                      <Text style={styles.tactileCheckmark}>3</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.studyStepTitle}>Autonomous Code Construction</Text>
+                      <Text style={styles.studyStepDesc}>Build and test algorithms without code generators.</Text>
+                    </View>
+                  </View>
+                </View>
               </View>
             </View>
           )}
 
           {/* ================================================================
-               LAYER 3: GYM & PHYSIQUE
+               LAYER 3: TUM '28 & METRO ROADMAP WITH EXAM DOTS
                ================================================================ */}
-          {activeTab === 'body' && (
+          {activeTab === 'tum' && (
             <View>
-              {/* Gym Protocol Routine */}
+              {/* German C1 Pathway */}
+              <View style={styles.card}>
+                <View style={styles.cardHeaderRow}>
+                  <Text style={styles.cardSectionTitle}>German C1 Progression</Text>
+                  <Text style={styles.monoSubLabel}>Active: B2.1</Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ marginTop: 10 }}>
+                  <View style={{ flexDirection: 'row', gap: 6 }}>
+                    <View style={styles.ladderPillDone}><Text style={styles.ladderPillDoneText}>A1 ✓</Text></View>
+                    <View style={styles.ladderPillDone}><Text style={styles.ladderPillDoneText}>A2 ✓</Text></View>
+                    <View style={styles.ladderPillDone}><Text style={styles.ladderPillDoneText}>B1 ✓</Text></View>
+                    <View style={styles.ladderPillActive}><Text style={styles.ladderPillActiveText}>B2.1 Active</Text></View>
+                    <View style={styles.ladderPill}><Text style={styles.ladderPillText}>B2.2</Text></View>
+                    <View style={styles.ladderPill}><Text style={styles.ladderPillText}>C1 Exam</Text></View>
+                  </View>
+                </ScrollView>
+              </View>
+
+              {/* Bavarian Aptitude Calculator Card */}
               <View style={styles.card}>
                 <View style={styles.cardHeaderRow}>
                   <View>
-                    <Text style={styles.cardSectionTitle}>{DEFAULT_GYM_PROTOCOL.name}</Text>
-                    <Text style={styles.cardSectionSubtitle}>{DEFAULT_GYM_PROTOCOL.day} • {DEFAULT_GYM_PROTOCOL.focus}</Text>
+                    <Text style={styles.cardSectionTitle}>TUM Aptitude Simulator</Text>
+                    <Text style={styles.cardSectionSubtitle}>Campus Heilbronn MDS Formula</Text>
                   </View>
-                  <View style={styles.pillLavender}>
-                    <Text style={styles.pillLavenderText}>UPPER</Text>
+                  <View style={styles.pillBlack}>
+                    <Text style={styles.pillBlackText}>88.5 PTS SAFE</Text>
                   </View>
                 </View>
-
-                {DEFAULT_GYM_PROTOCOL.exercises.map((ex, idx) => {
-                  const isDone = new Set(
-                    dailyLog.completed_exercises.split(',').map((s) => s.trim()).filter(Boolean)
-                  ).has(String(idx));
-
-                  return (
-                    <TouchableOpacity
-                      key={idx}
-                      style={[styles.routineRow, isDone && styles.routineRowDone]}
-                      onPress={() => toggleExercise(idx)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.checkBtn, isDone && styles.checkBtnChecked]}>
-                        {isDone && <Text style={styles.checkBtnIcon}>✓</Text>}
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text style={styles.routineTimePill}>{ex.sets_reps} • {ex.rest}</Text>
-                        <Text style={[styles.routineName, isDone && styles.textCrossed]}>
-                          {ex.name}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
+                <View style={styles.scoreRow}>
+                  <View style={styles.scoreCol}>
+                    <Text style={styles.scoreLabel}>POLISH GPA</Text>
+                    <Text style={styles.scoreValue}>5.50</Text>
+                  </View>
+                  <View style={styles.scoreCol}>
+                    <Text style={styles.scoreLabel}>BAVARIAN</Text>
+                    <Text style={styles.scoreValue}>1.25</Text>
+                  </View>
+                  <View style={styles.scoreCol}>
+                    <Text style={styles.scoreLabel}>VERDICT</Text>
+                    <Text style={styles.scoreValue}>DIRECT</Text>
+                  </View>
+                </View>
               </View>
 
-              {/* Weigh-in Card */}
+              {/* Metro Stations with School Exam Dots */}
               <View style={styles.card}>
                 <View style={styles.cardHeaderRow}>
-                  <Text style={styles.cardSectionTitle}>Body Mass &amp; Nutrition</Text>
-                  <Text style={styles.monoSubLabel}>Goal: 80.0 kg</Text>
+                  <View>
+                    <Text style={styles.cardSectionTitle}>TUM Metro Spine (2026 - 2028)</Text>
+                    <Text style={styles.cardSectionSubtitle}>Checkpoints with school exam dots on rail</Text>
+                  </View>
+                  <View style={styles.pillBlack}>
+                    <Text style={styles.pillBlackText}>ROADMAP</Text>
+                  </View>
                 </View>
-                <View style={{ flexDirection: 'row', gap: 8, marginVertical: 10 }}>
-                  <TextInput
-                    style={[styles.quickTaskInput, { flex: 1 }]}
-                    placeholder="Morning Weight (kg)"
-                    placeholderTextColor="#5f6368"
-                    keyboardType="decimal-pad"
-                    value={weightInput}
-                    onChangeText={setWeightInput}
-                  />
-                  <TouchableOpacity
-                    style={styles.quickAddBtn}
-                    onPress={() => {
-                      if (weightInput) {
-                        showToast(`Logged: ${weightInput} kg`);
-                        setWeightInput('');
-                      }
-                    }}
-                  >
-                    <Text style={styles.quickAddBtnText}>Log</Text>
-                  </TouchableOpacity>
-                </View>
-                <View style={{ flexDirection: 'row', gap: 16 }}>
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-                    onPress={() => setCalSurplus(!calSurplus)}
-                  >
-                    <View style={[styles.checkBtnSmall, calSurplus && styles.checkBtnSmallChecked]}>
-                      {calSurplus && <Text style={styles.checkBtnSmallIcon}>✓</Text>}
-                    </View>
-                    <Text style={{ color: '#f0f2f5', fontSize: 12 }}>+300 Cal Surplus</Text>
-                  </TouchableOpacity>
 
-                  <TouchableOpacity
-                    style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
-                    onPress={() => setProteinMet(!proteinMet)}
-                  >
-                    <View style={[styles.checkBtnSmall, proteinMet && styles.checkBtnSmallChecked]}>
-                      {proteinMet && <Text style={styles.checkBtnSmallIcon}>✓</Text>}
-                    </View>
-                    <Text style={{ color: '#f0f2f5', fontSize: 12 }}>140g+ Protein Met</Text>
-                  </TouchableOpacity>
+                {/* Vertical Rail Spine with Exam Dots */}
+                <View style={styles.metroVerticalWrapper}>
+                  {/* Continuous Rail Line */}
+                  <View style={styles.metroRailLine} />
+
+                  {metroStations.map((st, sIdx) => {
+                    const isDone = st.status === 'completed';
+                    const delivEntries = Object.entries(st.deliverables || {});
+                    const completedDelivs = new Set(st.completed_deliverables || []);
+
+                    // Associated exam dot for the station month if active
+                    const matchingExam = obligations.find((o) => o.type === 'exam' && sIdx === 0);
+
+                    return (
+                      <View key={st.id} style={styles.metroStationRow}>
+                        {/* Interchange Node on Rail */}
+                        <View style={[styles.metroRailNode, isDone && styles.metroRailNodeDone]}>
+                          {isDone ? (
+                            <Text style={styles.metroNodeCheck}>✓</Text>
+                          ) : (
+                            <View style={styles.metroNodeInnerDot} />
+                          )}
+                        </View>
+
+                        {/* Station Card */}
+                        <View style={[styles.metroCard, isDone && styles.metroCardDone]}>
+                          <View style={styles.cardHeaderRow}>
+                            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                              <Text style={styles.stationMonthTag}>{st.month_label}</Text>
+                              <Text style={styles.stationPhaseTag}>{st.phase.split(':')[0]}</Text>
+                            </View>
+                            <Text style={[styles.stationStatusBadge, isDone && { color: '#000000', fontWeight: '700' }]}>
+                              {isDone ? 'COMPLETED ✓' : `${completedDelivs.size}/${delivEntries.length} MET`}
+                            </Text>
+                          </View>
+
+                          <Text style={styles.stationName}>{st.name}</Text>
+                          <Text style={styles.stationObjective}>{st.objective}</Text>
+
+                          {/* School Test Dot Intercept on Metro Rail */}
+                          {matchingExam && sIdx === 0 && (
+                            <View style={styles.examDotBanner}>
+                              <View style={styles.examDotIcon} />
+                              <Text style={styles.examDotText}>
+                                School Exam Milestone: {matchingExam.subject} ({matchingExam.date})
+                              </Text>
+                            </View>
+                          )}
+
+                          {/* Deliverables Checklist */}
+                          <View style={styles.deliverablesLedger}>
+                            {delivEntries.map(([streamKey, desc]) => {
+                              const isChecked = completedDelivs.has(streamKey);
+                              return (
+                                <TouchableOpacity
+                                  key={streamKey}
+                                  style={[styles.deliverableItem, isChecked && styles.deliverableItemDone]}
+                                  onPress={() => toggleMetroDeliverable(st.id, streamKey)}
+                                  activeOpacity={0.7}
+                                >
+                                  {/* Tactile Checkbox */}
+                                  <View style={[styles.tactileBoxSmall, isChecked && styles.tactileBoxChecked]}>
+                                    {isChecked && <Text style={styles.tactileCheckmarkSmall}>✓</Text>}
+                                  </View>
+                                  <View style={{ flex: 1 }}>
+                                    <Text style={styles.streamBadgeText}>{streamKey.toUpperCase()} LINE</Text>
+                                    <Text style={[styles.deliverableText, isChecked && styles.textCrossed]}>
+                                      {desc}
+                                    </Text>
+                                  </View>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      </View>
+                    );
+                  })}
                 </View>
               </View>
             </View>
@@ -779,7 +888,7 @@ export default function App() {
         </ScrollView>
 
         {/* ==================================================================
-             BOTTOM LUXURY NAVIGATION BAR
+             BOTTOM 4-TAB MONOCHROME NAVIGATION DOCK
              ================================================================== */}
         <View style={styles.bottomNav}>
           <TouchableOpacity
@@ -790,40 +899,40 @@ export default function App() {
             }}
           >
             <Text style={[styles.navIcon, activeTab === 'cockpit' && styles.navIconActive]}>◈</Text>
-            <Text style={[styles.navLabel, activeTab === 'cockpit' && styles.navLabelActive]}>Cockpit</Text>
+            <Text style={[styles.navLabel, activeTab === 'cockpit' && styles.navLabelActive]}>0 Cockpit</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.navItem, activeTab === 'today' && styles.navItemActive]}
+            style={[styles.navItem, activeTab === 'daily' && styles.navItemActive]}
             onPress={() => {
               triggerHaptic('light');
-              setActiveTab('today');
+              setActiveTab('daily');
             }}
           >
-            <Text style={[styles.navIcon, activeTab === 'today' && styles.navIconActive]}>◻</Text>
-            <Text style={[styles.navLabel, activeTab === 'today' && styles.navLabelActive]}>Today</Text>
+            <Text style={[styles.navIcon, activeTab === 'daily' && styles.navIconActive]}>◻</Text>
+            <Text style={[styles.navLabel, activeTab === 'daily' && styles.navLabelActive]}>1 Daily</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.navItem, activeTab === 'metro' && styles.navItemActive]}
+            style={[styles.navItem, activeTab === 'study' && styles.navItemActive]}
             onPress={() => {
               triggerHaptic('light');
-              setActiveTab('metro');
+              setActiveTab('study');
             }}
           >
-            <Text style={[styles.navIcon, activeTab === 'metro' && styles.navIconActive]}>◎</Text>
-            <Text style={[styles.navLabel, activeTab === 'metro' && styles.navLabelActive]}>Metro</Text>
+            <Text style={[styles.navIcon, activeTab === 'study' && styles.navIconActive]}>▤</Text>
+            <Text style={[styles.navLabel, activeTab === 'study' && styles.navLabelActive]}>2 Study</Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.navItem, activeTab === 'body' && styles.navItemActive]}
+            style={[styles.navItem, activeTab === 'tum' && styles.navItemActive]}
             onPress={() => {
               triggerHaptic('light');
-              setActiveTab('body');
+              setActiveTab('tum');
             }}
           >
-            <Text style={[styles.navIcon, activeTab === 'body' && styles.navIconActive]}>▲</Text>
-            <Text style={[styles.navLabel, activeTab === 'body' && styles.navLabelActive]}>Gym</Text>
+            <Text style={[styles.navIcon, activeTab === 'tum' && styles.navIconActive]}>◎</Text>
+            <Text style={[styles.navLabel, activeTab === 'tum' && styles.navLabelActive]}>3 TUM '28</Text>
           </TouchableOpacity>
         </View>
 
@@ -835,73 +944,57 @@ export default function App() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#08090c',
-    alignItems: 'center', // Centers viewport on desktop
+    backgroundColor: '#ffffff',
+    alignItems: 'center',
   },
   viewportContainer: {
     flex: 1,
     width: '100%',
-    maxWidth: 520, // Strict mobile-oriented width constraint on desktop!
-    backgroundColor: '#08090c',
-    position: 'relative',
+    maxWidth: 520,
+    backgroundColor: '#fafafa',
   },
+
+  /* Monochrome Minimal Header */
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 14,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.08)',
-    backgroundColor: 'rgba(8, 9, 12, 0.96)',
+    borderBottomColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
   },
   brandRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
   },
-  icePickIconBox: {
+  brandMark: {
     width: 22,
     height: 22,
-    borderRadius: 6,
-    backgroundColor: '#ffffff',
+    borderRadius: 4,
+    backgroundColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
-    position: 'relative',
-    shadowColor: '#a78bfa',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
   },
-  shardBlade: {
-    position: 'absolute',
-    top: 4,
-    width: 13,
-    height: 3,
-    backgroundColor: '#a78bfa',
-    transform: [{ rotate: '-25deg' }],
+  brandMarkInner: {
+    width: 6,
+    height: 6,
     borderRadius: 1,
-  },
-  shardHandle: {
-    position: 'absolute',
-    bottom: 3,
-    width: 3,
-    height: 12,
-    backgroundColor: '#a78bfa',
-    transform: [{ rotate: '15deg' }],
-    borderRadius: 1,
+    backgroundColor: '#ffffff',
   },
   brandTitle: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontWeight: '800',
     fontSize: 13,
-    color: '#f0f2f5',
-    letterSpacing: 1.2,
+    color: '#000000',
+    letterSpacing: 1.5,
   },
   brandSubtitle: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 9,
-    color: '#5f6368',
+    color: '#737373',
     letterSpacing: 0.8,
   },
   syncBadge: {
@@ -911,520 +1004,694 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
-    backgroundColor: 'rgba(57, 211, 83, 0.08)',
+    backgroundColor: '#f5f5f5',
     borderWidth: 1,
-    borderColor: 'rgba(57, 211, 83, 0.25)',
+    borderColor: '#e5e7eb',
   },
   syncDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#39d353',
+    backgroundColor: '#000000',
   },
   syncText: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 9,
-    color: '#39d353',
+    color: '#000000',
     fontWeight: '700',
   },
+
   toast: {
     position: 'absolute',
     top: 60,
     alignSelf: 'center',
-    backgroundColor: '#181b24',
-    borderWidth: 1,
-    borderColor: '#f0f2f5',
+    backgroundColor: '#000000',
     paddingHorizontal: 16,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderRadius: 20,
     zIndex: 100,
     shadowColor: '#000',
-    shadowOpacity: 0.6,
-    shadowRadius: 10,
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
   },
   toastText: {
-    color: '#f0f2f5',
+    color: '#ffffff',
     fontSize: 11,
     fontWeight: '700',
   },
+
   contentScroll: {
     flex: 1,
     paddingHorizontal: 14,
     paddingTop: 14,
   },
-  cockpitGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    marginBottom: 12,
-  },
-  gaugeCard: {
-    flex: 1,
-    minWidth: '47%',
-    backgroundColor: '#111319',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.07)',
-    borderRadius: 8,
-    padding: 12,
-  },
-  gaugeHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  gaugeLabel: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 9,
-    fontWeight: '700',
-    color: '#9aa0a6',
-    letterSpacing: 0.5,
-  },
-  gaugeValueBig: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: '#f0f2f5',
-    marginVertical: 2,
-  },
-  gaugeValueMedium: {
-    fontSize: 14,
-    fontWeight: '700',
-    color: '#f0f2f5',
-  },
-  gaugeSubtext: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 9,
-    color: '#5f6368',
-    marginTop: 4,
-  },
-  progressTrack: {
-    height: 4,
-    backgroundColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 2,
-    overflow: 'hidden',
-    marginVertical: 4,
-  },
-  progressFill: {
-    height: '100%',
-    backgroundColor: '#f0f2f5',
-    borderRadius: 2,
-  },
-  pillLavender: {
-    backgroundColor: 'rgba(167, 139, 250, 0.12)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(167, 139, 250, 0.3)',
-  },
-  pillLavenderText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#c4b5fd',
-  },
-  pillGold: {
-    backgroundColor: 'rgba(197, 160, 89, 0.12)',
-    paddingHorizontal: 5,
-    paddingVertical: 2,
-    borderRadius: 4,
-    borderWidth: 1,
-    borderColor: 'rgba(197, 160, 89, 0.3)',
-  },
-  pillGoldText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 8,
-    fontWeight: '700',
-    color: '#c5a059',
-  },
-  monoSubLabel: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 9,
-    color: '#5f6368',
-  },
+
+  /* Cards */
   card: {
-    backgroundColor: '#111319',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.07)',
-    borderRadius: 8,
+    borderColor: '#e5e7eb',
+    borderRadius: 10,
     padding: 14,
     marginBottom: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
   cardHeaderRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 6,
   },
   cardSectionTitle: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#f0f2f5',
+    color: '#000000',
+    letterSpacing: -0.2,
   },
   cardSectionSubtitle: {
-    fontSize: 10,
-    color: '#5f6368',
+    fontSize: 11,
+    color: '#737373',
     marginTop: 2,
   },
+  cardActionLink: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#000000',
+  },
+
+  /* Cockpit Grid */
+  cockpitGrid: {
+    gap: 10,
+    marginBottom: 12,
+  },
+  gaugeCard: {
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 10,
+    padding: 14,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
+  },
+  gaugeHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  gaugeLabel: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#737373',
+    letterSpacing: 0.6,
+  },
+  gaugeValueBig: {
+    fontSize: 26,
+    fontWeight: '800',
+    color: '#000000',
+    marginVertical: 4,
+  },
+  gaugeValueMedium: {
+    fontSize: 17,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  gaugeSubtext: {
+    fontSize: 11,
+    color: '#737373',
+    marginTop: 4,
+  },
+  progressTrack: {
+    height: 5,
+    backgroundColor: '#e5e7eb',
+    borderRadius: 3,
+    overflow: 'hidden',
+    marginVertical: 4,
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#000000',
+  },
+
+  /* Monochrome Pills */
+  pillBlack: {
+    backgroundColor: '#000000',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  pillBlackText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#ffffff',
+    letterSpacing: 0.5,
+  },
+  pillOutline: {
+    borderWidth: 1,
+    borderColor: '#000000',
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 10,
+    backgroundColor: '#ffffff',
+  },
+  pillOutlineText: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 9,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  monoSubLabel: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 10,
+    color: '#737373',
+  },
+
+  /* Heatmap */
   heatmapLegend: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
   },
   legendText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 8,
-    color: '#5f6368',
+    fontSize: 9,
+    color: '#737373',
+    marginHorizontal: 2,
   },
   legendBox: {
-    width: 7,
-    height: 7,
-    borderRadius: 1.5,
+    width: 9,
+    height: 9,
+    borderRadius: 2,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
   heatCell: {
-    width: 10,
-    height: 10,
+    width: 14,
+    height: 14,
     borderRadius: 2,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  heatCellGlow: {
-    shadowColor: '#39d353',
-    shadowOpacity: 0.6,
-    shadowRadius: 4,
+  heatCellDone: {
+    borderColor: '#000000',
+  },
+  heatCellToday: {
+    borderWidth: 1.5,
+    borderColor: '#000000',
   },
   dayInfoPill: {
-    marginTop: 8,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 10,
-    color: '#c4b5fd',
-    textAlign: 'center',
-  },
-  forecastBox: {
-    marginTop: 4,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
-    paddingTop: 8,
-  },
-  forecastTitle: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: '#f0f2f5',
-    marginBottom: 4,
-  },
-  forecastDetail: {
-    fontSize: 11,
-    color: '#9aa0a6',
-    lineHeight: 18,
-  },
-  quickTaskBox: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#181b24',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.08)',
-    borderRadius: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 3,
-    marginBottom: 12,
-  },
-  quickTaskInput: {
-    flex: 1,
-    color: '#f0f2f5',
-    fontSize: 12,
+    marginTop: 10,
     paddingVertical: 6,
-  },
-  catBadge: {
-    backgroundColor: 'rgba(255, 255, 255, 0.05)',
-    paddingHorizontal: 6,
-    paddingVertical: 3,
-    borderRadius: 3,
-  },
-  catBadgeActive: {
-    backgroundColor: 'rgba(167, 139, 250, 0.2)',
-  },
-  catBadgeText: {
-    fontSize: 9,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    color: '#5f6368',
-    fontWeight: '700',
-  },
-  catBadgeTextActive: {
-    color: '#c4b5fd',
-  },
-  quickAddBtn: {
-    backgroundColor: '#f0f2f5',
     paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 4,
+    borderRadius: 6,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
   },
-  quickAddBtnText: {
-    color: '#08090c',
-    fontSize: 10,
-    fontWeight: '800',
+  dayInfoText: {
+    fontSize: 11,
+    color: '#000000',
+    fontWeight: '600',
   },
-  routineCountText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 10,
-    color: '#5f6368',
-    fontWeight: '700',
-  },
-  routineRow: {
+
+  /* Horizon List */
+  horizonItem: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 10,
-    paddingVertical: 9,
+    paddingVertical: 6,
     borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+    borderBottomColor: '#f5f5f5',
   },
-  routineRowDone: {
-    opacity: 0.45,
+  horizonBullet: {
+    width: 5,
+    height: 5,
+    borderRadius: 2.5,
+    backgroundColor: '#000000',
   },
-  checkBtn: {
-    width: 18,
-    height: 18,
-    borderRadius: 4,
-    borderWidth: 1.5,
-    borderColor: '#5f6368',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 2,
+  horizonTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#000000',
   },
-  checkBtnChecked: {
-    backgroundColor: '#f0f2f5',
-    borderColor: '#f0f2f5',
-  },
-  checkBtnIcon: {
-    color: '#08090c',
+  horizonMeta: {
     fontSize: 10,
-    fontWeight: '900',
-  },
-  checkBtnSmall: {
-    width: 16,
-    height: 16,
-    borderRadius: 3,
-    borderWidth: 1.5,
-    borderColor: '#5f6368',
-    alignItems: 'center',
-    justifyContent: 'center',
+    color: '#737373',
     marginTop: 1,
   },
-  checkBtnSmallChecked: {
-    backgroundColor: '#f0f2f5',
-    borderColor: '#f0f2f5',
+
+  /* Tactile Checkboxes (Visible contrast) */
+  tactileBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 4,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  checkBtnSmallIcon: {
-    color: '#08090c',
-    fontSize: 9,
-    fontWeight: '900',
+  tactileBoxChecked: {
+    backgroundColor: '#000000',
+  },
+  tactileCheckmark: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '800',
+    lineHeight: 14,
+  },
+  tactileBoxSmall: {
+    width: 18,
+    height: 18,
+    borderRadius: 3,
+    borderWidth: 1.5,
+    borderColor: '#000000',
+    backgroundColor: '#ffffff',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  tactileCheckmarkSmall: {
+    color: '#ffffff',
+    fontSize: 11,
+    fontWeight: '800',
+    lineHeight: 12,
+  },
+
+  /* Routine & Daily Schedule */
+  routineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 9,
+    paddingHorizontal: 10,
+    borderRadius: 8,
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  routineRowDone: {
+    backgroundColor: '#f5f5f5',
+    opacity: 0.7,
   },
   routineTimePill: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 9,
-    color: '#5f6368',
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#000000',
   },
-  routineCutoffTag: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 8,
-    color: '#c4b5fd',
-    backgroundColor: 'rgba(167, 139, 250, 0.1)',
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 2,
+  routineCutoff: {
+    fontSize: 10,
+    color: '#737373',
   },
   routineName: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#f0f2f5',
+    color: '#000000',
     marginTop: 2,
+  },
+  textCrossed: {
+    textDecorationLine: 'line-through',
+    color: '#9ca3af',
+  },
+
+  /* Tasks */
+  taskInput: {
+    height: 38,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 6,
+    paddingHorizontal: 12,
+    fontSize: 12,
+    color: '#000000',
+  },
+  btnBlack: {
+    height: 38,
+    backgroundColor: '#000000',
+    paddingHorizontal: 14,
+    borderRadius: 6,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  btnBlackText: {
+    color: '#ffffff',
+    fontSize: 12,
+    fontWeight: '700',
   },
   taskRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 7,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(255, 255, 255, 0.04)',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  taskRowDone: {
+    backgroundColor: '#fafafa',
+    opacity: 0.6,
   },
   taskTitle: {
     fontSize: 12,
-    fontWeight: '500',
-    color: '#f0f2f5',
+    fontWeight: '600',
+    color: '#000000',
   },
-  taskCategoryPill: {
+  taskCategory: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 8,
-    color: '#5f6368',
-    marginTop: 2,
+    fontSize: 9,
+    color: '#737373',
+    marginTop: 1,
   },
-  textCrossed: {
-    color: '#5f6368',
-    textDecorationLine: 'line-through',
+  btnDelete: {
+    padding: 6,
+  },
+  btnDeleteText: {
+    color: '#9ca3af',
+    fontSize: 12,
   },
   emptyNotice: {
-    fontSize: 11,
-    color: '#5f6368',
-    paddingVertical: 8,
+    fontSize: 12,
+    color: '#9ca3af',
+    textAlign: 'center',
+    marginVertical: 8,
   },
-  scratchpadArea: {
-    color: '#f0f2f5',
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 11,
-    minHeight: 70,
+
+  /* Scratchpad */
+  scratchpadInput: {
+    height: 90,
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    borderRadius: 6,
+    padding: 10,
+    fontSize: 12,
+    color: '#000000',
     textAlignVertical: 'top',
-    paddingTop: 4,
+    marginTop: 8,
   },
+
+  /* Obligations & Study */
+  obligationCard: {
+    padding: 12,
+    borderRadius: 8,
+    backgroundColor: '#ffffff',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    gap: 4,
+  },
+  obligationDaysLeft: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  obligationSubject: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#000000',
+    marginTop: 2,
+  },
+  obligationTopic: {
+    fontSize: 12,
+    color: '#404040',
+  },
+  obligationDate: {
+    fontSize: 10,
+    color: '#737373',
+    marginTop: 2,
+  },
+  studyProtocolRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    paddingVertical: 10,
+    paddingHorizontal: 10,
+    borderRadius: 6,
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  studyStepTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  studyStepDesc: {
+    fontSize: 11,
+    color: '#737373',
+    marginTop: 1,
+  },
+
+  /* German Ladder */
+  ladderPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+  },
+  ladderPillText: {
+    fontSize: 11,
+    color: '#737373',
+  },
+  ladderPillDone: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#000000',
+    backgroundColor: '#f5f5f5',
+  },
+  ladderPillDoneText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#000000',
+  },
+  ladderPillActive: {
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 12,
+    backgroundColor: '#000000',
+  },
+  ladderPillActiveText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ffffff',
+  },
+
+  /* Bavarian Simulator */
+  scoreRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    marginTop: 6,
+  },
+  scoreCol: {
+    alignItems: 'center',
+  },
+  scoreLabel: {
+    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+    fontSize: 9,
+    color: '#737373',
+  },
+  scoreValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#000000',
+    marginTop: 3,
+  },
+
+  /* Metro Vertical Roadmap with School Test Dots */
   metroVerticalWrapper: {
     position: 'relative',
-    paddingLeft: 18,
+    marginTop: 14,
+    paddingLeft: 22,
   },
   metroRailLine: {
     position: 'absolute',
     left: 8,
-    top: 14,
+    top: 10,
     bottom: 20,
     width: 2,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: '#000000',
   },
   metroStationRow: {
     position: 'relative',
-    marginBottom: 14,
+    marginBottom: 16,
   },
   metroRailNode: {
     position: 'absolute',
-    left: -18,
+    left: -22,
     top: 14,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: '#08090c',
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#ffffff',
     borderWidth: 2,
-    borderColor: '#5f6368',
+    borderColor: '#000000',
     justifyContent: 'center',
     alignItems: 'center',
-    zIndex: 10,
+    zIndex: 2,
   },
   metroRailNodeDone: {
-    backgroundColor: '#f0f2f5',
-    borderColor: '#f0f2f5',
-    shadowColor: '#ffffff',
-    shadowOpacity: 0.6,
-    shadowRadius: 6,
-  },
-  metroRailNodeMajor: {
-    borderColor: '#c5a059',
+    backgroundColor: '#000000',
   },
   metroNodeInnerDot: {
-    width: 4,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: '#5f6368',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#000000',
   },
   metroNodeCheck: {
-    fontSize: 9,
-    fontWeight: '900',
-    color: '#08090c',
+    color: '#ffffff',
+    fontSize: 10,
+    fontWeight: '800',
   },
   metroCard: {
-    backgroundColor: '#111319',
+    backgroundColor: '#ffffff',
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.07)',
+    borderColor: '#e5e7eb',
     borderRadius: 8,
     padding: 12,
   },
   metroCardDone: {
-    borderColor: 'rgba(57, 211, 83, 0.25)',
-  },
-  metroCardMajor: {
-    borderColor: 'rgba(197, 160, 89, 0.35)',
+    borderColor: '#d1d5db',
+    backgroundColor: '#fafafa',
   },
   stationMonthTag: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 10,
     fontWeight: '800',
-    color: '#f0f2f5',
+    color: '#000000',
   },
   stationPhaseTag: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 8,
-    color: '#5f6368',
+    fontSize: 9,
+    color: '#737373',
   },
   stationStatusBadge: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 9,
-    color: '#5f6368',
-    fontWeight: '700',
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#737373',
   },
   stationName: {
-    fontSize: 13,
+    fontSize: 14,
     fontWeight: '700',
-    color: '#f0f2f5',
+    color: '#000000',
     marginTop: 4,
   },
   stationObjective: {
     fontSize: 11,
-    color: '#9aa0a6',
+    color: '#6b7280',
     marginTop: 2,
-    marginBottom: 8,
-    lineHeight: 16,
+    lineHeight: 15,
   },
+
+  /* School Exam Dot on Rail */
+  examDotBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: '#e5e7eb',
+  },
+  examDotIcon: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#000000',
+  },
+  examDotText: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#000000',
+  },
+
+  /* Deliverables Ledger */
   deliverablesLedger: {
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.05)',
-    paddingTop: 6,
+    marginTop: 10,
+    gap: 6,
   },
   deliverableItem: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 8,
-    paddingVertical: 5,
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+    borderRadius: 6,
+    backgroundColor: '#fafafa',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
   deliverableItemDone: {
-    opacity: 0.5,
+    backgroundColor: '#f5f5f5',
+    opacity: 0.65,
   },
   streamBadgeText: {
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontSize: 8,
+    fontSize: 9,
     fontWeight: '700',
-    color: '#5f6368',
-    letterSpacing: 0.5,
+    color: '#000000',
   },
   deliverableText: {
     fontSize: 11,
-    color: '#f0f2f5',
-    lineHeight: 15,
+    color: '#374151',
+    marginTop: 1,
   },
+
+  /* Bottom Navigation Dock (4 Tabs) */
   bottomNav: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
     flexDirection: 'row',
-    backgroundColor: 'rgba(10, 12, 16, 0.98)',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    height: 60,
     borderTopWidth: 1,
-    borderTopColor: 'rgba(255, 255, 255, 0.08)',
-    paddingVertical: 8,
-    paddingBottom: Platform.OS === 'ios' ? 22 : 8,
+    borderTopColor: '#e5e7eb',
+    backgroundColor: '#ffffff',
+    paddingBottom: Platform.OS === 'ios' ? 4 : 0,
   },
   navItem: {
     flex: 1,
     alignItems: 'center',
-    gap: 2,
+    justifyContent: 'center',
+    paddingVertical: 6,
   },
-  navItemActive: {},
+  navItemActive: {
+    opacity: 1,
+  },
   navIcon: {
     fontSize: 15,
-    color: '#5f6368',
+    color: '#9ca3af',
   },
   navIconActive: {
-    color: '#f0f2f5',
+    color: '#000000',
+    fontWeight: '800',
   },
   navLabel: {
-    fontSize: 9,
     fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    color: '#5f6368',
-    fontWeight: '600',
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#9ca3af',
+    marginTop: 2,
   },
   navLabelActive: {
-    color: '#f0f2f5',
+    color: '#000000',
+    fontWeight: '800',
   },
 });

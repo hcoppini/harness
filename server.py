@@ -77,8 +77,8 @@ def pwa_manifest():
         "description": "Executive OS & Personal Execution Tracker for TUM Heilbronn Aspirants",
         "start_url": "/",
         "display": "standalone",
-        "background_color": "#050505",
-        "theme_color": "#050505"
+        "background_color": "#FFFFFF",
+        "theme_color": "#FFFFFF"
     })
 
 @app.route("/apple-touch-icon.png")
