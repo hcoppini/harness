@@ -7,43 +7,56 @@
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&family=Cormorant+Garamond:ital,wght@0,400;0,600;0,700;1,400&display=swap');
 
 :root {
-  /* Light Monochrome (luaws.pl Default) */
-  --bg-canvas: #FFFFFF;
+  /* Light Monochrome (luaws.pl Refined Editorial) */
+  --bg-canvas: #F6F7F9;
   --bg-surface: #FFFFFF;
-  --bg-surface-elevated: #F9F9F9;
-  --bg-surface-hover: #F2F2F2;
-  --bg-surface-active: #E5E5E5;
+  --bg-surface-elevated: #F9FAFB;
+  --bg-surface-hover: #F0F2F5;
+  --bg-surface-active: #E5E7EB;
   --bg-card: #FFFFFF;
-  --bg-input: #FAFAFA;
+  --bg-input: #FFFFFF;
 
-  /* Hairline Borders */
-  --border-hairline: rgba(0, 0, 0, 0.08);
-  --border-subtle: #E5E5E5;
-  --border-medium: #CCCCCC;
-  --border-focus: #000000;
+  /* Calibrated Hairlines & Tactile Borders */
+  --border-hairline: #E5E7EB;
+  --border-subtle: #D8DCE3;
+  --border-medium: #B5BAC5;
+  --border-focus: #111827;
 
-  /* Editorial Typography */
-  --text-primary: #000000;
-  --text-secondary: #333333;
-  --text-tertiary: #666666;
-  --text-muted: #999999;
+  /* Editorial Typography: Warm, Rich Darks (eliminates harsh white-on-black glare) */
+  --text-primary: #111827;
+  --text-secondary: #374151;
+  --text-tertiary: #6B7280;
+  --text-muted: #9CA3AF;
 
   /* Monochrome Accents */
-  --accent-primary: #000000;
-  --accent-dim: #222222;
-  --accent-subtle: rgba(0, 0, 0, 0.04);
-  --accent-border: rgba(0, 0, 0, 0.15);
+  --accent-primary: #111827;
+  --accent-dim: #27272A;
+  --accent-subtle: rgba(17, 24, 39, 0.05);
+  --accent-border: rgba(17, 24, 39, 0.12);
 
-  --accent-lavender: #000000;
-  --accent-lavender-light: #222222;
-  --accent-lavender-dim: #555555;
-  --accent-lavender-subtle: rgba(0, 0, 0, 0.04);
-  --accent-lavender-border: rgba(0, 0, 0, 0.15);
+  --accent-lavender: #111827;
+  --accent-lavender-light: #27272A;
+  --accent-lavender-dim: #4B5563;
+  --accent-lavender-subtle: rgba(17, 24, 39, 0.05);
+  --accent-lavender-border: rgba(17, 24, 39, 0.15);
+
+  /* Checkbox System */
+  --checkbox-border: #9CA3AF;
+  --checkbox-check: #FFFFFF;
+
+  /* Calendar System */
+  --cal-header-color: #4B5563;
+  --cal-day-bg: #FFFFFF;
+  --cal-day-border: #E5E7EB;
+  --cal-day-color: #1F2937;
+  --cal-day-today-border: #111827;
+  --cal-day-selected-bg: #111827;
+  --cal-day-selected-color: #FFFFFF;
 
   /* Clean Neutral Indicators */
-  --indicator-neutral: #666666;
-  --indicator-active: #000000;
-  --indicator-done: #000000;
+  --indicator-neutral: #6B7280;
+  --indicator-active: #111827;
+  --indicator-done: #111827;
 
   /* Stream Highlighter Line Colors (Calibrated Monochrome Grayscale) */
   --stream-academic: #18181b;
@@ -53,60 +66,73 @@
   --stream-physical: #d4d4d8;
 
   /* Heatmap Inverted Levels (Dark black for 100%, brighter for unchecked) */
-  --heatmap-empty: #F4F4F5;
-  --heatmap-lvl0: #F4F4F5;
-  --heatmap-lvl1: #D4D4D8;
-  --heatmap-lvl2: #8E8E93;
-  --heatmap-lvl3: #3A3A3C;
-  --heatmap-lvl4: #000000;
+  --heatmap-empty: #FFFFFF;
+  --heatmap-lvl0: #FFFFFF;
+  --heatmap-lvl1: #E5E7EB;
+  --heatmap-lvl2: #9CA3AF;
+  --heatmap-lvl3: #374151;
+  --heatmap-lvl4: #111827;
 
   /* Typography Stacks */
   --font-sans: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
   --font-mono: 'JetBrains Mono', "SF Mono", Consolas, monospace;
   --font-display: 'Cormorant Garamond', Georgia, serif;
 
-  /* Micro Radii & Fluid Transitions */
-  --radius-xs: 3px;
+  /* Micro Radii, Shadows & Fluid Transitions */
+  --radius-xs: 4px;
   --radius-sm: 6px;
   --radius-md: 10px;
   --radius-lg: 14px;
   --radius-full: 9999px;
   --ease-fluid: cubic-bezier(0.16, 1, 0.3, 1);
   --shadow-none: none;
-  --shadow-dropdown: 0 16px 40px rgba(0, 0, 0, 0.12);
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.02);
+  --shadow-card-elevated: 0 4px 12px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.02);
+  --shadow-dropdown: 0 16px 40px rgba(0, 0, 0, 0.10);
 }
 
 [data-theme="dark"] {
   --bg-canvas: #08080A;
-  --bg-surface: #0E0E11;
-  --bg-surface-elevated: #15151A;
-  --bg-surface-hover: #1C1C22;
-  --bg-surface-active: #24242C;
-  --bg-card: #0E0E11;
+  --bg-surface: #0E0E12;
+  --bg-surface-elevated: #15151C;
+  --bg-surface-hover: #1C1C24;
+  --bg-surface-active: #252530;
+  --bg-card: #0E0E12;
   --bg-input: #08080A;
 
-  --border-hairline: rgba(255, 255, 255, 0.08);
-  --border-subtle: #222226;
-  --border-medium: #333338;
+  --border-hairline: rgba(255, 255, 255, 0.09);
+  --border-subtle: #272730;
+  --border-medium: #4B5563;
   --border-focus: #FFFFFF;
 
-  --text-primary: #FFFFFF;
-  --text-secondary: #D4D4D8;
-  --text-tertiary: #A1A1AA;
-  --text-muted: #52525B;
+  --text-primary: #F9FAFB;
+  --text-secondary: #D1D5DB;
+  --text-tertiary: #9CA3AF;
+  --text-muted: #6B7280;
 
   --accent-primary: #FFFFFF;
-  --accent-dim: #E4E4E7;
+  --accent-dim: #E5E7EB;
   --accent-subtle: rgba(255, 255, 255, 0.06);
   --accent-border: rgba(255, 255, 255, 0.18);
 
   --accent-lavender: #FFFFFF;
-  --accent-lavender-light: #E4E4E7;
-  --accent-lavender-dim: #A1A1AA;
+  --accent-lavender-light: #E5E7EB;
+  --accent-lavender-dim: #9CA3AF;
   --accent-lavender-subtle: rgba(255, 255, 255, 0.06);
   --accent-lavender-border: rgba(255, 255, 255, 0.18);
 
-  --indicator-neutral: #A1A1AA;
+  --checkbox-border: #6B7280;
+  --checkbox-check: #08080A;
+
+  --cal-header-color: #9CA3AF;
+  --cal-day-bg: #0E0E12;
+  --cal-day-border: rgba(255, 255, 255, 0.09);
+  --cal-day-color: #E5E7EB;
+  --cal-day-today-border: #FFFFFF;
+  --cal-day-selected-bg: #FFFFFF;
+  --cal-day-selected-color: #08080A;
+
+  --indicator-neutral: #9CA3AF;
   --indicator-active: #FFFFFF;
   --indicator-done: #FFFFFF;
 
@@ -116,13 +142,15 @@
   --stream-german: #71717a;
   --stream-physical: #3f3f46;
 
-  --heatmap-empty: #18181B;
-  --heatmap-lvl0: #18181B;
-  --heatmap-lvl1: #3F3F46;
-  --heatmap-lvl2: #71717A;
-  --heatmap-lvl3: #A1A1AA;
+  --heatmap-empty: #131317;
+  --heatmap-lvl0: #131317;
+  --heatmap-lvl1: #272730;
+  --heatmap-lvl2: #4B5563;
+  --heatmap-lvl3: #9CA3AF;
   --heatmap-lvl4: #FFFFFF;
 
+  --shadow-card: 0 1px 3px rgba(0, 0, 0, 0.4);
+  --shadow-card-elevated: 0 4px 14px rgba(0, 0, 0, 0.5);
   --shadow-dropdown: 0 16px 40px rgba(0, 0, 0, 0.85);
 }
 
@@ -448,11 +476,13 @@ body {
   border-radius: var(--radius-md);
   padding: 18px 20px;
   margin-bottom: 16px;
-  transition: border-color 0.12s ease;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease;
 }
 
 .monotone-card:hover {
   border-color: var(--border-subtle);
+  box-shadow: var(--shadow-card-elevated);
 }
 
 .card-label-row {
@@ -526,11 +556,14 @@ body {
   flex-direction: column;
   justify-content: space-between;
   min-height: 100px;
-  transition: border-color 0.12s ease;
+  box-shadow: var(--shadow-card);
+  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
 }
 
 .cockpit-card:hover {
   border-color: var(--border-subtle);
+  box-shadow: var(--shadow-card-elevated);
+  transform: translateY(-1px);
 }
 
 .cockpit-header {
@@ -849,8 +882,45 @@ body {
 .easy-links-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 6px;
-  margin-top: 4px;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.easy-link-btn {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  min-height: 40px;
+}
+
+.easy-link-btn:hover {
+  background: var(--bg-surface-hover);
+  border-color: var(--border-medium);
+  box-shadow: var(--shadow-card);
+  transform: translateY(-1px);
+}
+
+.easy-link-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex: 1;
+}
+
+.easy-link-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* TUM Bavarian Aptitude & What-If Simulator Grids */
@@ -896,17 +966,18 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-md);
-  padding: 12px 16px;
+  padding: 14px 18px;
   margin-bottom: 14px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  box-shadow: var(--shadow-card);
 }
 
 .routine-timeline {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 6px;
   margin-bottom: 16px;
 }
 
@@ -914,26 +985,29 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-sm);
-  padding: 9px 12px;
+  padding: 10px 14px;
   display: flex;
   align-items: center;
   gap: 12px;
   transition: all 0.12s ease;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.02);
 }
 
 .routine-block:hover {
   background: var(--bg-surface-elevated);
-  border-color: var(--border-subtle);
+  border-color: var(--border-medium);
 }
 
 .routine-block.deep-work {
-  border-left: 2px solid var(--accent-lavender);
+  border-left: 3px solid var(--text-primary);
+  background: var(--bg-surface-elevated);
 }
 
 .routine-time {
   font-family: var(--font-mono);
-  font-size: 10px;
-  color: var(--text-tertiary);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
   width: 90px;
   flex-shrink: 0;
 }
@@ -957,17 +1031,17 @@ body {
 /* Checkbox Style (Minimalist Square with Responsive Touch Hit Target) */
 .check-dot {
   position: relative;
-  width: 14px;
-  height: 14px;
-  border: 1.5px solid rgba(255, 255, 255, 0.22);
-  border-radius: 3px;
+  width: 15px;
+  height: 15px;
+  border: 1.5px solid var(--checkbox-border);
+  border-radius: 3.5px;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   transition: all 0.12s ease;
-  background: transparent;
+  background: var(--bg-surface);
   box-sizing: border-box;
 }
 
@@ -981,22 +1055,22 @@ body {
 }
 
 .check-dot:hover {
-  border-color: var(--accent-lavender);
-  background: rgba(196, 181, 253, 0.08);
+  border-color: var(--text-primary);
+  background: var(--bg-surface-hover);
 }
 
 .check-dot.checked {
-  background: var(--accent-lavender);
-  border-color: var(--accent-lavender);
+  background: var(--text-primary) !important;
+  border-color: var(--text-primary) !important;
 }
 
 .check-dot.checked::after {
   content: "";
   width: 4px;
   height: 7px;
-  border: solid #09090b;
+  border: solid var(--checkbox-check);
   border-width: 0 1.8px 1.8px 0;
-  transform: rotate(45deg) translate(-0.5px, -0.5px);
+  transform: rotate(45deg) translate(-0.5px, -1px);
   display: block;
 }
 
@@ -1063,31 +1137,43 @@ body {
 .mini-calendar-grid {
   display: grid;
   grid-template-columns: repeat(7, 1fr);
-  gap: 3px;
+  gap: 4px;
   text-align: center;
 }
 
 .mini-cal-header-day {
   font-family: var(--font-mono);
-  font-size: 9px;
-  color: var(--text-muted);
-  padding-bottom: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--cal-header-color);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding-bottom: 6px;
 }
 
 .mini-cal-day {
+  position: relative;
   font-family: var(--font-mono);
-  font-size: 10px;
-  padding: 5px 0;
-  border-radius: 2px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-hairline);
-  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 6px 0;
+  min-height: 28px;
+  border-radius: var(--radius-xs);
+  background: var(--cal-day-bg, var(--bg-surface));
+  border: 1px solid var(--cal-day-border);
+  color: var(--cal-day-color);
   cursor: pointer;
-  transition: all 0.1s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.12s ease;
+  line-height: 1;
 }
 
 .mini-cal-day:hover {
   background: var(--bg-surface-hover);
+  border-color: var(--border-medium);
   color: var(--text-primary);
 }
 
@@ -1098,16 +1184,37 @@ body {
 }
 
 .mini-cal-day.today {
-  border-color: #ffffff;
-  color: #ffffff;
-  font-weight: 700;
+  border: 1.5px solid var(--cal-day-today-border);
+  color: var(--text-primary);
+  font-weight: 800;
+  background: var(--bg-surface-elevated);
 }
 
 .mini-cal-day.selected {
-  background: var(--accent-lavender);
-  border-color: var(--accent-lavender);
-  color: #09090b;
-  font-weight: 700;
+  background: var(--cal-day-selected-bg) !important;
+  border-color: var(--cal-day-selected-bg) !important;
+  color: var(--cal-day-selected-color) !important;
+  font-weight: 800;
+  box-shadow: var(--shadow-card);
+}
+
+.mini-cal-day.today.selected {
+  background: var(--cal-day-selected-bg) !important;
+  border-color: var(--cal-day-selected-bg) !important;
+  color: var(--cal-day-selected-color) !important;
+}
+
+.mini-cal-day .cal-event-dot {
+  position: absolute;
+  bottom: 2.5px;
+  width: 3.5px;
+  height: 3.5px;
+  border-radius: 50%;
+  background: var(--text-primary);
+}
+
+.mini-cal-day.selected .cal-event-dot {
+  background: var(--cal-day-selected-color);
 }
 
 /* --------------------------------------------------------------------------
@@ -1676,21 +1783,22 @@ body {
    Dynamic "Right Now" Banner & United Study Protocol Styles
    ========================================================================== */
 .now-banner {
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-sm);
-  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
   position: relative;
   overflow: hidden;
+  box-shadow: var(--shadow-card);
 }
 
 .now-pulse-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #ffffff;
+  background: var(--text-primary);
   display: inline-block;
-  box-shadow: 0 0 8px rgba(255, 255, 255, 0.6);
+  box-shadow: 0 0 6px rgba(0, 0, 0, 0.2);
   animation: nowPulse 2s infinite ease-in-out;
 }
 
@@ -1702,94 +1810,25 @@ body {
   50% {
     transform: scale(1.2);
     opacity: 1;
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.9);
   }
 }
 
 .study-protocol-step {
-  transition: background 0.12s ease, border-color 0.12s ease;
+  transition: all 0.12s ease;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-hairline);
 }
 
 .study-protocol-step:hover {
-  border-color: var(--border-focus);
+  background: var(--bg-surface-hover);
+  border-color: var(--border-medium);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.02);
 }
 
 .study-layout {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
-}
-
-/* ==========================================================================
-   Mobile Bottom Dock Navigation & Editorial PWA Design System
-   ========================================================================== */
-.mobile-bottom-nav {
-  display: none;
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: calc(56px + env(safe-area-inset-bottom, 0px));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  background: rgba(8, 9, 11, 0.92);
-  backdrop-filter: blur(28px) saturate(190%);
-  -webkit-backdrop-filter: blur(28px) saturate(190%);
-  border-top: 1px solid rgba(255, 255, 255, 0.08);
-  z-index: 1000;
-  justify-content: space-around;
-  align-items: center;
-  user-select: none;
-}
-
-.mobile-nav-tab {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 3px;
-  height: 100%;
-  background: transparent;
-  border: none;
-  color: #71717a;
-  cursor: pointer;
-  padding: 6px 0;
-  transition: all 0.15s ease;
-  user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-
-.mobile-tab-icon {
-  width: 20px;
-  height: 20px;
-  stroke: currentColor;
-  transition: transform 0.15s ease, stroke 0.15s ease;
-}
-
-.mobile-tab-label {
-  font-family: var(--font-sans);
-  font-size: 10px;
-  font-weight: 500;
-  letter-spacing: 0.02em;
-  transition: color 0.15s ease;
-}
-
-.mobile-nav-tab:active {
-  transform: scale(0.92);
-}
-
-.mobile-nav-tab.active {
-  color: var(--accent-lavender, #d8b4fe);
-}
-
-.mobile-nav-tab.active .mobile-tab-icon {
-  stroke: var(--accent-lavender, #d8b4fe);
-  transform: translateY(-1px);
-}
-
-.mobile-nav-tab.active .mobile-tab-label {
-  color: #ffffff;
-  font-weight: 600;
 }
 
 .mobile-only-btn {

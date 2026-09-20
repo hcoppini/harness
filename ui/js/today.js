@@ -241,6 +241,8 @@ const Today = {
     }
 
     const todayStr = this.getLocalDateStr();
+    const examsDates = new Set((this.examsList || []).map((e) => e.exam_date));
+    const hwDates = new Set((this.homeworkList || []).map((h) => h.due_date));
 
     for (let d = 1; d <= daysInMonth; d++) {
       const monthStr = String(this.calDisplayMonth + 1).padStart(2, "0");
@@ -249,13 +251,17 @@ const Today = {
 
       const isToday = cellDateStr === todayStr ? "today" : "";
       const isSelected = cellDateStr === this.selectedDateStr ? "selected" : "";
+      const hasEvent = examsDates.has(cellDateStr) || hwDates.has(cellDateStr);
 
       html += `
         <div 
           class="mini-cal-day ${isToday} ${isSelected}" 
           onclick="Today.selectDate('${cellDateStr}')"
-          title="${cellDateStr}"
-        >${d}</div>
+          title="${cellDateStr}${hasEvent ? ' (Scheduled Academic Items)' : ''}"
+        >
+          <span>${d}</span>
+          ${hasEvent ? `<span class="cal-event-dot"></span>` : ""}
+        </div>
       `;
     }
 
@@ -1122,15 +1128,15 @@ const Today = {
           }
 
           const badgeColor = isUrgent
-            ? "border-color: #f59e0b; color: #f59e0b;"
-            : "border-color: rgba(196, 181, 253, 0.3); color: var(--accent-lavender);";
+            ? "border-color: var(--border-focus); color: var(--text-primary); font-weight: 700;"
+            : "border-color: var(--border-medium); color: var(--text-secondary);";
 
           return `
             <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 7px 9px; margin-bottom: 2px;">
               <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 3px;">
                 <div style="display: flex; align-items: center; gap: 6px; min-width: 0;">
                   <div class="check-dot ${h.completed ? "checked" : ""}" onclick="Today.toggleHomeworkItem(${h.id})" title="Mark completed"></div>
-                  <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 700; white-space: nowrap;">
+                  <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-primary); font-weight: 700; white-space: nowrap;">
                     [${this.escapeHtml(h.subject)}]
                   </span>
                 </div>
@@ -1148,7 +1154,7 @@ const Today = {
 
         let html = "";
         if (dueThisWeek.length > 0) {
-          html += `<div style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--accent-lavender); text-transform: uppercase; letter-spacing: 0.05em; margin: 4px 0 2px 2px;">Due This Week (${dueThisWeek.length})</div>`;
+          html += `<div style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--text-primary); text-transform: uppercase; letter-spacing: 0.05em; margin: 4px 0 2px 2px;">Due This Week (${dueThisWeek.length})</div>`;
           html += dueThisWeek.map(renderItem).join("");
         }
 
@@ -1175,7 +1181,7 @@ const Today = {
               <div style="display: flex; justify-content: space-between; align-items: flex-start; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 6px 8px; margin-bottom: 2px;">
                 <div style="flex: 1; min-width: 0; padding-right: 6px;">
                   <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 700;">[${this.escapeHtml(e.subject)}]</span>
+                    <span style="font-size: 10px; font-family: var(--font-mono); color: var(--text-primary); font-weight: 700;">[${this.escapeHtml(e.subject)}]</span>
                     <span style="font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono);">${e.exam_date}</span>
                   </div>
                   <div style="font-size: 11px; color: var(--text-primary); margin-top: 2px; font-weight: 500; line-height: 1.3; word-break: break-word;">
@@ -1184,7 +1190,7 @@ const Today = {
                   ${e.scope ? `<div style="font-size: 10px; color: var(--text-tertiary); margin-top: 2px; line-height: 1.25; word-break: break-word;">Zakres: ${this.escapeHtml(e.scope)}</div>` : ""}
                 </div>
                 <div style="display: flex; align-items: center; gap: 4px; flex-shrink: 0;">
-                  <span class="key-pill" style="font-size: 9px; color: var(--accent-purple-light); border-color: rgba(196, 181, 253, 0.3);">${countdown}</span>
+                  <span class="key-pill" style="font-size: 9px; color: var(--text-primary); border-color: var(--border-medium); font-weight: 600;">${countdown}</span>
                   <button class="btn-ghost-icon" style="padding: 1px 4px; font-size: 10px; color: var(--text-tertiary);" onclick="Today.deleteExamItem(${e.id})" title="Delete">&times;</button>
                 </div>
               </div>
@@ -1193,6 +1199,8 @@ const Today = {
           .join("");
       }
     }
+
+    this.renderMiniCalendar();
   },
 
   async toggleHomeworkItem(id) {
