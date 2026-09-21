@@ -1,5 +1,5 @@
-// Harness Executive OS - Universal Unified Service Worker (v5.0 Monochrome)
-const CACHE_NAME = 'harness-monochrome-v5.0';
+// Harness Executive OS - Universal Unified Service Worker (v5.2 Monochrome)
+const CACHE_NAME = 'harness-monochrome-v5.2';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
@@ -8,20 +8,20 @@ const STATIC_ASSETS = [
   '/apple-touch-icon.png',
   '/icon-192.png',
   '/icon-512.png',
-  '/css/app.css?v=5.0',
-  '/js/api_bridge.js?v=5.0',
-  '/js/metro.js?v=5.0',
-  '/js/dashboard.js?v=5.0',
-  '/js/study.js?v=5.0',
-  '/js/today.js?v=5.0',
-  '/js/tum.js?v=5.0',
-  '/js/projects.js?v=5.0',
-  '/js/body.js?v=5.0',
-  '/js/knowledge.js?v=5.0',
-  '/js/focus_timer.js?v=5.0',
-  '/js/command_palette.js?v=5.0',
-  '/js/kill_list.js?v=5.0',
-  '/js/app.js?v=5.0'
+  '/css/app.css?v=5.2',
+  '/js/api_bridge.js?v=5.2',
+  '/js/metro.js?v=5.2',
+  '/js/dashboard.js?v=5.2',
+  '/js/study.js?v=5.2',
+  '/js/today.js?v=5.2',
+  '/js/tum.js?v=5.2',
+  '/js/projects.js?v=5.2',
+  '/js/body.js?v=5.2',
+  '/js/knowledge.js?v=5.2',
+  '/js/focus_timer.js?v=5.2',
+  '/js/command_palette.js?v=5.2',
+  '/js/kill_list.js?v=5.2',
+  '/js/app.js?v=5.2'
 ];
 
 self.addEventListener('install', (event) => {

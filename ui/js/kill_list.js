@@ -227,7 +227,7 @@ const KillListDrawer = {
             }
 
             return `
-              <div class="kill-item-card ${isDone ? "done" : ""}" style="background: #0d0f12; border: 1px solid ${isDone ? "rgba(255,255,255,0.04)" : "rgba(255,255,255,0.08)"}; border-radius: 6px; padding: 12px 14px; margin-bottom: 8px; transition: all 0.15s ease;">
+              <div class="kill-item-card ${isDone ? "done" : ""}">
                 <div style="display: flex; align-items: flex-start; justify-content: space-between; gap: 10px;">
                   <!-- Checkbox -->
                   <div 
@@ -240,7 +240,7 @@ const KillListDrawer = {
                   <!-- Info Block -->
                   <div style="flex: 1; min-width: 0;">
                     <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
-                      <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${streamColor}; text-transform: uppercase; border: 1px solid rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 2px;">
+                      <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${streamColor}; text-transform: uppercase; border: 1px solid var(--border-subtle); padding: 1px 5px; border-radius: 2px;">
                         ${this.escapeHtml(item.category)}
                       </span>
                       ${qtyBadge}

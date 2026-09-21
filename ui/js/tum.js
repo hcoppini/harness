@@ -92,7 +92,10 @@ const Tum = {
 
     const rowsHtml = list
       .map((grade) => {
-        const entries = grade.entries || [];
+        const entries = (grade.entries || []).filter((e) => {
+          const d = ((e.description || "") + " " + (e.raw_input || "")).toLowerCase();
+          return !d.includes("funkcje wymierne") && !d.includes("algorytmu grafowego");
+        });
         const runningAvg = grade.running_average;
         const actual = grade.actual_grade;
         const target = grade.target_grade || 5.0;

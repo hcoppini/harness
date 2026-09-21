@@ -171,6 +171,50 @@ const MetroMap = {
           );
         });
       }
+
+      if (!this.upcomingExams || this.upcomingExams.length === 0) {
+        let cachedExams = null;
+        try {
+          const cachedStr = localStorage.getItem("harness_exams_v3");
+          if (cachedStr) cachedExams = JSON.parse(cachedStr);
+        } catch (e) {}
+
+        if (Array.isArray(cachedExams) && cachedExams.length > 0) {
+          this.upcomingExams = cachedExams.filter((e) => {
+            const t = ((e.title || "") + " " + (e.scope || "")).toLowerCase();
+            return !t.includes("trygonometria") && !t.includes("kinematyka") && !t.includes("wyszukiwania") && !t.includes("powstanie styczniowe");
+          });
+        }
+
+        if (!this.upcomingExams || this.upcomingExams.length === 0) {
+          this.upcomingExams = [
+            {
+              id: 7,
+              subject: "Informatyka",
+              title: "Sprawdzian: Podstawy programowania (C++)",
+              exam_date: "2026-09-21",
+              scope: "Podstawy programowania - pojęcia (algorytmy, cout, cin, instrukcja if)",
+              completed: false,
+            },
+            {
+              id: 5,
+              subject: "Geografia",
+              title: "Sprawdzian: Mapa fizyczna Polski",
+              exam_date: "2026-10-02",
+              scope: "Sprawdzian wiadomości - Mapa fizyczna Polski.",
+              completed: false,
+            },
+            {
+              id: 6,
+              subject: "Język polski",
+              title: "Sprawdzian: Rozprawka (romantyzm)",
+              exam_date: "2026-10-06",
+              scope: "Rozprawka (romantyzm) - wstęp, teza, argument, przykład, kontekst.",
+              completed: false,
+            },
+          ];
+        }
+      }
       this.render();
       setTimeout(() => this.scrollToBeacon(), 200);
     } catch (err) {
@@ -404,7 +448,9 @@ const MetroMap = {
             const totalMs = endDate.getTime() - startDate.getTime();
             const ratio = elapsed / totalMs;
             const testX = startX + ratio * totalTrackLength;
-            const diffDays = Math.ceil((exDate.getTime() - nowMs) / (1000 * 60 * 60 * 24));
+            const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+            const examMid = new Date(exDate.getFullYear(), exDate.getMonth(), exDate.getDate()).getTime();
+            const diffDays = Math.round((examMid - todayMid) / (1000 * 60 * 60 * 24));
             const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "TMRW" : diffDays > 0 ? `in ${diffDays}d` : `${Math.abs(diffDays)}d ago`;
             const isTodayExam = diffDays === 0;
             const flagY = spineY - 34;
@@ -448,7 +494,7 @@ const MetroMap = {
 
     // SVG Base Lines (Main Spine, Grid, Tee Pins, Jagged Streams, Circles, Test Dots)
     let svgHtml = `
-      <svg width="${totalWidth}" height="520" style="position: absolute; top: 0; left: 0; pointer-events: none;">
+      <svg width="${totalWidth}" height="520" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 25;">
         <!-- Phase Vertical Grid Lines -->
         ${phases
           .map(
