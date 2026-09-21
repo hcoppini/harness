@@ -89,6 +89,19 @@ def test_grade_parser_non_ordinary_np_bz():
     assert p_bz["counts_in_average"] is False
     assert p_bz["display_label"] == "BZ"
 
+    # Polish school NP date format (e.g. teacher enters "20.9" for NP on Sep 20)
+    p_date_np = parse_polish_grade("20.9")
+    assert p_date_np["valid"] is True
+    assert p_date_np["numeric_value"] is None
+    assert p_date_np["counts_in_average"] is False
+    assert p_date_np["display_label"] == "NP (20.9)"
+
+    p_date_np2 = parse_polish_grade("20.09")
+    assert p_date_np2["valid"] is True
+    assert p_date_np2["numeric_value"] is None
+    assert p_date_np2["counts_in_average"] is False
+    assert p_date_np2["display_label"] == "NP (20.09)"
+
 
 def test_singular_grade_impact_on_running_average(test_db):
     # Initial state

@@ -46,7 +46,11 @@ def percentage_to_polish_grade(pct: float) -> Tuple[float, str]:
         return 1.0, "1"
 
 
-def parse_polish_grade(raw_input: str) -> Dict[str, Any]:
+def parse_polish_grade(
+    raw_input: str,
+    category: Optional[str] = None,
+    description: Optional[str] = None,
+) -> Dict[str, Any]:
     """
     Parses a user input grade string and returns a structured record with:
       - valid: bool
@@ -72,19 +76,52 @@ def parse_polish_grade(raw_input: str) -> Dict[str, Any]:
         }
 
     lower = cleaned.lower()
+    cat_lower = (category or "").lower()
+    desc_lower = (description or "").lower()
+    is_np_context = (
+        "nieprzygotowan" in cat_lower or cat_lower == "np" or
+        "nieprzygotowan" in desc_lower or desc_lower == "np" or
+        "np " in desc_lower or " np" in desc_lower or "(np)" in desc_lower
+    )
 
-    # 1. Check Non-Ordinary Informational Markers: NP, BZ, plus, minus
-    if lower in ["np", "nieprzygotowanie"]:
+    # 1. Check Nieprzygotowanie (NP) - text markers or date markers (e.g. 20.9, 20.09)
+    # In Polish schools, teachers enter the date of the NP as the grade entry (e.g. 20.9).
+    date_match = re.match(r"^(\d{1,2})\.(\d{1,2})$", cleaned)
+    if not date_match and is_np_context:
+        date_match = re.match(r"^(\d{1,2})[./-](\d{1,2})$", cleaned)
+
+    is_date_np = False
+    if date_match:
+        try:
+            day = int(date_match.group(1))
+            month = int(date_match.group(2))
+            if 1 <= day <= 31 and 1 <= month <= 12:
+                valid_polish_grades = {1.0, 1.25, 1.5, 1.75, 2.0, 2.25, 2.5, 2.75, 3.0, 3.25, 3.5, 3.75, 4.0, 4.25, 4.5, 4.75, 5.0, 5.25, 5.5, 5.75, 6.0}
+                if day > 6 or is_np_context or date_match.group(2).startswith("0"):
+                    is_date_np = True
+                elif float(cleaned) not in valid_polish_grades:
+                    is_date_np = True
+        except ValueError:
+            pass
+
+    if (
+        lower in ["np", "nieprzygotowanie", "nieprzygotowany", "np.", "np:"] or
+        is_date_np or
+        (is_np_context and not re.match(r"^[1-6][+-]?$", cleaned))
+    ):
+        label = f"NP ({cleaned})" if (is_date_np and cleaned not in ["np", "nieprzygotowanie"]) else "NP"
         return {
             "valid": True,
             "raw_input": cleaned,
             "numeric_value": None,
-            "display_label": "NP",
+            "display_label": label,
             "counts_in_average": False,
             "percentage": None,
             "grade_type": "special",
-            "badge_color": "#a1a1aa",  # Muted grey
+            "badge_color": "#6b7280",  # Muted grey
         }
+
+    # 2. Check Other Non-Ordinary Informational Markers: BZ, plus, minus
     if lower in ["bz", "brak zadania", "brak zad"]:
         return {
             "valid": True,
@@ -94,7 +131,7 @@ def parse_polish_grade(raw_input: str) -> Dict[str, Any]:
             "counts_in_average": False,
             "percentage": None,
             "grade_type": "special",
-            "badge_color": "#f87171",  # Reddish
+            "badge_color": "#9f1239",  # Deep red
         }
     if cleaned == "+":
         return {
@@ -105,7 +142,7 @@ def parse_polish_grade(raw_input: str) -> Dict[str, Any]:
             "counts_in_average": False,
             "percentage": None,
             "grade_type": "special",
-            "badge_color": "#6ee7b7",
+            "badge_color": "#166534",  # Deep emerald
         }
     if cleaned == "-":
         return {
@@ -116,7 +153,7 @@ def parse_polish_grade(raw_input: str) -> Dict[str, Any]:
             "counts_in_average": False,
             "percentage": None,
             "grade_type": "special",
-            "badge_color": "#fda4af",
+            "badge_color": "#9f1239",  # Deep red
         }
 
     # 2. Points / Fractions format: e.g. "17/17", "14 / 20", "28.5/30"
@@ -223,16 +260,16 @@ def parse_polish_grade(raw_input: str) -> Dict[str, Any]:
 def get_grade_badge_color(val: Optional[float]) -> str:
     """Returns aesthetic color hex for grade badge according to Polish scale."""
     if val is None:
-        return "#a1a1aa"
+        return "#6b7280"
     if val >= 5.0:
-        return "#6ee7b7"  # Emerald / Celujący / Bdb
+        return "#166534"  # Deep Forest Emerald / Celujący / Bdb
     if val >= 4.0:
-        return "#7dd3fc"  # Sky Blue / Dobry
+        return "#1e40af"  # Deep Navy / Dobry
     if val >= 3.0:
-        return "#c4b5fd"  # Lavender / Dostateczny
+        return "#5b21b6"  # Deep Lavender/Violet / Dostateczny
     if val >= 2.0:
-        return "#f59e0b"  # Amber / Dopuszczający
-    return "#f87171"      # Red / Niedostateczny
+        return "#92400e"  # Deep Warm Amber / Dopuszczający
+    return "#9f1239"      # Deep Crimson / Niedostateczny
 
 
 def calculate_subject_average(entries: List[Dict[str, Any]]) -> Optional[float]:

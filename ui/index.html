@@ -1548,6 +1548,40 @@
     </div>
   </div>
 
+  <!-- Deep Work Plan & Wind-Down Modal Window (Harness 3.5) -->
+  <div id="deepWorkPlanBackdrop" class="plan-modal-backdrop" onclick="Today.closeDeepWorkPlanModal()">
+    <div class="plan-modal-dialog" onclick="event.stopPropagation()">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; padding: 18px 20px; border-bottom: 1px solid var(--border-hairline);">
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--accent-lavender); letter-spacing: 0.06em;">SGH LIBRARY // 2-HOUR EXECUTION PLAN</span>
+            <span id="planWorkloadBadge" class="mono-chip lavender">Surge Defense</span>
+          </div>
+          <div id="planModalTitle" style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-top: 4px;">
+            Deep Focus Session & Wind-Down Protocol
+          </div>
+          <div id="planModalTimeSubtitle" style="font-family: var(--font-mono); font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+            14:30 – 16:30 • Hard Commute Cutoff 16:30
+          </div>
+        </div>
+        <button type="button" class="drawer-close-btn" onclick="Today.closeDeepWorkPlanModal()" style="font-size: 20px; line-height: 1; border: none; background: none; color: var(--text-secondary); cursor: pointer;">&times;</button>
+      </div>
+
+      <div id="planModalBody" style="padding: 18px 20px; display: flex; flex-direction: column; gap: 14px;">
+        <!-- Populated dynamically by Today.openDeepWorkPlanModal() -->
+      </div>
+
+      <div style="padding: 14px 20px; border-top: 1px solid var(--border-hairline); display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: var(--radius-md);">
+        <button type="button" class="btn-primary" onclick="Today.closeDeepWorkPlanModal(); if (window.KillListDrawer) window.KillListDrawer.open(Today.selectedDateStr);" style="font-size: 11px; padding: 6px 14px; font-weight: 700;">
+          Open Kill List Drawer →
+        </button>
+        <button type="button" class="btn-subtle" onclick="Today.closeDeepWorkPlanModal()" style="font-size: 11px; padding: 6px 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary);">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- 6. Kill List Sliding Drawer (Harness 2.1 - SGH Library Execution Engine) -->
   <div id="killListBackdrop" class="kill-list-backdrop"></div>
   <div id="killListDrawer" class="kill-list-drawer">

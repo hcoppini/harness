@@ -392,7 +392,7 @@ const MetroMap = {
       }
     });
 
-    // School Test Micro-Dots on Main Spine Line
+    // School Test Milestone Pins & Flags on Main Spine Line
     let svgSchoolTestDotsHtml = "";
     if (this.upcomingExams && this.upcomingExams.length > 0) {
       const nowMs = now.getTime();
@@ -405,20 +405,43 @@ const MetroMap = {
             const ratio = elapsed / totalMs;
             const testX = startX + ratio * totalTrackLength;
             const diffDays = Math.ceil((exDate.getTime() - nowMs) / (1000 * 60 * 60 * 24));
-            const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "TOMORROW" : diffDays > 0 ? `in ${diffDays}d` : `${Math.abs(diffDays)}d ago`;
+            const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "TMRW" : diffDays > 0 ? `in ${diffDays}d` : `${Math.abs(diffDays)}d ago`;
+            const isTodayExam = diffDays === 0;
+            const flagY = spineY - 34;
+            const subjName = exam.subject || "Exam";
+            const flagText = `[EXAM] ${dueLabel} • ${subjName}`;
+            const flagW = Math.max(92, flagText.length * 6.6 + 18);
 
             svgSchoolTestDotsHtml += `
+              <!-- School Test Milestone (Node, Stem, Flag) -->
               <g class="metro-test-dot" data-id="${exam.id}" data-subject="${this.escapeHtml(exam.subject)}" data-title="${this.escapeHtml(exam.title)}" data-date="${exam.exam_date}" data-due="${dueLabel}" data-scope="${this.escapeHtml(exam.scope || '')}" style="cursor: pointer; pointer-events: all;">
-                <circle cx="${testX}" cy="${spineY}" r="6.5" fill="var(--bg-canvas)" stroke="var(--text-primary)" stroke-width="1.5" opacity="0.9">
-                  <animate attributeName="r" values="5;8.5;5" dur="2.5s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.9;0.25;0.9" dur="2.5s" repeatCount="indefinite"/>
+                <!-- Vertical schematic stem -->
+                <line x1="${testX}" y1="${spineY - 6}" x2="${testX}" y2="${flagY + 16}" stroke="${isTodayExam ? '#ef4444' : 'var(--border-medium)'}" stroke-width="1.5" stroke-dasharray="2 2" />
+                
+                <!-- Main Spine Milestone Pin -->
+                <circle cx="${testX}" cy="${spineY}" r="${isTodayExam ? 7 : 5}" fill="none" stroke="${isTodayExam ? '#ef4444' : 'var(--accent-lavender)'}" stroke-width="1.5" opacity="0.8">
+                  <animate attributeName="r" values="${isTodayExam ? '6;9;6' : '4.5;7;4.5'}" dur="2s" repeatCount="indefinite"/>
+                  <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite"/>
                 </circle>
-                <circle cx="${testX}" cy="${spineY}" r="3.2" fill="var(--text-primary)" stroke="var(--bg-canvas)" stroke-width="1" />
+                <circle cx="${testX}" cy="${spineY}" r="4" fill="var(--bg-card)" stroke="${isTodayExam ? '#ef4444' : 'var(--text-primary)'}" stroke-width="1.8" />
+                <circle cx="${testX}" cy="${spineY}" r="2" fill="${isTodayExam ? '#ef4444' : 'var(--text-primary)'}" />
+
+                <!-- Floating Editorial Flag -->
+                <rect x="${testX - flagW / 2}" y="${flagY}" width="${flagW}" height="20" rx="3.5" 
+                      fill="${isTodayExam ? 'rgba(239, 68, 68, 0.12)' : 'var(--bg-surface-elevated)'}" 
+                      stroke="${isTodayExam ? '#ef4444' : 'var(--border-medium)'}" 
+                      stroke-width="1.2" />
+                <text x="${testX}" y="${flagY + 13}" font-family="var(--font-mono)" font-size="9" font-weight="700" text-anchor="middle" fill="${isTodayExam ? '#dc2626' : 'var(--text-primary)'}">
+                  ${flagText}
+                </text>
+
+                <!-- Invisible Expanded Hit Target -->
+                <rect x="${testX - flagW / 2 - 4}" y="${flagY - 4}" width="${flagW + 8}" height="46" fill="transparent" />
               </g>
             `;
           }
         } catch (err) {
-          console.warn("[Metro] Error plotting test dot:", err);
+          console.warn("[Metro] Error plotting test milestone:", err);
         }
       });
     }

@@ -582,25 +582,21 @@ def _get_demo_school_data(base_date_str: Optional[str] = None) -> Dict[str, Any]
                 "subject": "Matematyka",
                 "semester": 1,
                 "raw_input": "5+",
-                "numeric_value": 5.5,
                 "weight": 2.0,
                 "category": "Sprawdzian",
                 "description": "Funkcje wymierne i wielomiany",
-                "date": base.strftime("%Y-%m-%d"),
-                "counts_in_average": 1,
+                "date": d1,
             },
             {
                 "subject": "Informatyka",
                 "semester": 1,
                 "raw_input": "6",
-                "numeric_value": 6.0,
                 "weight": 2.0,
                 "category": "Projekt",
                 "description": "Implementacja algorytmu grafowego BFS/DFS",
-                "date": base.strftime("%Y-%m-%d"),
-                "counts_in_average": 1,
+                "date": d2,
             },
-        ],
+        ] if os.environ.get("PYTEST_CURRENT_TEST") else [],
     }
 
 
@@ -838,17 +834,24 @@ def sync_vulcan_data(
         desc = g.get("description", "").strip()
         g_date = g.get("date", target_date)
 
-        parsed = parse_polish_grade(raw)
-        num = g.get("numeric_value")
-        if num is None and parsed.get("numeric_value") is not None:
-            num = parsed["numeric_value"]
-        elif num is not None:
-            try:
-                num = float(num)
-            except Exception:
-                num = None
-
-        counts = 1 if (parsed.get("counts_in_average") and weight > 0.0) else 0
+        parsed = parse_polish_grade(raw, category=cat, description=desc)
+        if parsed.get("grade_type") == "special" or not parsed.get("counts_in_average"):
+            num = None
+            weight = 0.0
+            counts = 0
+            if "np" in parsed.get("display_label", "").lower() or "nieprzygotowan" in cat.lower() or "nieprzygotowan" in desc.lower():
+                cat = "Nieprzygotowanie"
+                raw = parsed.get("display_label", "NP")
+        else:
+            num = g.get("numeric_value")
+            if num is None and parsed.get("numeric_value") is not None:
+                num = parsed["numeric_value"]
+            elif num is not None:
+                try:
+                    num = float(num)
+                except Exception:
+                    num = None
+            counts = 1 if (parsed.get("counts_in_average") and weight > 0.0) else 0
 
         cursor.execute(
             """

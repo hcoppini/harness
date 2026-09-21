@@ -410,11 +410,15 @@ const Today = {
         const isDeepWork = block.type === "deep_work" || block.type === "study_block" || (block.focus && (block.focus.includes("Deep Work") || block.focus.includes("SGH Library") || block.focus.includes("Weekend Deep Work") || block.focus.includes("Weekend Focus")));
         const isChecked = this.completedBlocks.has(String(idx));
         const schoolBadge = block.is_school_dedicated ? `<span class="mono-chip" style="font-size: 9px; padding: 1px 5px; margin-left: 6px;">School First</span>` : "";
+        const compactActivity = isDeepWork
+          ? "2-Hour Time-Divided Session • Commute Cutoff 16:30"
+          : this.escapeHtml(block.activity);
+
         return `
           <div 
             class="routine-block ${isDeepWork ? "deep-work clickable" : ""} ${isChecked ? "completed" : ""}"
-            ${isDeepWork ? `onclick="if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');"` : ""}
-            ${isDeepWork ? 'title="Click to open SGH Library Kill List Drawer"' : ""}
+            ${isDeepWork ? `onclick="Today.openDeepWorkPlanModal(${idx});"` : ""}
+            ${isDeepWork ? 'title="Click to view 2-hour divided plan & wind-down protocol"' : ""}
             style="display: flex; align-items: center; gap: 10px; ${isDeepWork ? "cursor: pointer; border-left: 3px solid var(--accent-lavender);" : ""} ${isChecked ? "opacity: 0.65;" : ""}"
           >
             <div 
@@ -429,17 +433,90 @@ const Today = {
                 <span>${this.escapeHtml(block.focus)}</span>
                 ${schoolBadge}
               </div>
-              <div class="routine-activity" style="font-size: 11px; color: var(--text-tertiary);">${this.escapeHtml(block.activity)}</div>
+              <div class="routine-activity" style="font-size: 11px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${compactActivity}</div>
             </div>
             ${
               isDeepWork
-                ? `<button class="btn-primary" onclick="event.stopPropagation(); if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; letter-spacing: 0.03em;" title="Open Kill List Drawer">[KILL LIST]</button>`
+                ? `
+                  <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                    <button class="btn-subtle" onclick="event.stopPropagation(); Today.openDeepWorkPlanModal(${idx});" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer; white-space: nowrap;" title="Open Hour-by-Hour Session Plan & Wind-Down Protocol">Open Plan →</button>
+                    <button class="btn-primary" onclick="event.stopPropagation(); if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; letter-spacing: 0.03em; white-space: nowrap;" title="Open Kill List Drawer">[KILL LIST]</button>
+                  </div>
+                `
                 : ""
             }
           </div>
         `;
       })
       .join("");
+  },
+
+  openDeepWorkPlanModal(idx) {
+    const backdrop = document.getElementById("deepWorkPlanBackdrop");
+    const body = document.getElementById("planModalBody");
+    const titleEl = document.getElementById("planModalTitle");
+    const timeEl = document.getElementById("planModalTimeSubtitle");
+    const badgeEl = document.getElementById("planWorkloadBadge");
+    if (!backdrop || !body) return;
+
+    const block = (this.schedule && this.schedule.blocks && this.schedule.blocks[idx]) ? this.schedule.blocks[idx] : null;
+    const wl = this.schedule ? this.schedule.workload : null;
+    const wlMode = wl ? wl.mode : "CRUISE";
+
+    if (badgeEl) {
+      badgeEl.textContent = wlMode === "SURGE" ? "Surge Defense" : wlMode === "BALANCED" ? "Balanced Track" : "Cruise Protocol";
+      badgeEl.className = `mono-chip ${wlMode === "SURGE" ? "rose" : wlMode === "BALANCED" ? "lavender" : "optimal"}`;
+    }
+
+    if (block) {
+      if (titleEl) titleEl.textContent = block.focus || "Deep Focus Session";
+      if (timeEl) timeEl.textContent = `${block.time || "14:30 – 16:30"} • Commute Cutoff 16:30`;
+    }
+
+    const rawActivity = block ? block.activity : "";
+    const isSchool = block && block.is_school_dedicated;
+
+    let hour1Title = isSchool ? "Phase 1: High-Cognition Academic Defense" : "Phase 1: High-Cognition Deep Work";
+    let hour1Desc = rawActivity || "50m zero-distraction focus sprint + 10m mental reset buffer.";
+    let hour2Title = "Phase 2: Core TUM Deliverable / LeetCode & German";
+    let hour2Desc = "45m solve 1 LeetCode problem unassisted (trace on paper first) + 15m German vocabulary (A2/B1).";
+    let winddownDesc = "Session Audit: verify code commits, check off completed Kill List targets, close laptop, pack gear. Strict departure at 16:30 to guarantee arrival for evening routine / boxing.";
+
+    body.innerHTML = `
+      <div class="plan-phase-card phase-1">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--accent-lavender);">HOUR 1 (14:30 – 15:30)</span>
+          <span class="key-pill" style="font-size: 9px;">50m Focus + 10m Buffer</span>
+        </div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">${this.escapeHtml(hour1Title)}</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-top: 4px;">${this.escapeHtml(hour1Desc)}</div>
+      </div>
+
+      <div class="plan-phase-card phase-2">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #0284c7;">HOUR 2 (15:30 – 16:30)</span>
+          <span class="key-pill" style="font-size: 9px;">45m Code + 15m German</span>
+        </div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">${this.escapeHtml(hour2Title)}</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-top: 4px;">${this.escapeHtml(hour2Desc)}</div>
+      </div>
+
+      <div class="plan-phase-card phase-winddown">
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #d97706;">WIND-DOWN & COMMUTE (16:30)</span>
+          <span class="key-pill" style="font-size: 9px; color: #d97706; border-color: rgba(217, 119, 6, 0.3);">Hard Cutoff</span>
+        </div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">Clean Departure Protocol</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-top: 4px;">${this.escapeHtml(winddownDesc)}</div>
+      </div>
+    `;
+
+    backdrop.classList.add("open");
+  },
+
+  closeDeepWorkPlanModal() {
+    const backdrop = document.getElementById("deepWorkPlanBackdrop");
+    if (backdrop) backdrop.classList.remove("open");
   },
 
   async toggleRoutineBlock(idx) {

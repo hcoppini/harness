@@ -17,9 +17,9 @@
   --bg-input: #FFFFFF;
 
   /* Calibrated Hairlines & Tactile Borders */
-  --border-hairline: #E5E7EB;
-  --border-subtle: #D8DCE3;
-  --border-medium: #B5BAC5;
+  --border-hairline: #D8DCE3;
+  --border-subtle: #C4C9D4;
+  --border-medium: #8F96A3;
   --border-focus: #111827;
 
   /* Editorial Typography: Warm, Rich Darks (eliminates harsh white-on-black glare) */
@@ -34,21 +34,21 @@
   --accent-subtle: rgba(17, 24, 39, 0.05);
   --accent-border: rgba(17, 24, 39, 0.12);
 
-  --accent-lavender: #111827;
-  --accent-lavender-light: #27272A;
-  --accent-lavender-dim: #4B5563;
-  --accent-lavender-subtle: rgba(17, 24, 39, 0.05);
-  --accent-lavender-border: rgba(17, 24, 39, 0.15);
+  --accent-lavender: #4338ca;
+  --accent-lavender-light: #6366f1;
+  --accent-lavender-dim: #3730a3;
+  --accent-lavender-subtle: rgba(67, 56, 202, 0.08);
+  --accent-lavender-border: rgba(67, 56, 202, 0.25);
 
   /* Checkbox System */
-  --checkbox-border: #9CA3AF;
+  --checkbox-border: #4B5563;
   --checkbox-check: #FFFFFF;
 
   /* Calendar System */
-  --cal-header-color: #4B5563;
+  --cal-header-color: #374151;
   --cal-day-bg: #FFFFFF;
-  --cal-day-border: #E5E7EB;
-  --cal-day-color: #1F2937;
+  --cal-day-border: #D8DCE3;
+  --cal-day-color: #111827;
   --cal-day-today-border: #111827;
   --cal-day-selected-bg: #111827;
   --cal-day-selected-color: #FFFFFF;
@@ -56,7 +56,7 @@
   /* Clean Neutral Indicators */
   --indicator-neutral: #6B7280;
   --indicator-active: #111827;
-  --indicator-done: #111827;
+  --indicator-done: #15803d;
 
   /* Stream Highlighter Line Colors (Calibrated Monochrome Grayscale) */
   --stream-academic: #18181b;
@@ -279,15 +279,27 @@ body {
 .key-pill {
   font-family: var(--font-mono);
   font-size: 9px;
-  font-weight: 500;
-  padding: 0 4px;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid var(--border-hairline);
-  border-radius: 2px;
-  color: var(--text-tertiary);
+  font-weight: 600;
+  padding: 1px 5px;
+  background: rgba(17, 24, 39, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: 3px;
+  color: var(--text-secondary);
 }
 
 .nav-tab.active .key-pill {
+  background: rgba(67, 56, 202, 0.12);
+  border-color: var(--accent-lavender-border);
+  color: var(--accent-lavender);
+}
+
+[data-theme="dark"] .key-pill {
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+}
+
+[data-theme="dark"] .nav-tab.active .key-pill {
   background: rgba(216, 180, 254, 0.15);
   border-color: var(--accent-lavender-border);
   color: var(--accent-lavender);
@@ -508,22 +520,72 @@ body {
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  padding: 1px 5px;
-  border-radius: 2px;
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary);
-  border: 1px solid var(--border-hairline);
+  padding: 1px 6px;
+  border-radius: 3px;
+  background: rgba(17, 24, 39, 0.05);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
 }
 
 .mono-chip.lavender {
-  color: var(--accent-lavender);
-  background: var(--accent-lavender-subtle);
-  border-color: var(--accent-lavender-border);
+  color: #4338ca;
+  background: rgba(67, 56, 202, 0.08);
+  border-color: rgba(67, 56, 202, 0.25);
+  font-weight: 700;
 }
 
+.mono-chip.optimal,
 .mono-chip.done {
-  color: var(--text-primary);
-  border-color: var(--border-medium);
+  color: #15803d;
+  background: rgba(21, 128, 61, 0.08);
+  border-color: rgba(21, 128, 61, 0.25);
+  font-weight: 700;
+}
+
+.mono-chip.amber {
+  color: #b45309;
+  background: rgba(180, 83, 9, 0.08);
+  border-color: rgba(180, 83, 9, 0.25);
+  font-weight: 700;
+}
+
+.mono-chip.rose {
+  color: #be123c;
+  background: rgba(190, 18, 60, 0.08);
+  border-color: rgba(190, 18, 60, 0.25);
+  font-weight: 700;
+}
+
+/* Dark mode overrides for mono-chips */
+[data-theme="dark"] .mono-chip {
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text-secondary);
+  border-color: var(--border-hairline);
+}
+
+[data-theme="dark"] .mono-chip.lavender {
+  color: #c4b5fd;
+  background: rgba(196, 181, 253, 0.12);
+  border-color: rgba(196, 181, 253, 0.25);
+}
+
+[data-theme="dark"] .mono-chip.optimal,
+[data-theme="dark"] .mono-chip.done {
+  color: #6ee7b7;
+  background: rgba(110, 231, 183, 0.12);
+  border-color: rgba(110, 231, 183, 0.3);
+}
+
+[data-theme="dark"] .mono-chip.amber {
+  color: #f59e0b;
+  background: rgba(245, 158, 11, 0.12);
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+[data-theme="dark"] .mono-chip.rose {
+  color: #f87171;
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(239, 68, 68, 0.35);
 }
 
 /* --------------------------------------------------------------------------
@@ -1041,7 +1103,7 @@ body {
   justify-content: center;
   flex-shrink: 0;
   transition: all 0.12s ease;
-  background: var(--bg-surface);
+  background: var(--bg-surface-elevated);
   box-sizing: border-box;
 }
 
@@ -1056,7 +1118,7 @@ body {
 
 .check-dot:hover {
   border-color: var(--text-primary);
-  background: var(--bg-surface-hover);
+  background: var(--bg-surface-active);
 }
 
 .check-dot.checked {
@@ -1068,10 +1130,14 @@ body {
   content: "";
   width: 4px;
   height: 7px;
-  border: solid var(--checkbox-check);
+  border: solid #FFFFFF;
   border-width: 0 1.8px 1.8px 0;
   transform: rotate(45deg) translate(-0.5px, -1px);
   display: block;
+}
+
+[data-theme="dark"] .check-dot.checked::after {
+  border-color: #000000;
 }
 
 /* Quick Task Form */
@@ -1646,20 +1712,21 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  padding: 2px 7px;
+  padding: 2.5px 8px;
   border-radius: 3px;
   font-family: var(--font-mono);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
-  background: rgba(255, 255, 255, 0.04);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-primary);
   cursor: pointer;
   transition: all 0.12s ease;
 }
 
 .grade-chip:hover {
-  border-color: rgba(255, 255, 255, 0.35);
-  background: rgba(255, 255, 255, 0.08);
+  border-color: var(--border-focus);
+  background: var(--bg-surface-hover);
   transform: translateY(-1px);
 }
 
@@ -1667,11 +1734,13 @@ body {
   opacity: 0.5;
   font-size: 11px;
   margin-left: 2px;
+  color: var(--text-tertiary);
+  transition: opacity 0.1s ease, color 0.1s ease;
 }
 
 .grade-chip:hover .chip-del-btn {
   opacity: 1;
-  color: #f87171;
+  color: #dc2626;
 }
 
 .grade-avg-pill {
@@ -2288,6 +2357,78 @@ body {
   .main-content {
     padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
   }
+  .plan-modal-dialog {
+    width: calc(100vw - 24px) !important;
+    max-width: 480px !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    margin: 12px auto !important;
+  }
 }
+
+/* ==========================================================================
+   SGH Deep Focus Plan & Wind-Down Protocol Modal (Harness 3.5)
+   ========================================================================== */
+.plan-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.65);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 120;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s var(--ease-fluid);
+}
+
+.plan-modal-backdrop.open {
+  opacity: 1;
+  pointer-events: all;
+}
+
+.plan-modal-dialog {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  width: 92%;
+  max-width: 540px;
+  box-shadow: var(--shadow-dropdown);
+  transform: translateY(12px) scale(0.98);
+  transition: transform 0.2s var(--ease-fluid);
+  overflow: hidden;
+}
+
+.plan-modal-backdrop.open .plan-modal-dialog {
+  transform: translateY(0) scale(1);
+}
+
+.plan-phase-card {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: 12px 14px;
+  transition: all 0.12s ease;
+}
+
+.plan-phase-card:hover {
+  border-color: var(--border-medium);
+  background: var(--bg-surface-hover);
+}
+
+.plan-phase-card.phase-1 {
+  border-left: 3.5px solid var(--accent-lavender);
+}
+
+.plan-phase-card.phase-2 {
+  border-left: 3.5px solid #0284c7;
+}
+
+.plan-phase-card.phase-winddown {
+  border-left: 3.5px solid #d97706;
+}
+
 
 

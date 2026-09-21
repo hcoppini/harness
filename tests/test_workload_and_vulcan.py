@@ -324,3 +324,25 @@ def test_multi_obligation_adaptive_kill_list(test_db):
     assert any(c in ["Math R", "Algorithms", "German"] for c in categories)
 
 
+def test_exam_day_afternoon_sgh_never_assigns_prep_for_today_exam(test_db):
+    """Verifies that when an exam is scheduled for today (taken in morning school hours),
+    the afternoon SGH Deep Work block does NOT assign prep for that exam."""
+    from app.services import homework_service
+    test_date = "2026-09-21"  # Monday (Schedule A_MON)
+
+    # CS exam occurred today (morning)
+    homework_service.add_exam("Informatyka", "Sprawdzian: Podstawy programowania", "2026-09-21", conn=test_db)
+    # Next exam is in 5 days (Geografia on Oct 02 is far, or Fizyka on 2026-09-26)
+    homework_service.add_exam("Fizyka", "Sprawdzian: Termodynamika", "2026-09-26", conn=test_db)
+
+    sched = today_service.get_schedule_for_date(test_date, conn=test_db)
+    deep_block = next((b for b in sched["blocks"] if b.get("type") == "deep_work"), None)
+    assert deep_block is not None
+
+    # Afternoon deep work must NEVER prepare for today's CS exam
+    assert "Informatyka" not in deep_block["focus"]
+    assert "Podstawy programowania" not in deep_block["activity"]
+    # It targets either future exams or standard TUM deep work
+    assert "Informatyka" not in deep_block.get("activity", "")
+
+

@@ -255,15 +255,17 @@ def get_workload_analysis(
         e["is_vulnerable"] = subj_vuln.get("is_vulnerable", False)
         e["subject_gpa"] = subj_vuln.get("gpa", 4.0)
 
-        if days_left <= 2:
+        # Only future exams (days_left >= 1) require acute study preparation
+        if 1 <= days_left <= 2:
             immediate_exams.append(e)
-        if days_left <= 5:
+        if 1 <= days_left <= 5:
             week_exams.append(e)
 
-        if e["is_tier_1"]:
-            tier_1_exams.append(e)
-        else:
-            tier_2_exams.append(e)
+        if days_left >= 1:
+            if e["is_tier_1"]:
+                tier_1_exams.append(e)
+            else:
+                tier_2_exams.append(e)
 
     # 2. Fetch pending homework
     cursor.execute(
@@ -343,6 +345,9 @@ def get_workload_analysis(
     if close_conn:
         conn.close()
 
+    future_exams = [e for e in exams if e.get("days_left", 0) >= 1]
+    today_exams = [e for e in exams if e.get("days_left", 0) == 0]
+
     return {
         "date": target_dt.strftime("%Y-%m-%d"),
         "mode": mode,
@@ -355,7 +360,9 @@ def get_workload_analysis(
         "tier_1_count": len(tier_1_exams),
         "tier_2_count": len(tier_2_exams),
         "immediate_count": len(immediate_exams),
-        "upcoming_exams": exams,
+        "upcoming_exams": future_exams,
+        "today_exams": today_exams,
+        "all_exams": exams,
         "homework_count": len(homework),
         "urgent_homework_count": len(urgent_homework),
         "urgent_homework": urgent_homework,
@@ -387,10 +394,10 @@ def synthesize_adaptive_schedule(
     exams = analysis.get("upcoming_exams", [])
     homework = analysis.get("urgent_homework", []) + analysis.get("active_homework", [])
 
-    # Identify acute writing tasks (essays due in <= 3 days)
-    acute_essays = [h for h in homework if h.get("is_essay") and h.get("days_left", 99) <= 3]
-    # Identify acute exams (exams due in <= 3 days)
-    acute_exams = [e for e in exams if e.get("days_left", 99) <= 3]
+    # Identify acute writing tasks (essays due in 1 to 3 days)
+    acute_essays = [h for h in homework if h.get("is_essay") and 1 <= h.get("days_left", 99) <= 3]
+    # Identify acute exams (exams due in 1 to 3 days - never past/today's completed exams)
+    acute_exams = [e for e in exams if 1 <= e.get("days_left", 99) <= 3]
 
     # --------------------------------------------------------------------------
     # 1. WEEKEND ADAPTATION: Inject structured study blocks if heavy load looms
