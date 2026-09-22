@@ -81,13 +81,13 @@ window.Study = {
         let dueLabel = `${ex.exam_date}`;
         if (ex.days_left === 0) {
           dueLabel = "TODAY";
-          badgeColor = "border-color: #f59e0b; color: #f59e0b; font-weight: 700;";
+          badgeColor = "border-color: var(--color-red-border); color: var(--color-red); background: var(--color-red-subtle); font-weight: 700;";
         } else if (ex.days_left === 1) {
           dueLabel = "TOMORROW";
-          badgeColor = "border-color: #f59e0b; color: #f59e0b; font-weight: 700;";
+          badgeColor = "border-color: var(--color-amber-border); color: var(--color-amber); background: var(--color-amber-subtle); font-weight: 700;";
         } else if (ex.days_left > 1 && ex.days_left <= 7) {
           dueLabel = `in ${ex.days_left}d`;
-          badgeColor = "border-color: var(--border-focus); color: var(--text-primary);";
+          badgeColor = "border-color: var(--color-purple-border); color: var(--color-purple); background: var(--color-purple-subtle); font-weight: 600;";
         } else if (ex.days_left > 7) {
           dueLabel = `in ${ex.days_left}d`;
         }
@@ -145,10 +145,10 @@ window.Study = {
         let dueLabel = `${hw.due_date}`;
         if (hw.days_left === 0) {
           dueLabel = "TODAY";
-          badgeColor = "border-color: #f59e0b; color: #f59e0b; font-weight: 700;";
+          badgeColor = "border-color: var(--color-red-border); color: var(--color-red); background: var(--color-red-subtle); font-weight: 700;";
         } else if (hw.days_left === 1) {
           dueLabel = "TOMORROW";
-          badgeColor = "border-color: #f59e0b; color: #f59e0b; font-weight: 700;";
+          badgeColor = "border-color: var(--color-amber-border); color: var(--color-amber); background: var(--color-amber-subtle); font-weight: 700;";
         } else if (hw.days_left > 1) {
           dueLabel = `in ${hw.days_left}d`;
         }

@@ -58,12 +58,48 @@
   --indicator-active: #111827;
   --indicator-done: #15803d;
 
-  /* Stream Highlighter Line Colors (Calibrated Monochrome Grayscale) */
-  --stream-academic: #18181b;
-  --stream-code: #52525b;
-  --stream-sigg: #71717a;
-  --stream-german: #a1a1aa;
-  --stream-physical: #d4d4d8;
+  /* High-Contrast Semantic Color System (Light Mode Primary) */
+  --color-green: #15803d;
+  --color-green-light: #22c55e;
+  --color-green-subtle: #f0fdf4;
+  --color-green-border: #bbf7d0;
+
+  --color-amber: #b45309;
+  --color-amber-light: #f59e0b;
+  --color-amber-subtle: #fffbeb;
+  --color-amber-border: #fde68a;
+
+  --color-red: #b91c1c;
+  --color-red-light: #ef4444;
+  --color-red-subtle: #fef2f2;
+  --color-red-border: #fecaca;
+
+  --color-rose: #be123c;
+  --color-rose-light: #f43f5e;
+  --color-rose-subtle: #fff1f2;
+  --color-rose-border: #fecdd3;
+
+  --color-purple: #6d28d9;
+  --color-purple-light: #8b5cf6;
+  --color-purple-subtle: #f5f3ff;
+  --color-purple-border: #ddd6fe;
+
+  --color-blue: #0369a1;
+  --color-blue-light: #0ea5e9;
+  --color-blue-subtle: #f0f9ff;
+  --color-blue-border: #bae6fd;
+
+  --color-indigo: #4338ca;
+  --color-indigo-light: #6366f1;
+  --color-indigo-subtle: #eef2ff;
+  --color-indigo-border: #c7d2fe;
+
+  /* Stream Highlighter Line Colors (Calibrated High-Contrast) */
+  --stream-academic: #6d28d9;
+  --stream-code: #0369a1;
+  --stream-sigg: #b45309;
+  --stream-german: #15803d;
+  --stream-physical: #be123c;
 
   /* Heatmap Inverted Levels (Dark black for 100%, brighter for unchecked) */
   --heatmap-empty: #FFFFFF;
@@ -136,11 +172,47 @@
   --indicator-active: #FFFFFF;
   --indicator-done: #FFFFFF;
 
-  --stream-academic: #fafafa;
-  --stream-code: #d4d4d8;
-  --stream-sigg: #a1a1aa;
-  --stream-german: #71717a;
-  --stream-physical: #3f3f46;
+  /* High-Contrast Semantic Color System (Dark Mode) */
+  --color-green: #4ade80;
+  --color-green-light: #86efac;
+  --color-green-subtle: rgba(74, 222, 128, 0.12);
+  --color-green-border: rgba(74, 222, 128, 0.3);
+
+  --color-amber: #fbbf24;
+  --color-amber-light: #fde68a;
+  --color-amber-subtle: rgba(251, 191, 36, 0.12);
+  --color-amber-border: rgba(251, 191, 36, 0.3);
+
+  --color-red: #f87171;
+  --color-red-light: #fca5a5;
+  --color-red-subtle: rgba(248, 113, 113, 0.12);
+  --color-red-border: rgba(248, 113, 113, 0.3);
+
+  --color-rose: #fb7185;
+  --color-rose-light: #fda4af;
+  --color-rose-subtle: rgba(251, 113, 133, 0.12);
+  --color-rose-border: rgba(251, 113, 133, 0.3);
+
+  --color-purple: #c084fc;
+  --color-purple-light: #d8b4fe;
+  --color-purple-subtle: rgba(192, 132, 252, 0.12);
+  --color-purple-border: rgba(192, 132, 252, 0.3);
+
+  --color-blue: #38bdf8;
+  --color-blue-light: #7dd3fc;
+  --color-blue-subtle: rgba(56, 189, 248, 0.12);
+  --color-blue-border: rgba(56, 189, 248, 0.3);
+
+  --color-indigo: #818cf8;
+  --color-indigo-light: #a5b4fc;
+  --color-indigo-subtle: rgba(129, 140, 248, 0.12);
+  --color-indigo-border: rgba(129, 140, 248, 0.3);
+
+  --stream-academic: #c084fc;
+  --stream-code: #38bdf8;
+  --stream-sigg: #fbbf24;
+  --stream-german: #4ade80;
+  --stream-physical: #fb7185;
 
   --heatmap-empty: #131317;
   --heatmap-lvl0: #131317;
@@ -522,70 +594,87 @@ body {
   letter-spacing: 0.04em;
   padding: 1px 6px;
   border-radius: 3px;
-  background: rgba(17, 24, 39, 0.05);
+  background: var(--bg-surface-hover);
   color: var(--text-primary);
   border: 1px solid var(--border-subtle);
 }
 
-.mono-chip.lavender {
-  color: #4338ca;
-  background: rgba(67, 56, 202, 0.08);
-  border-color: rgba(67, 56, 202, 0.25);
+.mono-chip.lavender,
+.mono-chip.purple {
+  color: var(--color-purple);
+  background: var(--color-purple-subtle);
+  border-color: var(--color-purple-border);
   font-weight: 700;
 }
 
 .mono-chip.optimal,
-.mono-chip.done {
-  color: #15803d;
-  background: rgba(21, 128, 61, 0.08);
-  border-color: rgba(21, 128, 61, 0.25);
+.mono-chip.done,
+.mono-chip.green {
+  color: var(--color-green);
+  background: var(--color-green-subtle);
+  border-color: var(--color-green-border);
   font-weight: 700;
 }
 
 .mono-chip.amber {
-  color: #b45309;
-  background: rgba(180, 83, 9, 0.08);
-  border-color: rgba(180, 83, 9, 0.25);
+  color: var(--color-amber);
+  background: var(--color-amber-subtle);
+  border-color: var(--color-amber-border);
   font-weight: 700;
 }
 
-.mono-chip.rose {
-  color: #be123c;
-  background: rgba(190, 18, 60, 0.08);
-  border-color: rgba(190, 18, 60, 0.25);
+.mono-chip.rose,
+.mono-chip.red {
+  color: var(--color-rose);
+  background: var(--color-rose-subtle);
+  border-color: var(--color-rose-border);
   font-weight: 700;
 }
 
-/* Dark mode overrides for mono-chips */
-[data-theme="dark"] .mono-chip {
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text-secondary);
-  border-color: var(--border-hairline);
+.mono-chip.blue {
+  color: var(--color-blue);
+  background: var(--color-blue-subtle);
+  border-color: var(--color-blue-border);
+  font-weight: 700;
 }
 
-[data-theme="dark"] .mono-chip.lavender {
-  color: #c4b5fd;
-  background: rgba(196, 181, 253, 0.12);
-  border-color: rgba(196, 181, 253, 0.25);
+/* Key Pill Semantic Variants */
+.key-pill.done,
+.key-pill.green {
+  color: var(--color-green);
+  background: var(--color-green-subtle);
+  border-color: var(--color-green-border);
+  font-weight: 600;
 }
 
-[data-theme="dark"] .mono-chip.optimal,
-[data-theme="dark"] .mono-chip.done {
-  color: #6ee7b7;
-  background: rgba(110, 231, 183, 0.12);
-  border-color: rgba(110, 231, 183, 0.3);
+.key-pill.amber {
+  color: var(--color-amber);
+  background: var(--color-amber-subtle);
+  border-color: var(--color-amber-border);
+  font-weight: 600;
 }
 
-[data-theme="dark"] .mono-chip.amber {
-  color: #f59e0b;
-  background: rgba(245, 158, 11, 0.12);
-  border-color: rgba(245, 158, 11, 0.3);
+.key-pill.rose,
+.key-pill.red {
+  color: var(--color-rose);
+  background: var(--color-rose-subtle);
+  border-color: var(--color-rose-border);
+  font-weight: 600;
 }
 
-[data-theme="dark"] .mono-chip.rose {
-  color: #f87171;
-  background: rgba(239, 68, 68, 0.15);
-  border-color: rgba(239, 68, 68, 0.35);
+.key-pill.purple,
+.key-pill.lavender {
+  color: var(--color-purple);
+  background: var(--color-purple-subtle);
+  border-color: var(--color-purple-border);
+  font-weight: 600;
+}
+
+.key-pill.blue {
+  color: var(--color-blue);
+  background: var(--color-blue-subtle);
+  border-color: var(--color-blue-border);
+  font-weight: 600;
 }
 
 /* --------------------------------------------------------------------------
@@ -2304,7 +2393,7 @@ body {
 }
 
 /* ==========================================================================
-   Mobile Bottom Navigation Dock (iPhone PWA)
+   Mobile Bottom Navigation Dock (iPhone PWA / Web App)
    ========================================================================== */
 .mobile-bottom-nav {
   display: none;
@@ -2312,15 +2401,23 @@ body {
   bottom: 0;
   left: 0;
   right: 0;
-  height: calc(56px + env(safe-area-inset-bottom, 0px));
-  padding-bottom: env(safe-area-inset-bottom, 0px);
-  background: var(--bg-surface);
+  height: calc(60px + env(safe-area-inset-bottom, 0px));
+  padding-bottom: max(6px, env(safe-area-inset-bottom, 0px));
+  background: rgba(255, 255, 255, 0.88);
   border-top: 1px solid var(--border-hairline);
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.04);
   z-index: 100;
   align-items: center;
   justify-content: space-around;
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+[data-theme="dark"] .mobile-bottom-nav {
+  background: rgba(14, 14, 18, 0.88);
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.5);
 }
 
 .mobile-nav-tab {
@@ -2336,26 +2433,34 @@ body {
   font-size: 10px;
   font-weight: 500;
   cursor: pointer;
-  padding: 6px 12px;
+  padding: 5px 12px;
   border-radius: var(--radius-sm);
-  transition: color 0.15s ease, transform 0.1s ease;
-  min-width: 60px;
+  transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+  min-width: 64px;
   min-height: 44px;
+  -webkit-tap-highlight-color: transparent;
 }
 
 .mobile-nav-tab .mobile-tab-icon {
   width: 20px;
   height: 20px;
   stroke: currentColor;
+  transition: transform 0.15s ease, stroke-width 0.15s ease;
 }
 
 .mobile-nav-tab.active {
-  color: var(--text-primary);
+  color: var(--accent-lavender);
+  background: var(--accent-lavender-subtle);
   font-weight: 700;
 }
 
+.mobile-nav-tab.active .mobile-tab-icon {
+  transform: scale(1.08);
+  stroke-width: 2.3px;
+}
+
 .mobile-nav-tab:active {
-  transform: scale(0.94);
+  transform: scale(0.92);
 }
 
 @media (max-width: 768px) {

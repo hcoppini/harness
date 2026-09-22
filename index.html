@@ -5,7 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <title>HARNESS // Executive OS</title>
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-touch-fullscreen" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
   <meta name="apple-mobile-web-app-title" content="Harness">
   <meta name="theme-color" content="#FFFFFF">
   <meta name="description" content="Executive OS & Personal Execution Tracker for TUM Heilbronn Aspirants">
@@ -363,7 +365,7 @@
           </div>
 
           <!-- Embedded SGH / Deep Work Kill List (Daily Execution Center) -->
-          <div id="todayInlineKillListCard" class="monotone-card" style="margin-bottom: 14px; border: 1px solid rgba(196, 181, 253, 0.25); background: rgba(13, 15, 18, 0.95);">
+          <div id="todayInlineKillListCard" class="monotone-card" style="margin-bottom: 14px; border: 1px solid var(--accent-lavender-border); background: var(--bg-surface-elevated);">
             <div class="card-label-row" style="margin-bottom: 8px;">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span id="todayInlineKillListTitle" class="card-label" style="color: var(--accent-lavender); font-weight: 700; font-size: 11px; letter-spacing: 0.05em;">SGH LIBRARY KILL LIST</span>
@@ -741,25 +743,25 @@
           </div>
 
           <div class="aptitude-score-grid">
-            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
+            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
               <div style="font-size: 9px; color: var(--text-tertiary);">GERMAN GPA (1.0-4.0)</div>
               <div id="tumGermanGpaVal" style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">--</div>
               <div id="tumPolishGpaVal" style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Polish: --</div>
             </div>
 
-            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
+            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
               <div style="font-size: 9px; color: var(--text-tertiary);">TOTAL TUM SCORE</div>
               <div id="tumTotalScoreVal" style="font-size: 18px; font-weight: 700; color: var(--accent-lavender); margin-top: 2px;">-- / 100</div>
               <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Safe &ge; 88.0 pts</div>
             </div>
 
-            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
+            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
               <div style="font-size: 9px; color: var(--text-tertiary);">CURRICULAR SCORE</div>
               <div id="tumSubjectScoreVal" style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">--</div>
               <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Math 2x, CS 2x, Lang 1x</div>
             </div>
 
-            <div style="background: rgba(0,0,0,0.25); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
+            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
               <div style="font-size: 9px; color: var(--text-tertiary);">ADMISSION VERDICT</div>
               <div id="tumVerdictText" style="font-size: 10px; font-weight: 700; color: var(--text-primary); margin-top: 4px; line-height: 1.3;">
                 --
@@ -768,13 +770,13 @@
           </div>
 
           <!-- Interactive What-If Simulation Controls -->
-          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.07);">
+          <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-hairline);">
             <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
               <div style="display: flex; align-items: center; gap: 6px;">
                 <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-lavender); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
                   Interactive Simulator // What-If Grade Scenario
                 </span>
-                <span id="simModeBadge" class="mono-chip" style="font-size: 9px; padding: 1px 6px; background: rgba(196, 181, 253, 0.1); color: var(--accent-lavender); border-color: rgba(196, 181, 253, 0.2);">
+                <span id="simModeBadge" class="mono-chip" style="font-size: 9px; padding: 1px 6px; background: var(--accent-lavender-subtle); color: var(--accent-lavender); border-color: var(--accent-lavender-border);">
                   Live Ledger Linked
                 </span>
               </div>
@@ -784,7 +786,7 @@
             </div>
 
             <div class="simulator-slider-grid">
-              <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
+              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                   <span style="font-size: 9px; color: var(--text-tertiary);">OVERALL GPA (65%)</span>
                   <span id="simValGpa" style="font-size: 12px; font-weight: 700; color: var(--accent-lavender);">5.00</span>
@@ -792,7 +794,7 @@
                 <input type="range" id="simSliderGpa" min="2.0" max="6.0" step="0.05" value="5.0" style="width: 100%; height: 4px; accent-color: var(--accent-lavender); cursor: pointer;" />
               </div>
 
-              <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
+              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                   <span style="font-size: 9px; color: var(--text-tertiary);">MATH R (2x)</span>
                   <span id="simValMath" style="font-size: 12px; font-weight: 700; color: var(--accent-lavender);">5.50</span>
@@ -800,7 +802,7 @@
                 <input type="range" id="simSliderMath" min="2.0" max="6.0" step="0.1" value="5.5" style="width: 100%; height: 4px; accent-color: var(--accent-lavender); cursor: pointer;" />
               </div>
 
-              <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
+              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                   <span style="font-size: 9px; color: var(--text-tertiary);">CS / ALGO (2x)</span>
                   <span id="simValCs" style="font-size: 12px; font-weight: 700; color: var(--accent-lavender);">5.50</span>
@@ -808,7 +810,7 @@
                 <input type="range" id="simSliderCs" min="2.0" max="6.0" step="0.1" value="5.5" style="width: 100%; height: 4px; accent-color: var(--accent-lavender); cursor: pointer;" />
               </div>
 
-              <div style="background: rgba(0,0,0,0.2); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
+              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
                 <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
                   <span style="font-size: 9px; color: var(--text-tertiary);">LANGUAGE (1x)</span>
                   <span id="simValLang" style="font-size: 12px; font-weight: 700; color: var(--accent-lavender);">5.50</span>
@@ -1245,68 +1247,96 @@
 
   <!-- 5b. Dedicated Sync Setup & Status Modal -->
   <div id="syncModal" class="modal-overlay">
-    <div class="modal-card" style="max-width: 460px;">
+    <div class="modal-card" style="max-width: 520px;">
       <div class="card-label-row" style="margin-bottom: 14px;">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary);">Cross-Device Sync Settings</h2>
+          <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary);">Cross-Device Cloud Sync</h2>
           <span id="syncModalStatusPill" class="mono-chip" style="font-size: 10px;">Checking...</span>
         </div>
         <button id="btnCloseSyncModal" class="drawer-close-btn">&times;</button>
       </div>
 
       <div style="font-size: 11px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 14px;">
-        Sync your daily tasks, SGH Kill List, workout logs, and TUM milestones across your Desktop PC, Laptop, and iPhone companion.
+        Connect to your free Supabase PostgreSQL database to sync homework, exams, tasks, grades, and logs across PC, laptop, and iPhone with zero monthly fees.
       </div>
 
       <form id="syncSettingsForm">
-        <div class="form-group">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label" style="font-weight: 600;">SUPABASE PROJECT URL</label>
+          <input type="url" id="syncInputSupabaseUrl" class="form-input" placeholder="https://your-project.supabase.co" style="font-family: var(--font-mono); font-size: 11px;" />
+          <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px;">
+            Your project REST URL from Supabase Project Settings &rarr; API.
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label" style="font-weight: 600;">SUPABASE ANON KEY</label>
+          <input type="password" id="syncInputSupabaseKey" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="font-family: var(--font-mono); font-size: 11px;" />
+          <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px;">
+            Your project anon / public key from Supabase Project Settings &rarr; API.
+          </div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 12px;">
           <div style="display: flex; justify-content: space-between; align-items: baseline;">
-            <label class="form-label">WEB COMPANION / SERVER URL</label>
+            <label class="form-label">WEB COMPANION / SERVER URL (OPTIONAL)</label>
             <button type="button" id="btnUseLocalSync" class="btn-link" style="font-size: 10px; color: var(--accent-lavender); background: none; border: none; cursor: pointer; text-decoration: underline; padding: 0;">
               Use Local Server (:5000)
             </button>
           </div>
-          <input type="text" id="syncInputWebUrl" class="form-input" placeholder="http://localhost:5000 or https://your-domain.vercel.app" />
+          <input type="text" id="syncInputWebUrl" class="form-input" placeholder="http://localhost:5000 or https://your-domain.vercel.app" style="font-family: var(--font-mono); font-size: 11px;" />
           <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px;">
-            Target URL for the Harness Web Companion or Cloudflare tunnel.
-          </div>
-        </div>
-
-        <div class="form-group">
-          <label class="form-label">SUPABASE ANON KEY (OPTIONAL)</label>
-          <input type="password" id="syncInputSupabaseKey" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." />
-          <div style="font-size: 10px; color: var(--text-tertiary); margin-top: 4px;">
-            Direct cloud PostgreSQL replication via Supabase REST API.
+            Optional companion endpoint for offline HTTP fallback or local LAN bridge.
           </div>
         </div>
 
         <div class="form-group" style="display: flex; align-items: center; gap: 8px; margin-bottom: 14px;">
           <input type="checkbox" id="syncInputAutoSync" style="accent-color: var(--accent-lavender); cursor: pointer;" />
           <label for="syncInputAutoSync" style="font-size: 11px; color: var(--text-secondary); cursor: pointer; margin-bottom: 0;">
-            Enable automatic background sync (every 60s &amp; on focus)
+            Enable automatic background sync (every 60s &amp; on mutations)
           </label>
         </div>
 
-        <div style="background: rgba(255,255,255,0.03); border: 1px solid var(--border-hairline); border-radius: 6px; padding: 10px; margin-bottom: 16px; font-size: 11px;">
+        <!-- Sync Diagnostics & Status Card -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 6px; padding: 10px; margin-bottom: 14px; font-size: 11px;">
           <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
             <span style="color: var(--text-tertiary);">Last Synced:</span>
             <span id="syncModalLastTime" style="font-family: var(--font-mono); color: var(--text-secondary);">Never</span>
           </div>
-          <div style="display: flex; justify-content: space-between;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
             <span style="color: var(--text-tertiary);">Mode:</span>
             <span id="syncModalModeText" style="font-family: var(--font-mono); color: var(--text-secondary);">Offline-First (Local WAL)</span>
           </div>
+          <div id="syncModalDiagnostics" style="margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border-hairline); font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); line-height: 1.4;">
+            Ready to test connection or sync.
+          </div>
+        </div>
+
+        <!-- Action Buttons Row -->
+        <div style="display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px;">
+          <button type="button" id="btnTestSupabaseSync" class="btn-ghost-icon" style="padding: 6px 10px; font-size: 10px; font-weight: 600;">
+            ⚡ Test Connection
+          </button>
+          <button type="button" id="btnPushSupabaseSync" class="btn-ghost-icon" style="padding: 6px 10px; font-size: 10px; font-weight: 600; color: var(--color-green);">
+            &uarr; Push PC Data to Cloud
+          </button>
+          <button type="button" id="btnPullSupabaseSync" class="btn-ghost-icon" style="padding: 6px 10px; font-size: 10px; font-weight: 600; color: var(--accent-lavender);">
+            &darr; Pull Cloud to PC
+          </button>
+          <button type="button" id="btnCopySchemaSql" class="btn-ghost-icon" style="padding: 6px 10px; font-size: 10px; font-weight: 600;" title="Copy PostgreSQL schema to clipboard for Supabase SQL Editor">
+            Copy Schema SQL
+          </button>
         </div>
 
         <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-          <button type="button" id="btnSyncNowFromModal" class="btn-ghost-icon" style="padding: 7px 12px;">
+          <button type="button" id="btnSyncNowFromModal" class="btn-ghost-icon" style="padding: 7px 12px; font-size: 11px;">
             Sync Now
           </button>
           <div style="display: flex; gap: 6px;">
             <button type="button" id="btnSyncOpenJsonHub" class="btn-ghost-icon" style="padding: 7px 10px; font-size: 10px;">
               JSON Hub
             </button>
-            <button type="submit" class="btn-primary" style="padding: 7px 14px;">
+            <button type="submit" class="btn-primary" style="padding: 7px 14px; font-size: 11px; font-weight: 600;">
               Save &amp; Connect
             </button>
           </div>
@@ -1650,7 +1680,7 @@
     <!-- 1-Click Upcoming School Exams Prep Queue -->
     <div id="killListExamQueueSection" style="margin-bottom: 16px;">
       <div class="card-label-row" style="margin-bottom: 8px;">
-        <span class="card-label" style="color: #fda4af;">Upcoming School Exams (Workload Governor)</span>
+        <span class="card-label" style="color: var(--color-rose);">Upcoming School Exams (Workload Governor)</span>
         <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Vulcan UONET+</span>
       </div>
       <div id="killListUpcomingExamsQueue" style="display: flex; flex-direction: column; gap: 8px;">
@@ -1659,7 +1689,7 @@
     </div>
 
     <!-- Quick Single-Input Task / Enqueue Card -->
-    <div id="killListAddCard" style="background: #0d0f12; border: 1px solid rgba(255,255,255,0.08); border-radius: 6px; padding: 14px; margin-bottom: 16px;">
+    <div id="killListAddCard" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 6px; padding: 14px; margin-bottom: 16px;">
       <div class="card-label" style="margin-bottom: 8px; color: var(--text-secondary); font-size: 11px;">+ Quick Custom Item</div>
       <form id="quickAddKillItemForm" style="display: flex; gap: 8px;">
         <input 

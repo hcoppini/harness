@@ -1,5 +1,5 @@
-// Harness Executive OS - Universal Unified Service Worker (v5.2 Monochrome)
-const CACHE_NAME = 'harness-monochrome-v5.2';
+// Harness Executive OS - Universal Unified Service Worker (v5.3 Monochrome)
+const CACHE_NAME = 'harness-monochrome-v5.3';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

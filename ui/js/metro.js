@@ -72,6 +72,18 @@ const MetroMap = {
     },
   ],
 
+  getStreamColor(streamId) {
+    const isDark = document.documentElement.getAttribute("data-theme") === "dark";
+    switch (streamId) {
+      case "academics": return isDark ? "#c084fc" : "#6d28d9";
+      case "code": return isDark ? "#38bdf8" : "#0369a1";
+      case "sigg": return isDark ? "#fbbf24" : "#b45309";
+      case "german": return isDark ? "#4ade80" : "#15803d";
+      case "physical": return isDark ? "#fb7185" : "#be123c";
+      default: return isDark ? "#ffffff" : "#111827";
+    }
+  },
+
   async init() {
     this.bindEvents();
     await this.load();
@@ -294,6 +306,7 @@ const MetroMap = {
     let streamJunctionDotsHtml = "";
 
     this.streams.forEach((stream) => {
+      stream.color = this.getStreamColor(stream.id);
       const activeIndices = [];
       stations.forEach((st, idx) => {
         if ((st.branches || []).includes(stream.id)) {

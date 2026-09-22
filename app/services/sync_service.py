@@ -18,7 +18,7 @@ from app.db import get_connection, DATA_DIR
 CONFIG_FILE = DATA_DIR / "sync_config.json"
 
 DEFAULT_CONFIG = {
-    "supabase_url": "https://xfslkbcopnugiubkboux.supabase.co",
+    "supabase_url": "",
     "supabase_key": "",
     "web_url": "",
     "auto_sync": True,
@@ -35,6 +35,10 @@ def get_sync_config() -> Dict[str, Any]:
                 cfg.update(json.load(f))
         except Exception:
             pass
+
+    # Clean legacy placeholder URL if present
+    if cfg.get("supabase_url") and "xfslkbcopnugiubkboux" in cfg["supabase_url"]:
+        cfg["supabase_url"] = ""
 
     # Environment variables take precedence (for Vercel / Cloud deployments)
     env_url = os.environ.get("SUPABASE_URL") or os.environ.get("NEXT_PUBLIC_SUPABASE_URL") or os.environ.get("EXPO_PUBLIC_SUPABASE_URL")
@@ -126,13 +130,173 @@ def _make_supabase_request(
 
     req = urllib.request.Request(full_url, data=data_bytes, headers=req_headers, method=method)
     try:
-        with urllib.request.urlopen(req, timeout=6) as response:
+        with urllib.request.urlopen(req, timeout=8) as response:
             res_body = response.read().decode("utf-8")
             if res_body:
                 return json.loads(res_body)
             return {}
-    except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, Exception) as e:
+    except urllib.error.HTTPError as e:
+        err_body = ""
+        try:
+            err_body = e.read().decode("utf-8")
+        except Exception:
+            pass
+        print(f"[Supabase Sync] HTTP {e.code} for {method} {endpoint}: {err_body or e.reason}")
         return None
+    except Exception as e:
+        print(f"[Supabase Sync] Request failed for {method} {endpoint}: {e}")
+        return None
+
+
+def delete_remote_item(table: str, id_column: str, id_value: Any, async_mode: bool = False) -> bool:
+    """Sends DELETE request to Supabase PostgREST endpoint."""
+    cfg = get_sync_config()
+    if not cfg.get("supabase_key") or not cfg.get("supabase_url"):
+        return False
+
+    def _execute():
+        try:
+            endpoint = f"{table}?{id_column}=eq.{id_value}"
+            res = _make_supabase_request(endpoint, method="DELETE")
+            return res is not None
+        except Exception as e:
+            print(f"[Supabase Sync] Remote delete failed for {table} {id_column}={id_value}: {e}")
+            return False
+
+    if async_mode:
+        import threading
+        threading.Thread(target=_execute, daemon=True).start()
+        return True
+    return _execute()
+
+
+def upsert_remote_item(table: str, id_column: str, payload: Dict[str, Any], async_mode: bool = False) -> bool:
+    """Sends an immediate UPSERT (POST with resolution=merge-duplicates) request to Supabase PostgREST endpoint."""
+    cfg = get_sync_config()
+    if not cfg.get("supabase_key") or not cfg.get("supabase_url"):
+        return False
+
+    def _execute():
+        try:
+            endpoint = f"{table}?on_conflict={id_column}"
+            res = _make_supabase_request(
+                endpoint,
+                method="POST",
+                payload=payload,
+                headers_extra={"Prefer": "resolution=merge-duplicates"},
+            )
+            return res is not None
+        except Exception as e:
+            print(f"[Supabase Sync] Remote upsert failed for {table}: {e}")
+            return False
+
+    if async_mode:
+        import threading
+        threading.Thread(target=_execute, daemon=True).start()
+        return True
+    return _execute()
+
+
+def test_supabase_connection(url: Optional[str] = None, key: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Tests connectivity to Supabase and verifies existence of required schema tables.
+    """
+    cfg = get_sync_config()
+    target_url = (url or cfg.get("supabase_url", "")).rstrip("/")
+    target_key = (key or cfg.get("supabase_key", "")).strip()
+
+    if not target_url or not target_key:
+        return {
+            "success": False,
+            "status": "unconfigured",
+            "message": "Supabase Project URL and API Key are required.",
+            "error": "Supabase Project URL and API Key are required.",
+            "tables_found": [],
+            "verified_tables": [],
+            "tables_missing": [],
+        }
+
+    required_tables = [
+        "tasks", "daily_logs", "homework_items", "school_exams",
+        "tum_grades", "tum_grade_entries", "tum_matura", "tum_language",
+        "kill_list_items", "metro_stations", "station_deliverable_progress",
+        "body_metrics", "workouts", "projects", "app_settings"
+    ]
+
+    req_headers = {
+        "apikey": target_key,
+        "Authorization": f"Bearer {target_key}",
+        "Content-Type": "application/json",
+        "Accept": "application/json",
+    }
+
+    try:
+        probe_url = f"{target_url}/rest/v1/"
+        req = urllib.request.Request(probe_url, headers=req_headers, method="GET")
+        with urllib.request.urlopen(req, timeout=5) as resp:
+            pass
+    except urllib.error.HTTPError as e:
+        if e.code in [401, 403]:
+            return {
+                "success": False,
+                "status": "error",
+                "message": f"Authentication failed (HTTP {e.code}). Please check your Supabase anon/service key.",
+                "error": f"Authentication failed (HTTP {e.code})",
+                "tables_found": [],
+                "verified_tables": [],
+                "tables_missing": required_tables,
+            }
+        # Some Supabase instances return 404 for root /rest/v1/ - proceed to table check
+    except Exception as e:
+        return {
+            "success": False,
+            "status": "error",
+            "message": f"Could not reach Supabase at {target_url}: {e}",
+            "error": str(e),
+            "tables_found": [],
+            "verified_tables": [],
+            "tables_missing": required_tables,
+        }
+
+    tables_found = []
+    tables_missing = []
+
+    for tbl in required_tables:
+        try:
+            tbl_url = f"{target_url}/rest/v1/{tbl}?select=*&limit=1"
+            req = urllib.request.Request(tbl_url, headers=req_headers, method="GET")
+            with urllib.request.urlopen(req, timeout=4) as resp:
+                if resp.status in [200, 206]:
+                    tables_found.append(tbl)
+                else:
+                    tables_missing.append(tbl)
+        except urllib.error.HTTPError as e:
+            if e.code in [404, 400]:
+                tables_missing.append(tbl)
+            else:
+                tables_missing.append(tbl)
+        except Exception:
+            tables_missing.append(tbl)
+
+    if not tables_missing:
+        return {
+            "success": True,
+            "status": "connected",
+            "message": f"Connected successfully! All {len(tables_found)} schema tables verified in PostgreSQL.",
+            "tables_found": tables_found,
+            "verified_tables": tables_found,
+            "tables_missing": [],
+        }
+    else:
+        return {
+            "success": False,
+            "status": "schema_missing",
+            "message": f"Connected to Supabase, but {len(tables_missing)} table(s) missing ({', '.join(tables_missing[:4])}...). Execute supabase/schema.sql in your Supabase SQL Editor.",
+            "error": f"Connected to Supabase, but {len(tables_missing)} table(s) missing",
+            "tables_found": tables_found,
+            "verified_tables": tables_found,
+            "tables_missing": tables_missing,
+        }
 
 
 # =========================================================================
@@ -176,14 +340,23 @@ def sync_tasks(conn: sqlite3.Connection) -> int:
         else:
             loc = local_tasks[r_id]
             if loc["completed"] != r_comp:
-                cursor.execute("UPDATE tasks SET completed = ? WHERE id = ?", (r_comp, r_id))
-                synced_count += 1
+                if loc["completed"] == 1 and r_comp == 0:
+                    _make_supabase_request(
+                        "tasks?on_conflict=id",
+                        method="POST",
+                        payload={"id": r_id, "completed": True},
+                        headers_extra={"Prefer": "resolution=merge-duplicates"},
+                    )
+                    synced_count += 1
+                elif r_comp == 1 and loc["completed"] == 0:
+                    cursor.execute("UPDATE tasks SET completed = 1 WHERE id = ?", (r_id,))
+                    synced_count += 1
 
     remote_ids = {rt.get("id") for rt in remote_tasks if rt.get("id")}
     for l_id, loc in local_tasks.items():
         if l_id not in remote_ids:
             _make_supabase_request(
-                "tasks",
+                "tasks?on_conflict=id",
                 method="POST",
                 payload={
                     "id": l_id,
@@ -324,7 +497,7 @@ def sync_daily_logs(conn: sqlite3.Connection) -> int:
     cursor.execute("SELECT date, scratchpad, wake_time, sleep_time, reflection_worked, reflection_slipped, reflection_tomorrow, completed_blocks, completed_exercises FROM daily_logs")
     for row in cursor.fetchall():
         _make_supabase_request(
-            "daily_logs",
+            "daily_logs?on_conflict=date",
             method="POST",
             payload={
                 "date": row["date"],
@@ -384,7 +557,7 @@ def sync_metro_roadmap() -> int:
             synced_count += 1
         else:
             _make_supabase_request(
-                "metro_stations",
+                "metro_stations?on_conflict=id",
                 method="POST",
                 payload={
                     "id": st_id,
@@ -451,14 +624,23 @@ def sync_kill_list_items(conn: sqlite3.Connection) -> int:
             synced_count += 1
         else:
             if local_items[r_id]["completed"] != r_comp:
-                cursor.execute("UPDATE kill_list_items SET completed = ? WHERE id = ?", (r_comp, r_id))
-                synced_count += 1
+                if local_items[r_id]["completed"] == 1 and r_comp == 0:
+                    _make_supabase_request(
+                        "kill_list_items?on_conflict=id",
+                        method="POST",
+                        payload={"id": r_id, "completed": True},
+                        headers_extra={"Prefer": "resolution=merge-duplicates"},
+                    )
+                    synced_count += 1
+                elif r_comp == 1 and local_items[r_id]["completed"] == 0:
+                    cursor.execute("UPDATE kill_list_items SET completed = 1 WHERE id = ?", (r_id,))
+                    synced_count += 1
 
     remote_ids = {ri.get("id") for ri in remote_items if ri.get("id")}
     for l_id, loc in local_items.items():
         if l_id not in remote_ids:
             _make_supabase_request(
-                "kill_list_items",
+                "kill_list_items?on_conflict=id",
                 method="POST",
                 payload={
                     "id": l_id,
@@ -531,7 +713,7 @@ def sync_station_deliverable_progress(conn: sqlite3.Connection) -> int:
     cursor.execute("SELECT deliverable_id, station_id, stream, title, total_required, completed_count, unit_label, is_completed FROM station_deliverable_progress")
     for row in cursor.fetchall():
         _make_supabase_request(
-            "station_deliverable_progress",
+            "station_deliverable_progress?on_conflict=deliverable_id",
             method="POST",
             payload={
                 "deliverable_id": row["deliverable_id"],
@@ -597,7 +779,7 @@ def sync_body_metrics(conn: sqlite3.Connection) -> int:
     for l_id, loc in local_metrics.items():
         if l_id not in remote_ids:
             _make_supabase_request(
-                "body_metrics",
+                "body_metrics?on_conflict=id",
                 method="POST",
                 payload={
                     "id": l_id,
@@ -661,7 +843,7 @@ def sync_workouts(conn: sqlite3.Connection) -> int:
     for l_id, loc in local_workouts.items():
         if l_id not in remote_ids:
             _make_supabase_request(
-                "workouts",
+                "workouts?on_conflict=id",
                 method="POST",
                 payload={
                     "id": l_id,
@@ -736,7 +918,7 @@ def sync_projects(conn: sqlite3.Connection) -> int:
     for l_id, loc in local_projects.items():
         if l_id not in remote_ids:
             _make_supabase_request(
-                "projects",
+                "projects?on_conflict=id",
                 method="POST",
                 payload={
                     "id": l_id,
@@ -792,14 +974,38 @@ def sync_school_exams(conn: sqlite3.Connection) -> int:
         else:
             loc = local_exams[r_id]
             if loc["completed"] != r_comp or loc["result_percentage"] != r_res:
-                cursor.execute("UPDATE school_exams SET completed = ?, result_percentage = ? WHERE id = ?", (r_comp, r_res, r_id))
-                synced_count += 1
+                if loc["completed"] == 1 and r_comp == 0:
+                    _make_supabase_request(
+                        "school_exams?on_conflict=id",
+                        method="POST",
+                        payload={
+                            "id": r_id,
+                            "completed": True,
+                            "result_percentage": loc["result_percentage"],
+                        },
+                        headers_extra={"Prefer": "resolution=merge-duplicates"},
+                    )
+                    synced_count += 1
+                elif r_comp == 1 and loc["completed"] == 0:
+                    cursor.execute("UPDATE school_exams SET completed = 1, result_percentage = ? WHERE id = ?", (r_res, r_id))
+                    synced_count += 1
+                elif r_res is not None and loc["result_percentage"] is None:
+                    cursor.execute("UPDATE school_exams SET result_percentage = ? WHERE id = ?", (r_res, r_id))
+                    synced_count += 1
+                elif loc["result_percentage"] is not None and r_res != loc["result_percentage"]:
+                    _make_supabase_request(
+                        "school_exams?on_conflict=id",
+                        method="POST",
+                        payload={"id": r_id, "result_percentage": loc["result_percentage"]},
+                        headers_extra={"Prefer": "resolution=merge-duplicates"},
+                    )
+                    synced_count += 1
 
     remote_ids = {re.get("id") for re in remote_exams if re.get("id")}
     for l_id, loc in local_exams.items():
         if l_id not in remote_ids:
             _make_supabase_request(
-                "school_exams",
+                "school_exams?on_conflict=id",
                 method="POST",
                 payload={
                     "id": l_id,
@@ -851,14 +1057,23 @@ def sync_homework_items(conn: sqlite3.Connection) -> int:
         else:
             loc = local_hw[r_id]
             if loc["completed"] != r_comp:
-                cursor.execute("UPDATE homework_items SET completed = ? WHERE id = ?", (r_comp, r_id))
-                synced_count += 1
+                if loc["completed"] == 1 and r_comp == 0:
+                    _make_supabase_request(
+                        "homework_items?on_conflict=id",
+                        method="POST",
+                        payload={"id": r_id, "completed": True},
+                        headers_extra={"Prefer": "resolution=merge-duplicates"},
+                    )
+                    synced_count += 1
+                elif r_comp == 1 and loc["completed"] == 0:
+                    cursor.execute("UPDATE homework_items SET completed = 1 WHERE id = ?", (r_id,))
+                    synced_count += 1
 
     remote_ids = {rh.get("id") for rh in remote_hw if rh.get("id")}
     for l_id, loc in local_hw.items():
         if l_id not in remote_ids:
             _make_supabase_request(
-                "homework_items",
+                "homework_items?on_conflict=id",
                 method="POST",
                 payload={
                     "id": l_id,
@@ -917,7 +1132,7 @@ def sync_tum_grades(conn) -> int:
     for l_id, loc in local_items.items():
         if l_id not in remote_ids:
             _make_supabase_request(
-                "tum_grades",
+                "tum_grades?on_conflict=id",
                 method="POST",
                 payload=loc,
                 headers_extra={"Prefer": "resolution=merge-duplicates"},
@@ -959,7 +1174,7 @@ def sync_tum_grade_entries(conn) -> int:
             payload = dict(loc)
             payload["counts_in_average"] = bool(payload["counts_in_average"])
             _make_supabase_request(
-                "tum_grade_entries",
+                "tum_grade_entries?on_conflict=id",
                 method="POST",
                 payload=payload,
                 headers_extra={"Prefer": "resolution=merge-duplicates"},
@@ -1005,7 +1220,7 @@ def sync_tum_matura(conn) -> int:
     for l_id, loc in local_items.items():
         if l_id not in remote_ids:
             _make_supabase_request(
-                "tum_matura",
+                "tum_matura?on_conflict=id",
                 method="POST",
                 payload=loc,
                 headers_extra={"Prefer": "resolution=merge-duplicates"},
@@ -1051,7 +1266,7 @@ def sync_tum_language(conn) -> int:
     for l_id, loc in local_items.items():
         if l_id not in remote_ids:
             _make_supabase_request(
-                "tum_language",
+                "tum_language?on_conflict=id",
                 method="POST",
                 payload=loc,
                 headers_extra={"Prefer": "resolution=merge-duplicates"},
@@ -1089,7 +1304,7 @@ def sync_app_settings() -> int:
 
             if "vulcan_config" not in remote_settings or remote_settings["vulcan_config"] != local_vulcan:
                 _make_supabase_request(
-                    "app_settings",
+                    "app_settings?on_conflict=key",
                     method="POST",
                     payload={"key": "vulcan_config", "value": local_vulcan},
                     headers_extra={"Prefer": "resolution=merge-duplicates"},
@@ -1625,7 +1840,7 @@ def sync_with_web_server(conn: sqlite3.Connection, cfg: Optional[Dict[str, Any]]
 # =========================================================================
 # Master Multi-Entity Synchronizer
 # =========================================================================
-def sync_all() -> Dict[str, Any]:
+def sync_all(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
     """Executes full bi-directional synchronization across all tables."""
     cfg = get_sync_config()
     has_web = bool(cfg.get("web_url"))
@@ -1648,7 +1863,11 @@ def sync_all() -> Dict[str, Any]:
                 "timestamp": datetime.now().isoformat(),
             }
 
-    conn = get_connection()
+    should_close = False
+    if conn is None:
+        conn = get_connection()
+        should_close = True
+
     total_synced = 0
     errors = []
 
@@ -1704,5 +1923,264 @@ def sync_all() -> Dict[str, Any]:
             "timestamp": datetime.now().isoformat(),
         }
     finally:
-        conn.close()
+        if should_close:
+            conn.close()
+
+
+def push_all_local_to_supabase(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
+    """
+    Pushes all local records across all 15 tables to Supabase in one atomic push.
+    Guarantees user PC progress (homework, exams, grades, logs, tasks) is saved in Supabase.
+    """
+    should_close = False
+    if conn is None:
+        conn = get_connection()
+        should_close = True
+
+    cfg = get_sync_config()
+    if not cfg.get("supabase_key") or not cfg.get("supabase_url"):
+        if should_close:
+            conn.close()
+        return {
+            "status": "unconfigured",
+            "message": "Supabase Project URL and Key are required to push data to cloud.",
+            "pushed_count": 0,
+            "synced_count": 0,
+        }
+
+    cursor = conn.cursor()
+    pushed = 0
+    errors = []
+
+    def push_table(table_name, select_sql, id_col, transform_fn=None):
+        nonlocal pushed
+        try:
+            cursor.execute(select_sql)
+            rows = [dict(r) for r in cursor.fetchall()]
+            for r in rows:
+                payload = transform_fn(r) if transform_fn else r
+                endpoint = f"{table_name}?on_conflict={id_col}"
+                res = _make_supabase_request(
+                    endpoint,
+                    method="POST",
+                    payload=payload,
+                    headers_extra={"Prefer": "resolution=merge-duplicates"},
+                )
+                if res is not None:
+                    pushed += 1
+        except sqlite3.OperationalError:
+            pass
+        except Exception as e:
+            errors.append(f"{table_name}: {e}")
+
+    try:
+        # 1. Tasks
+        push_table("tasks", "SELECT * FROM tasks", "id", lambda r: {
+            "id": r["id"],
+            "title": r["title"],
+            "category": r["category"],
+            "is_tum": bool(r["is_tum"]),
+            "completed": bool(r["completed"]),
+            "date": r["date"],
+            "rollover_count": r.get("rollover_count", 0),
+            "created_at": r.get("created_at"),
+            "completed_at": r.get("completed_at"),
+        })
+
+        # 2. Daily Logs
+        push_table("daily_logs", "SELECT * FROM daily_logs", "date", lambda r: {
+            "date": r["date"],
+            "scratchpad": r.get("scratchpad") or "",
+            "wake_time": r.get("wake_time") or "",
+            "sleep_time": r.get("sleep_time") or "",
+            "reflection_worked": r.get("reflection_worked") or "",
+            "reflection_slipped": r.get("reflection_slipped") or "",
+            "reflection_tomorrow": r.get("reflection_tomorrow") or "",
+            "completed_blocks": r.get("completed_blocks") or "",
+            "completed_exercises": r.get("completed_exercises") or "",
+            "updated_at": r.get("updated_at") or datetime.now().isoformat(),
+        })
+
+        # 3. Homework Items
+        push_table("homework_items", "SELECT * FROM homework_items", "id", lambda r: {
+            "id": r["id"],
+            "subject": r["subject"],
+            "title": r["title"],
+            "due_date": r["due_date"],
+            "completed": bool(r["completed"]),
+            "source": r.get("source") or "manual",
+            "priority": r.get("priority") or 1,
+            "notes": r.get("notes") or "",
+        })
+
+        # 4. School Exams
+        push_table("school_exams", "SELECT * FROM school_exams", "id", lambda r: {
+            "id": r["id"],
+            "subject": r["subject"],
+            "title": r["title"],
+            "exam_date": r["exam_date"],
+            "scope": r.get("scope") or "",
+            "completed": bool(r["completed"]),
+            "result_percentage": r.get("result_percentage"),
+        })
+
+        # 5. Kill List Items
+        push_table("kill_list_items", "SELECT * FROM kill_list_items", "id", lambda r: {
+            "id": r["id"],
+            "date": r["date"],
+            "category": r["category"],
+            "title": r["title"],
+            "action_type": r["action_type"],
+            "target_path": r.get("target_path") or "",
+            "target_spec": r.get("target_spec") or "",
+            "station_deliverable_id": r.get("station_deliverable_id"),
+            "completed": bool(r["completed"]),
+        })
+
+        # 6. Station Deliverable Progress
+        push_table("station_deliverable_progress", "SELECT * FROM station_deliverable_progress", "deliverable_id", lambda r: {
+            "deliverable_id": r["deliverable_id"],
+            "completed_count": r.get("completed_count", 0),
+            "total_required": r.get("total_required", 100),
+            "unit_label": r.get("unit_label", "units"),
+            "is_completed": bool(r.get("is_completed", 0)),
+        })
+
+        # 7. TUM Grades
+        push_table("tum_grades", "SELECT * FROM tum_grades", "id", lambda r: {
+            "id": r["id"],
+            "subject": r["subject"],
+            "semester": r["semester"],
+            "target_grade": r.get("target_grade"),
+            "actual_grade": r.get("actual_grade"),
+            "percentage": r.get("percentage"),
+            "notes": r.get("notes") or "",
+        })
+
+        # 8. TUM Grade Entries
+        push_table("tum_grade_entries", "SELECT * FROM tum_grade_entries", "id", lambda r: {
+            "id": r["id"],
+            "subject": r["subject"],
+            "semester": r["semester"],
+            "raw_input": r["raw_input"],
+            "numeric_value": r.get("numeric_value"),
+            "weight": r.get("weight", 1.0),
+            "category": r.get("category", "Grade"),
+            "description": r.get("description") or "",
+            "date": r["date"],
+            "counts_in_average": bool(r.get("counts_in_average", 1)),
+        })
+
+        # 9. TUM Matura
+        push_table("tum_matura", "SELECT * FROM tum_matura", "id", lambda r: {
+            "id": r["id"],
+            "subject": r["subject"],
+            "target_percentage": r.get("target_percentage", 90.0),
+            "current_mock_percentage": r.get("current_mock_percentage", 0.0),
+            "notes": r.get("notes") or "",
+        })
+
+        # 10. TUM Language
+        push_table("tum_language", "SELECT * FROM tum_language", "id", lambda r: {
+            "id": r["id"],
+            "level": r["level"],
+            "target_date": r.get("target_date"),
+            "status": r.get("status", "pending"),
+            "milestone_description": r.get("milestone_description") or "",
+        })
+
+        # 11. Body Metrics
+        push_table("body_metrics", "SELECT * FROM body_metrics", "id", lambda r: {
+            "id": r["id"],
+            "date": r["date"],
+            "weight_kg": r["weight_kg"],
+            "calories_met": bool(r.get("calories_met")),
+            "protein_met": bool(r.get("protein_met")),
+            "notes": r.get("notes") or "",
+        })
+
+        # 12. Workouts
+        push_table("workouts", "SELECT * FROM workouts", "id", lambda r: {
+            "id": r["id"],
+            "date": r["date"],
+            "workout_type": r["workout_type"],
+            "details": r.get("details") or "",
+            "intensity": r.get("intensity", 7),
+        })
+
+        # 13. Projects
+        push_table("projects", "SELECT * FROM projects", "id", lambda r: {
+            "id": r["id"],
+            "name": r["name"],
+            "description": r.get("description") or "",
+            "status": r.get("status", "active"),
+            "local_path": r.get("local_path") or "",
+            "github_url": r.get("github_url") or "",
+            "current_milestone": r.get("current_milestone") or "",
+            "next_action": r.get("next_action") or "",
+            "deadline": r.get("deadline") or "",
+            "notes": r.get("notes") or "",
+        })
+
+        # 14. Metro Roadmap
+        metro_file = DATA_DIR / "metro_roadmap.json"
+        if metro_file.exists():
+            try:
+                with open(metro_file, "r", encoding="utf-8") as f:
+                    mdata = json.load(f)
+                for idx, st in enumerate(mdata.get("stations", [])):
+                    endpoint = "metro_stations?on_conflict=id"
+                    res = _make_supabase_request(
+                        endpoint,
+                        method="POST",
+                        payload={
+                            "id": st["id"],
+                            "name": st.get("name", ""),
+                            "phase": st.get("phase", ""),
+                            "month_label": st.get("month_label", ""),
+                            "year_month": st.get("date", ""),
+                            "is_major": bool(st.get("is_major")),
+                            "status": st.get("status", "upcoming"),
+                            "objective": st.get("objective", ""),
+                            "deliverables": st.get("deliverables", {}),
+                            "completed_deliverables": st.get("completed_deliverables", []),
+                            "order_idx": idx,
+                        },
+                        headers_extra={"Prefer": "resolution=merge-duplicates"},
+                    )
+                    if res is not None:
+                        pushed += 1
+            except Exception as me:
+                errors.append(f"metro_stations: {me}")
+
+        now_iso = datetime.now().isoformat()
+        cfg["last_synced_at"] = now_iso
+        save_sync_config(cfg)
+
+        return {
+            "status": "synced" if not errors else "partial",
+            "message": f"Successfully pushed {pushed} items to Supabase cloud." if not errors else f"Pushed {pushed} items ({'; '.join(errors)})",
+            "pushed_count": pushed,
+            "synced_count": pushed,
+            "timestamp": now_iso,
+        }
+    finally:
+        if should_close:
+            conn.close()
+
+
+def pull_all_supabase_to_local(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
+    """Pulls all remote data from Supabase and hydrates local SQLite."""
+    should_close = False
+    if conn is None:
+        conn = get_connection()
+        should_close = True
+
+    try:
+        # Run sync_all which pulls deltas
+        return sync_all(conn)
+    finally:
+        if should_close:
+            conn.close()
+
 

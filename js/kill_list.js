@@ -139,13 +139,13 @@ const KillListDrawer = {
         statusText = `Pace Deficit: ${this.paceVelocity.deficit_item_title} (-${this.paceVelocity.max_deficit} ${this.paceVelocity.deficit_unit})`;
       }
       const badgeStyle = isBehind
-        ? "background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); color: #f59e0b;"
-        : "background: rgba(110, 231, 183, 0.08); border: 1px solid rgba(110, 231, 183, 0.25); color: #6ee7b7;";
+        ? "background: var(--color-amber-subtle); border: 1px solid var(--color-amber-border); color: var(--color-amber);"
+        : "background: var(--color-green-subtle); border: 1px solid var(--color-green-border); color: var(--color-green);";
 
       velocityContainer.innerHTML = `
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; ${badgeStyle}">
           <div style="display: flex; align-items: center; gap: 6px;">
-            <span style="width: 7px; height: 7px; border-radius: 50%; background: ${isBehind ? "#f59e0b" : "#6ee7b7"}; display: inline-block;"></span>
+            <span style="width: 7px; height: 7px; border-radius: 50%; background: ${isBehind ? "var(--color-amber)" : "var(--color-green)"}; display: inline-block;"></span>
             <span style="font-weight: 600;">${statusText}</span>
           </div>
           <span style="font-size: 9px; opacity: 0.8;">Day ${this.paceVelocity.day_of_month || 1}/${this.paceVelocity.total_days || 30}</span>
@@ -211,9 +211,9 @@ const KillListDrawer = {
               let pacePill = "";
               if (paceItem) {
                 if (paceItem.is_behind) {
-                  pacePill = `<span style="color: #f59e0b; font-weight: 600; margin-left: 6px;">[Deficit: -${paceItem.deficit} ${paceItem.unit_label}]</span>`;
+                  pacePill = `<span style="color: var(--color-amber); font-weight: 600; margin-left: 6px;">[Deficit: -${paceItem.deficit} ${paceItem.unit_label}]</span>`;
                 } else {
-                  pacePill = `<span style="color: #6ee7b7; font-weight: 600; margin-left: 6px;">[Optimal: +${Math.max(0, paceItem.pace_delta)} ${paceItem.unit_label}]</span>`;
+                  pacePill = `<span style="color: var(--color-green); font-weight: 600; margin-left: 6px;">[Optimal: +${Math.max(0, paceItem.pace_delta)} ${paceItem.unit_label}]</span>`;
                 }
               }
 
@@ -221,7 +221,7 @@ const KillListDrawer = {
                 <div style="display: flex; align-items: center; flex-wrap: wrap; gap: 4px; margin-top: 6px; font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">
                   <span style="color: var(--accent-lavender); font-weight: 600;">Burn-down:</span>
                   <span>${delivInfo.completed_count}/${delivInfo.total_required} ${delivInfo.unit_label}</span>
-                  ${delivInfo.is_completed ? '<span style="color: #6ee7b7; font-weight: 700; margin-left: 6px;">(COMPLETE)</span>' : pacePill}
+                  ${delivInfo.is_completed ? '<span style="color: var(--color-green); font-weight: 700; margin-left: 6px;">(COMPLETE)</span>' : pacePill}
                 </div>
               `;
             }
@@ -338,15 +338,15 @@ const KillListDrawer = {
         examContainer.innerHTML = acuteExams
           .map((ex) => {
             const daysLeft = ex.days_left;
-            const daysColor = daysLeft <= 2 ? "#fda4af" : daysLeft <= 4 ? "#fdba74" : "#c4b5fd";
-            const urgencyBadge = `<span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${daysColor}; background: rgba(255,255,255,0.05); padding: 1px 5px; border-radius: 2px;">${daysLeft === 0 ? "TODAY" : daysLeft === 1 ? "TOMORROW" : `IN ${daysLeft} DAYS`}</span>`;
+            const daysColor = daysLeft <= 2 ? "var(--color-rose)" : daysLeft <= 4 ? "var(--color-amber)" : "var(--color-purple)";
+            const urgencyBadge = `<span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: ${daysColor}; background: var(--bg-surface); border: 1px solid var(--border-hairline); padding: 1px 5px; border-radius: 2px;">${daysLeft === 0 ? "TODAY" : daysLeft === 1 ? "TOMORROW" : `IN ${daysLeft} DAYS`}</span>`;
             const tierBadge = `<span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary);">Tier ${ex.tier || 1}</span>`;
 
             return `
-              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: rgba(254, 202, 202, 0.02); border: 1px solid rgba(254, 202, 202, 0.15); border-radius: 4px;">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px;">
                 <div style="flex: 1; min-width: 0;">
                   <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="font-size: 10px; font-weight: 700; color: #fda4af;">${this.escapeHtml(ex.subject)}</span>
+                    <span style="font-size: 10px; font-weight: 700; color: var(--color-rose);">${this.escapeHtml(ex.subject)}</span>
                     ${urgencyBadge}
                     ${tierBadge}
                   </div>
@@ -358,7 +358,7 @@ const KillListDrawer = {
                 <div>
                   ${
                     canEnqueue
-                      ? `<button type="button" class="btn-ghost-icon" onclick="KillListDrawer.enqueueExamPrep(${ex.id})" style="font-size: 9px; padding: 3px 7px; color: #fda4af; border-color: rgba(254, 202, 202, 0.3); font-weight: 600; white-space: nowrap;">+ Prep</button>`
+                      ? `<button type="button" class="btn-ghost-icon" onclick="KillListDrawer.enqueueExamPrep(${ex.id})" style="font-size: 9px; padding: 3px 7px; color: var(--color-rose); border-color: var(--color-rose-border); font-weight: 600; white-space: nowrap;">+ Prep</button>`
                       : `<button type="button" class="btn-ghost-icon" disabled style="font-size: 9px; padding: 2px 6px; opacity: 0.4;">Full</button>`
                   }
                 </div>
@@ -383,11 +383,11 @@ const KillListDrawer = {
 
   getStreamColor(category) {
     const cat = (category || "").toLowerCase();
-    if (cat.includes("math")) return "#c4b5fd"; // Lavender
-    if (cat.includes("algo") || cat.includes("code")) return "#7dd3fc"; // Sky Blue
-    if (cat.includes("sigg")) return "#fdba74"; // Orange
-    if (cat.includes("german")) return "#6ee7b7"; // Emerald
-    return "#fda4af"; // Rose
+    if (cat.includes("math")) return "var(--stream-academic, var(--color-purple))";
+    if (cat.includes("algo") || cat.includes("code")) return "var(--stream-code, var(--color-blue))";
+    if (cat.includes("sigg")) return "var(--stream-sigg, var(--color-amber))";
+    if (cat.includes("german")) return "var(--stream-german, var(--color-green))";
+    return "var(--stream-physical, var(--color-rose))";
   },
 
   getActionIcon(actionType) {

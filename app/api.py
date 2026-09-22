@@ -21,6 +21,8 @@ class HarnessAPI:
         # Ensure database and tables are ready
         init_db()
         self._last_sync_trigger = 0.0
+        # Automatically sync on startup if configured
+        self._trigger_auto_sync()
 
     def _trigger_auto_sync(self):
         """Asynchronously triggers two-way sync if auto_sync is enabled and configured."""
@@ -99,20 +101,37 @@ class HarnessAPI:
         notes: str = "",
         source: str = "manual",
     ) -> Dict[str, Any]:
-        from app.services import homework_service
+        from app.services import homework_service, sync_service
         res = homework_service.add_homework(subject, title, due_date, priority, notes, source)
+        if res and isinstance(res, dict) and res.get("id"):
+            sync_service.upsert_remote_item("homework_items", "id", {
+                "id": res["id"],
+                "subject": res.get("subject", subject),
+                "title": res.get("title", title),
+                "due_date": res.get("due_date", due_date),
+                "priority": res.get("priority", priority),
+                "notes": res.get("notes", notes),
+                "source": res.get("source", source),
+                "completed": bool(res.get("completed", False)),
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def toggle_homework(self, hw_id: int) -> Dict[str, Any]:
-        from app.services import homework_service
+        from app.services import homework_service, sync_service
         res = homework_service.toggle_homework(hw_id)
+        if res and isinstance(res, dict) and "completed" in res:
+            sync_service.upsert_remote_item("homework_items", "id", {
+                "id": hw_id,
+                "completed": bool(res["completed"]),
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def delete_homework(self, hw_id: int) -> bool:
-        from app.services import homework_service
+        from app.services import homework_service, sync_service
         res = homework_service.delete_homework(hw_id)
+        sync_service.delete_remote_item("homework_items", "id", hw_id, async_mode=True)
         self._trigger_auto_sync()
         return res
 
@@ -121,20 +140,36 @@ class HarnessAPI:
         return homework_service.get_upcoming_exams()
 
     def add_exam(self, subject: str, title: str, exam_date: str, scope: str = "") -> Dict[str, Any]:
-        from app.services import homework_service
+        from app.services import homework_service, sync_service
         res = homework_service.add_exam(subject, title, exam_date, scope)
+        if res and isinstance(res, dict) and res.get("id"):
+            sync_service.upsert_remote_item("school_exams", "id", {
+                "id": res["id"],
+                "subject": res.get("subject", subject),
+                "title": res.get("title", title),
+                "exam_date": res.get("exam_date", exam_date),
+                "scope": res.get("scope", scope),
+                "completed": bool(res.get("completed", False)),
+                "result_percentage": res.get("result_percentage"),
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def toggle_exam(self, exam_id: int, result_percentage: Optional[float] = None) -> bool:
-        from app.services import homework_service
+        from app.services import homework_service, sync_service
         res = homework_service.toggle_exam(exam_id, result_percentage)
+        sync_service.upsert_remote_item("school_exams", "id", {
+            "id": exam_id,
+            "completed": bool(res),
+            "result_percentage": result_percentage,
+        }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def delete_exam(self, exam_id: int) -> bool:
-        from app.services import homework_service
+        from app.services import homework_service, sync_service
         res = homework_service.delete_exam(exam_id)
+        sync_service.delete_remote_item("school_exams", "id", exam_id, async_mode=True)
         self._trigger_auto_sync()
         return res
 
@@ -160,17 +195,37 @@ class HarnessAPI:
         }
 
     def add_task(self, title: str, category: str = "personal", is_tum: bool = False, date_str: Optional[str] = None) -> Dict[str, Any]:
+        from app.services import sync_service
         res = today_service.add_task(title, category, is_tum, date_str)
+        if res and isinstance(res, dict) and res.get("id"):
+            sync_service.upsert_remote_item("tasks", "id", {
+                "id": res["id"],
+                "title": res.get("title", title),
+                "category": res.get("category", category),
+                "is_tum": bool(res.get("is_tum", is_tum)),
+                "completed": bool(res.get("completed", False)),
+                "date": res.get("date", date_str),
+                "rollover_count": res.get("rollover_count", 0),
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def toggle_task(self, task_id: int) -> Dict[str, Any]:
+        from app.services import sync_service
         res = today_service.toggle_task(task_id)
+        if res and isinstance(res, dict) and "completed" in res:
+            sync_service.upsert_remote_item("tasks", "id", {
+                "id": task_id,
+                "completed": bool(res["completed"]),
+                "completed_at": res.get("completed_at"),
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def delete_task(self, task_id: int) -> bool:
+        from app.services import sync_service
         res = today_service.delete_task(task_id)
+        sync_service.delete_remote_item("tasks", "id", task_id, async_mode=True)
         self._trigger_auto_sync()
         return res
 
@@ -191,6 +246,7 @@ class HarnessAPI:
         completed_blocks: Optional[str] = None,
         completed_exercises: Optional[str] = None,
     ) -> Dict[str, Any]:
+        from app.services import sync_service
         res = today_service.update_daily_log(
             date_str=date_str,
             scratchpad=scratchpad,
@@ -202,6 +258,19 @@ class HarnessAPI:
             completed_blocks=completed_blocks,
             completed_exercises=completed_exercises,
         )
+        if res and isinstance(res, dict) and res.get("date"):
+            sync_service.upsert_remote_item("daily_logs", "date", {
+                "date": res["date"],
+                "scratchpad": res.get("scratchpad") or "",
+                "wake_time": res.get("wake_time") or "",
+                "sleep_time": res.get("sleep_time") or "",
+                "reflection_worked": res.get("reflection_worked") or "",
+                "reflection_slipped": res.get("reflection_slipped") or "",
+                "reflection_tomorrow": res.get("reflection_tomorrow") or "",
+                "completed_blocks": res.get("completed_blocks") or "",
+                "completed_exercises": res.get("completed_exercises") or "",
+                "updated_at": res.get("updated_at"),
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
@@ -222,6 +291,7 @@ class HarnessAPI:
         date_str: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Adds an item to the Kill List (max 3 items per session)."""
+        from app.services import sync_service
         res = kill_list_controller.add_kill_item(
             category=category,
             title=title,
@@ -232,24 +302,51 @@ class HarnessAPI:
             quantity=quantity,
             date_str=date_str,
         )
+        if res and isinstance(res, dict) and res.get("item"):
+            item = res["item"]
+            sync_service.upsert_remote_item("kill_list_items", "id", {
+                "id": item.get("id"),
+                "date": item.get("date", date_str),
+                "category": item.get("category", category),
+                "title": item.get("title", title),
+                "action_type": item.get("action_type", action_type),
+                "target_path": item.get("target_path", target_path),
+                "target_spec": item.get("target_spec", target_spec),
+                "station_deliverable_id": item.get("station_deliverable_id", station_deliverable_id),
+                "completed": bool(item.get("completed", False)),
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def complete_kill_item(self, item_id: str) -> Dict[str, Any]:
         """Marks kill item done and atomically increments connected station deliverable."""
+        from app.services import sync_service
         res = kill_list_controller.complete_kill_item(item_id)
+        if res and isinstance(res, dict) and "completed" in res:
+            sync_service.upsert_remote_item("kill_list_items", "id", {
+                "id": item_id,
+                "completed": bool(res["completed"]),
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def toggle_kill_item(self, item_id: str) -> Dict[str, Any]:
         """Toggles kill item done status and syncs station deliverable counter."""
+        from app.services import sync_service
         res = kill_list_controller.toggle_kill_item(item_id)
+        if res and isinstance(res, dict) and "completed" in res:
+            sync_service.upsert_remote_item("kill_list_items", "id", {
+                "id": item_id,
+                "completed": bool(res["completed"]),
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def delete_kill_item(self, item_id: str) -> bool:
         """Deletes a kill item from the daily list."""
+        from app.services import sync_service
         res = kill_list_controller.delete_kill_item(item_id)
+        sync_service.delete_remote_item("kill_list_items", "id", item_id, async_mode=True)
         self._trigger_auto_sync()
         return res
 
@@ -261,7 +358,16 @@ class HarnessAPI:
         self, deliverable_id: str, new_count: Optional[int] = None, delta: Optional[int] = None
     ) -> Dict[str, Any]:
         """Directly sets or adjusts countable progress on a Metro deliverable."""
+        from app.services import sync_service
         res = kill_list_controller.update_deliverable_progress(deliverable_id, new_count=new_count, delta=delta)
+        if res and isinstance(res, dict) and res.get("deliverable_id"):
+            sync_service.upsert_remote_item("station_deliverable_progress", "deliverable_id", {
+                "deliverable_id": res["deliverable_id"],
+                "completed_count": res.get("completed_count", 0),
+                "total_required": res.get("total_required", 1),
+                "unit_label": res.get("unit_label", "reps"),
+                "is_completed": bool(res.get("is_completed", 0)),
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
@@ -292,6 +398,7 @@ class HarnessAPI:
         date_str: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Logs an individual grade (supports 4+, 17/17, 85%, np, bz), recalculating subject average instantly."""
+        from app.services import sync_service
         res = tum_service.add_grade_entry(
             subject=subject,
             semester=semester,
@@ -301,12 +408,27 @@ class HarnessAPI:
             description=description,
             date_str=date_str,
         )
+        if res and isinstance(res, dict) and res.get("id"):
+            sync_service.upsert_remote_item("tum_grade_entries", "id", {
+                "id": res["id"],
+                "subject": res.get("subject", subject),
+                "semester": res.get("semester", semester),
+                "raw_input": res.get("raw_input", raw_input),
+                "numeric_value": res.get("numeric_value"),
+                "weight": res.get("weight", weight),
+                "category": res.get("category", category),
+                "description": res.get("description", description),
+                "date": res.get("date", date_str),
+                "counts_in_average": bool(res.get("counts_in_average", True)),
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def delete_grade_entry(self, entry_id: int) -> bool:
         """Removes a grade entry and updates running average."""
+        from app.services import sync_service
         res = tum_service.delete_grade_entry(entry_id)
+        sync_service.delete_remote_item("tum_grade_entries", "id", entry_id, async_mode=True)
         self._trigger_auto_sync()
         return res
 
@@ -339,17 +461,35 @@ class HarnessAPI:
         percentage: Optional[float] = None,
         notes: Optional[str] = None,
     ) -> bool:
+        from app.services import sync_service
         res = tum_service.update_grade(grade_id, actual_grade, percentage, notes)
+        sync_service.upsert_remote_item("tum_grades", "id", {
+            "id": grade_id,
+            "actual_grade": actual_grade,
+            "percentage": percentage,
+            "notes": notes or "",
+        }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def update_matura(self, matura_id: int, current_mock_percentage: float, notes: Optional[str] = None) -> bool:
+        from app.services import sync_service
         res = tum_service.update_matura(matura_id, current_mock_percentage, notes)
+        sync_service.upsert_remote_item("tum_matura", "id", {
+            "id": matura_id,
+            "current_mock_percentage": current_mock_percentage,
+            "notes": notes or "",
+        }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def update_language_status(self, level: str, status: str) -> bool:
+        from app.services import sync_service
         res = tum_service.update_language_status(level, status)
+        sync_service.upsert_remote_item("tum_language", "level", {
+            "level": level,
+            "status": status,
+        }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
@@ -390,6 +530,7 @@ class HarnessAPI:
         notes: str = "",
         status: str = "active",
     ) -> Dict[str, Any]:
+        from app.services import sync_service
         res = project_service.add_project(
             name=name,
             description=description,
@@ -401,6 +542,19 @@ class HarnessAPI:
             notes=notes,
             status=status,
         )
+        if res and isinstance(res, dict) and res.get("id"):
+            sync_service.upsert_remote_item("projects", "id", {
+                "id": res["id"],
+                "name": name,
+                "description": description,
+                "local_path": local_path,
+                "github_url": github_url,
+                "current_milestone": current_milestone,
+                "next_action": next_action,
+                "deadline": deadline,
+                "notes": notes,
+                "status": status,
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
@@ -417,6 +571,7 @@ class HarnessAPI:
         github_url: Optional[str] = None,
         notes: Optional[str] = None,
     ) -> bool:
+        from app.services import sync_service
         res = project_service.update_project(
             project_id=project_id,
             name=name,
@@ -429,11 +584,24 @@ class HarnessAPI:
             github_url=github_url,
             notes=notes,
         )
+        payload = {"id": project_id}
+        if name is not None: payload["name"] = name
+        if description is not None: payload["description"] = description
+        if status is not None: payload["status"] = status
+        if current_milestone is not None: payload["current_milestone"] = current_milestone
+        if next_action is not None: payload["next_action"] = next_action
+        if deadline is not None: payload["deadline"] = deadline
+        if local_path is not None: payload["local_path"] = local_path
+        if github_url is not None: payload["github_url"] = github_url
+        if notes is not None: payload["notes"] = notes
+        sync_service.upsert_remote_item("projects", "id", payload, async_mode=True)
         self._trigger_auto_sync()
         return res
 
     def delete_project(self, project_id: int) -> bool:
+        from app.services import sync_service
         res = project_service.delete_project(project_id)
+        sync_service.delete_remote_item("projects", "id", project_id, async_mode=True)
         self._trigger_auto_sync()
         return res
 
@@ -465,7 +633,17 @@ class HarnessAPI:
         notes: str = "",
         date_str: Optional[str] = None,
     ) -> Dict[str, Any]:
+        from app.services import sync_service
         res = body_service.log_body_metric(weight_kg, calories_met, protein_met, notes, date_str)
+        if res and isinstance(res, dict) and res.get("id"):
+            sync_service.upsert_remote_item("body_metrics", "id", {
+                "id": res["id"],
+                "date": res.get("date", date_str),
+                "weight_kg": weight_kg,
+                "calories_met": bool(calories_met),
+                "protein_met": bool(protein_met),
+                "notes": notes or "",
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
@@ -476,7 +654,16 @@ class HarnessAPI:
         intensity: int = 7,
         date_str: Optional[str] = None,
     ) -> Dict[str, Any]:
+        from app.services import sync_service
         res = body_service.log_workout(workout_type, details, intensity, date_str)
+        if res and isinstance(res, dict) and res.get("id"):
+            sync_service.upsert_remote_item("workouts", "id", {
+                "id": res["id"],
+                "date": res.get("date", date_str),
+                "workout_type": workout_type,
+                "details": details or "",
+                "intensity": intensity,
+            }, async_mode=True)
         self._trigger_auto_sync()
         return res
 
@@ -506,18 +693,35 @@ class HarnessAPI:
         from app.services import sync_service
         return sync_service.sync_all()
 
+    def test_supabase_sync(self, supabase_url: Optional[str] = None, supabase_key: Optional[str] = None) -> Dict[str, Any]:
+        """Tests Supabase connection and verifies existence of all required schema tables."""
+        from app.services import sync_service
+        return sync_service.test_supabase_connection(supabase_url, supabase_key)
+
+    def push_local_to_supabase(self) -> Dict[str, Any]:
+        """Pushes all local PC data (homework, exams, grades, logs, tasks) to Supabase cloud."""
+        from app.services import sync_service
+        return sync_service.push_all_local_to_supabase()
+
+    def pull_supabase_to_local(self) -> Dict[str, Any]:
+        """Pulls cloud data from Supabase and hydrates local database."""
+        from app.services import sync_service
+        return sync_service.pull_all_supabase_to_local()
+
     def get_sync_status(self) -> Dict[str, Any]:
         from app.services import sync_service
         cfg = sync_service.get_sync_config()
         has_key = bool(cfg.get("supabase_key"))
+        has_url = bool(cfg.get("supabase_url"))
         has_web = bool(cfg.get("web_url"))
         local_detected = sync_service.probe_local_server() if not has_web else None
-        configured = has_key or has_web or bool(local_detected)
+        configured = (has_key and has_url) or has_web or bool(local_detected)
         status = "synced" if cfg.get("last_synced_at") else ("ready" if configured else "unconfigured")
         return {
             "status": status,
             "supabase_url": cfg.get("supabase_url", ""),
             "has_key": has_key,
+            "has_url": has_url,
             "web_url": cfg.get("web_url", ""),
             "has_web_url": has_web,
             "local_detected_url": local_detected or "",
@@ -542,8 +746,9 @@ class HarnessAPI:
             cfg["web_url"] = clean_web.rstrip("/")
         if supabase_key is not None:
             cfg["supabase_key"] = supabase_key.strip()
-        if supabase_url:
-            cfg["supabase_url"] = supabase_url.strip().rstrip("/")
+        if supabase_url is not None:
+            clean_url = supabase_url.strip().rstrip("/")
+            cfg["supabase_url"] = clean_url
         cfg["auto_sync"] = bool(auto_sync)
         sync_service.save_sync_config(cfg)
         return self.get_sync_status()

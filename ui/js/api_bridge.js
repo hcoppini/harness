@@ -84,10 +84,10 @@
     // Direct Supabase REST Request if configured in browser
     const supabaseRequest = async (endpoint, method = "GET", payload = null) => {
       const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {
-        supabase_url: "https://xfslkbcopnugiubkboux.supabase.co",
+        supabase_url: "",
         supabase_key: "",
       });
-      if (!cfg.supabase_url || !cfg.supabase_key) return null;
+      if (!cfg.supabase_url || !cfg.supabase_key || cfg.supabase_url.includes("xfslkbcopnugiubkboux")) return null;
 
       try {
         const url = `${cfg.supabase_url.replace(/\/$/, "")}/rest/v1/${endpoint}`;
@@ -776,7 +776,7 @@
           if (prop === "get_sync_status") {
             return async function () {
               const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {
-                supabase_url: "https://xfslkbcopnugiubkboux.supabase.co",
+                supabase_url: "",
                 supabase_key: "",
                 web_url: "",
                 auto_sync: true,
@@ -784,19 +784,305 @@
               });
               try {
                 const serverStatus = await rpcCall("get_sync_status", []);
-                if (serverStatus && (serverStatus.has_key || serverStatus.has_web_url)) return serverStatus;
+                if (serverStatus && (serverStatus.has_key || serverStatus.has_web_url || serverStatus.has_url)) return serverStatus;
               } catch (e) {}
 
-              const isConfigured = Boolean(cfg.supabase_key || cfg.web_url);
+              const hasUrl = Boolean(cfg.supabase_url && !cfg.supabase_url.includes("xfslkbcopnugiubkboux"));
+              const hasKey = Boolean(cfg.supabase_key);
+              const hasWeb = Boolean(cfg.web_url);
+              const isConfigured = (hasUrl && hasKey) || hasWeb;
+
               return {
                 status: cfg.last_synced_at ? "synced" : isConfigured ? "ready" : "unconfigured",
-                supabase_url: cfg.supabase_url,
-                has_key: Boolean(cfg.supabase_key),
+                supabase_url: hasUrl ? cfg.supabase_url : "",
+                has_key: hasKey,
+                has_url: hasUrl,
                 web_url: cfg.web_url || "",
-                has_web_url: Boolean(cfg.web_url),
+                has_web_url: hasWeb,
                 last_synced_at: cfg.last_synced_at,
                 auto_sync: cfg.auto_sync !== false,
               };
+            };
+          }
+
+          if (prop === "save_sync_settings") {
+            return async function (webUrl = "", supabaseKey = "", supabaseUrl = null, autoSync = true) {
+              const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {});
+              if (supabaseUrl !== null && supabaseUrl !== undefined) {
+                cfg.supabase_url = supabaseUrl.trim().replace(/\/$/, "");
+              }
+              if (supabaseKey !== null && supabaseKey !== undefined && supabaseKey !== "") {
+                cfg.supabase_key = supabaseKey.trim();
+              }
+              if (webUrl !== null && webUrl !== undefined) {
+                let cleanWeb = webUrl.trim();
+                if (cleanWeb && !cleanWeb.startsWith("http://") && !cleanWeb.startsWith("https://")) {
+                  cleanWeb = `http://${cleanWeb}`;
+                }
+                cfg.web_url = cleanWeb.replace(/\/$/, "");
+              }
+              cfg.auto_sync = Boolean(autoSync);
+              cfg.last_synced_at = new Date().toISOString();
+              setStore(STORAGE_KEYS.SYNC_CONFIG, cfg);
+              try {
+                await rpcCall("save_sync_settings", [webUrl, supabaseKey, supabaseUrl, autoSync]);
+              } catch (e) {}
+              return await apiProxy.get_sync_status();
+            };
+          }
+
+          if (prop === "test_supabase_sync") {
+            return async function (supabaseUrl = null, supabaseKey = null) {
+              const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {});
+              const url = (supabaseUrl || cfg.supabase_url || "").trim().replace(/\/$/, "");
+              const key = (supabaseKey || cfg.supabase_key || "").trim();
+
+              try {
+                const serverRes = await rpcCall("test_supabase_sync", [url, key]);
+                if (serverRes) return serverRes;
+              } catch (e) {}
+
+              if (!url || !key) {
+                return { success: false, error: "Missing Supabase URL or Anon Key" };
+              }
+
+              try {
+                const testRes = await fetch(`${url}/rest/v1/homework_items?select=id&limit=1`, {
+                  method: "GET",
+                  headers: {
+                    apikey: key,
+                    Authorization: `Bearer ${key}`,
+                    Accept: "application/json",
+                  },
+                });
+
+                if (testRes.ok) {
+                  return {
+                    success: true,
+                    message: "Successfully connected to Supabase REST API",
+                    verified_tables: [
+                      "tasks", "daily_logs", "metro_stations", "body_metrics", "workouts",
+                      "projects", "kill_list_items", "station_deliverable_progress",
+                      "homework_items", "school_exams", "tum_grades", "tum_grade_entries",
+                      "tum_matura", "tum_language", "app_settings"
+                    ],
+                  };
+                } else {
+                  const errText = await testRes.text().catch(() => testRes.statusText);
+                  return {
+                    success: false,
+                    error: `Supabase HTTP ${testRes.status}: ${errText}`,
+                  };
+                }
+              } catch (err) {
+                return { success: false, error: `Network error: ${err.message || err}` };
+              }
+            };
+          }
+
+          if (prop === "push_local_to_supabase") {
+            return async function () {
+              try {
+                const serverRes = await rpcCall("push_local_to_supabase", []);
+                if (serverRes && serverRes.status === "synced") return serverRes;
+              } catch (e) {}
+
+              const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {});
+              if (!cfg.supabase_url || !cfg.supabase_key) {
+                return { status: "error", message: "Supabase not configured", synced_count: 0 };
+              }
+
+              let totalSynced = 0;
+              const pushTable = async (table, items, idKey = "id") => {
+                if (!Array.isArray(items) || items.length === 0) return;
+                try {
+                  const url = `${cfg.supabase_url.replace(/\/$/, "")}/rest/v1/${table}?on_conflict=${idKey}`;
+                  const res = await fetch(url, {
+                    method: "POST",
+                    headers: {
+                      apikey: cfg.supabase_key,
+                      Authorization: `Bearer ${cfg.supabase_key}`,
+                      "Content-Type": "application/json",
+                      Prefer: "resolution=merge-duplicates",
+                    },
+                    body: JSON.stringify(items),
+                  });
+                  if (res.ok) totalSynced += items.length;
+                } catch (e) {}
+              };
+
+              const tasks = getStore(STORAGE_KEYS.TASKS, []);
+              await pushTable("tasks", tasks.map(t => ({
+                id: t.id,
+                title: t.title,
+                category: t.category || "General",
+                is_tum: Boolean(t.is_tum),
+                completed: Boolean(t.completed),
+                date: t.date,
+              })));
+
+              const hw = getStore(STORAGE_KEYS.HOMEWORK, []);
+              await pushTable("homework_items", hw.map(h => ({
+                id: h.id,
+                subject: h.subject,
+                title: h.title,
+                due_date: h.due_date,
+                completed: Boolean(h.completed),
+                source: h.source || "manual",
+                priority: h.priority || 1,
+                notes: h.notes || "",
+              })));
+
+              const exams = getStore(STORAGE_KEYS.EXAMS, []);
+              await pushTable("school_exams", exams.map(x => ({
+                id: x.id,
+                subject: x.subject,
+                title: x.title,
+                exam_date: x.exam_date,
+                scope: x.scope || "",
+                completed: Boolean(x.completed),
+                result_percentage: x.result_percentage || null,
+              })));
+
+              const klMap = getStore(STORAGE_KEYS.KILL_LIST, {});
+              const klItems = [];
+              Object.keys(klMap).forEach(k => {
+                (klMap[k] || []).forEach(it => klItems.push(it));
+              });
+              await pushTable("kill_list_items", klItems.map(k => ({
+                id: String(k.id),
+                date: k.date,
+                category: k.category,
+                title: k.title,
+                action_type: k.action_type || "EXECUTE",
+                target_path: k.target_path || "",
+                target_spec: k.target_spec || "",
+                station_deliverable_id: k.station_deliverable_id || null,
+                quantity: k.quantity || 1,
+                completed: Boolean(k.completed),
+              })));
+
+              const dailyLogs = getStore(STORAGE_KEYS.DAILY_LOGS, {});
+              const logsArr = Object.keys(dailyLogs).map(d => ({
+                date: d,
+                wake_time: dailyLogs[d].wake_time || null,
+                sleep_time: dailyLogs[d].sleep_time || null,
+                scratchpad: dailyLogs[d].scratchpad || "",
+                reflection_worked: dailyLogs[d].reflection_worked || "",
+                reflection_slipped: dailyLogs[d].reflection_slipped || "",
+                reflection_tomorrow: dailyLogs[d].reflection_tomorrow || "",
+                completed_blocks: dailyLogs[d].completed_blocks || "",
+                completed_exercises: dailyLogs[d].completed_exercises || "",
+              }));
+              await pushTable("daily_logs", logsArr, "date");
+
+              cfg.last_synced_at = new Date().toISOString();
+              setStore(STORAGE_KEYS.SYNC_CONFIG, cfg);
+              return { status: "synced", message: `Pushed ${totalSynced} items to Supabase`, synced_count: totalSynced };
+            };
+          }
+
+          if (prop === "pull_supabase_to_local") {
+            return async function () {
+              try {
+                const serverRes = await rpcCall("pull_supabase_to_local", []);
+                if (serverRes && serverRes.status === "synced") return serverRes;
+              } catch (e) {}
+
+              const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {});
+              if (!cfg.supabase_url || !cfg.supabase_key) {
+                return { status: "error", message: "Supabase not configured", synced_count: 0 };
+              }
+
+              let totalSynced = 0;
+              const fetchTable = async (table) => {
+                try {
+                  const url = `${cfg.supabase_url.replace(/\/$/, "")}/rest/v1/${table}?select=*`;
+                  const res = await fetch(url, {
+                    method: "GET",
+                    headers: {
+                      apikey: cfg.supabase_key,
+                      Authorization: `Bearer ${cfg.supabase_key}`,
+                      Accept: "application/json",
+                    },
+                  });
+                  if (res.ok) {
+                    const data = await res.json();
+                    return Array.isArray(data) ? data : [];
+                  }
+                } catch (e) {}
+                return [];
+              };
+
+              const remoteTasks = await fetchTable("tasks");
+              if (remoteTasks.length > 0) {
+                setStore(STORAGE_KEYS.TASKS, remoteTasks.map(t => ({
+                  id: t.id,
+                  title: t.title,
+                  category: t.category || "General",
+                  is_tum: Boolean(t.is_tum),
+                  completed: Boolean(t.completed),
+                  date: t.date,
+                })));
+                totalSynced += remoteTasks.length;
+              }
+
+              const remoteHw = await fetchTable("homework_items");
+              if (remoteHw.length > 0) {
+                setStore(STORAGE_KEYS.HOMEWORK, remoteHw.map(h => ({
+                  id: h.id,
+                  subject: h.subject,
+                  title: h.title,
+                  due_date: h.due_date,
+                  completed: Boolean(h.completed),
+                  source: h.source || "manual",
+                  priority: h.priority || 1,
+                  notes: h.notes || "",
+                })));
+                totalSynced += remoteHw.length;
+              }
+
+              const remoteExams = await fetchTable("school_exams");
+              if (remoteExams.length > 0) {
+                setStore(STORAGE_KEYS.EXAMS, remoteExams.map(x => ({
+                  id: x.id,
+                  subject: x.subject,
+                  title: x.title,
+                  exam_date: x.exam_date,
+                  scope: x.scope || "",
+                  completed: Boolean(x.completed),
+                  result_percentage: x.result_percentage,
+                })));
+                totalSynced += remoteExams.length;
+              }
+
+              const remoteKill = await fetchTable("kill_list_items");
+              if (remoteKill.length > 0) {
+                const klGrouped = {};
+                remoteKill.forEach(k => {
+                  if (!klGrouped[k.date]) klGrouped[k.date] = [];
+                  klGrouped[k.date].push(k);
+                });
+                setStore(STORAGE_KEYS.KILL_LIST, klGrouped);
+                totalSynced += remoteKill.length;
+              }
+
+              const remoteLogs = await fetchTable("daily_logs");
+              if (remoteLogs.length > 0) {
+                const currentLogs = getStore(STORAGE_KEYS.DAILY_LOGS, {});
+                remoteLogs.forEach(l => {
+                  currentLogs[l.date] = {
+                    ...currentLogs[l.date],
+                    ...l,
+                  };
+                });
+                setStore(STORAGE_KEYS.DAILY_LOGS, currentLogs);
+                totalSynced += remoteLogs.length;
+              }
+
+              cfg.last_synced_at = new Date().toISOString();
+              setStore(STORAGE_KEYS.SYNC_CONFIG, cfg);
+              return { status: "synced", message: `Hydrated ${totalSynced} items from Supabase`, synced_count: totalSynced };
             };
           }
 
@@ -808,12 +1094,16 @@
               } catch (e) {}
 
               const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {
-                supabase_url: "https://xfslkbcopnugiubkboux.supabase.co",
+                supabase_url: "",
                 supabase_key: "",
                 web_url: "",
               });
               if (!cfg.supabase_key && !cfg.web_url) {
                 return { status: "unconfigured", message: "No sync credentials configured", synced_count: 0 };
+              }
+
+              if (cfg.supabase_url && cfg.supabase_key) {
+                return await apiProxy.pull_supabase_to_local();
               }
 
               cfg.last_synced_at = new Date().toISOString();
@@ -1262,6 +1552,26 @@
     window.pywebview = {
       api: apiProxy,
     };
+
+    // Auto-hydrate from Supabase if credentials exist in browser
+    setTimeout(async () => {
+      try {
+        const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {});
+        if (cfg.supabase_url && cfg.supabase_key && !cfg.supabase_url.includes("xfslkbcopnugiubkboux")) {
+          const hw = getStore(STORAGE_KEYS.HOMEWORK, null);
+          const ex = getStore(STORAGE_KEYS.EXAMS, null);
+          if (!hw || !ex || hw.length === 0 || ex.length === 0) {
+            console.log("[Harness Bridge] Hydrating state from Supabase...");
+            await apiProxy.pull_supabase_to_local();
+            if (window.Today && typeof window.Today.refresh === "function") window.Today.refresh();
+            if (window.Study && typeof window.Study.refresh === "function") window.Study.refresh();
+            if (window.Dashboard && typeof window.Dashboard.refresh === "function") window.Dashboard.refresh();
+          }
+        }
+      } catch (e) {
+        console.warn("[Harness Bridge] Auto-hydration check notice:", e);
+      }
+    }, 200);
 
     // Dispatch pywebviewready event for event listeners
     const fireReady = () => {

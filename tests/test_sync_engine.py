@@ -119,8 +119,13 @@ def temp_sync_env(tmp_path, monkeypatch):
     """)
     conn.commit()
 
+    def _create_test_conn():
+        c = sqlite3.connect(str(db_path))
+        c.row_factory = sqlite3.Row
+        return c
+
     # Mock get_connection in sync_service
-    monkeypatch.setattr(sync_service, "get_connection", lambda: sqlite3.connect(str(db_path)))
+    monkeypatch.setattr(sync_service, "get_connection", _create_test_conn)
 
     yield conn, test_data_dir
     conn.close()
@@ -526,5 +531,105 @@ def test_direct_web_sync_exchange(temp_sync_env):
     body_row = cursor.fetchone()
     assert body_row is not None
     assert body_row[0] == 72.5
+
+
+def test_test_supabase_connection(temp_sync_env):
+    conn, data_dir = temp_sync_env
+
+    # 1. Missing credentials
+    res = sync_service.test_supabase_connection("", "")
+    assert res["success"] is False
+    assert "required" in res.get("message", "").lower() or "required" in res.get("error", "").lower()
+
+    # 2. Successful check
+    mock_resp = MagicMock()
+    mock_resp.status = 200
+    mock_resp.__enter__.return_value = mock_resp
+    with patch("urllib.request.urlopen", return_value=mock_resp):
+        res = sync_service.test_supabase_connection("https://test.supabase.co", "valid_key")
+        assert res["success"] is True
+        assert len(res["tables_found"]) == 15
+        assert len(res["verified_tables"]) == 15
+
+    # 3. Connection failure
+    with patch("urllib.request.urlopen", side_effect=Exception("Connection refused")):
+        res = sync_service.test_supabase_connection("https://test.supabase.co", "invalid_key")
+        assert res["success"] is False
+
+
+def test_push_and_pull_all_supabase(temp_sync_env):
+    conn, data_dir = temp_sync_env
+
+    sync_service.save_sync_config({
+        "supabase_url": "https://test.supabase.co",
+        "supabase_key": "valid_key",
+        "auto_sync": True,
+        "last_synced_at": None,
+    })
+
+    # Test push
+    cursor = conn.cursor()
+    cursor.execute("INSERT INTO tasks (id, title, category, is_tum, completed, date) VALUES (10, 'Push Task', 'Code', 1, 0, '2026-09-22')")
+    conn.commit()
+
+    with patch.object(sync_service, "_make_supabase_request", return_value=[{"id": 10}]):
+        push_res = sync_service.push_all_local_to_supabase(conn)
+        assert push_res["status"] == "synced"
+        assert push_res.get("pushed_count", push_res.get("synced_count", 0)) >= 1
+
+    # Test pull
+    remote_tasks = [{"id": 20, "title": "Pulled Task", "category": "Academic", "is_tum": 1, "completed": 1, "date": "2026-09-22"}]
+    with patch.object(sync_service, "_make_supabase_request", return_value=remote_tasks):
+        pull_res = sync_service.pull_all_supabase_to_local(conn)
+        assert pull_res["status"] == "synced"
+        assert pull_res["synced_count"] >= 1
+
+    cursor.execute("SELECT title, completed FROM tasks WHERE id = 20")
+    row = cursor.fetchone()
+    assert row is not None
+    assert row[0] == "Pulled Task"
+    assert row[1] == 1
+
+
+def test_delete_remote_item(temp_sync_env):
+    conn, data_dir = temp_sync_env
+
+    sync_service.save_sync_config({
+        "supabase_url": "https://test.supabase.co",
+        "supabase_key": "valid_key",
+        "auto_sync": True,
+        "last_synced_at": None,
+    })
+
+    with patch.object(sync_service, "_make_supabase_request", return_value=[]) as mock_req:
+        res = sync_service.delete_remote_item("homework_items", "id", 42)
+        assert res is True
+        mock_req.assert_called_once_with(
+            "homework_items?id=eq.42",
+            method="DELETE",
+        )
+
+
+def test_upsert_remote_item(temp_sync_env):
+    conn, data_dir = temp_sync_env
+
+    sync_service.save_sync_config({
+        "supabase_url": "https://test.supabase.co",
+        "supabase_key": "valid_key",
+        "auto_sync": True,
+        "last_synced_at": None,
+    })
+
+    with patch.object(sync_service, "_make_supabase_request", return_value=[{"id": 42}]) as mock_req:
+        res = sync_service.upsert_remote_item("homework_items", "id", {"id": 42, "title": "Math HW"}, async_mode=False)
+        assert res is True
+        mock_req.assert_called_once_with(
+            "homework_items?on_conflict=id",
+            method="POST",
+            payload={"id": 42, "title": "Math HW"},
+            headers_extra={"Prefer": "resolution=merge-duplicates"},
+        )
+
+
 
 

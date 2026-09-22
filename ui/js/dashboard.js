@@ -544,8 +544,8 @@ window.Dashboard = {
       const g = day.gym_routine;
       const exercises = g.exercises || [];
       gymHtml = `
-        <div style="margin-bottom: 14px; background: rgba(244, 63, 94, 0.04); border: 1px solid rgba(244, 63, 94, 0.2); border-radius: 6px; padding: 12px;">
-          <div class="card-label" style="color: #fda4af; margin-bottom: 6px;">STRUCTURED HYPERTROPHY PROTOCOL</div>
+        <div style="margin-bottom: 14px; background: var(--color-rose-subtle); border: 1px solid var(--color-rose-border); border-radius: 6px; padding: 12px;">
+          <div class="card-label" style="color: var(--color-rose); font-weight: 700; margin-bottom: 6px;">STRUCTURED HYPERTROPHY PROTOCOL</div>
           <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); margin-bottom: 6px;">
             ${this.escapeHtml(g.name)}
           </div>
@@ -553,7 +553,7 @@ window.Dashboard = {
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px;">
               ${exercises
                 .map((ex) => `
-                  <div style="font-size: 11px; padding: 4px 8px; background: rgba(0,0,0,0.25); border-radius: 3px; border: 1px solid var(--border-hairline);">
+                  <div style="font-size: 11px; padding: 4px 8px; background: var(--bg-surface); border-radius: 3px; border: 1px solid var(--border-hairline);">
                     <span style="font-weight: 600; color: var(--text-primary);">${this.escapeHtml(ex.name)}</span>
                     <span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); margin-left: 4px;">${this.escapeHtml(ex.sets || "")}</span>
                   </div>

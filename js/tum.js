@@ -139,13 +139,13 @@ const Tum = {
           let avgBorder = "rgba(196, 181, 253, 0.3)";
 
           if (runningAvg < 4.0) {
-            avgBg = "rgba(239, 68, 68, 0.12)";
-            avgColor = "#f87171";
-            avgBorder = "rgba(239, 68, 68, 0.3)";
+            avgBg = "var(--color-red-subtle)";
+            avgColor = "var(--color-red)";
+            avgBorder = "var(--color-red-border)";
           } else if (runningAvg >= target) {
-            avgBg = "rgba(110, 231, 183, 0.12)";
-            avgColor = "#6ee7b7";
-            avgBorder = "rgba(110, 231, 183, 0.3)";
+            avgBg = "var(--color-green-subtle)";
+            avgColor = "var(--color-green)";
+            avgBorder = "var(--color-green-border)";
           }
 
           avgHtml = `
@@ -159,9 +159,9 @@ const Tum = {
         let statusBadge = `<span class="key-pill">Pending</span>`;
         if (runningAvg !== null && runningAvg !== undefined) {
           if (runningAvg < 4.0) {
-            statusBadge = `<span class="key-pill" style="color: #f87171; border-color: rgba(239, 68, 68, 0.35);">Risk (&lt; 4.0)</span>`;
+            statusBadge = `<span class="key-pill rose">Risk (&lt; 4.0)</span>`;
           } else if (runningAvg >= target) {
-            statusBadge = `<span class="key-pill done" style="color: #6ee7b7; border-color: rgba(110, 231, 183, 0.35);">Target Met</span>`;
+            statusBadge = `<span class="key-pill done">Target Met</span>`;
           } else {
             statusBadge = `<span class="key-pill" style="color: var(--text-primary);">On Track</span>`;
           }
@@ -368,11 +368,11 @@ const Tum = {
 
     if (badgeEl) {
       if (calc.total_tum_points >= 88.0) {
-        badgeEl.innerHTML = `<span class="mono-chip done" style="background: rgba(110, 231, 183, 0.15); border-color: rgba(110, 231, 183, 0.4); color: #6ee7b7; font-size: 11px; padding: 4px 10px; font-weight: 700;">DIRECT ADMISSION SAFE (Level 1)</span>`;
+        badgeEl.innerHTML = `<span class="mono-chip done" style="font-size: 11px; padding: 4px 10px; font-weight: 700;">DIRECT ADMISSION SAFE (Level 1)</span>`;
       } else if (calc.total_tum_points >= 70.0) {
-        badgeEl.innerHTML = `<span class="mono-chip amber" style="background: rgba(245, 158, 11, 0.15); border-color: rgba(245, 158, 11, 0.4); color: #f59e0b; font-size: 11px; padding: 4px 10px; font-weight: 700;">INTERVIEW THRESHOLD (Level 2)</span>`;
+        badgeEl.innerHTML = `<span class="mono-chip amber" style="font-size: 11px; padding: 4px 10px; font-weight: 700;">INTERVIEW THRESHOLD (Level 2)</span>`;
       } else {
-        badgeEl.innerHTML = `<span class="mono-chip" style="background: rgba(239, 68, 68, 0.15); border-color: rgba(239, 68, 68, 0.4); color: #f87171; font-size: 11px; padding: 4px 10px; font-weight: 700;">DEFICIT: MATH/CS RECOVERY NEEDED</span>`;
+        badgeEl.innerHTML = `<span class="mono-chip rose" style="font-size: 11px; padding: 4px 10px; font-weight: 700;">DEFICIT: MATH/CS RECOVERY NEEDED</span>`;
       }
     }
   },

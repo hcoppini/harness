@@ -375,10 +375,10 @@ const Today = {
           wlBadge.style.border = "";
           wlBadge.title = `Balanced Mode: Academic load ${wl.academic_load_score}/100. Dual-track TUM Metro & school prep.`;
         } else {
-          wlBadge.className = "mono-chip";
-          wlBadge.style.background = "rgba(110, 231, 183, 0.12)";
-          wlBadge.style.color = "#6ee7b7";
-          wlBadge.style.border = "1px solid rgba(110, 231, 183, 0.3)";
+          wlBadge.className = "mono-chip green";
+          wlBadge.style.background = "";
+          wlBadge.style.color = "";
+          wlBadge.style.border = "";
           wlBadge.title = `Cruise Mode: Academic load ${wl.academic_load_score}/100. 100% TUM Metro priority focus.`;
         }
       } else {
@@ -575,7 +575,7 @@ const Today = {
               STRUCTURED LIFT • ${this.escapeHtml(this.gymRoutine.name)}
             </span>
           </div>
-          <button type="button" class="btn-ghost-icon" onclick="Today.toggleWholeWorkout()" style="font-size: 9px; padding: 2px 7px; color: ${allCompleted ? "#6ee7b7" : "var(--accent-lavender)"}; border-color: ${allCompleted ? "rgba(110,231,183,0.3)" : "rgba(196,181,253,0.3)"};">
+          <button type="button" class="btn-ghost-icon" onclick="Today.toggleWholeWorkout()" style="font-size: 9px; padding: 2px 7px; color: ${allCompleted ? "var(--color-green)" : "var(--accent-lavender)"}; border-color: ${allCompleted ? "var(--color-green-border)" : "var(--accent-lavender-border)"};">
             ${allCompleted ? "[DONE]" : "1-CLICK COMPLETE"}
           </button>
         </div>
@@ -1409,12 +1409,12 @@ const Today = {
         const isDone = item.completed;
         const catLower = (item.category || "").toLowerCase();
         const catColor = catLower.includes("math")
-          ? "#c4b5fd"
+          ? "var(--stream-academic, var(--color-purple))"
           : catLower.includes("german")
-          ? "#6ee7b7"
+          ? "var(--stream-german, var(--color-green))"
           : catLower.includes("sigg")
-          ? "#fdba74"
-          : "#7dd3fc";
+          ? "var(--stream-sigg, var(--color-amber))"
+          : "var(--stream-code, var(--color-blue))";
 
         const qtyBadge = item.quantity && item.quantity > 1
           ? `<span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: var(--accent-lavender); background: rgba(196, 181, 253, 0.12); padding: 1px 4px; border-radius: 2px;">+${item.quantity} reps</span>`

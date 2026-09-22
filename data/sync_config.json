@@ -1,7 +1,7 @@
 {
-  "supabase_url": "https://xfslkbcopnugiubkboux.supabase.co",
+  "supabase_url": "",
   "supabase_key": "",
-  "web_url": "http://127.0.0.1:5000",
+  "web_url": "",
   "auto_sync": true,
-  "last_synced_at": "2026-09-20T00:53:06.057371"
+  "last_synced_at": null
 }

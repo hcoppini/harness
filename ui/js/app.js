@@ -16,6 +16,7 @@ window.HarnessApp = {
     this.bindJsonModal();
     this.bindSyncModal();
     this.startClock();
+    this.checkMobilePwaTip();
 
     const startBridge = async () => {
       if (this.initialized) return;
@@ -57,18 +58,30 @@ window.HarnessApp = {
   },
 
   applyTheme(theme) {
-    if (theme === "dark") {
+    const isDark = theme === "dark";
+    if (isDark) {
       document.documentElement.setAttribute("data-theme", "dark");
     } else {
       document.documentElement.removeAttribute("data-theme");
     }
     localStorage.setItem("harness_theme", theme);
+
+    // Dynamic mobile PWA status bar & theme-color sync for native iOS/Android look
+    const themeColorMeta = document.querySelector('meta[name="theme-color"]');
+    if (themeColorMeta) {
+      themeColorMeta.setAttribute("content", isDark ? "#08080A" : "#FFFFFF");
+    }
+    const statusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
+    if (statusBarMeta) {
+      statusBarMeta.setAttribute("content", isDark ? "black-translucent" : "default");
+    }
+
     const btn = document.getElementById("btnToggleTheme");
     if (btn) {
       const icon = btn.querySelector("#themeToggleIcon");
       const text = btn.querySelector("#themeToggleText");
-      if (icon) icon.textContent = theme === "dark" ? "☀️" : "🌙";
-      if (text) text.textContent = theme === "dark" ? "LIGHT" : "DARK";
+      if (icon) icon.textContent = isDark ? "☀️" : "🌙";
+      if (text) text.textContent = isDark ? "LIGHT" : "DARK";
     }
   },
 
@@ -77,6 +90,50 @@ window.HarnessApp = {
     const next = current === "dark" ? "light" : "dark";
     this.applyTheme(next);
     if (window.HarnessApp) this.showToast(`Switched to ${next} monochrome`);
+  },
+
+  checkMobilePwaTip() {
+    const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent) || (window.innerWidth <= 768);
+    const isStandalone = window.navigator.standalone || window.matchMedia("(display-mode: standalone)").matches;
+    const dismissed = localStorage.getItem("harness_pwa_tip_dismissed");
+
+    if (isMobile && !isStandalone && !dismissed) {
+      const isIOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+      const tip = document.createElement("div");
+      tip.id = "mobilePwaInstallTip";
+      tip.style.cssText = `
+        position: fixed;
+        bottom: calc(68px + env(safe-area-inset-bottom, 0px));
+        left: 12px;
+        right: 12px;
+        background: var(--bg-surface);
+        border: 1px solid var(--border-medium);
+        border-radius: 10px;
+        padding: 10px 14px;
+        box-shadow: var(--shadow-dropdown);
+        z-index: 95;
+        font-size: 11px;
+        color: var(--text-primary);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+      `;
+
+      const tipText = isIOS
+        ? `To use as full app: tap <span style="font-weight: 700;">Share [⎋]</span> &rarr; <span style="font-weight: 700;">"Add to Home Screen"</span>`
+        : `To use as full app: tap <span style="font-weight: 700;">menu [⋮]</span> &rarr; <span style="font-weight: 700;">"Install app"</span>`;
+
+      tip.innerHTML = `
+        <div style="line-height: 1.4;">
+          <div style="font-weight: 700; font-size: 10px; color: var(--accent-lavender); letter-spacing: 0.04em;">PHONE WEB APP</div>
+          <div>${tipText}</div>
+        </div>
+        <button type="button" style="background: none; border: none; font-size: 18px; color: var(--text-tertiary); cursor: pointer; padding: 2px 6px; line-height: 1;" onclick="document.getElementById('mobilePwaInstallTip').remove(); localStorage.setItem('harness_pwa_tip_dismissed', '1');">&times;</button>
+      `;
+
+      document.body.appendChild(tip);
+    }
   },
 
   async initAllLayers() {
@@ -364,6 +421,11 @@ window.HarnessApp = {
     const btnSyncNow = document.getElementById("btnSyncNowFromModal");
     const btnUseLocal = document.getElementById("btnUseLocalSync");
     const btnOpenJson = document.getElementById("btnSyncOpenJsonHub");
+    const btnTest = document.getElementById("btnTestSupabaseSync");
+    const btnPush = document.getElementById("btnPushSupabaseSync");
+    const btnPull = document.getElementById("btnPullSupabaseSync");
+    const btnCopySql = document.getElementById("btnCopySchemaSql");
+    const diagEl = document.getElementById("syncModalDiagnostics");
 
     if (btnClose) {
       btnClose.addEventListener("click", () => this.closeSyncModal());
@@ -383,6 +445,97 @@ window.HarnessApp = {
       });
     }
 
+    if (btnTest) {
+      btnTest.addEventListener("click", async () => {
+        const url = (document.getElementById("syncInputSupabaseUrl")?.value || "").trim();
+        const key = (document.getElementById("syncInputSupabaseKey")?.value || "").trim();
+        if (!url || !key) {
+          if (diagEl) diagEl.innerHTML = '<span style="color: var(--color-amber);">⚠ Enter both Supabase Project URL and Anon Key first.</span>';
+          return;
+        }
+        if (diagEl) diagEl.innerHTML = '<span style="color: var(--text-tertiary);">Testing Supabase connection & verifying tables...</span>';
+        try {
+          if (window.pywebview && window.pywebview.api) {
+            const res = await window.pywebview.api.test_supabase_sync(url, key);
+            if (res && res.success) {
+              const count = res.verified_tables ? res.verified_tables.length : 15;
+              if (diagEl) diagEl.innerHTML = `<span style="color: var(--color-green); font-weight: 600;">✓ Connected to Supabase! Verified ${count}/15 schema tables.</span>`;
+              this.showToast("Supabase connection verified!");
+            } else {
+              const msg = res ? (res.error || res.message) : "Failed to connect";
+              if (diagEl) diagEl.innerHTML = `<span style="color: var(--color-red); font-weight: 600;">✗ Connection test failed: ${msg}</span>`;
+            }
+          }
+        } catch (err) {
+          if (diagEl) diagEl.innerHTML = `<span style="color: var(--color-red);">✗ Error: ${err.message || err}</span>`;
+        }
+      });
+    }
+
+    if (btnPush) {
+      btnPush.addEventListener("click", async () => {
+        if (diagEl) diagEl.innerHTML = '<span style="color: var(--text-tertiary);">Pushing all local PC data (homework, exams, tasks, grades) to Supabase...</span>';
+        try {
+          if (window.pywebview && window.pywebview.api) {
+            const res = await window.pywebview.api.push_local_to_supabase();
+            if (res && res.status === "synced") {
+              const count = res.synced_count || 0;
+              if (diagEl) diagEl.innerHTML = `<span style="color: var(--color-green); font-weight: 600;">✓ Successfully pushed ${count} records across all 15 tables to Supabase!</span>`;
+              this.showToast(`Pushed ${count} records to Supabase!`);
+              await this.refreshSyncModal();
+            } else {
+              const msg = res ? (res.error || res.message) : "Push failed";
+              if (diagEl) diagEl.innerHTML = `<span style="color: var(--color-red);">✗ ${msg}</span>`;
+            }
+          }
+        } catch (err) {
+          if (diagEl) diagEl.innerHTML = `<span style="color: var(--color-red);">✗ Error: ${err.message || err}</span>`;
+        }
+      });
+    }
+
+    if (btnPull) {
+      btnPull.addEventListener("click", async () => {
+        if (diagEl) diagEl.innerHTML = '<span style="color: var(--text-tertiary);">Pulling latest data from Supabase into local state...</span>';
+        try {
+          if (window.pywebview && window.pywebview.api) {
+            const res = await window.pywebview.api.pull_supabase_to_local();
+            if (res && res.status === "synced") {
+              const count = res.synced_count || 0;
+              if (diagEl) diagEl.innerHTML = `<span style="color: var(--color-green); font-weight: 600;">✓ Successfully hydrated ${count} records from Supabase into local storage!</span>`;
+              this.showToast(`Hydrated ${count} records from Supabase!`);
+              if (window.Today && typeof window.Today.refresh === "function") window.Today.refresh();
+              if (window.Study && typeof window.Study.refresh === "function") window.Study.refresh();
+              if (window.Dashboard && typeof window.Dashboard.refresh === "function") window.Dashboard.refresh();
+              await this.refreshSyncModal();
+            } else {
+              const msg = res ? (res.error || res.message) : "Pull failed";
+              if (diagEl) diagEl.innerHTML = `<span style="color: var(--color-red);">✗ ${msg}</span>`;
+            }
+          }
+        } catch (err) {
+          if (diagEl) diagEl.innerHTML = `<span style="color: var(--color-red);">✗ Error: ${err.message || err}</span>`;
+        }
+      });
+    }
+
+    if (btnCopySql) {
+      btnCopySql.addEventListener("click", async () => {
+        try {
+          let sqlText = `-- Supabase PostgreSQL Schema for Harness Executive OS\n-- Visit github.com/hcoppini/harness/blob/master/supabase/schema.sql to copy the complete 15-table DDL.`;
+          try {
+            const res = await fetch("/supabase/schema.sql");
+            if (res.ok) sqlText = await res.text();
+          } catch (e) {}
+          await navigator.clipboard.writeText(sqlText);
+          this.showToast("Schema SQL copied to clipboard!");
+          if (diagEl) diagEl.innerHTML = '<span style="color: var(--color-green);">✓ Schema SQL copied! Open Supabase Dashboard &rarr; SQL Editor and run it.</span>';
+        } catch (err) {
+          this.showToast("Could not access clipboard");
+        }
+      });
+    }
+
     if (btnSyncNow) {
       btnSyncNow.addEventListener("click", async () => {
         await this.triggerSync(false);
@@ -393,6 +546,7 @@ window.HarnessApp = {
     if (form) {
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
+        const supabaseUrl = (document.getElementById("syncInputSupabaseUrl")?.value || "").trim();
         const webUrl = (document.getElementById("syncInputWebUrl")?.value || "").trim();
         const key = (document.getElementById("syncInputSupabaseKey")?.value || "").trim();
         const autoSync = Boolean(document.getElementById("syncInputAutoSync")?.checked);
@@ -400,17 +554,19 @@ window.HarnessApp = {
         try {
           if (window.pywebview && window.pywebview.api) {
             if (typeof window.pywebview.api.save_sync_settings === "function") {
-              await window.pywebview.api.save_sync_settings(webUrl, key, null, autoSync);
+              await window.pywebview.api.save_sync_settings(webUrl, key, supabaseUrl, autoSync);
             } else {
               await window.pywebview.api.configure_web_sync(webUrl, autoSync);
             }
             this.showToast("Sync settings saved!");
+            if (diagEl) diagEl.innerHTML = '<span style="color: var(--color-green);">✓ Settings saved! Running sync...</span>';
             await this.triggerSync(false);
             await this.refreshSyncModal();
           }
         } catch (err) {
           console.error("Error saving sync settings:", err);
           this.showToast("Failed to save sync settings");
+          if (diagEl) diagEl.innerHTML = `<span style="color: var(--color-red);">✗ Failed to save: ${err.message || err}</span>`;
         }
       });
     }
@@ -433,6 +589,8 @@ window.HarnessApp = {
     try {
       const status = await window.pywebview.api.get_sync_status();
       const pill = document.getElementById("syncModalStatusPill");
+      const urlInput = document.getElementById("syncInputSupabaseUrl");
+      const keyInput = document.getElementById("syncInputSupabaseKey");
       const webInput = document.getElementById("syncInputWebUrl");
       const autoSyncCheck = document.getElementById("syncInputAutoSync");
       const lastTime = document.getElementById("syncModalLastTime");
@@ -442,6 +600,16 @@ window.HarnessApp = {
         pill.textContent = (status.status || "ready").toUpperCase();
         pill.className = "mono-chip";
         if (status.status === "synced") pill.classList.add("lavender");
+      }
+
+      if (urlInput && document.activeElement !== urlInput) {
+        urlInput.value = status.supabase_url || "";
+      }
+
+      if (keyInput && document.activeElement !== keyInput) {
+        if (status.has_key && !keyInput.value) {
+          keyInput.placeholder = "•••••••••••••••••••••••••••••••• (Configured)";
+        }
       }
 
       if (webInput && document.activeElement !== webInput) {
@@ -462,12 +630,12 @@ window.HarnessApp = {
       }
 
       if (modeText) {
-        if (status.has_web_url) {
+        if (status.has_url && status.has_key) {
+          modeText.textContent = `Direct Supabase Cloud Sync (${status.supabase_url})`;
+        } else if (status.has_web_url) {
           modeText.textContent = `Direct HTTP Sync (${status.web_url})`;
         } else if (status.local_detected_url) {
           modeText.textContent = `Local Auto-Detected (${status.local_detected_url})`;
-        } else if (status.has_key) {
-          modeText.textContent = "Supabase Cloud Sync";
         } else {
           modeText.textContent = "Local Only (Offline SQLite WAL)";
         }
@@ -497,20 +665,26 @@ window.HarnessApp = {
         setTimeout(() => this.triggerSync(true), 300);
       }
 
-      // Automatically sync on window focus (e.g. switching back from browser/mobile)
+      // Automatically sync on window focus / tab visibility (e.g. switching back from browser/mobile)
       if (!this._focusSyncBound) {
         this._focusSyncBound = true;
-        window.addEventListener("focus", async () => {
+        const autoSyncHandler = async () => {
           if (window.pywebview && window.pywebview.api) {
             const cur = await window.pywebview.api.get_sync_status();
             if ((cur.has_key || cur.has_web_url || cur.local_detected_url) && cur.auto_sync) {
               await this.triggerSync(true);
             }
           }
+        };
+        window.addEventListener("focus", autoSyncHandler);
+        document.addEventListener("visibilitychange", async () => {
+          if (document.visibilityState === "visible") {
+            await autoSyncHandler();
+          }
         });
       }
 
-      // Schedule periodic background sync every 60 seconds
+      // Schedule periodic background sync every 30 seconds
       if (this.syncTimer) clearInterval(this.syncTimer);
       this.syncTimer = setInterval(async () => {
         if (window.pywebview && window.pywebview.api) {
@@ -519,7 +693,7 @@ window.HarnessApp = {
             await this.triggerSync(true);
           }
         }
-      }, 60 * 1000);
+      }, 30 * 1000);
     } catch (e) {
       console.warn("[Sync] Init failed:", e);
       this.updateSyncBadge("offline");
@@ -568,6 +742,7 @@ window.HarnessApp = {
         if (res.synced_count > 0 || !isBackground) {
           if (this.currentView === "dashboard" && window.Dashboard) window.Dashboard.load();
           if (this.currentView === "today" && window.Today) window.Today.load();
+          if (this.currentView === "study" && window.Study) window.Study.load();
           if (this.currentView === "tum" && window.Tum) window.Tum.load();
           if (this.currentView === "projects" && window.Projects) window.Projects.load();
           if (this.currentView === "body" && window.Body) window.Body.load();
