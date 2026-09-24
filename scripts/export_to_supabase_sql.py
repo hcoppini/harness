@@ -231,7 +231,8 @@ def generate_sql():
         lines.append("VALUES")
         val_rows = []
         for r in rows:
-            val_rows.append(f"  ({sql_quote(r['id'])}, {sql_quote(r['name'])}, {sql_quote(r['description'])}, {sql_quote(r['local_path'])}, {sql_quote(r['github_url'])}, {sql_quote(r['current_milestone'])}, {sql_quote(r['next_action'])}, {sql_quote(r['deadline'])}, {sql_quote(r['notes'])}, {sql_quote(r['status'])}, {sql_quote(r['created_at'])})")
+            clean_path = (r['local_path'] or '').replace('\\', '/')
+            val_rows.append(f"  ({sql_quote(r['id'])}, {sql_quote(r['name'])}, {sql_quote(r['description'])}, {sql_quote(clean_path)}, {sql_quote(r['github_url'])}, {sql_quote(r['current_milestone'])}, {sql_quote(r['next_action'])}, {sql_quote(r['deadline'])}, {sql_quote(r['notes'])}, {sql_quote(r['status'])}, {sql_quote(r['created_at'])})")
         lines.append(",\n".join(val_rows))
         lines.append("ON CONFLICT (id) DO UPDATE SET")
         lines.append("  name = EXCLUDED.name, current_milestone = EXCLUDED.current_milestone, next_action = EXCLUDED.next_action, status = EXCLUDED.status;\n")
