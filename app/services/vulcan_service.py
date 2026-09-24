@@ -919,6 +919,18 @@ def sync_vulcan_data(
 
     conn.commit()
 
+    # Replicate newly synced Vulcan data to Supabase if configured
+    try:
+        from app.services import sync_service
+        sync_cfg = sync_service.get_sync_config()
+        if sync_cfg.get("supabase_key"):
+            sync_service.sync_school_exams(conn)
+            sync_service.sync_homework_items(conn)
+            sync_service.sync_tum_grades(conn)
+            sync_service.sync_tum_grade_entries(conn)
+    except Exception as e:
+        print(f"[Vulcan Service] Supabase sync replication error: {e}")
+
     now_iso = datetime.now().isoformat()
     cfg["last_synced_at"] = now_iso
     save_vulcan_config(cfg)
@@ -1000,10 +1012,19 @@ def start_vulcan_daily_scheduler() -> None:
 def setup_windows_scheduled_sync(target_time: str = "15:00") -> bool:
     """Registers or updates Windows Task Scheduler task to run daily at 3:00 PM."""
     import subprocess
+    import sys
+
+    # Always use the permanent repo scripts path, never temporary PyInstaller extraction dir
+    desktop_repo_bat = Path.home() / "Desktop" / "harness" / "scripts" / "sync_vulcan_daily.bat"
     base_dir = Path(__file__).resolve().parent.parent.parent
-    bat_path = base_dir / "scripts" / "sync_vulcan_daily.bat"
-    if not bat_path.exists():
-        return False
+    candidate_bat = base_dir / "scripts" / "sync_vulcan_daily.bat"
+
+    if desktop_repo_bat.exists():
+        bat_path = desktop_repo_bat
+    elif candidate_bat.exists() and "Temp" not in str(candidate_bat):
+        bat_path = candidate_bat
+    else:
+        bat_path = desktop_repo_bat
 
     cmd = [
         "schtasks",
