@@ -1,7 +1,7 @@
 {
-  "supabase_url": "",
-  "supabase_key": "",
-  "web_url": "",
+  "supabase_url": "https://xfslkbcqpnugiubkboux.supabase.co",
+  "supabase_key": "sb_publishable_MQeDTIgtzkzqX_wohBlx4w_UXiEtGK8",
+  "web_url": "http://127.0.0.1:5000",
   "auto_sync": true,
   "last_synced_at": null
 }

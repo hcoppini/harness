@@ -84,10 +84,10 @@
     // Direct Supabase REST Request if configured in browser
     const supabaseRequest = async (endpoint, method = "GET", payload = null) => {
       const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {
-        supabase_url: "",
-        supabase_key: "",
+        supabase_url: "https://xfslkbcqpnugiubkboux.supabase.co",
+        supabase_key: "sb_publishable_MQeDTIgtzkzqX_wohBlx4w_UXiEtGK8",
       });
-      if (!cfg.supabase_url || !cfg.supabase_key || cfg.supabase_url.includes("xfslkbcopnugiubkboux")) return null;
+      if (!cfg.supabase_url || !cfg.supabase_key) return null;
 
       try {
         const url = `${cfg.supabase_url.replace(/\/$/, "")}/rest/v1/${endpoint}`;
