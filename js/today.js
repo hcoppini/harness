@@ -516,27 +516,51 @@ const Today = {
     const codeDone = this.completedBlocks.has("study_code");
     const completedCount = (schoolDone ? 1 : 0) + (maturaDone ? 1 : 0) + (codeDone ? 1 : 0);
 
-    let step1Title = isSchool ? "Academic Defense: Exam / Essay Priority" : "School Defense: Homework & Next-Day Class Prep";
-    let step1Desc = isSchool
-      ? (rawActivity || "50m zero-distraction focus sprint on upcoming exam / essay + 10m mental reset buffer.")
-      : "Clear pending homework backlog • 15-min preview so you are never surprised in class (Fizyka / Matematyka).";
+    const upcomingExams = (this.examsList && this.examsList.length > 0)
+      ? this.examsList
+      : ((wl && wl.upcoming_exams) ? wl.upcoming_exams : []);
+    const nextExam = upcomingExams[0] || null;
+    const todayExams = (wl && wl.today_exams && wl.today_exams.length > 0) ? wl.today_exams : [];
+
+    let step1Title = "School Defense: Homework & Next-Day Class Prep";
+    let step1Desc = "Clear pending homework backlog • 15-min preview so you are never surprised in class (Fizyka / Matematyka).";
+
+    if (todayExams.length > 0) {
+      step1Title = `Exam Cleared: [${todayExams[0].subject}] Written This Morning`;
+      step1Desc = `Morning examination cleared at school. Zero afternoon school pressure. 100% capacity focused on TUM roadmap.`;
+    } else if (isSchool) {
+      step1Title = `Academic Defense: ${block ? (block.focus || "Exam / Essay Priority") : "Exam Priority"}`;
+      step1Desc = rawActivity || "50m zero-distraction focus sprint on upcoming exam / essay + 10m mental reset buffer.";
+    } else if (nextExam && nextExam.days_left <= 5) {
+      const dueText = nextExam.days_left === 1 ? "TOMORROW" : `in ${nextExam.days_left}d (${nextExam.exam_date})`;
+      step1Title = `Upcoming Exam Preview: [${nextExam.subject}] (${dueText})`;
+      const scopeText = nextExam.scope ? ` • Scope: ${nextExam.scope}` : "";
+      step1Desc = `${nextExam.title}${scopeText}\nReview core definitions, active recall flashcards, and error bank problems (35 MIN).`;
+    } else {
+      step1Title = "School Baseline: Backlog Cleared";
+      step1Desc = "All school homework and exams are under control. 100% capacity unlocked for TUM roadmap.";
+    }
 
     let step2Title = deliv
       ? `TUM Roadmap: ${deliv.title || deliv.category || "Station Sprint"}`
-      : "Matura R Problem Solving & Proofs";
+      : "TUM Roadmap: Pure Syntax & Diagnostic Proofs";
     let step2Desc = deliv
-      ? `[Target Spec] ${deliv.target_spec || deliv.title || "Core milestone problem set unassisted"}.\nCurrent Progress: ${deliv.completed_count || 0} / ${deliv.total_required || deliv.quantity || 1} ${deliv.unit_label || "reps"} completed.`
-      : "Planimetria: Koła i okręgi • Twierdzenie o stycznej i siecznej • Arkusze maturalne CKE.";
+      ? `[Target Spec] ${deliv.target_spec || deliv.title}.\nCurrent Progress: ${deliv.completed_count || 0} / ${deliv.total_required || deliv.quantity || 1} ${deliv.unit_label || "reps"} completed.`
+      : "Core milestone problem sets unassisted • Diagnostic mastery & unassisted proofs on TUM Heilbronn track.";
 
-    let step3Title = "LeetCode Syntax & German Vocabulary";
-    let step3Desc = "Daily Algorithm Rep unassisted (trace on paper first) + 15m German vocabulary / grammar recall.";
+    let step3Title = "LeetCode Syntax & Algorithmic Anchor";
+    let step3Desc = "Daily Algorithm Rep unassisted (trace on paper first, zero AI prompt) + syntax verification.";
+    if (deliv && (deliv.category === "Algorithms" || (deliv.title && deliv.title.toLowerCase().includes("leetcode")))) {
+      step3Title = "German Vocabulary & Grammar Recall";
+      step3Desc = "20m Nicos Weg A2 vocabulary drill & sentence construction + error log review.";
+    }
 
     let winddownDesc = "Session Audit: verify code commits, pack gear, close laptop. Strict departure at 16:30 to guarantee arrival for evening routine / boxing.";
 
     body.innerHTML = `
       <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--border-hairline);">
         <div style="display: flex; align-items: center; gap: 8px;">
-          <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--accent-lavender); letter-spacing: 0.05em;">UNITED STUDY PROTOCOL</span>
+          <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--accent-lavender); letter-spacing: 0.05em;">DAILY EXECUTION PLAN</span>
           <span id="modalUnitedStudyBadge" class="mono-chip ${completedCount === 3 ? "done" : "lavender"}" style="font-size: 9px;">${completedCount}/3 Completed</span>
         </div>
         <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">90m Execution Pipeline</span>
@@ -1098,11 +1122,6 @@ const Today = {
   },
 
   renderUnitedStudyCard() {
-    const schoolDot = document.getElementById("checkStudySchool");
-    const maturaDot = document.getElementById("checkStudyMatura");
-    const codeDot = document.getElementById("checkStudyCode");
-    const badge = document.getElementById("unitedStudyProgressBadge");
-
     const modalSchoolDot = document.getElementById("modalCheckStudySchool");
     const modalMaturaDot = document.getElementById("modalCheckStudyMatura");
     const modalCodeDot = document.getElementById("modalCheckStudyCode");
@@ -1116,45 +1135,29 @@ const Today = {
     const maturaDone = this.completedBlocks.has("study_matura");
     const codeDone = this.completedBlocks.has("study_code");
 
-    [schoolDot, modalSchoolDot].forEach((dot) => {
-      if (dot) {
-        if (schoolDone) dot.classList.add("checked");
-        else dot.classList.remove("checked");
-      }
-    });
+    if (modalSchoolDot) {
+      if (schoolDone) modalSchoolDot.classList.add("checked");
+      else modalSchoolDot.classList.remove("checked");
+    }
     if (modalSchoolTitle) modalSchoolTitle.style.textDecoration = schoolDone ? "line-through" : "none";
 
-    [maturaDot, modalMaturaDot].forEach((dot) => {
-      if (dot) {
-        if (maturaDone) dot.classList.add("checked");
-        else dot.classList.remove("checked");
-      }
-    });
+    if (modalMaturaDot) {
+      if (maturaDone) modalMaturaDot.classList.add("checked");
+      else modalMaturaDot.classList.remove("checked");
+    }
     if (modalMaturaTitle) modalMaturaTitle.style.textDecoration = maturaDone ? "line-through" : "none";
 
-    [codeDot, modalCodeDot].forEach((dot) => {
-      if (dot) {
-        if (codeDone) dot.classList.add("checked");
-        else dot.classList.remove("checked");
-      }
-    });
+    if (modalCodeDot) {
+      if (codeDone) modalCodeDot.classList.add("checked");
+      else modalCodeDot.classList.remove("checked");
+    }
     if (modalCodeTitle) modalCodeTitle.style.textDecoration = codeDone ? "line-through" : "none";
 
     const count = (schoolDone ? 1 : 0) + (maturaDone ? 1 : 0) + (codeDone ? 1 : 0);
-    [badge, modalBadge].forEach((b) => {
-      if (b) {
-        b.textContent = `${count}/3 Completed`;
-        if (count === 3) {
-          b.className = "mono-chip done";
-          b.style.background = "";
-          b.style.color = "";
-        } else {
-          b.className = "mono-chip lavender";
-          b.style.background = "";
-          b.style.color = "";
-        }
-      }
-    });
+    if (modalBadge) {
+      modalBadge.textContent = `${count}/3 Completed`;
+      modalBadge.className = count === 3 ? "mono-chip done" : "mono-chip lavender";
+    }
   },
 
   async loadSchoolPlan(forceRefresh = false) {

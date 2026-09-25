@@ -22,6 +22,8 @@ def temp_sync_env(tmp_path, monkeypatch):
     monkeypatch.setattr(sync_service, "DATA_DIR", test_data_dir)
     monkeypatch.setattr(sync_service, "CONFIG_FILE", test_data_dir / "sync_config.json")
     monkeypatch.setattr(sync_service, "probe_local_server", lambda: None)
+    for env_k in ["SUPABASE_URL", "SUPABASE_KEY", "SUPABASE_ANON_KEY", "SUPABASE_SERVICE_ROLE_KEY", "NEXT_PUBLIC_SUPABASE_URL", "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY", "EXPO_PUBLIC_SUPABASE_URL", "EXPO_PUBLIC_SUPABASE_ANON_KEY"]:
+        monkeypatch.delenv(env_k, raising=False)
 
     # In-memory or temporary SQLite db
     db_path = test_data_dir / "harness.db"

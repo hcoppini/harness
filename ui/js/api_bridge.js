@@ -1188,9 +1188,13 @@
 
               const todayDate = new Date(todayStr);
               const validHw = [];
+              const seenKeys = new Set();
               localHw.forEach((h) => {
                 if (!h.due_date) return;
                 if (h.due_date < todayStr) return; // Expired, auto-prune
+                const key = `${(h.subject || "").trim().toLowerCase()}|${(h.title || "").trim().toLowerCase()}|${(h.due_date || "").trim()}`;
+                if (seenKeys.has(key)) return;
+                seenKeys.add(key);
                 const itemDate = new Date(h.due_date);
                 const diffTime = itemDate.getTime() - todayDate.getTime();
                 const daysLeft = Math.round(diffTime / (1000 * 3600 * 24));
@@ -1216,13 +1220,21 @@
                 console.warn("[Harness Bridge] toggle_homework RPC notice:", e.message);
               }
 
-              const item = localHw.find((h) => h.id == hwId);
+              const targetItem = localHw.find((h) => h.id == hwId);
               let newCompleted = false;
-              if (item) {
-                item.completed = (serverRes && serverRes.completed !== undefined) ? Boolean(serverRes.completed) : !item.completed;
-                newCompleted = item.completed;
+              if (targetItem) {
+                newCompleted = (serverRes && serverRes.completed !== undefined) ? Boolean(serverRes.completed) : !targetItem.completed;
+                localHw.forEach((h) => {
+                  if (h.id == hwId || (
+                    (h.subject || "").trim().toLowerCase() === (targetItem.subject || "").trim().toLowerCase() &&
+                    (h.title || "").trim().toLowerCase() === (targetItem.title || "").trim().toLowerCase() &&
+                    h.due_date === targetItem.due_date
+                  )) {
+                    h.completed = newCompleted;
+                  }
+                });
                 setStore(STORAGE_KEYS.HOMEWORK, localHw);
-                supabaseRequest(`homework_items?id=eq.${hwId}`, "PATCH", { completed: newCompleted });
+                supabaseRequest(`homework_items?subject=eq.${encodeURIComponent(targetItem.subject)}&due_date=eq.${targetItem.due_date}`, "PATCH", { completed: newCompleted });
               }
               return serverRes || { id: hwId, completed: newCompleted };
             };
@@ -1324,54 +1336,75 @@
                 return !text.includes("trygonometria") && !text.includes("kinematyka") && !text.includes("wyszukiwania") && !text.includes("powstanie styczniowe");
               });
 
-              if (localExams.length === 0) {
-                localExams = [
-                  {
-                    id: 7,
-                    subject: "Informatyka",
-                    title: "Sprawdzian: Podstawy programowania (C++)",
-                    exam_date: "2026-09-21",
-                    scope: "Podstawy programowania - pojęcia (algorytmy, cout, cin, instrukcja if)",
-                    completed: false,
-                    result_percentage: null
-                  },
-                  {
-                    id: 5,
-                    subject: "Geografia",
-                    title: "Sprawdzian: Mapa fizyczna Polski",
-                    exam_date: "2026-10-02",
-                    scope: "Sprawdzian wiadomości - Mapa fizyczna Polski.",
-                    completed: false,
-                    result_percentage: null
-                  },
-                  {
-                    id: 6,
-                    subject: "Język polski",
-                    title: "Sprawdzian: Rozprawka (romantyzm)",
-                    exam_date: "2026-10-06",
-                    scope: "Rozprawka (romantyzm) - wstęp, teza, argument, przykład, kontekst.",
-                    completed: false,
-                    result_percentage: null
-                  }
-                ];
-              }
               setStore(STORAGE_KEYS.EXAMS, localExams);
 
               const todayDate = new Date(todayStr);
-              const validExams = localExams
-                .filter((e) => e.exam_date >= todayStr || !e.completed)
-                .map((e) => {
+              const validExams = [];
+              const seenExamKeys = new Set();
+              localExams
+                .filter((e) => e.exam_date >= todayStr && !e.completed)
+                .forEach((e) => {
+                  const key = `${(e.subject || "").trim().toLowerCase()}|${(e.title || "").trim().toLowerCase()}|${(e.exam_date || "").trim()}`;
+                  if (seenExamKeys.has(key)) return;
+                  seenExamKeys.add(key);
                   const itemDate = new Date(e.exam_date);
-                  const daysLeft = Math.round((itemDate - todayDate) / (1000 * 3600 * 24));
-                  return {
+                  const diffTime = itemDate.getTime() - todayDate.getTime();
+                  const daysLeft = Math.round(diffTime / (1000 * 3600 * 24));
+                  validExams.push({
                     ...e,
                     days_left: daysLeft,
                     completed: Boolean(e.completed),
-                  };
+                  });
                 });
 
               setStore(STORAGE_KEYS.EXAMS, validExams);
               return validExams.filter((e) => !e.completed);
+            };
+          }
+
+          if (prop === "toggle_exam") {
+            return async function (examId, resultPct = null) {
+              const localExams = getStore(STORAGE_KEYS.EXAMS, []);
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("toggle_exam", [examId, resultPct]);
+              } catch (e) {
+                console.warn("[Harness Bridge] toggle_exam RPC notice:", e.message);
+              }
+
+              const targetExam = localExams.find((e) => e.id == examId);
+              let newCompleted = false;
+              if (targetExam) {
+                newCompleted = !targetExam.completed;
+                localExams.forEach((e) => {
+                  if (e.id == examId || (
+                    (e.subject || "").trim().toLowerCase() === (targetExam.subject || "").trim().toLowerCase() &&
+                    (e.title || "").trim().toLowerCase() === (targetExam.title || "").trim().toLowerCase() &&
+                    e.exam_date === targetExam.exam_date
+                  )) {
+                    e.completed = newCompleted;
+                    if (resultPct !== null) e.result_percentage = resultPct;
+                  }
+                });
+                setStore(STORAGE_KEYS.EXAMS, localExams);
+                supabaseRequest(`school_exams?subject=eq.${encodeURIComponent(targetExam.subject)}&exam_date=eq.${targetExam.exam_date}`, "PATCH", { completed: newCompleted, result_percentage: resultPct });
+              }
+              return serverRes || true;
+            };
+          }
+
+          if (prop === "delete_exam") {
+            return async function (examId) {
+              try {
+                await rpcCall("delete_exam", [examId]);
+              } catch (e) {
+                console.warn("[Harness Bridge] delete_exam RPC notice:", e.message);
+              }
+              let localExams = getStore(STORAGE_KEYS.EXAMS, []);
+              localExams = localExams.filter((e) => e.id != examId);
+              setStore(STORAGE_KEYS.EXAMS, localExams);
+              supabaseRequest(`school_exams?id=eq.${examId}`, "DELETE");
+              return true;
             };
           }
 

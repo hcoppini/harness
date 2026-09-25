@@ -666,7 +666,34 @@ def synthesize_adaptive_schedule(
     # --------------------------------------------------------------------------
     # 2. WEEKDAY SGH DEEP WORK SHAPING
     # --------------------------------------------------------------------------
-    has_acute_academic_defense = bool(acute_essays) or bool(acute_exams) or (analysis["mode"] == "SURGE" and bool(exams))
+    # Identify acute writing tasks (essays due in 1 to 2 days)
+    acute_essays = [h for h in homework if h.get("is_essay") and 1 <= h.get("days_left", 99) <= 2]
+    # Identify acute exams (exams due in 1 to 2 days - NEVER days_left == 0)
+    acute_exams = [e for e in exams if 1 <= e.get("days_left", 99) <= 2]
+    # Identify major vulnerable exams in 3 days
+    impending_major = [
+        e for e in exams
+        if e.get("days_left", 99) == 3 and (e.get("is_vulnerable") or classify_obligation(e)["type"] == "major_exam")
+    ]
+    urgent_academic_exams = acute_exams + impending_major
+    today_exams = analysis.get("today_exams", [])
+    urgent_hw = analysis.get("urgent_homework", [])
+
+    has_acute_defense = bool(acute_essays) or bool(urgent_academic_exams) or bool(urgent_hw)
+
+    deliv_dict = {
+        "deliverable_id": top_deliv["deliverable_id"] if top_deliv else "sgh_tum_roadmap",
+        "station_id": active_station_id,
+        "title": deliv_spec["title"],
+        "category": deliv_spec["category"],
+        "target_spec": deliv_spec["target_spec"],
+        "action_type": deliv_spec["action_type"],
+        "target_path": deliv_spec["target_path"],
+        "quantity": deliv_spec["quantity"],
+        "completed_count": top_deliv["completed_count"] if top_deliv else 0,
+        "total_required": top_deliv["total_required"] if top_deliv else 15,
+        "unit_label": top_deliv["unit_label"] if top_deliv else "exercises",
+    } if top_deliv else None
 
     for b in blocks:
         is_deep_work = b.get("type") == "deep_work" or "SGH Library" in b.get("focus", "")
@@ -681,80 +708,85 @@ def synthesize_adaptive_schedule(
             phased = generate_phased_study_action(
                 top_essay,
                 days_left=top_essay.get("days_left", 1),
-                subject_gpa=top_essay.get("subject_gpa")
+                subject_gpa=top_essay.get("subject_gpa"),
             )
             b["focus"] = phased["focus"]
             b["activity"] = phased["activity"]
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
+            b["deliverable"] = None
 
-        # Scenario B: Acute Exam Due in <= 2 days (strictly future exams)
-        elif acute_exams:
-            top_exam = acute_exams[0]
-            phased = generate_phased_study_action(
-                top_exam,
-                days_left=top_exam.get("days_left", 1),
-                subject_gpa=top_exam.get("subject_gpa")
-            )
-            b["focus"] = phased["focus"]
-            b["activity"] = phased["activity"]
-            b["is_school_dedicated"] = True
-            b["is_tum_roadmap"] = False
-
-        # Scenario C: Multiple Exams in Near Horizon (2+ upcoming)
-        elif len(exams) >= 2:
-            e1, e2 = exams[0], exams[1]
+        # Scenario B: Multiple Urgent Exams in Acute Window (2+ due in <= 2 days)
+        elif len(urgent_academic_exams) >= 2:
+            e1, e2 = urgent_academic_exams[0], urgent_academic_exams[1]
             b["focus"] = f"Deep Work • Dual Defense: {e1['subject']} + {e2['subject']}"
             b["activity"] = (
-                f"[{analysis['mode']} // Dual Defense] 50m {e1['subject']} ({e1['title']}) problem drill + "
+                f"[{analysis['mode']} // Acute Dual Defense] 50m {e1['subject']} ({e1['title']}) problem drill + "
                 f"45m {e2['subject']} ({e2['title']}) concept check + 25m TUM LeetCode anchor."
             )
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
+            b["deliverable"] = None
 
-        # Scenario D: Single Exam + Urgent Homework
-        elif exams and analysis.get("urgent_homework"):
-            e = exams[0]
-            hw = analysis["urgent_homework"][0]
-            b["focus"] = f"Deep Work • {e['subject']} Prep + [{hw['subject']}] Homework"
-            b["activity"] = (
-                f"[{analysis['mode']} // Exam & Submission Split] 45m clear {hw['subject']} assignment ({hw['title'][:35]}) + "
-                f"55m {e['subject']} past paper & formula drill."
+        # Scenario C: Single Urgent Exam Due in <= 2 days
+        elif urgent_academic_exams:
+            top_exam = urgent_academic_exams[0]
+            phased = generate_phased_study_action(
+                top_exam,
+                days_left=top_exam.get("days_left", 1),
+                subject_gpa=top_exam.get("subject_gpa"),
             )
+            b["focus"] = phased["focus"]
+            b["activity"] = phased["activity"]
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
+            b["deliverable"] = None
 
-        # Scenario E: Urgent Homework Only
-        elif analysis.get("urgent_homework"):
-            hw = analysis["urgent_homework"][0]
+        # Scenario D: Urgent Homework Due Tomorrow
+        elif urgent_hw:
+            hw = urgent_hw[0]
             phased = generate_phased_study_action(hw, days_left=hw.get("days_left", 1), subject_gpa=hw.get("subject_gpa"))
             b["focus"] = phased["focus"]
             b["activity"] = phased["activity"]
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
+            b["deliverable"] = None
 
-        # Scenario F: Non-Defense Day / Cruise Mode -> AUTOMATIC TUM ROADMAP INJECTION
-        else:
+        # Scenario E: Exam Written Today (T-0) -> Test cleared in morning, afternoon dedicated to TUM Roadmap
+        elif today_exams:
             b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']}"
             b["activity"] = (
-                f"[TUM Roadmap Sprint // {active_station_id}] 60m {deliv_spec['target_spec']} + "
-                f"30m self-correction & formula recall + 15m German vocabulary buffer."
+                f"[TUM Victory Sprint // {active_station_id}] Morning examination cleared. "
+                f"70m {deliv_spec['target_spec']} + 35m algorithm problem solving + 15m German vocabulary buffer."
             )
             b["is_school_dedicated"] = False
             b["is_tum_roadmap"] = True
-            b["deliverable"] = {
-                "deliverable_id": top_deliv["deliverable_id"] if top_deliv else "sgh_tum_roadmap",
-                "station_id": active_station_id,
-                "title": deliv_spec["title"],
-                "category": deliv_spec["category"],
-                "target_spec": deliv_spec["target_spec"],
-                "action_type": deliv_spec["action_type"],
-                "target_path": deliv_spec["target_path"],
-                "quantity": deliv_spec["quantity"],
-                "completed_count": top_deliv["completed_count"] if top_deliv else 0,
-                "total_required": top_deliv["total_required"] if top_deliv else 15,
-                "unit_label": top_deliv["unit_label"] if top_deliv else "exercises",
-            } if top_deliv else None
+            b["deliverable"] = deliv_dict
+
+        # Scenario F: Non-Defense Day with Medium-Horizon Exam (Exam in 3 to 5 days, e.g. Chemia in 4d)
+        elif exams and exams[0].get("days_left", 99) <= 5:
+            e = exams[0]
+            scope_info = f" ({e['scope'][:40]})" if e.get("scope") else ""
+            b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']} & {e['subject']} Preview"
+            b["activity"] = (
+                f"[TUM Roadmap Sprint // {active_station_id}] 60m {deliv_spec['target_spec']} + "
+                f"35m {e['subject']} ({e['title']}) foundation prep{scope_info}: formulas & definitions + "
+                f"15m German vocabulary recall."
+            )
+            b["is_school_dedicated"] = False
+            b["is_tum_roadmap"] = True
+            b["deliverable"] = deliv_dict
+
+        # Scenario G: Pure Cruise Mode / Clear Academic Horizon -> 100% TUM Acceleration
+        else:
+            b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']}"
+            b["activity"] = (
+                f"[TUM Roadmap Sprint // {active_station_id}] 65m {deliv_spec['target_spec']} + "
+                f"35m self-correction & formula recall + 15m German vocabulary buffer."
+            )
+            b["is_school_dedicated"] = False
+            b["is_tum_roadmap"] = True
+            b["deliverable"] = deliv_dict
 
     schedule["blocks"] = blocks
     return schedule
@@ -862,14 +894,27 @@ def get_recommended_kill_items(
     if close_conn:
         conn.close()
 
-    # Combine school items (up to 2) with metro items (at least 2)
-    final_recs = school_items[:2] + metro_items[:2]
-    # If fewer than 4, fill remaining from either pool
-    if len(final_recs) < 4:
-        for m in metro_items[2:]:
-            if len(final_recs) >= 4:
-                break
-            final_recs.append(m)
+    # Determine if today is an active academic defense day (acute test in 1-2 days or urgent homework)
+    is_defense_day = bool(urgent_hw) or any(1 <= ex.get("days_left", 99) <= 2 for ex in analysis.get("upcoming_exams", []))
+    if is_defense_day:
+        final_recs = school_items[:2] + metro_items[:2]
+        if len(final_recs) < 4:
+            for m in metro_items[2:]:
+                if len(final_recs) >= 4:
+                    break
+                final_recs.append(m)
+    else:
+        # Non-defense day: TUM Roadmap deliverables take absolute priority
+        final_recs = metro_items[:3] + school_items[:1]
+        if len(final_recs) < 4:
+            for m in metro_items[3:]:
+                if len(final_recs) >= 4:
+                    break
+                final_recs.append(m)
+            for s in school_items[1:]:
+                if len(final_recs) >= 4:
+                    break
+                final_recs.append(s)
 
     return final_recs[:4]
 

@@ -533,8 +533,8 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None, client_date
 
     # Homework & Exams
     from app.services import homework_service
-    upcoming_homework = homework_service.get_upcoming_homework(conn=conn, limit=5)
-    upcoming_exams = homework_service.get_upcoming_exams(conn=conn, limit=5)
+    upcoming_homework = homework_service.get_upcoming_homework(conn=conn, limit=5, today_str=today_str)
+    upcoming_exams = homework_service.get_upcoming_exams(conn=conn, limit=5, today_str=today_str)
 
     from engine import workload_governor
     workload_analysis = workload_governor.get_workload_analysis(target_date_str=today_str, conn=conn)

@@ -757,14 +757,14 @@ def sync_vulcan_data(
         }
 
     if payload is None:
-        if (os.environ.get("VERCEL") or os.environ.get("HARNESS_SERVER")) and not os.environ.get("PYTEST_CURRENT_TEST"):
+        if not os.environ.get("PYTEST_CURRENT_TEST"):
             return {
-                "status": "skipped",
-                "message": "Demo mode disabled on server to prevent overwriting real data.",
+                "status": "idle",
+                "message": "Live Vulcan fetch inactive or offline. Retaining existing cached school data.",
                 "exams_synced": 0,
                 "homework_synced": 0,
                 "grades_synced": 0,
-                "mode": "demo_skipped",
+                "mode": "live_offline",
                 "timestamp": datetime.now().isoformat(),
             }
         payload = _get_demo_school_data(target_date)
