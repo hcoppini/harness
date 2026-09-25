@@ -1463,29 +1463,34 @@ body {
 
 .metro-station-card {
   position: absolute;
-  width: 170px;
+  width: 200px;
   background: var(--bg-surface);
   border: 1px solid var(--border-hairline);
-  border-radius: var(--radius-sm);
-  padding: 10px;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
   cursor: pointer;
-  transition: all 0.12s ease;
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.18s ease, border-color 0.18s ease;
   z-index: 20;
+  box-shadow: var(--shadow-card);
 }
 
 .metro-station-card:hover {
   border-color: var(--accent-lavender);
   background: var(--bg-surface-elevated);
-  transform: translateY(-2px);
+  transform: translateY(-4px);
+  box-shadow: var(--shadow-card-elevated);
   z-index: 35;
 }
 
 .metro-station-card.active-card {
-  border-color: var(--accent-lavender);
+  border: 2px solid var(--accent-lavender);
+  background: var(--bg-surface-elevated);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
 }
 
 .metro-station-card.completed-card {
-  border-color: rgba(244, 244, 245, 0.4);
+  border-color: var(--border-subtle);
+  opacity: 0.9;
 }
 
 /* Station Slide-over Drawer */
@@ -2344,30 +2349,54 @@ body {
 }
 
 /* ==========================================================================
-   TUM Metro School Test Micro-Dots
+   TUM Metro School Test Milestone Flags & Radar Beacon
    ========================================================================== */
+.metro-test-dot {
+  transition: transform 0.15s ease;
+}
+
+.metro-test-dot:hover {
+  transform: translateY(-2px);
+}
+
 .metro-test-dot circle {
   transition: r 0.2s ease, stroke-width 0.2s ease;
 }
 
-.metro-test-dot:hover circle:first-child {
-  stroke-width: 2.5px;
+.metro-test-dot:hover rect {
+  filter: brightness(1.12);
 }
 
 .metro-test-tooltip {
   position: fixed;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-focus);
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-medium);
   color: var(--text-primary);
   border-radius: var(--radius-sm);
-  padding: 6px 12px;
+  padding: 8px 12px;
   font-family: var(--font-sans);
   font-size: 11px;
-  font-weight: 600;
+  font-weight: 500;
   pointer-events: none;
   z-index: 300;
   box-shadow: var(--shadow-dropdown);
-  white-space: nowrap;
+  max-width: 320px;
+  line-height: 1.4;
+}
+
+@keyframes beaconHaloPulse {
+  0%, 100% {
+    r: 18px;
+    opacity: 0.45;
+  }
+  50% {
+    r: 28px;
+    opacity: 0.1;
+  }
+}
+
+.beacon-pulse {
+  animation: beaconHaloPulse 2.4s ease-in-out infinite;
 }
 
 /* ==========================================================================
