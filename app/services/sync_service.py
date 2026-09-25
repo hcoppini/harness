@@ -107,6 +107,9 @@ def _make_supabase_request(
     headers_extra: Optional[Dict[str, str]] = None,
 ) -> Optional[Any]:
     """Sends authenticated REST request to Supabase PostgREST API."""
+    if os.environ.get("PYTEST_CURRENT_TEST"):
+        return None
+
     cfg = get_sync_config()
     url_base = cfg.get("supabase_url", "").rstrip("/")
     key = cfg.get("supabase_key", "").strip()

@@ -589,7 +589,7 @@ def get_station_deliverables(
     station_id: str = "sep-2026",
     conn: Optional[sqlite3.Connection] = None,
 ) -> List[Dict[str, Any]]:
-    """Returns all deliverable progress records for a given station ID."""
+    """Returns all deliverable progress records for a given station ID, auto-seeding from roadmap if needed."""
     close_conn = False
     if conn is None:
         conn = get_connection()
@@ -607,6 +607,77 @@ def get_station_deliverables(
         (station_id, alt_id),
     )
     rows = cursor.fetchall()
+
+    if not rows:
+        roadmap_file = DATA_DIR / "metro_roadmap.json"
+        if roadmap_file.exists():
+            try:
+                with open(roadmap_file, "r", encoding="utf-8") as f:
+                    m_data = json.load(f)
+                matched_st = next((s for s in m_data.get("stations", []) if s.get("id") in (station_id, alt_id)), None)
+                if matched_st:
+                    delivs_dict = matched_st.get("deliverables", {})
+                    clean_sid = matched_st["id"].replace("-", "")
+                    seed_items = []
+                    for key, desc in delivs_dict.items():
+                        k_low = key.lower()
+                        if "math" in k_low or "academic" in k_low:
+                            stream = "academics"
+                            unit = "problems"
+                            total = 40
+                            title = f"Math R: {desc[:40]}"
+                        elif "code" in k_low or "syntax" in k_low or "leet" in k_low or "cs" in k_low:
+                            stream = "code"
+                            unit = "exercises"
+                            total = 15
+                            title = f"Code / LeetCode: {desc[:40]}"
+                        elif "german" in k_low or "anki" in k_low or "lang" in k_low:
+                            stream = "german"
+                            unit = "words"
+                            total = 100
+                            title = f"German Vocabulary: {desc[:40]}"
+                        elif "sigg" in k_low or "trad" in k_low:
+                            stream = "sigg"
+                            unit = "modules"
+                            total = 5
+                            title = f"SIGG: {desc[:40]}"
+                        elif "phys" in k_low or "protein" in k_low:
+                            stream = "physical"
+                            unit = "days"
+                            total = 30
+                            title = f"Fitness: {desc[:40]}"
+                        else:
+                            stream = "academics"
+                            unit = "tasks"
+                            total = 10
+                            title = f"{key}: {desc[:40]}"
+
+                        d_id = f"{clean_sid}_{stream[:4]}"
+                        seed_items.append((d_id, matched_st["id"], stream, title, total, 0, unit, 0))
+
+                    for d_id, s_id, stream, title, total, comp, unit, is_done in seed_items:
+                        cursor.execute(
+                            """
+                            INSERT OR IGNORE INTO station_deliverable_progress 
+                            (deliverable_id, station_id, stream, title, total_required, completed_count, unit_label, is_completed)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (d_id, s_id, stream, title, total, comp, unit, is_done),
+                        )
+                    conn.commit()
+
+                    cursor.execute(
+                        """
+                        SELECT * FROM station_deliverable_progress 
+                        WHERE station_id = ? OR station_id = ?
+                        ORDER BY deliverable_id ASC
+                        """,
+                        (station_id, alt_id),
+                    )
+                    rows = cursor.fetchall()
+            except Exception:
+                pass
+
     results = [
         {
             "deliverable_id": r["deliverable_id"],
@@ -854,26 +925,34 @@ def auto_populate_kill_list(
 
     # 1. Dynamically adapt school defense slots to weekly test volume and homework deadlines
     from app.services import homework_service
+    from engine.workload_governor import is_us_travel_date
+    is_travel = is_us_travel_date(target_date)
+
     upcoming_exams = homework_service.get_upcoming_exams(conn=conn, limit=5, today_str=target_date)
     acute_exams = [
         e for e in upcoming_exams
-        if not e["completed"] and 0 <= e.get("days_left", 99) <= 5
+        if not e["completed"] and 1 <= e.get("days_left", 99) <= 5
         and not any(e["subject"].lower() in t for t in existing_titles)
         and "exam prep" not in existing_cats
+        and not is_travel
     ]
 
     all_hw = homework_service.get_upcoming_homework(conn=conn, today_str=target_date)
     urgent_hw = [
         h for h in all_hw
-        if not h["completed"] and 0 <= h.get("days_left", 99) <= 2
+        if not h["completed"] and 1 <= h.get("days_left", 99) <= 2
         and not any(h["title"].lower() in t for t in existing_titles)
         and "homework" not in existing_cats
+        and not is_travel
     ]
 
     # Academic density determination:
-    # If 2+ acute school commitments (multiple tests or test + urgent homework), allocate up to 2 slots
-    # to academic defense while preserving at least 1 slot for TUM anchor (Math R or LeetCode).
-    school_slots_max = 2 if (len(acute_exams) >= 2 or (acute_exams and urgent_hw) or len(urgent_hw) >= 2) else (1 if (acute_exams or urgent_hw) else 0)
+    # If in US Travel Mode, school defense is frozen (0 slots) -> 100% capacity to TUM Roadmap.
+    # Otherwise, allocate up to 2 slots if multiple tests/urgent hw, or 1 slot if single obligation.
+    if is_travel:
+        school_slots_max = 0
+    else:
+        school_slots_max = 2 if (len(acute_exams) >= 2 or (acute_exams and urgent_hw) or len(urgent_hw) >= 2) else (1 if (acute_exams or urgent_hw) else 0)
     school_slots_used = 0
 
     # Urgent homework due today/tomorrow gets immediate defense

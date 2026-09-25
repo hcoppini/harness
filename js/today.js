@@ -388,31 +388,71 @@ const Today = {
 
     const blocks = this.schedule.blocks || [];
     const isSunday = this.schedule.key === "G_REST" || (this.schedule.weekday || "").toLowerCase().includes("sun");
-    const hasDeepWork = blocks.some((b) => b.type === "deep_work" || (b.focus && (b.focus.includes("Deep Work") || b.focus.includes("SGH Library"))));
+    const isUsTravel = Boolean(this.schedule.workload && this.schedule.workload.is_us_travel_mode);
 
-    // Harness 3.0: Kill List Visibility Rule
-    // Hide completely on days without SGH Library / deep work sessions (e.g. Sunday rest).
-    // On home sprint days (Saturday), label it "TUM DEEP WORK KILL LIST".
-    // On weekdays with SGH Library, label it "SGH LIBRARY KILL LIST".
+    // Harness 3.0: Standalone Kill List retired from primary view.
+    // TUM Roadmap deliverables and academic defense are directly embedded into deep work blocks.
     if (inlineKillCard) {
-      if (!hasDeepWork || isSunday) {
-        inlineKillCard.style.display = "none";
-      } else {
-        inlineKillCard.style.display = "block";
-        if (inlineKillTitle) {
-          const isSgh = blocks.some((b) => (b.focus && b.focus.includes("SGH Library")) || (b.activity && b.activity.includes("SGH")));
-          inlineKillTitle.textContent = isSgh ? "SGH LIBRARY KILL LIST" : "TUM DEEP WORK KILL LIST";
-        }
-      }
+      inlineKillCard.style.display = "none";
     }
-    blocksContainer.innerHTML = blocks
+
+    const travelBannerHtml = isUsTravel
+      ? `
+        <div class="travel-protocol-banner" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <span style="font-size: 18px;">✈️</span>
+            <div>
+              <div style="font-size: 11px; font-weight: 700; color: #60a5fa; letter-spacing: 0.05em; font-family: var(--font-mono);">US TRAVEL PROTOCOL ACTIVE (OCT 4–18)</div>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Warsaw school schedule suspended. 90m US Hotel deep work prioritized for TUM Station roadmap.</div>
+            </div>
+          </div>
+          <span class="mono-chip" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); font-size: 10px;">Travel Mode</span>
+        </div>
+      `
+      : "";
+
+    const blocksHtml = blocks
       .map((block, idx) => {
-        const isDeepWork = block.type === "deep_work" || block.type === "study_block" || (block.focus && (block.focus.includes("Deep Work") || block.focus.includes("SGH Library") || block.focus.includes("Weekend Deep Work") || block.focus.includes("Weekend Focus")));
+        const isDeepWork =
+          block.type === "deep_work" ||
+          block.type === "study_block" ||
+          (block.focus &&
+            (block.focus.includes("Deep Work") ||
+              block.focus.includes("SGH Library") ||
+              block.focus.includes("Weekend Deep Work") ||
+              block.focus.includes("Weekend Focus") ||
+              block.focus.includes("US Hotel Deep Work")));
         const isChecked = this.completedBlocks.has(String(idx));
-        const schoolBadge = block.is_school_dedicated ? `<span class="mono-chip" style="font-size: 9px; padding: 1px 5px; margin-left: 6px;">School First</span>` : "";
+        const deliv = block.deliverable;
+
+        let badgesHtml = "";
+        if (block.is_school_dedicated) {
+          badgesHtml += `<span class="mono-chip" style="font-size: 9px; padding: 1px 5px; margin-left: 6px;">School First</span>`;
+        } else if (deliv) {
+          const comp = deliv.completed_count || 0;
+          const tot = deliv.total_required || deliv.quantity || 1;
+          const unit = deliv.unit_label || "reps";
+          badgesHtml += `<span class="mono-chip lavender" style="font-size: 9px; padding: 1px 6px; margin-left: 6px;" title="${this.escapeHtml(deliv.category || "TUM Roadmap")}">${comp}/${tot} ${this.escapeHtml(unit)}</span>`;
+        }
+
         const compactActivity = isDeepWork
-          ? "2-Hour Time-Divided Session • Commute Cutoff 16:30"
+          ? (deliv ? `TUM Roadmap • ${deliv.target_spec || deliv.title || block.activity} • Cutoff 16:30` : "2-Hour Time-Divided Session • Commute Cutoff 16:30")
           : this.escapeHtml(block.activity);
+
+        let actionsHtml = "";
+        if (isDeepWork) {
+          actionsHtml = `
+            <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+              ${deliv && deliv.target_path ? `
+                <button class="btn-subtle" onclick="event.stopPropagation(); Today.launchResource('${deliv.action_type || 'url'}', '${this.escapeJs(deliv.target_path)}');" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer; white-space: nowrap;" title="Open Resource (${deliv.target_path})">Open ↗</button>
+              ` : ""}
+              ${deliv && deliv.deliverable_id ? `
+                <button class="btn-subtle" onclick="event.stopPropagation(); Today.advanceDeliverable('${this.escapeJs(deliv.deliverable_id)}', 1);" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer; white-space: nowrap;" title="Log +1 completed rep">+1 Done</button>
+              ` : ""}
+              <button class="btn-subtle" onclick="event.stopPropagation(); Today.openDeepWorkPlanModal(${idx});" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer; white-space: nowrap;" title="Open Hour-by-Hour Session Plan & Wind-Down Protocol">Open Plan →</button>
+            </div>
+          `;
+        }
 
         return `
           <div 
@@ -431,24 +471,17 @@ const Today = {
             <div class="routine-info" style="flex: 1; min-width: 0;">
               <div class="routine-focus" style="font-size: 13px; font-weight: 600; color: ${isDeepWork ? "var(--text-primary)" : "var(--text-secondary)"}; text-decoration: ${isChecked ? "line-through" : "none"}; display: flex; align-items: center;">
                 <span>${this.escapeHtml(block.focus)}</span>
-                ${schoolBadge}
+                ${badgesHtml}
               </div>
               <div class="routine-activity" style="font-size: 11px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${compactActivity}</div>
             </div>
-            ${
-              isDeepWork
-                ? `
-                  <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
-                    <button class="btn-subtle" onclick="event.stopPropagation(); Today.openDeepWorkPlanModal(${idx});" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer; white-space: nowrap;" title="Open Hour-by-Hour Session Plan & Wind-Down Protocol">Open Plan →</button>
-                    <button class="btn-primary" onclick="event.stopPropagation(); if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; letter-spacing: 0.03em; white-space: nowrap;" title="Open Kill List Drawer">[KILL LIST]</button>
-                  </div>
-                `
-                : ""
-            }
+            ${actionsHtml}
           </div>
         `;
       })
       .join("");
+
+    blocksContainer.innerHTML = travelBannerHtml + blocksHtml;
   },
 
   openDeepWorkPlanModal(idx) {
@@ -457,6 +490,7 @@ const Today = {
     const titleEl = document.getElementById("planModalTitle");
     const timeEl = document.getElementById("planModalTimeSubtitle");
     const badgeEl = document.getElementById("planWorkloadBadge");
+    const footerEl = document.getElementById("planModalFooter");
     if (!backdrop || !body) return;
 
     const block = (this.schedule && this.schedule.blocks && this.schedule.blocks[idx]) ? this.schedule.blocks[idx] : null;
@@ -475,21 +509,46 @@ const Today = {
 
     const rawActivity = block ? block.activity : "";
     const isSchool = block && block.is_school_dedicated;
+    const deliv = block ? block.deliverable : null;
 
-    let hour1Title = isSchool ? "Phase 1: High-Cognition Academic Defense" : "Phase 1: High-Cognition Deep Work";
-    let hour1Desc = rawActivity || "50m zero-distraction focus sprint + 10m mental reset buffer.";
+    let hour1Title = isSchool
+      ? "Phase 1: High-Cognition Academic Defense"
+      : (deliv ? `Phase 1: TUM Roadmap Deliverable (${deliv.category || "TUM Track"})` : "Phase 1: High-Cognition Deep Work");
+
+    let hour1Desc = isSchool
+      ? (rawActivity || "50m zero-distraction focus sprint on upcoming exam / essay + 10m mental reset buffer.")
+      : (deliv
+          ? `[Target Spec] ${deliv.target_spec || deliv.title || "Core milestone problem set unassisted"}.\nCurrent Progress: ${deliv.completed_count || 0} / ${deliv.total_required || deliv.quantity || 1} ${deliv.unit_label || "reps"} completed.`
+          : (rawActivity || "50m zero-distraction focus sprint + 10m mental reset buffer."));
+
     let hour2Title = "Phase 2: Core TUM Deliverable / LeetCode & German";
     let hour2Desc = "45m solve 1 LeetCode problem unassisted (trace on paper first) + 15m German vocabulary (A2/B1).";
-    let winddownDesc = "Session Audit: verify code commits, check off completed Kill List targets, close laptop, pack gear. Strict departure at 16:30 to guarantee arrival for evening routine / boxing.";
+    let winddownDesc = "Session Audit: verify code commits, check off completed targets, close laptop, pack gear. Strict departure at 16:30 to guarantee arrival for evening routine / boxing.";
 
     body.innerHTML = `
       <div class="plan-phase-card phase-1">
         <div style="display: flex; justify-content: space-between; align-items: center;">
           <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--accent-lavender);">HOUR 1 (14:30 – 15:30)</span>
-          <span class="key-pill" style="font-size: 9px;">50m Focus + 10m Buffer</span>
+          <span class="key-pill" style="font-size: 9px;">${isSchool ? "Academic Defense" : "TUM Sprint"}</span>
         </div>
-        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">${this.escapeHtml(hour1Title)}</div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-top: 4px;">${this.escapeHtml(hour1Desc)}</div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 4px;">${this.escapeHtml(hour1Title)}</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 4px; white-space: pre-line;">${this.escapeHtml(hour1Desc)}</div>
+        ${
+          deliv
+            ? `
+              <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
+                ${deliv.target_path ? `
+                  <button type="button" class="btn-primary" onclick="Today.launchResource('${deliv.action_type || 'url'}', '${this.escapeJs(deliv.target_path)}');" style="font-size: 10px; padding: 4px 10px;">
+                    Open Resource ↗
+                  </button>
+                ` : ""}
+                <button type="button" class="btn-subtle" onclick="Today.advanceDeliverable('${this.escapeJs(deliv.deliverable_id)}', 1); Today.openDeepWorkPlanModal(${idx});" style="font-size: 10px; padding: 4px 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer;">
+                  +1 Advance Rep
+                </button>
+              </div>
+            `
+            : ""
+        }
       </div>
 
       <div class="plan-phase-card phase-2">
@@ -497,8 +556,13 @@ const Today = {
           <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #0284c7;">HOUR 2 (15:30 – 16:30)</span>
           <span class="key-pill" style="font-size: 9px;">45m Code + 15m German</span>
         </div>
-        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">${this.escapeHtml(hour2Title)}</div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-top: 4px;">${this.escapeHtml(hour2Desc)}</div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 4px;">${this.escapeHtml(hour2Title)}</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 4px;">${this.escapeHtml(hour2Desc)}</div>
+        <div style="margin-top: 10px;">
+          <button type="button" class="btn-subtle" onclick="Today.launchResource('url', 'https://leetcode.com/problemset/all/')" style="font-size: 10px; padding: 4px 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer;">
+            Open LeetCode ↗
+          </button>
+        </div>
       </div>
 
       <div class="plan-phase-card phase-winddown">
@@ -506,10 +570,32 @@ const Today = {
           <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #d97706;">WIND-DOWN & COMMUTE (16:30)</span>
           <span class="key-pill" style="font-size: 9px; color: #d97706; border-color: rgba(217, 119, 6, 0.3);">Hard Cutoff</span>
         </div>
-        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 2px;">Clean Departure Protocol</div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-top: 4px;">${this.escapeHtml(winddownDesc)}</div>
+        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 4px;">Clean Departure Protocol</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 4px;">${this.escapeHtml(winddownDesc)}</div>
       </div>
     `;
+
+    if (footerEl) {
+      if (deliv) {
+        footerEl.innerHTML = `
+          <button type="button" class="btn-primary" onclick="Today.advanceDeliverable('${this.escapeJs(deliv.deliverable_id)}', 1); Today.closeDeepWorkPlanModal();" style="font-size: 11px; padding: 6px 14px; font-weight: 700;">
+            Complete Rep & Advance (+1)
+          </button>
+          <button type="button" class="btn-subtle" onclick="Today.closeDeepWorkPlanModal()" style="font-size: 11px; padding: 6px 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary);">
+            Close
+          </button>
+        `;
+      } else {
+        footerEl.innerHTML = `
+          <button type="button" class="btn-primary" onclick="Today.closeDeepWorkPlanModal();" style="font-size: 11px; padding: 6px 14px; font-weight: 700;">
+            Got It — Start Focus Sprint
+          </button>
+          <button type="button" class="btn-subtle" onclick="Today.closeDeepWorkPlanModal()" style="font-size: 11px; padding: 6px 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary);">
+            Close
+          </button>
+        `;
+      }
+    }
 
     backdrop.classList.add("open");
   },
@@ -517,6 +603,41 @@ const Today = {
   closeDeepWorkPlanModal() {
     const backdrop = document.getElementById("deepWorkPlanBackdrop");
     if (backdrop) backdrop.classList.remove("open");
+  },
+
+  async launchResource(actionType, targetPath) {
+    if (!targetPath) return;
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.launch_kill_item) {
+      try {
+        await window.pywebview.api.launch_kill_item(actionType, targetPath);
+        return;
+      } catch (err) {
+        console.warn("launch_kill_item error:", err);
+      }
+    }
+    if (targetPath.startsWith("http://") || targetPath.startsWith("https://")) {
+      window.open(targetPath, "_blank");
+    } else {
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast(`Resource: ${targetPath}`);
+      }
+    }
+  },
+
+  async advanceDeliverable(deliverableId, delta = 1) {
+    if (!deliverableId) return;
+    if (window.pywebview && window.pywebview.api && window.pywebview.api.update_deliverable_progress) {
+      try {
+        const res = await window.pywebview.api.update_deliverable_progress(deliverableId, null, delta);
+        if (window.HarnessApp && window.HarnessApp.showToast) {
+          window.HarnessApp.showToast(`+${delta} progress logged`);
+        }
+        await this.load(this.selectedDateStr);
+        return res;
+      } catch (err) {
+        console.error("Error advancing deliverable:", err);
+      }
+    }
   },
 
   async toggleRoutineBlock(idx) {
@@ -808,9 +929,21 @@ const Today = {
     const isSunday = dayOfWeek === 0;
     const isSaturday = dayOfWeek === 6;
 
+    const isUsTravel = Boolean(this.schedule && this.schedule.workload && this.schedule.workload.is_us_travel_mode);
+
     let period = null;
 
-    if (isSunday) {
+    if (isUsTravel) {
+      if (currentMins < 9 * 60 + 30) {
+        period = { name: "Morning Fuel & US Launch", focus: "Wake up, hydration, high-protein breakfast, plan day program", endMins: 9 * 60 + 30 };
+      } else if (currentMins < 11 * 60 + 30) {
+        period = { name: "US Hotel Deep Work Session", focus: "TUM Roadmap sprint, algorithm practice & review", endMins: 11 * 60 + 30, action: "Deep Work" };
+      } else if (currentMins < 20 * 60) {
+        period = { name: "US Program & Exploration", focus: "Active travel, university/tech site visits, networking, recovery", endMins: 20 * 60 };
+      } else {
+        period = { name: "Evening Recovery & Rest", focus: "Diary, hydration, wind-down and restful recovery", endMins: 24 * 60 };
+      }
+    } else if (isSunday) {
       if (currentMins < 9 * 60) {
         period = { name: "Morning Sleep & Reset", focus: "Full recovery & nervous system restoration", endMins: 9 * 60 };
       } else if (currentMins < 14 * 60) {
@@ -824,7 +957,7 @@ const Today = {
       if (currentMins < 9 * 60) {
         period = { name: "Morning Wake & Fuel", focus: "Clean breakfast, hydration, zero-screen wakefulness", endMins: 9 * 60 };
       } else if (currentMins < 13 * 60) {
-        period = { name: "TUM Metro Deep Sprint", focus: "Algorithm exercises, code practice & mathematics focus", endMins: 13 * 60, action: "Kill List" };
+        period = { name: "TUM Metro Deep Sprint", focus: "Algorithm exercises, code practice & mathematics focus", endMins: 13 * 60, action: "Deep Work" };
       } else if (currentMins < 17 * 60) {
         period = { name: "Matura R Problem Solving", focus: "Planimetria & high-weight exam arkusz practice", endMins: 17 * 60 };
       } else {
@@ -838,7 +971,7 @@ const Today = {
       } else if (currentMins < 15 * 60) {
         period = { name: "Post-School Transit & Fuel", focus: "Rapid commute to library / workstation & high-energy meal", endMins: 15 * 60 };
       } else if (currentMins < 18 * 60) {
-        period = { name: "SGH Library Deep Work Session", focus: "United Study Protocol: School Defense (25m) -> Matura R (35m) -> LeetCode (25m)", endMins: 18 * 60, action: "Kill List" };
+        period = { name: "SGH Library Deep Work Session", focus: "United Study Protocol: School Defense (25m) -> Matura R (35m) -> LeetCode (25m)", endMins: 18 * 60, action: "Deep Work" };
       } else if (currentMins < 20 * 60) {
         period = { name: "Physical Training / Boxing", focus: "Boxing workout, hypertrophy progression or evening dinner", endMins: 20 * 60 };
       } else if (currentMins < 22 * 60) {
@@ -865,8 +998,21 @@ const Today = {
     }
 
     if (actionArea) {
-      if (period.action === "Kill List") {
-        actionArea.innerHTML = `<button type="button" class="btn-primary" onclick="if (window.KillListDrawer) window.KillListDrawer.open('${this.selectedDateStr}');" style="font-size: 10px; padding: 3px 8px; font-family: var(--font-mono);">[KILL LIST]</button>`;
+      if (period.action === "Deep Work" || period.action === "Kill List") {
+        const dwIdx = this.schedule && this.schedule.blocks
+          ? this.schedule.blocks.findIndex(
+              (b) =>
+                b.type === "deep_work" ||
+                b.type === "study_block" ||
+                (b.focus &&
+                  (b.focus.includes("Deep Work") ||
+                    b.focus.includes("SGH Library") ||
+                    b.focus.includes("Hotel Deep Work") ||
+                    b.focus.includes("Weekend Deep Work")))
+            )
+          : 0;
+        const targetIdx = dwIdx >= 0 ? dwIdx : 0;
+        actionArea.innerHTML = `<button type="button" class="btn-primary" onclick="Today.openDeepWorkPlanModal(${targetIdx});" style="font-size: 10px; padding: 3px 8px; font-family: var(--font-mono); letter-spacing: 0.03em;">[OPEN PLAN →]</button>`;
       } else {
         actionArea.innerHTML = "";
       }

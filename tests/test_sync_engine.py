@@ -21,6 +21,7 @@ def temp_sync_env(tmp_path, monkeypatch):
 
     monkeypatch.setattr(sync_service, "DATA_DIR", test_data_dir)
     monkeypatch.setattr(sync_service, "CONFIG_FILE", test_data_dir / "sync_config.json")
+    monkeypatch.setattr(sync_service, "probe_local_server", lambda: None)
 
     # In-memory or temporary SQLite db
     db_path = test_data_dir / "harness.db"

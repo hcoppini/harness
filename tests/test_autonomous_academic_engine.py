@@ -147,5 +147,7 @@ def test_cruise_mode_preserves_standard_routine(academic_db):
     }
     adaptive = workload_governor.synthesize_adaptive_schedule(base_schedule, date_str=target_date, conn=academic_db)
     sgh_block = adaptive["blocks"][0]
-    assert sgh_block["focus"] == "SGH Library • Deep Work Sprint"
-    assert "LeetCode" in sgh_block["activity"]
+    assert "TUM Deep Work" in sgh_block["focus"]
+    assert sgh_block["is_tum_roadmap"] is True
+    assert sgh_block["is_school_dedicated"] is False
+    assert sgh_block["deliverable"] is not None

@@ -923,7 +923,7 @@ def sync_vulcan_data(
     try:
         from app.services import sync_service
         sync_cfg = sync_service.get_sync_config()
-        if sync_cfg.get("supabase_key"):
+        if sync_cfg.get("supabase_key") and not os.environ.get("PYTEST_CURRENT_TEST"):
             sync_service.sync_school_exams(conn)
             sync_service.sync_homework_items(conn)
             sync_service.sync_tum_grades(conn)

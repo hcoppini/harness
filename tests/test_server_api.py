@@ -476,6 +476,12 @@ def test_four_day_selection_persistence_no_reset(client):
 
 
 def test_harness_3_workload_and_kill_list_routes(client):
+    from app.db import get_connection
+    conn = get_connection()
+    conn.execute("DELETE FROM school_exams")
+    conn.commit()
+    conn.close()
+
     # 1. Sync Vulcan via POST /api/vulcan/sync
     sync_res = client.post(
         "/api/vulcan/sync",

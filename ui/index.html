@@ -56,7 +56,7 @@
         <span id="themeToggleIcon">🌙</span>
         <span id="themeToggleText">DARK</span>
       </button>
-      <button id="btnMobileKillList" class="btn-ghost-icon mobile-only-btn" title="Open SGH Kill List" onclick="window.KillListDrawer ? window.KillListDrawer.open() : null">
+      <button id="btnMobileKillList" class="btn-ghost-icon mobile-only-btn" title="Open SGH Kill List" style="display: none;" onclick="window.KillListDrawer ? window.KillListDrawer.open() : null">
         <span>[KILL]</span>
       </button>
       <button id="syncStatusBadge" class="sync-badge" title="Click to sync Laptop and PC">
@@ -247,7 +247,7 @@
           <p class="section-caption">Routines are pre-calibrated. Zero input fatigue. Check the boxes.</p>
         </div>
         <div style="display: flex; gap: 8px;">
-          <button id="btnOpenKillList" class="btn-ghost-icon" title="Open Kill List Drawer (SGH Library Deep Work)">
+          <button id="btnOpenKillList" class="btn-ghost-icon" title="Open Kill List Drawer (SGH Library Deep Work)" style="display: none;">
             <span style="font-weight: 700; letter-spacing: 0.04em;">Kill List</span>
             <span class="key-pill" id="todayKillListBadge">0/3</span>
           </button>
@@ -365,7 +365,7 @@
           </div>
 
           <!-- Embedded SGH / Deep Work Kill List (Daily Execution Center) -->
-          <div id="todayInlineKillListCard" class="monotone-card" style="margin-bottom: 14px; border: 1px solid var(--accent-lavender-border); background: var(--bg-surface-elevated);">
+          <div id="todayInlineKillListCard" class="monotone-card" style="display: none; margin-bottom: 14px; border: 1px solid var(--accent-lavender-border); background: var(--bg-surface-elevated);">
             <div class="card-label-row" style="margin-bottom: 8px;">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span id="todayInlineKillListTitle" class="card-label" style="color: var(--accent-lavender); font-weight: 700; font-size: 11px; letter-spacing: 0.05em;">SGH LIBRARY KILL LIST</span>
@@ -1601,9 +1601,9 @@
         <!-- Populated dynamically by Today.openDeepWorkPlanModal() -->
       </div>
 
-      <div style="padding: 14px 20px; border-top: 1px solid var(--border-hairline); display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: var(--radius-md);">
-        <button type="button" class="btn-primary" onclick="Today.closeDeepWorkPlanModal(); if (window.KillListDrawer) window.KillListDrawer.open(Today.selectedDateStr);" style="font-size: 11px; padding: 6px 14px; font-weight: 700;">
-          Open Kill List Drawer →
+      <div id="planModalFooter" style="padding: 14px 20px; border-top: 1px solid var(--border-hairline); display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); border-bottom-left-radius: var(--radius-md); border-bottom-right-radius: var(--radius-md);">
+        <button type="button" class="btn-primary" onclick="Today.closeDeepWorkPlanModal();" style="font-size: 11px; padding: 6px 14px; font-weight: 700;">
+          Got It — Start Focus Sprint
         </button>
         <button type="button" class="btn-subtle" onclick="Today.closeDeepWorkPlanModal()" style="font-size: 11px; padding: 6px 14px; font-weight: 600; cursor: pointer; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-secondary);">
           Close

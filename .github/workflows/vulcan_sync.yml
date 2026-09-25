@@ -1,37 +1,35 @@
-name: Vulcan UONET+ Daily Auto-Sync
+name: Vulcan Cloud Auto-Sync
 
 on:
   schedule:
-    # 12:15 UTC = 14:15 Warsaw time (CEST), Mon-Fri right after school ends
-    - cron: '15 12 * * 1-5'
-    # 15:00 UTC = 17:00 Warsaw time (CEST), Mon-Fri before evening study session
-    - cron: '00 15 * * 1-5'
+    # 06:00, 12:00, 15:00 UTC corresponds to 08:00, 14:00, 17:00 CEST (Polish local time)
+    - cron: '0 6,12,15 * * *'
   workflow_dispatch:
 
 jobs:
   sync:
+    name: Sync Vulcan E-Dziennik to Supabase Cloud
     runs-on: ubuntu-latest
-    timeout-minutes: 10
 
     steps:
-      - name: Check out repository
+      - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python 3.11
+      - name: Set up Python 3.12
         uses: actions/setup-python@v5
         with:
-          python-version: '3.11'
+          python-version: '3.12'
           cache: 'pip'
 
-      - name: Install dependencies
+      - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Execute Headless Vulcan & Supabase Sync
+      - name: Execute Headless Vulcan Cloud Sync
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_KEY: ${{ secrets.SUPABASE_KEY }}
           VULCAN_CONFIG_JSON: ${{ secrets.VULCAN_CONFIG_JSON }}
         run: |
-          python scripts/sync_vulcan_daily.py
+          python scripts/sync_vulcan_cloud.py

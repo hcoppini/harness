@@ -7,7 +7,7 @@ Unifies school-first defense with long-term Matura Rozszerzona & TUM Heilbronn m
 
 import re
 import sqlite3
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, date
 from typing import Dict, Any, List, Optional, Tuple
 
 from app.db import get_connection
@@ -18,6 +18,72 @@ TIER_1_KEYWORDS = ["matematyka", "informatyka", "angielski", "math", "cs", "algo
 ESSAY_KEYWORDS = ["esej", "rozprawka", "wypracowanie", "tekst", "opowiadanie", "charakterystyka", "analiza literacka", "praca pisemna"]
 EXAM_MAJOR_KEYWORDS = ["sprawdzian", "praca klasowa", "test diagnostyczny", "arkusz", "matura", "egzamin"]
 QUIZ_KEYWORDS = ["kartkówka", "kartkowka", "odpowiedź", "odpowiedz ustna", "wejściówka"]
+
+
+def is_us_travel_date(target_date: Optional[Any] = None) -> bool:
+    """
+    Returns True if target_date falls within the autonomous US trip window (October 4th - 18th, 2026).
+    During this window, Warsaw Liceum timetables and alarms are suspended, school surge mode
+    is frozen, and flexible hotel deep work blocks are scheduled.
+    """
+    if target_date is None:
+        dt = datetime.now().date()
+    elif isinstance(target_date, str):
+        try:
+            dt = datetime.strptime(target_date[:10], "%Y-%m-%d").date()
+        except Exception:
+            dt = datetime.now().date()
+    elif isinstance(target_date, datetime):
+        dt = target_date.date()
+    elif isinstance(target_date, date):
+        dt = target_date
+    else:
+        dt = datetime.now().date()
+
+    return date(2026, 10, 4) <= dt <= date(2026, 10, 18)
+
+
+def get_active_station_id(target_date: Optional[Any] = None) -> str:
+    """
+    Dynamically maps any target date between 2026 and 2028 to its active TUM Metro station ID.
+    Handles the combined summer station 'jul-aug-2027', boundaries, and monthly progression.
+    Guarantees autonomous operation for the next two years through July 2028 graduation.
+    """
+    if target_date is None:
+        dt = datetime.now().date()
+    elif isinstance(target_date, str):
+        try:
+            dt = datetime.strptime(target_date[:10], "%Y-%m-%d").date()
+        except Exception:
+            dt = datetime.now().date()
+    elif isinstance(target_date, datetime):
+        dt = target_date.date()
+    elif isinstance(target_date, date):
+        dt = target_date
+    else:
+        dt = datetime.now().date()
+
+    year = dt.year
+    month = dt.month
+
+    # Boundary conditions
+    if year < 2026 or (year == 2026 and month <= 8):
+        return "kickoff-2026"
+    if year > 2028 or (year == 2028 and month >= 7):
+        return "jul-2028"
+
+    month_names = {
+        1: "jan", 2: "feb", 3: "mar", 4: "apr",
+        5: "may", 6: "jun", 7: "jul", 8: "aug",
+        9: "sep", 10: "oct", 11: "nov", 12: "dec"
+    }
+
+    # Year 2027 special case: July & August combined
+    if year == 2027 and month in (7, 8):
+        return "jul-aug-2027"
+
+    m_abbr = month_names.get(month, "sep")
+    return f"{m_abbr}-{year}"
 
 
 def _is_tier_1(subject: str) -> bool:
@@ -126,8 +192,9 @@ def generate_phased_study_action(
     subject_gpa: Optional[float] = None,
 ) -> Dict[str, Any]:
     """
-    Synthesizes concrete step-by-step guidance tailored to task archetype,
+    Synthesizes concrete 5-stage progressive execution guidance tailored to task archetype,
     days remaining until deadline, and current subject standing.
+    Includes explicit post-exam suppression on exam day (T-0).
     """
     classification = classify_obligation(obligation)
     ob_type = classification["type"]
@@ -138,69 +205,121 @@ def generate_phased_study_action(
     is_vuln = subject_gpa is not None and subject_gpa < 3.8
     vuln_tag = f" [Grade Risk: {subject_gpa:.1f} GPA]" if is_vuln else ""
 
-    if ob_type == "essay":
-        if days_left <= 1:
-            stage = "Final Polish & Submission"
+    if ob_type in ("major_exam", "exam"):
+        if days_left <= 0:
+            stage = "Stage 5: Post-Exam Clearance & Roadmap Advance (T-0)"
+            focus = f"Deep Work • Post-Exam Clearance: {subject}"
+            activity = (
+                f"[Exam Written // {stage}] Morning test completed in school. Academic defense cleared. "
+                f"100% afternoon deep work capacity redirected to active TUM Roadmap deliverable."
+            )
+            is_school = False
+        elif days_left == 1:
+            stage = "Stage 4: Timed Mock Simulation & Rapid Blitz (T-1)"
+            focus = f"Deep Work • {subject} Exam Prep: Final Mock & Blitz"
+            activity = (
+                f"[Exam Sprint // {stage}{vuln_tag}] 45m strict timed {subject} mock exam simulation + "
+                f"30m rapid formula recall blitz on {scope or title[:35]} + 15m trap review."
+            )
+            is_school = True
+        elif days_left in (2, 3):
+            stage = "Stage 3: Hard & Past-Paper Drills (T-3 to T-2)"
+            focus = f"Deep Work • {subject} Exam Prep: Advanced Past Papers"
+            activity = (
+                f"[Exam Sprint // {stage}{vuln_tag}] 60m {subject} unassisted CKE/operon past paper problems ({scope or title[:35]}) + "
+                f"30m red-pen step-by-step scoring and proof verification."
+            )
+            is_school = True
+        elif days_left in (4, 5):
+            stage = "Stage 2: Foundational Problem Sets & Error Bank (T-5 to T-4)"
+            focus = f"Deep Work • {subject} Exam Prep: Problem Drills"
+            activity = (
+                f"[Exam Prep // {stage}{vuln_tag}] 50m solve 6-8 foundational {subject} problem sets ({scope or title[:35]}) + "
+                f"30m log all errors/hesitations into error bank + 10m review theorem justifications."
+            )
+            is_school = True
+        else:  # T-6 or further (Stage 1)
+            stage = "Stage 1: Scope & Theorem Mapping (T-7 to T-6)"
+            focus = f"Deep Work • {subject} Exam Prep: Scope & Theorem Mapping"
+            activity = (
+                f"[Exam Prep // {stage}{vuln_tag}] 35m create condensed {subject} concept/theorem map ({scope or title[:35]}) + "
+                f"35m catalog definition sheet & review past errors + 20m calibrate target problem archetypes."
+            )
+            is_school = True
+
+    elif ob_type == "essay":
+        if days_left <= 0:
+            stage = "Stage 4: Submission Cleared (T-0)"
+            focus = f"Deep Work • Essay Cleared: {subject}"
+            activity = f"[Essay Submitted // {stage}] Written assignment submitted in morning class. SGH deep work pivoted to TUM Roadmap."
+            is_school = False
+        elif days_left == 1:
+            stage = "Stage 3: Final Polish & Linguistic Flow (T-1)"
             focus = f"Deep Work • Polish Essay: Final Review ({subject})"
             activity = (
-                f"[Essay Sprint // {stage}{vuln_tag}] 30m verify thesis alignment, textual quotes & bibliography + "
-                f"40m polish syntax, transition sentences & argument flow + 20m final formatting and word count check."
+                f"[Essay Sprint // {stage}{vuln_tag}] 35m verify thesis alignment, textual quotes & bibliography + "
+                f"35m polish syntax, vocabulary variety & transitions + 20m final formatting and word count check."
             )
-        elif days_left == 2:
-            stage = "Drafting Sprint"
+            is_school = True
+        elif days_left in (2, 3):
+            stage = "Stage 2: Full Drafting Sprint (T-3 to T-2)"
             focus = f"Deep Work • Essay Drafting: {subject}"
             activity = (
-                f"[Essay Sprint // {stage}{vuln_tag}] 40m draft core thesis & body paragraphs 1-2 + "
-                f"45m integrate direct textual citations & analysis + 25m draft conclusion and review cohesion."
+                f"[Essay Sprint // {stage}{vuln_tag}] 45m draft core thesis & body paragraphs 1-2 + "
+                f"35m integrate direct textual citations & analysis + 20m draft counter-argument and conclusion."
             )
+            is_school = True
         else:
-            stage = "Outline & Textual Research"
+            stage = "Stage 1: Outline & Textual Research (T-4+)"
             focus = f"Deep Work • Essay Structure & Thesis: {subject}"
             activity = (
                 f"[Essay Prep // {stage}{vuln_tag}] 35m analyze prompt, formulate central thesis & select 3 arguments + "
                 f"45m extract literary quotes and supporting evidence from source texts."
             )
-    elif ob_type == "major_exam":
-        if days_left <= 1:
-            stage = "T-1 Rapid Error Blitz & Formula Mastery"
-            focus = f"Deep Work • {subject} Exam: Error Blitz"
-            activity = (
-                f"[Exam Sprint // {stage}{vuln_tag}] 50m targeted formula recall & review past homework error log + "
-                f"40m timed past-paper questions on {scope or title[:35]}."
-            )
-        elif days_left <= 3:
-            stage = "T-3 High-Intensity Problem Drill"
-            focus = f"Deep Work • {subject} Exam Prep"
-            activity = (
-                f"[Exam Sprint // {stage}{vuln_tag}] 60m solve 8 targeted exam problem sets ({scope or title[:35]}) + "
-                f"30m self-correction and formula derivation."
-            )
-        else:
-            stage = "T-5 Concept Mapping"
-            focus = f"Deep Work • {subject} Concept Review"
-            activity = (
-                f"[Exam Prep // {stage}{vuln_tag}] 45m core theorem/concept mapping + 45m progressive diagnostic problems."
-            )
+            is_school = True
+
     elif ob_type == "quiz":
-        stage = "Quick Active Recall"
-        focus = f"Deep Work • {subject} Kartkówka Drill"
-        activity = (
-            f"[Quiz Sprint // {stage}{vuln_tag}] 30m rapid active recall flashcards/formulas ({title}) + "
-            f"25m practice exercises."
-        )
+        if days_left <= 0:
+            stage = "Post-Quiz Clearance (T-0)"
+            focus = f"Deep Work • Quiz Cleared: {subject}"
+            activity = f"[Quiz Written // {stage}] Morning quiz finished. Capacity focused on TUM Roadmap."
+            is_school = False
+        elif days_left == 1:
+            stage = "T-1 Rapid Active Recall & Flashcards"
+            focus = f"Deep Work • {subject} Kartkówka Drill"
+            activity = f"[Quiz Sprint // {stage}{vuln_tag}] 30m high-speed active recall flashcards/formulas ({title}) + 25m practice exercises under timer."
+            is_school = True
+        else:
+            stage = "Early Concept & Terminology Review"
+            focus = f"Deep Work • {subject} Concepts"
+            activity = f"[Quiz Prep // {stage}{vuln_tag}] 30m active recall of definitions/formulas ({title}) + 20m review example problems."
+            is_school = True
+
     else:  # homework / presentation
-        stage = "Submission Clearance"
-        focus = f"Deep Work • Homework Clearance: {subject}"
-        activity = (
-            f"[Homework Sprint // {stage}{vuln_tag}] 45m complete {title} requirements + "
-            f"30m answer verification and submission readiness."
-        )
+        if days_left <= 0:
+            stage = "Submission Clearance (T-0)"
+            focus = f"Deep Work • Homework Cleared: {subject}"
+            activity = f"[Homework Cleared // {stage}] Assignment submitted. Session dedicated to TUM Roadmap."
+            is_school = False
+        elif days_left == 1:
+            stage = "Final Review & Completion (T-1)"
+            focus = f"Deep Work • Homework Clearance: {subject}"
+            activity = (
+                f"[Homework Sprint // {stage}{vuln_tag}] 45m complete {title} requirements + "
+                f"30m answer verification and submission readiness."
+            )
+            is_school = True
+        else:
+            stage = "Early Problem Solving"
+            focus = f"Deep Work • {subject} Assignment"
+            activity = f"[Homework Prep // {stage}{vuln_tag}] 40m solve core assignment questions ({title[:35]}) + 20m verify steps."
+            is_school = True
 
     return {
         "stage": stage,
         "focus": focus,
         "activity": activity,
-        "is_school_dedicated": True,
+        "is_school_dedicated": is_school,
         "obligation_type": ob_type,
     }
 
@@ -212,6 +331,7 @@ def get_workload_analysis(
     """
     Evaluates upcoming academic commitments over the active horizon (next 10 days for exams, next 7 days for homework).
     Incorporates subject grade vulnerability to calculate the composite academic pressure score.
+    Automatically handles US Travel Protocol (Oct 4–18) and exam-day post-test suppression (T-0).
     """
     close_conn = False
     if conn is None:
@@ -222,6 +342,7 @@ def get_workload_analysis(
     end_dt = target_dt + timedelta(days=10)
     hw_end_dt = target_dt + timedelta(days=7)
 
+    is_travel = is_us_travel_date(target_dt)
     vulnerabilities = get_subject_vulnerabilities(conn=conn)
 
     cursor = conn.cursor()
@@ -247,6 +368,7 @@ def get_workload_analysis(
             ex_date = datetime.strptime(e["exam_date"], "%Y-%m-%d").date()
             days_left = (ex_date - target_dt).days
         except Exception:
+            ex_date = target_dt
             days_left = 0
 
         e["days_left"] = days_left
@@ -255,13 +377,17 @@ def get_workload_analysis(
         e["is_vulnerable"] = subj_vuln.get("is_vulnerable", False)
         e["subject_gpa"] = subj_vuln.get("gpa", 4.0)
 
-        # Only future exams (days_left >= 1) require acute study preparation
-        if 1 <= days_left <= 2:
-            immediate_exams.append(e)
-        if 1 <= days_left <= 5:
-            week_exams.append(e)
+        # US Travel protocol: exams occurring during trip are travel-excused post-trip defense
+        if is_travel or is_us_travel_date(ex_date):
+            e["is_travel_excused"] = True
 
-        if days_left >= 1:
+        # Only future exams (days_left >= 1) require acute study preparation; exam day (days_left == 0) is already written
+        if days_left >= 1 and not e.get("is_travel_excused"):
+            if 1 <= days_left <= 2:
+                immediate_exams.append(e)
+            if 1 <= days_left <= 5:
+                week_exams.append(e)
+
             if e["is_tier_1"]:
                 tier_1_exams.append(e)
             else:
@@ -286,6 +412,7 @@ def get_workload_analysis(
             h_date = datetime.strptime(h["due_date"], "%Y-%m-%d").date()
             days_left = (h_date - target_dt).days
         except Exception:
+            h_date = target_dt
             days_left = 0
         h["days_left"] = days_left
         classification = classify_obligation(h)
@@ -294,37 +421,39 @@ def get_workload_analysis(
         h["is_vulnerable"] = subj_vuln.get("is_vulnerable", False)
         h["subject_gpa"] = subj_vuln.get("gpa", 4.0)
 
-        if days_left <= 1:
-            urgent_homework.append(h)
-        elif days_left <= 5:
-            active_homework.append(h)
+        if is_travel or is_us_travel_date(h_date):
+            h["is_travel_excused"] = True
+
+        if not h.get("is_travel_excused"):
+            if days_left == 1:
+                urgent_homework.append(h)
+            elif 2 <= days_left <= 5:
+                active_homework.append(h)
 
     # Composite Workload score calculation:
-    # - Tier 1 exam: 2.5 pts
-    # - Tier 2 exam: 1.0 pt
-    # - Immediate exam (<= 2 days): +2.0 pts
-    # - Vulnerable subject exam (GPA < 3.8): +2.0 pts booster
-    # - Multiple exams this week booster: +1.5 pts per additional exam beyond the first
-    # - Urgent homework (due today/tomorrow): +1.5 pts each
-    # - Active essay (due in <= 3 days): +2.0 pts booster
-    # - Active homework (due in 2-5 days): +0.5 pts each
     score = (len(tier_1_exams) * 2.5) + (len(tier_2_exams) * 1.0)
     if immediate_exams:
         score += 2.0
     for e in exams:
-        if e.get("is_vulnerable"):
+        if e.get("is_vulnerable") and e.get("days_left", 0) >= 1 and not e.get("is_travel_excused"):
             score += 1.5
     if len(week_exams) > 1:
         score += (len(week_exams) - 1) * 1.5
     score += (len(urgent_homework) * 1.5)
     for h in homework:
-        if h.get("is_essay") and h.get("days_left", 99) <= 3:
+        if h.get("is_essay") and 1 <= h.get("days_left", 99) <= 3 and not h.get("is_travel_excused"):
             score += 2.0
-        elif h.get("is_vulnerable") and h.get("days_left", 99) <= 3:
+        elif h.get("is_vulnerable") and 1 <= h.get("days_left", 99) <= 3 and not h.get("is_travel_excused"):
             score += 1.0
     score += (len(active_homework) * 0.5)
 
-    if score <= 2.5:
+    if is_travel:
+        mode = "TRAVEL"
+        mode_label = "US Travel Protocol • Hotel Deep Work"
+        badge_class = "travel"
+        desc = "US Trip Active (Oct 4–18). Warsaw Liceum timetable suspended. Academic surge mode frozen. 75m flexible hotel deep work scheduled for TUM roadmap."
+        score = 1.0
+    elif score <= 2.5:
         mode = "CRUISE"
         mode_label = "Cruise Mode • TUM Acceleration"
         badge_class = "optimal"
@@ -334,18 +463,18 @@ def get_workload_analysis(
         mode_label = "Balanced Mode • Dual Track Focus"
         badge_class = "lavender"
         hw_info = f", {len(urgent_homework)} urgent hw" if urgent_homework else ""
-        desc = f"Moderate academic load ({len(exams)} exam(s){hw_info}). SGH library deep work calibrated between test prep and core TUM deliverables."
+        desc = f"Moderate academic load ({len(tier_1_exams) + len(tier_2_exams)} exam(s){hw_info}). SGH library deep work calibrated between test prep and core TUM deliverables."
     else:
         mode = "SURGE"
         mode_label = "Surge Protocol • High Academic Density"
         badge_class = "amber"
         hw_info = f", {len(urgent_homework)} urgent homework" if urgent_homework else ""
-        desc = f"High academic load ({len(exams)} upcoming test(s){hw_info}). SGH deep work blocks dynamically re-routed to phased exam defense and submission clearance."
+        desc = f"High academic load ({len(tier_1_exams) + len(tier_2_exams)} upcoming test(s){hw_info}). SGH deep work blocks dynamically re-routed to phased exam defense and submission clearance."
 
     if close_conn:
         conn.close()
 
-    future_exams = [e for e in exams if e.get("days_left", 0) >= 1]
+    future_exams = [e for e in exams if e.get("days_left", 0) >= 1 and not e.get("is_travel_excused")]
     today_exams = [e for e in exams if e.get("days_left", 0) == 0]
 
     return {
@@ -368,6 +497,7 @@ def get_workload_analysis(
         "urgent_homework": urgent_homework,
         "active_homework": active_homework,
         "vulnerabilities": vulnerabilities,
+        "is_us_travel_mode": is_travel,
     }
 
 
@@ -378,8 +508,10 @@ def synthesize_adaptive_schedule(
 ) -> Dict[str, Any]:
     """
     Takes the static base routine and dynamically shapes the daily plan and study blocks
-    depending on upcoming tests, essays, homework deadlines, and live subject grades.
-    Weekend schedules automatically inject focused study blocks when upcoming obligations demand defense.
+    depending on upcoming tests, essays, homework deadlines, live subject grades, and travel protocols.
+    - US Travel Mode (Oct 4–18): Suspends Warsaw timetable and schedules hotel deep work.
+    - Exam Day (T-0): Written test is excluded from afternoon study blocks.
+    - Non-Defense Days: SGH Library block embeds active station TUM Roadmap deliverable.
     """
     schedule = dict(base_schedule)
     blocks = [dict(b) for b in schedule.get("blocks", [])]
@@ -391,19 +523,111 @@ def synthesize_adaptive_schedule(
     weekday = target_dt.weekday()  # Monday=0, ... Saturday=5, Sunday=6
     is_weekend = weekday in (5, 6)
 
+    # --------------------------------------------------------------------------
+    # 0. US TRAVEL PROTOCOL (Oct 4–18, 2026)
+    # --------------------------------------------------------------------------
+    if analysis.get("is_us_travel_mode"):
+        station_id = get_active_station_id(target_dt)
+        delivs = kill_list_controller.get_station_deliverables(station_id, conn=conn)
+        chosen_deliv = next((d for d in delivs if not d.get("is_completed")), (delivs[0] if delivs else None))
+        spec = (chosen_deliv.get("next_spec") if chosen_deliv else None) or {
+            "title": "LeetCode Unassisted & Math R",
+            "target_spec": "Solve 1 problem without AI & review Math R",
+            "action_type": "url",
+            "target_path": "https://leetcode.com/problemset/all/",
+            "category": "Algorithms",
+            "quantity": 1,
+        }
+        travel_blocks = [
+            {
+                "time": "08:30 – 09:30",
+                "focus": "Morning Fuel & US Launch",
+                "activity": "Wake up, hydration, high-protein breakfast, plan day exploration/program.",
+                "type": "routine",
+            },
+            {
+                "time": "10:00 – 11:30",
+                "focus": f"US Hotel Deep Work • TUM Roadmap: {spec['title']}",
+                "activity": f"[US Hotel Sprint // {station_id}] 60m {spec['target_spec']} + 30m self-correction & vocabulary review.",
+                "type": "deep_work",
+                "is_tum_roadmap": True,
+                "is_school_dedicated": False,
+                "is_us_travel": True,
+                "deliverable": {
+                    "deliverable_id": chosen_deliv["deliverable_id"] if chosen_deliv else "us_hotel_sprint",
+                    "station_id": station_id,
+                    "title": spec["title"],
+                    "category": spec["category"],
+                    "target_spec": spec["target_spec"],
+                    "action_type": spec["action_type"],
+                    "target_path": spec["target_path"],
+                    "quantity": spec["quantity"],
+                    "completed_count": chosen_deliv["completed_count"] if chosen_deliv else 0,
+                    "total_required": chosen_deliv["total_required"] if chosen_deliv else 15,
+                    "unit_label": chosen_deliv["unit_label"] if chosen_deliv else "exercises",
+                } if chosen_deliv else None,
+            },
+            {
+                "time": "11:30 – 18:30",
+                "focus": "US Travel Program & Cultural Immersion",
+                "activity": "Scheduled trip activities, city transit, cultural immersion, conferences, and exploration.",
+                "type": "travel",
+            },
+            {
+                "time": "18:30 – 19:15",
+                "focus": "Hotel Fitness & Mobility Routine",
+                "activity": "45 min hotel room / gym bodyweight workout (pushups, core circuit, mobility).",
+                "type": "training",
+            },
+            {
+                "time": "19:30 – 21:00",
+                "focus": "Dinner & Travel Log",
+                "activity": "High-protein dinner, hydration, quick day reflection log.",
+                "type": "nutrition",
+            },
+            {
+                "time": "21:00 – 22:30",
+                "focus": "Evening Wind Down & Read",
+                "activity": "Decompress, read, zero cognitive strain.",
+                "type": "rest",
+            },
+            {
+                "time": "22:30 – 07:30",
+                "focus": "Restful Sleep (9 hrs)",
+                "activity": "Deep physical recovery & circadian alignment.",
+                "type": "sleep",
+            },
+        ]
+        schedule["blocks"] = travel_blocks
+        schedule["name"] = f"US Travel Protocol ({target_dt.strftime('%A')})"
+        schedule["description"] = "Warsaw timetable suspended. 90m hotel deep work on active TUM Roadmap deliverable."
+        return schedule
+
     exams = analysis.get("upcoming_exams", [])
     homework = analysis.get("urgent_homework", []) + analysis.get("active_homework", [])
 
-    # Identify acute writing tasks (essays due in 1 to 3 days)
-    acute_essays = [h for h in homework if h.get("is_essay") and 1 <= h.get("days_left", 99) <= 3]
-    # Identify acute exams (exams due in 1 to 3 days - never past/today's completed exams)
-    acute_exams = [e for e in exams if 1 <= e.get("days_left", 99) <= 3]
+    # Identify acute writing tasks (essays due in 1 to 2 days)
+    acute_essays = [h for h in homework if h.get("is_essay") and 1 <= h.get("days_left", 99) <= 2]
+    # Identify acute exams (exams due in 1 to 2 days - NEVER days_left == 0)
+    acute_exams = [e for e in exams if 1 <= e.get("days_left", 99) <= 2]
+
+    # Active station deliverable lookup for non-defense TUM embedding
+    active_station_id = get_active_station_id(target_dt)
+    station_delivs = kill_list_controller.get_station_deliverables(active_station_id, conn=conn)
+    top_deliv = next((d for d in station_delivs if not d.get("is_completed")), (station_delivs[0] if station_delivs else None))
+    deliv_spec = top_deliv.get("next_spec") if top_deliv else {
+        "title": "LeetCode Unassisted & Math R",
+        "target_spec": "Solve 1 problem without AI & review Math R",
+        "action_type": "url",
+        "target_path": "https://leetcode.com/problemset/all/",
+        "category": "Algorithms",
+        "quantity": 1,
+    }
 
     # --------------------------------------------------------------------------
     # 1. WEEKEND ADAPTATION: Inject structured study blocks if heavy load looms
     # --------------------------------------------------------------------------
     if is_weekend:
-        # Check if tests or essays are scheduled for the coming week (days_left <= 5)
         impending_obligations = [e for e in exams if e.get("days_left", 99) <= 5] + [
             h for h in homework if h.get("days_left", 99) <= 5 and (h.get("is_essay") or h.get("is_vulnerable"))
         ]
@@ -442,11 +666,7 @@ def synthesize_adaptive_schedule(
     # --------------------------------------------------------------------------
     # 2. WEEKDAY SGH DEEP WORK SHAPING
     # --------------------------------------------------------------------------
-    # If no upcoming exams and no urgent homework, return standard pre-calibrated schedule
-    has_academic_commitments = bool(exams) or bool(homework)
-    if analysis["mode"] == "CRUISE" and not has_academic_commitments:
-        schedule["blocks"] = blocks
-        return schedule
+    has_acute_academic_defense = bool(acute_essays) or bool(acute_exams) or (analysis["mode"] == "SURGE" and bool(exams))
 
     for b in blocks:
         is_deep_work = b.get("type") == "deep_work" or "SGH Library" in b.get("focus", "")
@@ -455,7 +675,7 @@ def synthesize_adaptive_schedule(
 
         b["is_surge"] = (analysis["mode"] == "SURGE")
 
-        # Scenario A: Acute Essay Due in <= 2 days (e.g. Essay due after tomorrow -> Tomorrow dedicated to essay)
+        # Scenario A: Acute Essay Due in <= 2 days
         if acute_essays:
             top_essay = acute_essays[0]
             phased = generate_phased_study_action(
@@ -466,8 +686,9 @@ def synthesize_adaptive_schedule(
             b["focus"] = phased["focus"]
             b["activity"] = phased["activity"]
             b["is_school_dedicated"] = True
+            b["is_tum_roadmap"] = False
 
-        # Scenario B: Acute Exam Due in <= 2 days
+        # Scenario B: Acute Exam Due in <= 2 days (strictly future exams)
         elif acute_exams:
             top_exam = acute_exams[0]
             phased = generate_phased_study_action(
@@ -478,6 +699,7 @@ def synthesize_adaptive_schedule(
             b["focus"] = phased["focus"]
             b["activity"] = phased["activity"]
             b["is_school_dedicated"] = True
+            b["is_tum_roadmap"] = False
 
         # Scenario C: Multiple Exams in Near Horizon (2+ upcoming)
         elif len(exams) >= 2:
@@ -488,6 +710,7 @@ def synthesize_adaptive_schedule(
                 f"45m {e2['subject']} ({e2['title']}) concept check + 25m TUM LeetCode anchor."
             )
             b["is_school_dedicated"] = True
+            b["is_tum_roadmap"] = False
 
         # Scenario D: Single Exam + Urgent Homework
         elif exams and analysis.get("urgent_homework"):
@@ -499,6 +722,7 @@ def synthesize_adaptive_schedule(
                 f"55m {e['subject']} past paper & formula drill."
             )
             b["is_school_dedicated"] = True
+            b["is_tum_roadmap"] = False
 
         # Scenario E: Urgent Homework Only
         elif analysis.get("urgent_homework"):
@@ -507,14 +731,30 @@ def synthesize_adaptive_schedule(
             b["focus"] = phased["focus"]
             b["activity"] = phased["activity"]
             b["is_school_dedicated"] = True
+            b["is_tum_roadmap"] = False
 
-        # Scenario F: General Exam Further Out (3-10 days)
-        elif exams:
-            prio_exam = exams[0]
-            phased = generate_phased_study_action(prio_exam, days_left=prio_exam.get("days_left", 4), subject_gpa=prio_exam.get("subject_gpa"))
-            b["focus"] = phased["focus"]
-            b["activity"] = phased["activity"]
-            b["is_school_dedicated"] = (analysis["mode"] == "SURGE" or prio_exam.get("is_vulnerable", False))
+        # Scenario F: Non-Defense Day / Cruise Mode -> AUTOMATIC TUM ROADMAP INJECTION
+        else:
+            b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']}"
+            b["activity"] = (
+                f"[TUM Roadmap Sprint // {active_station_id}] 60m {deliv_spec['target_spec']} + "
+                f"30m self-correction & formula recall + 15m German vocabulary buffer."
+            )
+            b["is_school_dedicated"] = False
+            b["is_tum_roadmap"] = True
+            b["deliverable"] = {
+                "deliverable_id": top_deliv["deliverable_id"] if top_deliv else "sgh_tum_roadmap",
+                "station_id": active_station_id,
+                "title": deliv_spec["title"],
+                "category": deliv_spec["category"],
+                "target_spec": deliv_spec["target_spec"],
+                "action_type": deliv_spec["action_type"],
+                "target_path": deliv_spec["target_path"],
+                "quantity": deliv_spec["quantity"],
+                "completed_count": top_deliv["completed_count"] if top_deliv else 0,
+                "total_required": top_deliv["total_required"] if top_deliv else 15,
+                "unit_label": top_deliv["unit_label"] if top_deliv else "exercises",
+            } if top_deliv else None
 
     schedule["blocks"] = blocks
     return schedule
@@ -528,20 +768,24 @@ def get_recommended_kill_items(
     Generates the top actionable items for today's library session.
     Automatically prioritizes impending school exams, urgent essays/homework,
     next sequential LeetCode problem, and progressive Math R problem sets.
+    Dynamically resolves station ID for the next two years.
+    Guarantees that both academic defense and TUM Metro deliverables are present.
     """
     close_conn = False
     if conn is None:
         conn = get_connection()
         close_conn = True
 
+    target_dt = datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else datetime.now().date()
     analysis = get_workload_analysis(date_str, conn=conn)
-    recommendations = []
+    school_items = []
+    metro_items = []
 
-    # 1. Urgent essays or homework (due in <= 2 days)
+    # 1. Urgent essays or homework (due tomorrow, days_left == 1)
     urgent_hw = analysis.get("urgent_homework", []) + [h for h in analysis.get("active_homework", []) if h.get("is_essay")]
     if urgent_hw:
-        for hw in urgent_hw[:2]:
-            recommendations.append({
+        for hw in urgent_hw[:1]:
+            school_items.append({
                 "type": "homework_prep",
                 "homework_id": hw["id"],
                 "category": hw["subject"],
@@ -553,11 +797,11 @@ def get_recommended_kill_items(
                 "days_left": hw["days_left"],
             })
 
-    # 2. Impending exam prep
+    # 2. Impending exam prep (strictly future exams, days_left >= 1)
     if analysis["upcoming_exams"]:
-        for ex in analysis["upcoming_exams"][:2]:
+        for ex in analysis["upcoming_exams"][:1]:
             scope_desc = f" ({ex.get('scope', '')[:35]}...)" if ex.get("scope") else ""
-            recommendations.append({
+            school_items.append({
                 "type": "exam_prep",
                 "exam_id": ex["id"],
                 "category": ex["subject"],
@@ -569,8 +813,9 @@ def get_recommended_kill_items(
                 "days_left": ex["days_left"],
             })
 
-    # 3. Sequential Metro deliverable progression (LeetCode & Math R)
-    deliverables = kill_list_controller.get_station_deliverables("sep-2026", conn=conn)
+    # 3. Dynamic 2-Year Sequential Metro deliverable progression (LeetCode & Math R)
+    active_station = get_active_station_id(target_dt)
+    deliverables = kill_list_controller.get_station_deliverables(active_station, conn=conn)
     for d in deliverables:
         d_id = d["deliverable_id"]
         next_spec = d.get("next_spec")
@@ -578,7 +823,7 @@ def get_recommended_kill_items(
             continue
 
         if "leetcode" in d_id or "code" in d_id:
-            recommendations.append({
+            metro_items.append({
                 "type": "metro_deliverable",
                 "deliverable_id": d_id,
                 "category": next_spec["category"],
@@ -590,7 +835,19 @@ def get_recommended_kill_items(
                 "stream": d["stream"],
             })
         elif "math" in d_id:
-            recommendations.append({
+            metro_items.append({
+                "type": "metro_deliverable",
+                "deliverable_id": d_id,
+                "category": next_spec["category"],
+                "title": next_spec["title"],
+                "target_spec": next_spec["target_spec"],
+                "quantity": next_spec["quantity"],
+                "action_type": next_spec["action_type"],
+                "target_path": next_spec["target_path"],
+                "stream": d["stream"],
+            })
+        elif "german" in d_id:
+            metro_items.append({
                 "type": "metro_deliverable",
                 "deliverable_id": d_id,
                 "category": next_spec["category"],
@@ -605,4 +862,14 @@ def get_recommended_kill_items(
     if close_conn:
         conn.close()
 
-    return recommendations[:4]
+    # Combine school items (up to 2) with metro items (at least 2)
+    final_recs = school_items[:2] + metro_items[:2]
+    # If fewer than 4, fill remaining from either pool
+    if len(final_recs) < 4:
+        for m in metro_items[2:]:
+            if len(final_recs) >= 4:
+                break
+            final_recs.append(m)
+
+    return final_recs[:4]
+
