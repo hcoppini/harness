@@ -511,67 +511,122 @@ const Today = {
     const isSchool = block && block.is_school_dedicated;
     const deliv = block ? block.deliverable : null;
 
-    let hour1Title = isSchool
-      ? "Phase 1: High-Cognition Academic Defense"
-      : (deliv ? `Phase 1: TUM Roadmap Deliverable (${deliv.category || "TUM Track"})` : "Phase 1: High-Cognition Deep Work");
+    const schoolDone = this.completedBlocks.has("study_school");
+    const maturaDone = this.completedBlocks.has("study_matura");
+    const codeDone = this.completedBlocks.has("study_code");
+    const completedCount = (schoolDone ? 1 : 0) + (maturaDone ? 1 : 0) + (codeDone ? 1 : 0);
 
-    let hour1Desc = isSchool
+    let step1Title = isSchool ? "Academic Defense: Exam / Essay Priority" : "School Defense: Homework & Next-Day Class Prep";
+    let step1Desc = isSchool
       ? (rawActivity || "50m zero-distraction focus sprint on upcoming exam / essay + 10m mental reset buffer.")
-      : (deliv
-          ? `[Target Spec] ${deliv.target_spec || deliv.title || "Core milestone problem set unassisted"}.\nCurrent Progress: ${deliv.completed_count || 0} / ${deliv.total_required || deliv.quantity || 1} ${deliv.unit_label || "reps"} completed.`
-          : (rawActivity || "50m zero-distraction focus sprint + 10m mental reset buffer."));
+      : "Clear pending homework backlog • 15-min preview so you are never surprised in class (Fizyka / Matematyka).";
 
-    let hour2Title = "Phase 2: Core TUM Deliverable / LeetCode & German";
-    let hour2Desc = "45m solve 1 LeetCode problem unassisted (trace on paper first) + 15m German vocabulary (A2/B1).";
-    let winddownDesc = "Session Audit: verify code commits, check off completed targets, close laptop, pack gear. Strict departure at 16:30 to guarantee arrival for evening routine / boxing.";
+    let step2Title = deliv
+      ? `TUM Roadmap: ${deliv.title || deliv.category || "Station Sprint"}`
+      : "Matura R Problem Solving & Proofs";
+    let step2Desc = deliv
+      ? `[Target Spec] ${deliv.target_spec || deliv.title || "Core milestone problem set unassisted"}.\nCurrent Progress: ${deliv.completed_count || 0} / ${deliv.total_required || deliv.quantity || 1} ${deliv.unit_label || "reps"} completed.`
+      : "Planimetria: Koła i okręgi • Twierdzenie o stycznej i siecznej • Arkusze maturalne CKE.";
+
+    let step3Title = "LeetCode Syntax & German Vocabulary";
+    let step3Desc = "Daily Algorithm Rep unassisted (trace on paper first) + 15m German vocabulary / grammar recall.";
+
+    let winddownDesc = "Session Audit: verify code commits, pack gear, close laptop. Strict departure at 16:30 to guarantee arrival for evening routine / boxing.";
 
     body.innerHTML = `
-      <div class="plan-phase-card phase-1">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--accent-lavender);">HOUR 1 (14:30 – 15:30)</span>
-          <span class="key-pill" style="font-size: 9px;">${isSchool ? "Academic Defense" : "TUM Sprint"}</span>
+      <div style="display: flex; align-items: center; justify-content: space-between; padding-bottom: 8px; border-bottom: 1px solid var(--border-hairline);">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--accent-lavender); letter-spacing: 0.05em;">UNITED STUDY PROTOCOL</span>
+          <span id="modalUnitedStudyBadge" class="mono-chip ${completedCount === 3 ? "done" : "lavender"}" style="font-size: 9px;">${completedCount}/3 Completed</span>
         </div>
-        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 4px;">${this.escapeHtml(hour1Title)}</div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 4px; white-space: pre-line;">${this.escapeHtml(hour1Desc)}</div>
-        ${
-          deliv
-            ? `
-              <div style="margin-top: 10px; display: flex; align-items: center; gap: 8px;">
-                ${deliv.target_path ? `
-                  <button type="button" class="btn-primary" onclick="Today.launchResource('${deliv.action_type || 'url'}', '${this.escapeJs(deliv.target_path)}');" style="font-size: 10px; padding: 4px 10px;">
-                    Open Resource ↗
+        <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">90m Execution Pipeline</span>
+      </div>
+
+      <!-- Step 1: School Defense -->
+      <div class="plan-phase-card phase-1" style="display: flex; gap: 12px; align-items: flex-start;">
+        <div 
+          id="modalCheckStudySchool" 
+          class="check-dot ${schoolDone ? "checked" : ""}" 
+          onclick="Today.toggleStudyBlock('study_school');" 
+          title="Toggle completion" 
+          style="cursor: pointer; flex-shrink: 0; margin-top: 2px;"
+        ></div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--accent-lavender);">[1. SCHOOL DEFENSE]</span>
+            <span class="key-pill" style="font-size: 9px;">25 MIN</span>
+          </div>
+          <div id="modalStudySchoolTitle" style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 3px; text-decoration: ${schoolDone ? "line-through" : "none"};">${this.escapeHtml(step1Title)}</div>
+          <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.45; margin-top: 3px; white-space: pre-line;">${this.escapeHtml(step1Desc)}</div>
+        </div>
+      </div>
+
+      <!-- Step 2: TUM Deliverable / Matura R -->
+      <div class="plan-phase-card phase-2" style="display: flex; gap: 12px; align-items: flex-start;">
+        <div 
+          id="modalCheckStudyMatura" 
+          class="check-dot ${maturaDone ? "checked" : ""}" 
+          onclick="Today.toggleStudyBlock('study_matura');" 
+          title="Toggle completion" 
+          style="cursor: pointer; flex-shrink: 0; margin-top: 2px;"
+        ></div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #0284c7;">[2. TUM ROADMAP &amp; MATURA R]</span>
+            <span class="key-pill" style="font-size: 9px;">35 MIN</span>
+          </div>
+          <div id="modalStudyMaturaTitle" style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 3px; text-decoration: ${maturaDone ? "line-through" : "none"};">${this.escapeHtml(step2Title)}</div>
+          <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.45; margin-top: 3px; white-space: pre-line;">${this.escapeHtml(step2Desc)}</div>
+          ${
+            deliv
+              ? `
+                <div style="margin-top: 8px; display: flex; align-items: center; gap: 8px;">
+                  ${deliv.target_path ? `
+                    <button type="button" class="btn-primary" onclick="Today.launchResource('${deliv.action_type || 'url'}', '${this.escapeJs(deliv.target_path)}');" style="font-size: 10px; padding: 4px 10px;">
+                      Open Resource ↗
+                    </button>
+                  ` : ""}
+                  <button type="button" class="btn-subtle" onclick="Today.advanceDeliverable('${this.escapeJs(deliv.deliverable_id)}', 1); Today.openDeepWorkPlanModal(${idx});" style="font-size: 10px; padding: 4px 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer;">
+                    +1 Advance Rep
                   </button>
-                ` : ""}
-                <button type="button" class="btn-subtle" onclick="Today.advanceDeliverable('${this.escapeJs(deliv.deliverable_id)}', 1); Today.openDeepWorkPlanModal(${idx});" style="font-size: 10px; padding: 4px 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer;">
-                  +1 Advance Rep
-                </button>
-              </div>
-            `
-            : ""
-        }
-      </div>
-
-      <div class="plan-phase-card phase-2">
-        <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #0284c7;">HOUR 2 (15:30 – 16:30)</span>
-          <span class="key-pill" style="font-size: 9px;">45m Code + 15m German</span>
-        </div>
-        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 4px;">${this.escapeHtml(hour2Title)}</div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 4px;">${this.escapeHtml(hour2Desc)}</div>
-        <div style="margin-top: 10px;">
-          <button type="button" class="btn-subtle" onclick="Today.launchResource('url', 'https://leetcode.com/problemset/all/')" style="font-size: 10px; padding: 4px 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer;">
-            Open LeetCode ↗
-          </button>
+                </div>
+              `
+              : ""
+          }
         </div>
       </div>
 
-      <div class="plan-phase-card phase-winddown">
+      <!-- Step 3: LeetCode & German -->
+      <div class="plan-phase-card phase-3" style="display: flex; gap: 12px; align-items: flex-start;">
+        <div 
+          id="modalCheckStudyCode" 
+          class="check-dot ${codeDone ? "checked" : ""}" 
+          onclick="Today.toggleStudyBlock('study_code');" 
+          title="Toggle completion" 
+          style="cursor: pointer; flex-shrink: 0; margin-top: 2px;"
+        ></div>
+        <div style="flex: 1; min-width: 0;">
+          <div style="display: flex; justify-content: space-between; align-items: center;">
+            <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #10b981;">[3. LEETCODE &amp; GERMAN]</span>
+            <span class="key-pill" style="font-size: 9px;">25 MIN</span>
+          </div>
+          <div id="modalStudyCodeTitle" style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 3px; text-decoration: ${codeDone ? "line-through" : "none"};">${this.escapeHtml(step3Title)}</div>
+          <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.45; margin-top: 3px;">${this.escapeHtml(step3Desc)}</div>
+          <div style="margin-top: 8px;">
+            <button type="button" class="btn-subtle" onclick="Today.launchResource('url', 'https://leetcode.com/problemset/all/')" style="font-size: 10px; padding: 4px 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer;">
+              Open LeetCode ↗
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wind-Down & Commute Protocol -->
+      <div class="plan-phase-card phase-winddown" style="padding: 10px 12px;">
         <div style="display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #d97706;">WIND-DOWN & COMMUTE (16:30)</span>
+          <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #d97706;">WIND-DOWN &amp; COMMUTE (16:30)</span>
           <span class="key-pill" style="font-size: 9px; color: #d97706; border-color: rgba(217, 119, 6, 0.3);">Hard Cutoff</span>
         </div>
-        <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 4px;">Clean Departure Protocol</div>
-        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin-top: 4px;">${this.escapeHtml(winddownDesc)}</div>
+        <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.4; margin-top: 4px;">${this.escapeHtml(winddownDesc)}</div>
       </div>
     `;
 
@@ -1048,43 +1103,58 @@ const Today = {
     const codeDot = document.getElementById("checkStudyCode");
     const badge = document.getElementById("unitedStudyProgressBadge");
 
+    const modalSchoolDot = document.getElementById("modalCheckStudySchool");
+    const modalMaturaDot = document.getElementById("modalCheckStudyMatura");
+    const modalCodeDot = document.getElementById("modalCheckStudyCode");
+    const modalBadge = document.getElementById("modalUnitedStudyBadge");
+
+    const modalSchoolTitle = document.getElementById("modalStudySchoolTitle");
+    const modalMaturaTitle = document.getElementById("modalStudyMaturaTitle");
+    const modalCodeTitle = document.getElementById("modalStudyCodeTitle");
+
     const schoolDone = this.completedBlocks.has("study_school");
     const maturaDone = this.completedBlocks.has("study_matura");
     const codeDone = this.completedBlocks.has("study_code");
 
-    if (schoolDot) {
-      if (schoolDone) {
-        schoolDot.classList.add("checked");
-      } else {
-        schoolDot.classList.remove("checked");
+    [schoolDot, modalSchoolDot].forEach((dot) => {
+      if (dot) {
+        if (schoolDone) dot.classList.add("checked");
+        else dot.classList.remove("checked");
       }
-    }
-    if (maturaDot) {
-      if (maturaDone) {
-        maturaDot.classList.add("checked");
-      } else {
-        maturaDot.classList.remove("checked");
+    });
+    if (modalSchoolTitle) modalSchoolTitle.style.textDecoration = schoolDone ? "line-through" : "none";
+
+    [maturaDot, modalMaturaDot].forEach((dot) => {
+      if (dot) {
+        if (maturaDone) dot.classList.add("checked");
+        else dot.classList.remove("checked");
       }
-    }
-    if (codeDot) {
-      if (codeDone) {
-        codeDot.classList.add("checked");
-      } else {
-        codeDot.classList.remove("checked");
+    });
+    if (modalMaturaTitle) modalMaturaTitle.style.textDecoration = maturaDone ? "line-through" : "none";
+
+    [codeDot, modalCodeDot].forEach((dot) => {
+      if (dot) {
+        if (codeDone) dot.classList.add("checked");
+        else dot.classList.remove("checked");
       }
-    }
+    });
+    if (modalCodeTitle) modalCodeTitle.style.textDecoration = codeDone ? "line-through" : "none";
 
     const count = (schoolDone ? 1 : 0) + (maturaDone ? 1 : 0) + (codeDone ? 1 : 0);
-    if (badge) {
-      badge.textContent = `${count}/3 Completed`;
-      if (count === 3) {
-        badge.style.background = "#ffffff";
-        badge.style.color = "#000000";
-      } else {
-        badge.style.background = "";
-        badge.style.color = "";
+    [badge, modalBadge].forEach((b) => {
+      if (b) {
+        b.textContent = `${count}/3 Completed`;
+        if (count === 3) {
+          b.className = "mono-chip done";
+          b.style.background = "";
+          b.style.color = "";
+        } else {
+          b.className = "mono-chip lavender";
+          b.style.background = "";
+          b.style.color = "";
+        }
       }
-    }
+    });
   },
 
   async loadSchoolPlan(forceRefresh = false) {

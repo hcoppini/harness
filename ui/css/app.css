@@ -2542,6 +2542,10 @@ body {
   border-left: 3.5px solid #0284c7;
 }
 
+.plan-phase-card.phase-3 {
+  border-left: 3.5px solid #10b981;
+}
+
 .plan-phase-card.phase-winddown {
   border-left: 3.5px solid #d97706;
 }
