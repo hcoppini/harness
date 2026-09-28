@@ -427,7 +427,7 @@ const Today = {
 
         let badgesHtml = "";
         if (block.is_school_dedicated) {
-          badgesHtml += `<span class="mono-chip" style="font-size: 9px; padding: 1px 5px; margin-left: 6px;">School First</span>`;
+          badgesHtml += `<span class="mono-chip rose" style="font-size: 9px; padding: 1px 6px; margin-left: 6px;">Acute Defense</span>`;
         } else if (deliv) {
           const comp = deliv.completed_count || 0;
           const tot = deliv.total_required || deliv.quantity || 1;
@@ -435,9 +435,17 @@ const Today = {
           badgesHtml += `<span class="mono-chip lavender" style="font-size: 9px; padding: 1px 6px; margin-left: 6px;" title="${this.escapeHtml(deliv.category || "TUM Roadmap")}">${comp}/${tot} ${this.escapeHtml(unit)}</span>`;
         }
 
-        const compactActivity = isDeepWork
-          ? (deliv ? `TUM Roadmap • ${deliv.target_spec || deliv.title || block.activity} • Cutoff 16:30` : "2-Hour Time-Divided Session • Commute Cutoff 16:30")
-          : this.escapeHtml(block.activity);
+        const cutoffText = block.commute_cutoff ? ` • Cutoff ${block.commute_cutoff}` : " • Cutoff 16:30";
+        let compactActivity = this.escapeHtml(block.activity);
+        if (isDeepWork) {
+          if (block.is_school_dedicated) {
+            compactActivity = `${this.escapeHtml(block.activity)}${cutoffText}`;
+          } else if (deliv) {
+            compactActivity = `TUM Roadmap • ${this.escapeHtml(deliv.target_spec || deliv.title || block.activity)}${cutoffText}`;
+          } else {
+            compactActivity = `${this.escapeHtml(block.activity)}${cutoffText}`;
+          }
+        }
 
         let actionsHtml = "";
         if (isDeepWork) {
@@ -458,7 +466,7 @@ const Today = {
           <div 
             class="routine-block ${isDeepWork ? "deep-work clickable" : ""} ${isChecked ? "completed" : ""}"
             ${isDeepWork ? `onclick="Today.openDeepWorkPlanModal(${idx});"` : ""}
-            ${isDeepWork ? 'title="Click to view 2-hour divided plan & wind-down protocol"' : ""}
+            ${isDeepWork ? 'title="Click to view divided execution plan & wind-down protocol"' : ""}
             style="display: flex; align-items: center; gap: 10px; ${isDeepWork ? "cursor: pointer; border-left: 3px solid var(--accent-lavender);" : ""} ${isChecked ? "opacity: 0.65;" : ""}"
           >
             <div 
