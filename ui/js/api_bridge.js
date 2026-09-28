@@ -81,12 +81,31 @@
       }
     };
 
+    const DEFAULT_SYNC_CONFIG = {
+      supabase_url: "https://xfslkbcqpnugiubkboux.supabase.co",
+      supabase_key: "sb_publishable_MQeDTIgtzkzqX_wohBlx4w_UXiEtGK8",
+      web_url: "https://harness-flame.vercel.app",
+      auto_sync: true,
+      last_synced_at: null,
+    };
+
+    const getSyncConfig = () => {
+      const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {});
+      return {
+        ...DEFAULT_SYNC_CONFIG,
+        ...cfg,
+        supabase_url: (cfg && cfg.supabase_url && !cfg.supabase_url.includes("xfslkbcopnugiubkboux"))
+          ? cfg.supabase_url
+          : DEFAULT_SYNC_CONFIG.supabase_url,
+        supabase_key: (cfg && cfg.supabase_key)
+          ? cfg.supabase_key
+          : DEFAULT_SYNC_CONFIG.supabase_key,
+      };
+    };
+
     // Direct Supabase REST Request if configured in browser
     const supabaseRequest = async (endpoint, method = "GET", payload = null) => {
-      const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {
-        supabase_url: "https://xfslkbcqpnugiubkboux.supabase.co",
-        supabase_key: "sb_publishable_MQeDTIgtzkzqX_wohBlx4w_UXiEtGK8",
-      });
+      const cfg = getSyncConfig();
       if (!cfg.supabase_url || !cfg.supabase_key) return null;
 
       try {
@@ -111,6 +130,53 @@
         console.warn("[Harness Bridge] Direct Supabase request failed:", e);
       }
       return null;
+    };
+
+    const syncCloudDocument = async (key, data) => {
+      try {
+        const valStr = typeof data === "string" ? data : JSON.stringify(data);
+        await supabaseRequest("app_settings?on_conflict=key", "POST", {
+          key: key,
+          value: valStr,
+          updated_at: new Date().toISOString(),
+        });
+      } catch (e) {
+        console.warn(`[Harness Bridge] syncCloudDocument(${key}) notice:`, e);
+      }
+    };
+
+    const fetchAllCloudDocuments = async () => {
+      const keys = [
+        "cloud_tasks",
+        "cloud_daily_logs",
+        "cloud_kill_list",
+        "cloud_deliverables",
+        "cloud_homework",
+        "cloud_exams",
+        "cloud_body_metrics",
+        "cloud_workouts",
+        "cloud_projects",
+      ];
+      try {
+        const keyParam = `in.(${keys.join(",")})`;
+        const res = await supabaseRequest(`app_settings?key=${keyParam}&select=key,value,updated_at`);
+        if (Array.isArray(res)) {
+          const docMap = {};
+          res.forEach((item) => {
+            if (item.key && item.value !== undefined) {
+              try {
+                docMap[item.key] = JSON.parse(item.value);
+              } catch (_) {
+                docMap[item.key] = item.value;
+              }
+            }
+          });
+          return docMap;
+        }
+      } catch (e) {
+        console.warn("[Harness Bridge] fetchAllCloudDocuments notice:", e);
+      }
+      return {};
     };
 
     // =========================================================================
@@ -225,6 +291,68 @@
           if (prop === "get_today") {
             return async function (dateStr) {
               const todayStr = dateStr || getLocalDateStr();
+
+              // Cross-Device Instant Hydration:
+              // On first load on any device (e.g. laptop), hydrate from Supabase cloud documents before rendering
+              if (!window._cloudSyncHydratedOnce) {
+                window._cloudSyncHydratedOnce = true;
+                try {
+                  const cloudDocs = await fetchAllCloudDocuments();
+                  if (cloudDocs.cloud_tasks && Array.isArray(cloudDocs.cloud_tasks)) {
+                    const curTasks = getStore(STORAGE_KEYS.TASKS, []);
+                    if (curTasks.length === 0) {
+                      setStore(STORAGE_KEYS.TASKS, cloudDocs.cloud_tasks);
+                    } else {
+                      const tMap = new Map();
+                      cloudDocs.cloud_tasks.forEach((t) => tMap.set(t.id, t));
+                      curTasks.forEach((t) => {
+                        if (!tMap.has(t.id)) tMap.set(t.id, t);
+                        else {
+                          const cTask = tMap.get(t.id);
+                          if (t.completed || cTask.completed) cTask.completed = 1;
+                        }
+                      });
+                      setStore(STORAGE_KEYS.TASKS, Array.from(tMap.values()));
+                    }
+                  }
+                  if (cloudDocs.cloud_daily_logs && typeof cloudDocs.cloud_daily_logs === "object") {
+                    const curLogs = getStore(STORAGE_KEYS.DAILY_LOGS, {});
+                    Object.keys(cloudDocs.cloud_daily_logs).forEach((dt) => {
+                      const cLog = cloudDocs.cloud_daily_logs[dt];
+                      const lLog = curLogs[dt];
+                      if (!lLog) {
+                        curLogs[dt] = cLog;
+                      } else {
+                        const cUpdated = cLog.updated_at || "";
+                        const lUpdated = lLog._client_modified || "";
+                        if (cUpdated && (!lUpdated || cUpdated > lUpdated)) {
+                          curLogs[dt] = { ...lLog, ...cLog };
+                        } else {
+                          const lBlocks = (lLog.completed_blocks || "").split(",").map((s) => s.trim()).filter(Boolean);
+                          const cBlocks = (cLog.completed_blocks || "").split(",").map((s) => s.trim()).filter(Boolean);
+                          const allBlocks = Array.from(new Set([...lBlocks, ...cBlocks])).join(",");
+                          curLogs[dt] = {
+                            ...lLog,
+                            completed_blocks: allBlocks,
+                            completed_exercises: cLog.completed_exercises || lLog.completed_exercises || "",
+                            scratchpad: (lLog.scratchpad && lLog.scratchpad.length >= (cLog.scratchpad || "").length) ? lLog.scratchpad : (cLog.scratchpad || ""),
+                          };
+                        }
+                      }
+                    });
+                    setStore(STORAGE_KEYS.DAILY_LOGS, curLogs);
+                  }
+                  if (cloudDocs.cloud_kill_list && typeof cloudDocs.cloud_kill_list === "object") {
+                    setStore(STORAGE_KEYS.KILL_LIST, cloudDocs.cloud_kill_list);
+                  }
+                  if (cloudDocs.cloud_deliverables && typeof cloudDocs.cloud_deliverables === "object") {
+                    setStore(STORAGE_KEYS.DELIVERABLES, cloudDocs.cloud_deliverables);
+                  }
+                } catch (e) {
+                  console.warn("[Harness Bridge] Fast hydration check notice:", e);
+                }
+              }
+
               let serverRes = null;
               try {
                 serverRes = await rpcCall("get_today", [todayStr]);
@@ -248,7 +376,7 @@
 
                 const serverLog = serverRes.log || {};
 
-                // If local storage was explicitly modified by client, preserve client's authoritative boxes!
+                // If local storage was explicitly modified by client or hydrated from cloud, preserve authoritative boxes!
                 let completedBlocks = serverLog.completed_blocks || "";
                 let completedExercises = serverLog.completed_exercises || "";
                 if (currentLocalLog && currentLocalLog._client_modified) {
@@ -323,9 +451,11 @@
                 completed: 0,
                 date: dt,
                 rollover_count: 0,
+                _client_modified: Date.now(),
               };
               localTasks.unshift(newTask);
               setStore(STORAGE_KEYS.TASKS, localTasks);
+              syncCloudDocument("cloud_tasks", localTasks);
 
               supabaseRequest("tasks", "POST", {
                 id: newTask.id,
@@ -352,18 +482,25 @@
 
               const task = localTasks.find((t) => t.id == taskId);
               if (serverRes && serverRes.completed !== undefined) {
-                if (task) task.completed = serverRes.completed;
+                if (task) {
+                  task.completed = serverRes.completed;
+                  task._client_modified = Date.now();
+                }
                 setStore(STORAGE_KEYS.TASKS, localTasks);
+                syncCloudDocument("cloud_tasks", localTasks);
                 supabaseRequest(`tasks?id=eq.${taskId}`, "PATCH", { completed: Boolean(serverRes.completed) });
                 return serverRes;
               }
 
               if (task) {
                 task.completed = task.completed ? 0 : 1;
+                task._client_modified = Date.now();
                 setStore(STORAGE_KEYS.TASKS, localTasks);
+                syncCloudDocument("cloud_tasks", localTasks);
                 supabaseRequest(`tasks?id=eq.${taskId}`, "PATCH", { completed: Boolean(task.completed) });
                 return task;
               }
+              syncCloudDocument("cloud_tasks", localTasks);
               return { id: taskId, completed: 1 };
             };
           }
@@ -378,6 +515,7 @@
               let localTasks = getStore(STORAGE_KEYS.TASKS, []);
               localTasks = localTasks.filter((t) => t.id != taskId);
               setStore(STORAGE_KEYS.TASKS, localTasks);
+              syncCloudDocument("cloud_tasks", localTasks);
               supabaseRequest(`tasks?id=eq.${taskId}`, "DELETE");
               return true;
             };
@@ -399,8 +537,10 @@
               if (args[8] !== undefined && args[8] !== null) currentLog.completed_exercises = args[8];
 
               currentLog._client_modified = Date.now();
+              currentLog.updated_at = new Date().toISOString();
               localLogs[dateStr] = currentLog;
               setStore(STORAGE_KEYS.DAILY_LOGS, localLogs);
+              syncCloudDocument("cloud_daily_logs", localLogs);
 
               // Await RPC call so server database write commits before subsequent reads
               try {
@@ -479,6 +619,7 @@
               list.push(newItem);
               localKillMap[dt] = list;
               setStore(STORAGE_KEYS.KILL_LIST, localKillMap);
+              syncCloudDocument("cloud_kill_list", localKillMap);
 
               supabaseRequest("kill_list_items", "POST", newItem);
               return serverRes || { success: true, item: newItem };
@@ -505,6 +646,7 @@
                 }
               }
               setStore(STORAGE_KEYS.KILL_LIST, localKillMap);
+              syncCloudDocument("cloud_kill_list", localKillMap);
               if (targetItem) {
                 supabaseRequest(`kill_list_items?id=eq.${itemId}`, "PATCH", { completed: Boolean(targetItem.completed) });
               }
@@ -524,6 +666,7 @@
                 localKillMap[dt] = localKillMap[dt].filter((i) => i.id != itemId);
               }
               setStore(STORAGE_KEYS.KILL_LIST, localKillMap);
+              syncCloudDocument("cloud_kill_list", localKillMap);
               supabaseRequest(`kill_list_items?id=eq.${itemId}`, "DELETE");
               return { success: true };
             };
@@ -542,6 +685,7 @@
                 const localKillMap = getStore(STORAGE_KEYS.KILL_LIST, {});
                 localKillMap[dt] = serverRes.items;
                 setStore(STORAGE_KEYS.KILL_LIST, localKillMap);
+                syncCloudDocument("cloud_kill_list", localKillMap);
                 return serverRes;
               }
               return await apiProxy.get_kill_list(dt);
@@ -654,6 +798,7 @@
               deliv.is_completed = updatedCount >= (deliv.total_required || 1);
               localMap[deliverableId] = deliv;
               setStore(STORAGE_KEYS.DELIVERABLES, localMap);
+              syncCloudDocument("cloud_deliverables", localMap);
 
               rpcCall("update_deliverable_progress", [deliverableId, newCount, delta]).catch(() => {});
               supabaseRequest(`station_deliverable_progress?deliverable_id=eq.${deliverableId}`, "PATCH", {
@@ -882,17 +1027,39 @@
 
           if (prop === "push_local_to_supabase") {
             return async function () {
-              try {
-                const serverRes = await rpcCall("push_local_to_supabase", []);
-                if (serverRes && serverRes.status === "synced") return serverRes;
-              } catch (e) {}
-
-              const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {});
+              const cfg = getSyncConfig();
               if (!cfg.supabase_url || !cfg.supabase_key) {
                 return { status: "error", message: "Supabase not configured", synced_count: 0 };
               }
 
+              // Fire server RPC asynchronously without blocking browser push
+              rpcCall("push_local_to_supabase", []).catch(() => {});
+
               let totalSynced = 0;
+
+              // 1. Resilient Cloud Documents to app_settings (ensures zero data loss)
+              const localTasks = getStore(STORAGE_KEYS.TASKS, []);
+              const localDailyLogs = getStore(STORAGE_KEYS.DAILY_LOGS, {});
+              const localKillMap = getStore(STORAGE_KEYS.KILL_LIST, {});
+              const localDeliverables = getStore(STORAGE_KEYS.DELIVERABLES, {});
+              const localHw = getStore(STORAGE_KEYS.HOMEWORK, []);
+              const localExams = getStore(STORAGE_KEYS.EXAMS, []);
+              const localBody = getStore(STORAGE_KEYS.BODY, []);
+              const localWorkouts = getStore(STORAGE_KEYS.WORKOUTS, []);
+              const localProjects = getStore(STORAGE_KEYS.PROJECTS, []);
+
+              await syncCloudDocument("cloud_tasks", localTasks);
+              await syncCloudDocument("cloud_daily_logs", localDailyLogs);
+              await syncCloudDocument("cloud_kill_list", localKillMap);
+              await syncCloudDocument("cloud_deliverables", localDeliverables);
+              await syncCloudDocument("cloud_homework", localHw);
+              await syncCloudDocument("cloud_exams", localExams);
+              await syncCloudDocument("cloud_body_metrics", localBody);
+              await syncCloudDocument("cloud_workouts", localWorkouts);
+              await syncCloudDocument("cloud_projects", localProjects);
+              totalSynced += 9;
+
+              // 2. Direct tables push for live PostgreSQL tables
               const pushTable = async (table, items, idKey = "id") => {
                 if (!Array.isArray(items) || items.length === 0) return;
                 try {
@@ -911,8 +1078,7 @@
                 } catch (e) {}
               };
 
-              const tasks = getStore(STORAGE_KEYS.TASKS, []);
-              await pushTable("tasks", tasks.map(t => ({
+              await pushTable("tasks", localTasks.map((t) => ({
                 id: t.id,
                 title: t.title,
                 category: t.category || "General",
@@ -921,8 +1087,7 @@
                 date: t.date,
               })));
 
-              const hw = getStore(STORAGE_KEYS.HOMEWORK, []);
-              await pushTable("homework_items", hw.map(h => ({
+              await pushTable("homework_items", localHw.map((h) => ({
                 id: h.id,
                 subject: h.subject,
                 title: h.title,
@@ -933,8 +1098,7 @@
                 notes: h.notes || "",
               })));
 
-              const exams = getStore(STORAGE_KEYS.EXAMS, []);
-              await pushTable("school_exams", exams.map(x => ({
+              await pushTable("school_exams", localExams.map((x) => ({
                 id: x.id,
                 subject: x.subject,
                 title: x.title,
@@ -944,12 +1108,11 @@
                 result_percentage: x.result_percentage || null,
               })));
 
-              const klMap = getStore(STORAGE_KEYS.KILL_LIST, {});
               const klItems = [];
-              Object.keys(klMap).forEach(k => {
-                (klMap[k] || []).forEach(it => klItems.push(it));
+              Object.keys(localKillMap).forEach((k) => {
+                (localKillMap[k] || []).forEach((it) => klItems.push(it));
               });
-              await pushTable("kill_list_items", klItems.map(k => ({
+              await pushTable("kill_list_items", klItems.map((k) => ({
                 id: String(k.id),
                 date: k.date,
                 category: k.category,
@@ -962,39 +1125,128 @@
                 completed: Boolean(k.completed),
               })));
 
-              const dailyLogs = getStore(STORAGE_KEYS.DAILY_LOGS, {});
-              const logsArr = Object.keys(dailyLogs).map(d => ({
+              const logsArr = Object.keys(localDailyLogs).map((d) => ({
                 date: d,
-                wake_time: dailyLogs[d].wake_time || null,
-                sleep_time: dailyLogs[d].sleep_time || null,
-                scratchpad: dailyLogs[d].scratchpad || "",
-                reflection_worked: dailyLogs[d].reflection_worked || "",
-                reflection_slipped: dailyLogs[d].reflection_slipped || "",
-                reflection_tomorrow: dailyLogs[d].reflection_tomorrow || "",
-                completed_blocks: dailyLogs[d].completed_blocks || "",
-                completed_exercises: dailyLogs[d].completed_exercises || "",
+                wake_time: localDailyLogs[d].wake_time || null,
+                sleep_time: localDailyLogs[d].sleep_time || null,
+                scratchpad: localDailyLogs[d].scratchpad || "",
+                reflection_worked: localDailyLogs[d].reflection_worked || "",
+                reflection_slipped: localDailyLogs[d].reflection_slipped || "",
+                reflection_tomorrow: localDailyLogs[d].reflection_tomorrow || "",
+                completed_blocks: localDailyLogs[d].completed_blocks || "",
+                completed_exercises: localDailyLogs[d].completed_exercises || "",
               }));
               await pushTable("daily_logs", logsArr, "date");
 
               cfg.last_synced_at = new Date().toISOString();
               setStore(STORAGE_KEYS.SYNC_CONFIG, cfg);
-              return { status: "synced", message: `Pushed ${totalSynced} items to Supabase`, synced_count: totalSynced };
+              return { status: "synced", message: `Pushed ${totalSynced} items to Supabase cloud`, synced_count: totalSynced };
             };
           }
 
           if (prop === "pull_supabase_to_local") {
             return async function () {
-              try {
-                const serverRes = await rpcCall("pull_supabase_to_local", []);
-                if (serverRes && serverRes.status === "synced") return serverRes;
-              } catch (e) {}
-
-              const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {});
+              const cfg = getSyncConfig();
               if (!cfg.supabase_url || !cfg.supabase_key) {
                 return { status: "error", message: "Supabase not configured", synced_count: 0 };
               }
 
+              // Fire server RPC asynchronously without blocking browser hydration
+              rpcCall("pull_supabase_to_local", []).catch(() => {});
+
               let totalSynced = 0;
+
+              // 1. Hydrate all Cloud Documents from app_settings
+              try {
+                const cloudDocs = await fetchAllCloudDocuments();
+
+                if (cloudDocs.cloud_tasks && Array.isArray(cloudDocs.cloud_tasks)) {
+                  const curTasks = getStore(STORAGE_KEYS.TASKS, []);
+                  if (curTasks.length === 0) {
+                    setStore(STORAGE_KEYS.TASKS, cloudDocs.cloud_tasks);
+                    totalSynced += cloudDocs.cloud_tasks.length;
+                  } else {
+                    const tMap = new Map();
+                    cloudDocs.cloud_tasks.forEach((t) => tMap.set(t.id, t));
+                    curTasks.forEach((t) => {
+                      if (!tMap.has(t.id)) tMap.set(t.id, t);
+                      else {
+                        const cTask = tMap.get(t.id);
+                        if (t.completed || cTask.completed) cTask.completed = 1;
+                      }
+                    });
+                    const merged = Array.from(tMap.values());
+                    setStore(STORAGE_KEYS.TASKS, merged);
+                    totalSynced += merged.length;
+                  }
+                }
+
+                if (cloudDocs.cloud_daily_logs && typeof cloudDocs.cloud_daily_logs === "object") {
+                  const curLogs = getStore(STORAGE_KEYS.DAILY_LOGS, {});
+                  let logCount = 0;
+                  Object.keys(cloudDocs.cloud_daily_logs).forEach((dt) => {
+                    const cLog = cloudDocs.cloud_daily_logs[dt];
+                    const lLog = curLogs[dt];
+                    if (!lLog) {
+                      curLogs[dt] = cLog;
+                      logCount++;
+                    } else {
+                      const cUpdated = cLog.updated_at || "";
+                      const lUpdated = lLog._client_modified || "";
+                      if (cUpdated && (!lUpdated || cUpdated > lUpdated)) {
+                        curLogs[dt] = { ...lLog, ...cLog };
+                      } else {
+                        const lBlocks = (lLog.completed_blocks || "").split(",").map((s) => s.trim()).filter(Boolean);
+                        const cBlocks = (cLog.completed_blocks || "").split(",").map((s) => s.trim()).filter(Boolean);
+                        const allBlocks = Array.from(new Set([...lBlocks, ...cBlocks])).join(",");
+                        curLogs[dt] = {
+                          ...lLog,
+                          completed_blocks: allBlocks,
+                          completed_exercises: cLog.completed_exercises || lLog.completed_exercises || "",
+                          scratchpad: (lLog.scratchpad && lLog.scratchpad.length >= (cLog.scratchpad || "").length) ? lLog.scratchpad : (cLog.scratchpad || ""),
+                        };
+                      }
+                      logCount++;
+                    }
+                  });
+                  setStore(STORAGE_KEYS.DAILY_LOGS, curLogs);
+                  totalSynced += logCount;
+                }
+
+                if (cloudDocs.cloud_kill_list && typeof cloudDocs.cloud_kill_list === "object") {
+                  setStore(STORAGE_KEYS.KILL_LIST, cloudDocs.cloud_kill_list);
+                  totalSynced += Object.keys(cloudDocs.cloud_kill_list).length;
+                }
+
+                if (cloudDocs.cloud_deliverables && typeof cloudDocs.cloud_deliverables === "object") {
+                  setStore(STORAGE_KEYS.DELIVERABLES, cloudDocs.cloud_deliverables);
+                  totalSynced += Object.keys(cloudDocs.cloud_deliverables).length;
+                }
+
+                if (cloudDocs.cloud_homework && Array.isArray(cloudDocs.cloud_homework) && cloudDocs.cloud_homework.length > 0) {
+                  setStore(STORAGE_KEYS.HOMEWORK, cloudDocs.cloud_homework);
+                }
+
+                if (cloudDocs.cloud_exams && Array.isArray(cloudDocs.cloud_exams) && cloudDocs.cloud_exams.length > 0) {
+                  setStore(STORAGE_KEYS.EXAMS, cloudDocs.cloud_exams);
+                }
+
+                if (cloudDocs.cloud_body_metrics && Array.isArray(cloudDocs.cloud_body_metrics) && cloudDocs.cloud_body_metrics.length > 0) {
+                  setStore(STORAGE_KEYS.BODY, cloudDocs.cloud_body_metrics);
+                }
+
+                if (cloudDocs.cloud_workouts && Array.isArray(cloudDocs.cloud_workouts) && cloudDocs.cloud_workouts.length > 0) {
+                  setStore(STORAGE_KEYS.WORKOUTS, cloudDocs.cloud_workouts);
+                }
+
+                if (cloudDocs.cloud_projects && Array.isArray(cloudDocs.cloud_projects) && cloudDocs.cloud_projects.length > 0) {
+                  setStore(STORAGE_KEYS.PROJECTS, cloudDocs.cloud_projects);
+                }
+              } catch (e) {
+                console.warn("[Harness Bridge] Error hydrating from cloud documents:", e);
+              }
+
+              // 2. Query live PostgreSQL tables (homework_items, school_exams, kill_list_items)
               const fetchTable = async (table) => {
                 try {
                   const url = `${cfg.supabase_url.replace(/\/$/, "")}/rest/v1/${table}?select=*`;
@@ -1013,19 +1265,6 @@
                 } catch (e) {}
                 return [];
               };
-
-              const remoteTasks = await fetchTable("tasks");
-              if (remoteTasks.length > 0) {
-                setStore(STORAGE_KEYS.TASKS, remoteTasks.map(t => ({
-                  id: t.id,
-                  title: t.title,
-                  category: t.category || "General",
-                  is_tum: Boolean(t.is_tum),
-                  completed: Boolean(t.completed),
-                  date: t.date,
-                })));
-                totalSynced += remoteTasks.length;
-              }
 
               const remoteHw = await fetchTable("homework_items");
               if (remoteHw.length > 0) {
@@ -1058,57 +1297,31 @@
 
               const remoteKill = await fetchTable("kill_list_items");
               if (remoteKill.length > 0) {
-                const klGrouped = {};
+                const klGrouped = getStore(STORAGE_KEYS.KILL_LIST, {});
                 remoteKill.forEach(k => {
                   if (!klGrouped[k.date]) klGrouped[k.date] = [];
-                  klGrouped[k.date].push(k);
+                  const existingIdx = klGrouped[k.date].findIndex(item => item.id == k.id);
+                  if (existingIdx >= 0) {
+                    klGrouped[k.date][existingIdx] = k;
+                  } else {
+                    klGrouped[k.date].push(k);
+                  }
                 });
                 setStore(STORAGE_KEYS.KILL_LIST, klGrouped);
                 totalSynced += remoteKill.length;
               }
 
-              const remoteLogs = await fetchTable("daily_logs");
-              if (remoteLogs.length > 0) {
-                const currentLogs = getStore(STORAGE_KEYS.DAILY_LOGS, {});
-                remoteLogs.forEach(l => {
-                  currentLogs[l.date] = {
-                    ...currentLogs[l.date],
-                    ...l,
-                  };
-                });
-                setStore(STORAGE_KEYS.DAILY_LOGS, currentLogs);
-                totalSynced += remoteLogs.length;
-              }
-
               cfg.last_synced_at = new Date().toISOString();
               setStore(STORAGE_KEYS.SYNC_CONFIG, cfg);
-              return { status: "synced", message: `Hydrated ${totalSynced} items from Supabase`, synced_count: totalSynced };
+              return { status: "synced", message: `Hydrated ${totalSynced} items from Supabase cloud`, synced_count: totalSynced };
             };
           }
 
           if (prop === "sync_now") {
             return async function () {
-              try {
-                const serverRes = await rpcCall("sync_now", []);
-                if (serverRes) return serverRes;
-              } catch (e) {}
-
-              const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {
-                supabase_url: "",
-                supabase_key: "",
-                web_url: "",
-              });
-              if (!cfg.supabase_key && !cfg.web_url) {
-                return { status: "unconfigured", message: "No sync credentials configured", synced_count: 0 };
-              }
-
-              if (cfg.supabase_url && cfg.supabase_key) {
-                return await apiProxy.pull_supabase_to_local();
-              }
-
-              cfg.last_synced_at = new Date().toISOString();
-              setStore(STORAGE_KEYS.SYNC_CONFIG, cfg);
-              return { status: "synced", message: "Client storage synchronized", synced_count: 0 };
+              const pullRes = await apiProxy.pull_supabase_to_local();
+              await apiProxy.push_local_to_supabase();
+              return pullRes || { status: "synced", message: "Client and cloud synchronized", synced_count: 1 };
             };
           }
 
@@ -1234,6 +1447,7 @@
                   }
                 });
                 setStore(STORAGE_KEYS.HOMEWORK, localHw);
+                syncCloudDocument("cloud_homework", localHw);
                 supabaseRequest(`homework_items?subject=eq.${encodeURIComponent(targetItem.subject)}&due_date=eq.${targetItem.due_date}`, "PATCH", { completed: newCompleted });
               }
               return serverRes || { id: hwId, completed: newCompleted };
@@ -1250,6 +1464,7 @@
               let localHw = getStore(STORAGE_KEYS.HOMEWORK, []);
               localHw = localHw.filter((h) => h.id != hwId);
               setStore(STORAGE_KEYS.HOMEWORK, localHw);
+              syncCloudDocument("cloud_homework", localHw);
               supabaseRequest(`homework_items?id=eq.${hwId}`, "DELETE");
               return true;
             };
@@ -1282,6 +1497,7 @@
               };
               localHw.push(newItem);
               setStore(STORAGE_KEYS.HOMEWORK, localHw);
+              syncCloudDocument("cloud_homework", localHw);
 
               supabaseRequest("homework_items", "POST", newItem);
               return newItem;
@@ -1387,6 +1603,7 @@
                   }
                 });
                 setStore(STORAGE_KEYS.EXAMS, localExams);
+                syncCloudDocument("cloud_exams", localExams);
                 supabaseRequest(`school_exams?subject=eq.${encodeURIComponent(targetExam.subject)}&exam_date=eq.${targetExam.exam_date}`, "PATCH", { completed: newCompleted, result_percentage: resultPct });
               }
               return serverRes || true;
@@ -1403,8 +1620,37 @@
               let localExams = getStore(STORAGE_KEYS.EXAMS, []);
               localExams = localExams.filter((e) => e.id != examId);
               setStore(STORAGE_KEYS.EXAMS, localExams);
+              syncCloudDocument("cloud_exams", localExams);
               supabaseRequest(`school_exams?id=eq.${examId}`, "DELETE");
               return true;
+            };
+          }
+
+          if (prop === "add_exam") {
+            return async function (subject, title, examDate, scope = "", resultPercentage = null) {
+              const localExams = getStore(STORAGE_KEYS.EXAMS, []);
+              const newId = Date.now();
+              const todayDate = new Date(getLocalDateStr());
+              const itemDate = new Date(examDate);
+              const daysLeft = Math.round((itemDate - todayDate) / (1000 * 3600 * 24));
+
+              const newItem = {
+                id: newId,
+                subject,
+                title,
+                exam_date: examDate,
+                scope,
+                completed: false,
+                result_percentage: resultPercentage,
+                days_left: daysLeft,
+              };
+              localExams.push(newItem);
+              setStore(STORAGE_KEYS.EXAMS, localExams);
+              syncCloudDocument("cloud_exams", localExams);
+
+              rpcCall("add_exam", [subject, title, examDate, scope, resultPercentage]).catch(() => {});
+              supabaseRequest("school_exams", "POST", newItem);
+              return newItem;
             };
           }
 
@@ -1455,70 +1701,6 @@
                 },
                 semester_gpas: { 1: 4.33, 2: null, 3: null, 4: null }
               };
-            };
-          }
-
-          if (prop === "delete_exam") {
-            return async function (examId) {
-              try {
-                await rpcCall("delete_exam", [examId]);
-              } catch (e) {
-                console.warn("[Harness Bridge] delete_exam RPC notice:", e.message);
-              }
-              let localExams = getStore(STORAGE_KEYS.EXAMS, []);
-              localExams = localExams.filter((e) => e.id != examId);
-              setStore(STORAGE_KEYS.EXAMS, localExams);
-              supabaseRequest(`school_exams?id=eq.${examId}`, "DELETE");
-              return true;
-            };
-          }
-
-          if (prop === "toggle_exam") {
-            return async function (examId, resultPercentage = null) {
-              const localExams = getStore(STORAGE_KEYS.EXAMS, []);
-              let serverRes = null;
-              try {
-                serverRes = await rpcCall("toggle_exam", [examId, resultPercentage]);
-              } catch (e) {
-                console.warn("[Harness Bridge] toggle_exam RPC notice:", e.message);
-              }
-
-              const item = localExams.find((e) => e.id == examId);
-              let newCompleted = false;
-              if (item) {
-                item.completed = !item.completed;
-                newCompleted = item.completed;
-                setStore(STORAGE_KEYS.EXAMS, localExams);
-                supabaseRequest(`school_exams?id=eq.${examId}`, "PATCH", { completed: newCompleted });
-              }
-              return serverRes || { id: examId, completed: newCompleted };
-            };
-          }
-
-          if (prop === "add_exam") {
-            return async function (subject, title, examDate, scope = "", resultPercentage = null) {
-              const localExams = getStore(STORAGE_KEYS.EXAMS, []);
-              const newId = Date.now();
-              const todayDate = new Date(getLocalDateStr());
-              const itemDate = new Date(examDate);
-              const daysLeft = Math.round((itemDate - todayDate) / (1000 * 3600 * 24));
-
-              const newItem = {
-                id: newId,
-                subject,
-                title,
-                exam_date: examDate,
-                scope,
-                completed: false,
-                result_percentage: resultPercentage,
-                days_left: daysLeft,
-              };
-              localExams.push(newItem);
-              setStore(STORAGE_KEYS.EXAMS, localExams);
-
-              rpcCall("add_exam", [subject, title, examDate, scope, resultPercentage]).catch(() => {});
-              supabaseRequest("school_exams", "POST", newItem);
-              return newItem;
             };
           }
 
@@ -1586,25 +1768,35 @@
       api: apiProxy,
     };
 
-    // Auto-hydrate from Supabase if credentials exist in browser
+    // Auto-hydrate from Supabase if credentials exist
     setTimeout(async () => {
       try {
-        const cfg = getStore(STORAGE_KEYS.SYNC_CONFIG, {});
+        const cfg = getSyncConfig();
         if (cfg.supabase_url && cfg.supabase_key && !cfg.supabase_url.includes("xfslkbcopnugiubkboux")) {
-          const hw = getStore(STORAGE_KEYS.HOMEWORK, null);
-          const ex = getStore(STORAGE_KEYS.EXAMS, null);
-          if (!hw || !ex || hw.length === 0 || ex.length === 0) {
-            console.log("[Harness Bridge] Hydrating state from Supabase...");
-            await apiProxy.pull_supabase_to_local();
-            if (window.Today && typeof window.Today.refresh === "function") window.Today.refresh();
-            if (window.Study && typeof window.Study.refresh === "function") window.Study.refresh();
-            if (window.Dashboard && typeof window.Dashboard.refresh === "function") window.Dashboard.refresh();
-          }
+          console.log("[Harness Bridge] Hydrating state from Supabase...");
+          await apiProxy.pull_supabase_to_local();
+          if (window.Today && typeof window.Today.refresh === "function") window.Today.refresh();
+          if (window.Study && typeof window.Study.refresh === "function") window.Study.refresh();
+          if (window.Dashboard && typeof window.Dashboard.refresh === "function") window.Dashboard.refresh();
         }
       } catch (e) {
         console.warn("[Harness Bridge] Auto-hydration check notice:", e);
       }
-    }, 200);
+    }, 100);
+
+    // Auto-refresh when tab becomes visible (laptop lid opened / tab switch)
+    if (typeof document !== "undefined") {
+      document.addEventListener("visibilitychange", async () => {
+        if (document.visibilityState === "visible") {
+          try {
+            await apiProxy.pull_supabase_to_local();
+            if (window.Today && typeof window.Today.refresh === "function") window.Today.refresh();
+            if (window.Study && typeof window.Study.refresh === "function") window.Study.refresh();
+            if (window.Dashboard && typeof window.Dashboard.refresh === "function") window.Dashboard.refresh();
+          } catch (e) {}
+        }
+      });
+    }
 
     // Dispatch pywebviewready event for event listeners
     const fireReady = () => {

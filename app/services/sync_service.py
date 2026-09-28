@@ -290,6 +290,15 @@ def test_supabase_connection(url: Optional[str] = None, key: Optional[str] = Non
             "verified_tables": tables_found,
             "tables_missing": [],
         }
+    elif "app_settings" in tables_found:
+        return {
+            "success": True,
+            "status": "connected",
+            "message": f"Connected to Supabase! {len(tables_found)} tables verified in PostgreSQL, with resilient cloud sync enabled via app_settings document store.",
+            "tables_found": tables_found,
+            "verified_tables": tables_found,
+            "tables_missing": tables_missing,
+        }
     else:
         return {
             "success": False,
@@ -314,12 +323,30 @@ def sync_tasks(conn: sqlite3.Connection) -> int:
         return 0
 
     remote_tasks = _make_supabase_request("tasks?select=*")
+    used_document_sync = False
+    if remote_tasks is None:
+        # Resilient fallback to app_settings cloud document store
+        doc_res = _make_supabase_request("app_settings?key=eq.cloud_tasks&select=value")
+        if doc_res and isinstance(doc_res, list) and len(doc_res) > 0 and doc_res[0].get("value"):
+            try:
+                raw_val = doc_res[0]["value"]
+                remote_tasks = json.loads(raw_val) if isinstance(raw_val, str) else raw_val
+                used_document_sync = True
+            except Exception:
+                remote_tasks = []
+                used_document_sync = True
+        elif doc_res is not None:
+            remote_tasks = []
+            used_document_sync = True
+
     if remote_tasks is None:
         return 0
 
     synced_count = 0
     for rt in remote_tasks:
         r_id = rt.get("id")
+        if not r_id:
+            continue
         r_comp = 1 if rt.get("completed") else 0
         if r_id not in local_tasks:
             cursor.execute(
@@ -344,12 +371,14 @@ def sync_tasks(conn: sqlite3.Connection) -> int:
             loc = local_tasks[r_id]
             if loc["completed"] != r_comp:
                 if loc["completed"] == 1 and r_comp == 0:
-                    _make_supabase_request(
-                        "tasks?on_conflict=id",
-                        method="POST",
-                        payload={"id": r_id, "completed": True},
-                        headers_extra={"Prefer": "resolution=merge-duplicates"},
-                    )
+                    if not used_document_sync:
+                        _make_supabase_request(
+                            "tasks?on_conflict=id",
+                            method="POST",
+                            payload={"id": r_id, "completed": True},
+                            headers_extra={"Prefer": "resolution=merge-duplicates"},
+                        )
+                    rt["completed"] = True
                     synced_count += 1
                 elif r_comp == 1 and loc["completed"] == 0:
                     cursor.execute("UPDATE tasks SET completed = 1 WHERE id = ?", (r_id,))
@@ -358,22 +387,51 @@ def sync_tasks(conn: sqlite3.Connection) -> int:
     remote_ids = {rt.get("id") for rt in remote_tasks if rt.get("id")}
     for l_id, loc in local_tasks.items():
         if l_id not in remote_ids:
-            _make_supabase_request(
-                "tasks?on_conflict=id",
-                method="POST",
-                payload={
-                    "id": l_id,
-                    "title": loc["title"],
-                    "category": loc["category"],
-                    "is_tum": bool(loc["is_tum"]),
-                    "completed": bool(loc["completed"]),
-                    "date": loc["date"],
-                },
-                headers_extra={"Prefer": "resolution=merge-duplicates"},
-            )
+            task_payload = {
+                "id": l_id,
+                "title": loc["title"],
+                "category": loc["category"],
+                "is_tum": bool(loc["is_tum"]),
+                "completed": bool(loc["completed"]),
+                "date": loc["date"],
+                "rollover_count": loc.get("rollover_count", 0),
+            }
+            if not used_document_sync:
+                _make_supabase_request(
+                    "tasks?on_conflict=id",
+                    method="POST",
+                    payload=task_payload,
+                    headers_extra={"Prefer": "resolution=merge-duplicates"},
+                )
+            remote_tasks.append(task_payload)
             synced_count += 1
 
     conn.commit()
+
+    # Always persist updated cloud_tasks in app_settings for browser client parity
+    try:
+        cursor.execute("SELECT id, title, category, is_tum, completed, date, rollover_count, created_at, completed_at FROM tasks")
+        all_tasks = [
+            {
+                "id": r["id"],
+                "title": r["title"],
+                "category": r["category"],
+                "is_tum": bool(r["is_tum"]),
+                "completed": bool(r["completed"]),
+                "date": r["date"],
+                "rollover_count": r["rollover_count"],
+            }
+            for r in cursor.fetchall()
+        ]
+        _make_supabase_request(
+            "app_settings?on_conflict=key",
+            method="POST",
+            payload={"key": "cloud_tasks", "value": json.dumps(all_tasks), "updated_at": datetime.now().isoformat()},
+            headers_extra={"Prefer": "resolution=merge-duplicates"},
+        )
+    except Exception:
+        pass
+
     return synced_count
 
 
@@ -392,6 +450,28 @@ def sync_daily_logs(conn: sqlite3.Connection) -> int:
         return 0
 
     remote_logs = _make_supabase_request("daily_logs?select=*")
+    used_document_sync = False
+    if remote_logs is None:
+        # Resilient fallback to app_settings cloud document store
+        doc_res = _make_supabase_request("app_settings?key=eq.cloud_daily_logs&select=value")
+        if doc_res and isinstance(doc_res, list) and len(doc_res) > 0 and doc_res[0].get("value"):
+            try:
+                raw_val = doc_res[0]["value"]
+                parsed = json.loads(raw_val) if isinstance(raw_val, str) else raw_val
+                if isinstance(parsed, dict):
+                    remote_logs = list(parsed.values())
+                elif isinstance(parsed, list):
+                    remote_logs = parsed
+                else:
+                    remote_logs = []
+                used_document_sync = True
+            except Exception:
+                remote_logs = []
+                used_document_sync = True
+        elif doc_res is not None:
+            remote_logs = []
+            used_document_sync = True
+
     if remote_logs is None:
         return 0
 
@@ -498,23 +578,38 @@ def sync_daily_logs(conn: sqlite3.Connection) -> int:
                 synced_count += 1
 
     cursor.execute("SELECT date, scratchpad, wake_time, sleep_time, reflection_worked, reflection_slipped, reflection_tomorrow, completed_blocks, completed_exercises FROM daily_logs")
+    logs_to_upload = {}
     for row in cursor.fetchall():
+        row_payload = {
+            "date": row["date"],
+            "scratchpad": row["scratchpad"] or "",
+            "wake_time": row["wake_time"] or "",
+            "sleep_time": row["sleep_time"] or "",
+            "reflection_worked": row["reflection_worked"] or "",
+            "reflection_slipped": row["reflection_slipped"] or "",
+            "reflection_tomorrow": row["reflection_tomorrow"] or "",
+            "completed_blocks": row["completed_blocks"] or "",
+            "completed_exercises": row["completed_exercises"] or "",
+        }
+        logs_to_upload[row["date"]] = row_payload
+        if not used_document_sync:
+            _make_supabase_request(
+                "daily_logs?on_conflict=date",
+                method="POST",
+                payload=row_payload,
+                headers_extra={"Prefer": "resolution=merge-duplicates"},
+            )
+
+    # Always persist updated cloud_daily_logs in app_settings for browser client parity
+    try:
         _make_supabase_request(
-            "daily_logs?on_conflict=date",
+            "app_settings?on_conflict=key",
             method="POST",
-            payload={
-                "date": row["date"],
-                "scratchpad": row["scratchpad"] or "",
-                "wake_time": row["wake_time"] or "",
-                "sleep_time": row["sleep_time"] or "",
-                "reflection_worked": row["reflection_worked"] or "",
-                "reflection_slipped": row["reflection_slipped"] or "",
-                "reflection_tomorrow": row["reflection_tomorrow"] or "",
-                "completed_blocks": row["completed_blocks"] or "",
-                "completed_exercises": row["completed_exercises"] or "",
-            },
+            payload={"key": "cloud_daily_logs", "value": json.dumps(logs_to_upload), "updated_at": datetime.now().isoformat()},
             headers_extra={"Prefer": "resolution=merge-duplicates"},
         )
+    except Exception:
+        pass
 
     conn.commit()
     return synced_count
@@ -747,6 +842,21 @@ def sync_body_metrics(conn: sqlite3.Connection) -> int:
         return 0
 
     remote_metrics = _make_supabase_request("body_metrics?select=*")
+    used_document_sync = False
+    if remote_metrics is None:
+        doc_res = _make_supabase_request("app_settings?key=eq.cloud_body_metrics&select=value")
+        if doc_res and isinstance(doc_res, list) and len(doc_res) > 0 and doc_res[0].get("value"):
+            try:
+                raw_val = doc_res[0]["value"]
+                remote_metrics = json.loads(raw_val) if isinstance(raw_val, str) else raw_val
+                used_document_sync = True
+            except Exception:
+                remote_metrics = []
+                used_document_sync = True
+        elif doc_res is not None:
+            remote_metrics = []
+            used_document_sync = True
+
     if remote_metrics is None:
         return 0
 
@@ -781,22 +891,38 @@ def sync_body_metrics(conn: sqlite3.Connection) -> int:
     remote_ids = {rm.get("id") for rm in remote_metrics if rm.get("id")}
     for l_id, loc in local_metrics.items():
         if l_id not in remote_ids:
-            _make_supabase_request(
-                "body_metrics?on_conflict=id",
-                method="POST",
-                payload={
-                    "id": l_id,
-                    "date": loc["date"],
-                    "weight_kg": loc["weight_kg"],
-                    "calories_met": bool(loc["calories_met"]),
-                    "protein_met": bool(loc["protein_met"]),
-                    "notes": loc["notes"] or "",
-                },
-                headers_extra={"Prefer": "resolution=merge-duplicates"},
-            )
+            bm_payload = {
+                "id": l_id,
+                "date": loc["date"],
+                "weight_kg": loc["weight_kg"],
+                "calories_met": bool(loc["calories_met"]),
+                "protein_met": bool(loc["protein_met"]),
+                "notes": loc["notes"] or "",
+            }
+            if not used_document_sync:
+                _make_supabase_request(
+                    "body_metrics?on_conflict=id",
+                    method="POST",
+                    payload=bm_payload,
+                    headers_extra={"Prefer": "resolution=merge-duplicates"},
+                )
+            remote_metrics.append(bm_payload)
             synced_count += 1
 
     conn.commit()
+
+    try:
+        cursor.execute("SELECT id, date, weight_kg, calories_met, protein_met, notes FROM body_metrics")
+        all_bm = [dict(r) for r in cursor.fetchall()]
+        _make_supabase_request(
+            "app_settings?on_conflict=key",
+            method="POST",
+            payload={"key": "cloud_body_metrics", "value": json.dumps(all_bm), "updated_at": datetime.now().isoformat()},
+            headers_extra={"Prefer": "resolution=merge-duplicates"},
+        )
+    except Exception:
+        pass
+
     return synced_count
 
 
@@ -812,6 +938,21 @@ def sync_workouts(conn: sqlite3.Connection) -> int:
         return 0
 
     remote_workouts = _make_supabase_request("workouts?select=*")
+    used_document_sync = False
+    if remote_workouts is None:
+        doc_res = _make_supabase_request("app_settings?key=eq.cloud_workouts&select=value")
+        if doc_res and isinstance(doc_res, list) and len(doc_res) > 0 and doc_res[0].get("value"):
+            try:
+                raw_val = doc_res[0]["value"]
+                remote_workouts = json.loads(raw_val) if isinstance(raw_val, str) else raw_val
+                used_document_sync = True
+            except Exception:
+                remote_workouts = []
+                used_document_sync = True
+        elif doc_res is not None:
+            remote_workouts = []
+            used_document_sync = True
+
     if remote_workouts is None:
         return 0
 
@@ -845,21 +986,37 @@ def sync_workouts(conn: sqlite3.Connection) -> int:
     remote_ids = {rw.get("id") for rw in remote_workouts if rw.get("id")}
     for l_id, loc in local_workouts.items():
         if l_id not in remote_ids:
-            _make_supabase_request(
-                "workouts?on_conflict=id",
-                method="POST",
-                payload={
-                    "id": l_id,
-                    "date": loc["date"],
-                    "workout_type": loc["workout_type"],
-                    "details": loc["details"] or "",
-                    "intensity": loc["intensity"],
-                },
-                headers_extra={"Prefer": "resolution=merge-duplicates"},
-            )
+            wo_payload = {
+                "id": l_id,
+                "date": loc["date"],
+                "workout_type": loc["workout_type"],
+                "details": loc["details"] or "",
+                "intensity": loc["intensity"],
+            }
+            if not used_document_sync:
+                _make_supabase_request(
+                    "workouts?on_conflict=id",
+                    method="POST",
+                    payload=wo_payload,
+                    headers_extra={"Prefer": "resolution=merge-duplicates"},
+                )
+            remote_workouts.append(wo_payload)
             synced_count += 1
 
     conn.commit()
+
+    try:
+        cursor.execute("SELECT id, date, workout_type, details, intensity FROM workouts")
+        all_wo = [dict(r) for r in cursor.fetchall()]
+        _make_supabase_request(
+            "app_settings?on_conflict=key",
+            method="POST",
+            payload={"key": "cloud_workouts", "value": json.dumps(all_wo), "updated_at": datetime.now().isoformat()},
+            headers_extra={"Prefer": "resolution=merge-duplicates"},
+        )
+    except Exception:
+        pass
+
     return synced_count
 
 
@@ -875,6 +1032,21 @@ def sync_projects(conn: sqlite3.Connection) -> int:
         return 0
 
     remote_projects = _make_supabase_request("projects?select=*")
+    used_document_sync = False
+    if remote_projects is None:
+        doc_res = _make_supabase_request("app_settings?key=eq.cloud_projects&select=value")
+        if doc_res and isinstance(doc_res, list) and len(doc_res) > 0 and doc_res[0].get("value"):
+            try:
+                raw_val = doc_res[0]["value"]
+                remote_projects = json.loads(raw_val) if isinstance(raw_val, str) else raw_val
+                used_document_sync = True
+            except Exception:
+                remote_projects = []
+                used_document_sync = True
+        elif doc_res is not None:
+            remote_projects = []
+            used_document_sync = True
+
     if remote_projects is None:
         return 0
 
@@ -920,26 +1092,42 @@ def sync_projects(conn: sqlite3.Connection) -> int:
     remote_ids = {rp.get("id") for rp in remote_projects if rp.get("id")}
     for l_id, loc in local_projects.items():
         if l_id not in remote_ids:
-            _make_supabase_request(
-                "projects?on_conflict=id",
-                method="POST",
-                payload={
-                    "id": l_id,
-                    "name": loc["name"],
-                    "description": loc["description"] or "",
-                    "local_path": loc["local_path"] or "",
-                    "github_url": loc["github_url"] or "",
-                    "current_milestone": loc["current_milestone"] or "",
-                    "next_action": loc["next_action"] or "",
-                    "deadline": loc["deadline"] or "",
-                    "notes": loc["notes"] or "",
-                    "status": loc["status"] or "active",
-                },
-                headers_extra={"Prefer": "resolution=merge-duplicates"},
-            )
+            proj_payload = {
+                "id": l_id,
+                "name": loc["name"],
+                "description": loc["description"] or "",
+                "local_path": loc["local_path"] or "",
+                "github_url": loc["github_url"] or "",
+                "current_milestone": loc["current_milestone"] or "",
+                "next_action": loc["next_action"] or "",
+                "deadline": loc["deadline"] or "",
+                "notes": loc["notes"] or "",
+                "status": loc["status"] or "active",
+            }
+            if not used_document_sync:
+                _make_supabase_request(
+                    "projects?on_conflict=id",
+                    method="POST",
+                    payload=proj_payload,
+                    headers_extra={"Prefer": "resolution=merge-duplicates"},
+                )
+            remote_projects.append(proj_payload)
             synced_count += 1
 
     conn.commit()
+
+    try:
+        cursor.execute("SELECT id, name, description, local_path, github_url, current_milestone, next_action, deadline, notes, status FROM projects")
+        all_proj = [dict(r) for r in cursor.fetchall()]
+        _make_supabase_request(
+            "app_settings?on_conflict=key",
+            method="POST",
+            payload={"key": "cloud_projects", "value": json.dumps(all_proj), "updated_at": datetime.now().isoformat()},
+            headers_extra={"Prefer": "resolution=merge-duplicates"},
+        )
+    except Exception:
+        pass
+
     return synced_count
 
 
@@ -2157,6 +2345,44 @@ def push_all_local_to_supabase(conn: Optional[sqlite3.Connection] = None) -> Dic
                 errors.append(f"metro_stations: {me}")
 
         now_iso = datetime.now().isoformat()
+
+        # 15. Resilient Cloud Documents in app_settings (guarantees cross-device web client parity)
+        try:
+            cursor.execute("SELECT id, title, category, is_tum, completed, date, rollover_count, created_at, completed_at FROM tasks")
+            all_tasks = [dict(r) for r in cursor.fetchall()]
+            _make_supabase_request("app_settings?on_conflict=key", method="POST", payload={"key": "cloud_tasks", "value": json.dumps(all_tasks), "updated_at": now_iso}, headers_extra={"Prefer": "resolution=merge-duplicates"})
+            pushed += 1
+
+            cursor.execute("SELECT * FROM daily_logs")
+            all_logs = {r["date"]: dict(r) for r in cursor.fetchall()}
+            _make_supabase_request("app_settings?on_conflict=key", method="POST", payload={"key": "cloud_daily_logs", "value": json.dumps(all_logs), "updated_at": now_iso}, headers_extra={"Prefer": "resolution=merge-duplicates"})
+            pushed += 1
+
+            cursor.execute("SELECT * FROM kill_list_items")
+            all_kill = {}
+            for r in cursor.fetchall():
+                d = dict(r)
+                all_kill.setdefault(d.get("date", ""), []).append(d)
+            _make_supabase_request("app_settings?on_conflict=key", method="POST", payload={"key": "cloud_kill_list", "value": json.dumps(all_kill), "updated_at": now_iso}, headers_extra={"Prefer": "resolution=merge-duplicates"})
+            pushed += 1
+
+            cursor.execute("SELECT * FROM station_deliverable_progress")
+            all_deliv = {r["deliverable_id"]: dict(r) for r in cursor.fetchall()}
+            _make_supabase_request("app_settings?on_conflict=key", method="POST", payload={"key": "cloud_deliverables", "value": json.dumps(all_deliv), "updated_at": now_iso}, headers_extra={"Prefer": "resolution=merge-duplicates"})
+            pushed += 1
+
+            cursor.execute("SELECT * FROM homework_items")
+            all_hw = [dict(r) for r in cursor.fetchall()]
+            _make_supabase_request("app_settings?on_conflict=key", method="POST", payload={"key": "cloud_homework", "value": json.dumps(all_hw), "updated_at": now_iso}, headers_extra={"Prefer": "resolution=merge-duplicates"})
+            pushed += 1
+
+            cursor.execute("SELECT * FROM school_exams")
+            all_ex = [dict(r) for r in cursor.fetchall()]
+            _make_supabase_request("app_settings?on_conflict=key", method="POST", payload={"key": "cloud_exams", "value": json.dumps(all_ex), "updated_at": now_iso}, headers_extra={"Prefer": "resolution=merge-duplicates"})
+            pushed += 1
+        except Exception as de:
+            pass
+
         cfg["last_synced_at"] = now_iso
         save_sync_config(cfg)
 

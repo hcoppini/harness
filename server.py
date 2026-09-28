@@ -12,9 +12,16 @@ from pathlib import Path
 from flask import Flask, request, jsonify, send_from_directory, send_file
 
 # Initialize SQLite database on launch
-from app.db import init_db
+from app.db import init_db, ensure_db_and_data_files
 from app.api import HarnessAPI
 from app.services import sync_service
+
+# Ensure data directory, templates and DB exist before syncing
+try:
+    ensure_db_and_data_files()
+    init_db()
+except Exception:
+    pass
 
 # Preload state from Supabase on startup if configured
 try:
