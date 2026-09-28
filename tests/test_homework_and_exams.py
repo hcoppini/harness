@@ -1,6 +1,7 @@
 """Unit tests for School Homework & Exam tracking service."""
 
 import sqlite3
+from datetime import datetime, timedelta
 import pytest
 from app.db import init_db
 from app.services import homework_service
@@ -17,10 +18,11 @@ def test_db(tmp_path):
 
 
 def test_add_and_get_homework(test_db):
+    future_date = (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d")
     hw = homework_service.add_homework(
         subject="Matematyka R",
         title="Zadania 1-15 z geometrii analitycznej",
-        due_date="2026-09-25",
+        due_date=future_date,
         priority=2,
         notes="Wymagane dowody twierdzeń",
         conn=test_db,
@@ -70,25 +72,27 @@ def test_add_and_get_exams(test_db):
 
 
 def test_json_school_data_import_and_export(test_db):
-    sample_json = """
-    {
+    fut_hw = (datetime.now() + timedelta(days=5)).strftime("%Y-%m-%d")
+    fut_ex = (datetime.now() + timedelta(days=7)).strftime("%Y-%m-%d")
+    sample_json = f"""
+    {{
         "homework": [
-            {
+            {{
                 "subject": "Język Niemiecki",
                 "title": "Napisz esej o technologii (150 słów)",
-                "due_date": "2026-09-28",
+                "due_date": "{fut_hw}",
                 "priority": 1
-            }
+            }}
         ],
         "exams": [
-            {
+            {{
                 "subject": "Matematyka R",
                 "title": "Próbna Matura CKE",
-                "exam_date": "2026-09-25",
+                "exam_date": "{fut_ex}",
                 "scope": "Całość materiału klasa 1-2"
-            }
+            }}
         ]
-    }
+    }}
     """
     imported = homework_service.import_school_data_json(sample_json, conn=test_db)
     assert imported is True

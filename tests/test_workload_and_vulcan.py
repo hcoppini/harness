@@ -346,3 +346,95 @@ def test_exam_day_afternoon_sgh_never_assigns_prep_for_today_exam(test_db):
     assert "Informatyka" not in deep_block.get("activity", "")
 
 
+def test_acute_defense_single_nearest_exam_dominance(test_db):
+    """
+    Verifies that when multiple exams loom (e.g. Chemia in 1d, Fizyka in 3d),
+    the acute defense block allocates 100% capacity to the single nearest exam (Chemia),
+    pausing TUM roadmap deliverables, and synchronizes phase durations.
+    """
+    from app.services import homework_service
+    test_date = "2026-09-28"  # Monday (Schedule A_MON)
+
+    # Exam 1: Chemia in 1 day
+    homework_service.add_exam("Chemia", "Kartkówka: Alkany", "2026-09-29", scope="Alkany, izomeria", conn=test_db)
+    # Exam 2: Fizyka in 3 days
+    homework_service.add_exam("Fizyka", "Sprawdzian: Termodynamika", "2026-10-01", scope="Praca gazu", conn=test_db)
+
+    sched = today_service.get_schedule_for_date(test_date, conn=test_db)
+    deep_block = next((b for b in sched["blocks"] if b.get("type") == "deep_work"), None)
+    assert deep_block is not None
+
+    # Single nearest exam dominance
+    assert "Chemia" in deep_block["focus"]
+    assert "Fizyka" not in deep_block["focus"]
+    assert deep_block["is_school_dedicated"] is True
+    assert deep_block["is_tum_roadmap"] is False
+    assert deep_block["deliverable"] is None
+
+    # Parity & sync checks
+    assert "plan_phases" in deep_block
+    phases = deep_block["plan_phases"]
+    assert len(phases) == 3
+    total_phase_min = sum(p["duration_min"] for p in phases)
+    assert total_phase_min == deep_block["net_minutes"]
+    assert deep_block["commute_cutoff"] == "16:30"
+
+    # Descriptions must reference their exact duration minutes
+    for p in phases:
+        assert f"{p['duration_min']}m" in p["description"]
+
+
+def test_medium_horizon_balanced_foundation(test_db):
+    """
+    Verifies that when an exam is 3-5 days away (e.g. 4 days),
+    the session synthesizes a 50/50 Balanced Foundation: ~50m exam foundation
+    (scope + formulas) and ~60m active TUM deliverable sprint.
+    """
+    from app.services import homework_service
+    test_date = "2026-09-25"  # Friday (Schedule A_FRI)
+
+    # Exam 4 days out
+    homework_service.add_exam("Chemia", "Sprawdzian: Węglowodory", "2026-09-29", conn=test_db)
+
+    sched = today_service.get_schedule_for_date(test_date, conn=test_db)
+    deep_block = next((b for b in sched["blocks"] if b.get("type") == "deep_work"), None)
+    assert deep_block is not None
+
+    assert deep_block["is_school_dedicated"] is False
+    assert deep_block["is_tum_roadmap"] is True
+    assert deep_block["deliverable"] is not None
+
+    phases = deep_block["plan_phases"]
+    assert len(phases) == 3
+    assert phases[0]["type"] == "school_defense"
+    assert phases[1]["type"] == "school_defense"
+    assert phases[2]["type"] == "tum_deliverable"
+    assert sum(p["duration_min"] for p in phases) == deep_block["net_minutes"]
+
+
+def test_pure_cruise_3_pillar_pipeline(test_db):
+    """
+    Verifies that when no exams or urgent homework loom,
+    the session synthesizes the 3-Pillar TUM Metro Pipeline:
+    50m Active Station Sprint + 35m Matura R + 25m German A2.
+    """
+    test_date = "2026-11-02"  # Monday, clear academic horizon
+
+    sched = today_service.get_schedule_for_date(test_date, conn=test_db)
+    deep_block = next((b for b in sched["blocks"] if b.get("type") == "deep_work"), None)
+    assert deep_block is not None
+
+    assert deep_block["is_school_dedicated"] is False
+    assert deep_block["is_tum_roadmap"] is True
+    assert deep_block["deliverable"] is not None
+
+    phases = deep_block["plan_phases"]
+    assert len(phases) == 3
+    assert phases[0]["duration_min"] == 50
+    assert phases[1]["duration_min"] == 35
+    assert phases[2]["duration_min"] == 25
+    assert sum(p["duration_min"] for p in phases) == deep_block["net_minutes"]
+    assert deep_block["net_minutes"] == 110
+
+
+

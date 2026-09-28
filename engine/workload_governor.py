@@ -501,6 +501,68 @@ def get_workload_analysis(
     }
 
 
+def parse_block_net_minutes(time_str: str, default_minutes: int = 110) -> Tuple[int, str]:
+    """
+    Parses a time window string (e.g. '14:30 – 16:30' or '14:30 - 16:00') into:
+    (net_minutes, cutoff_time_str).
+    Subtracts a 10-minute commute buffer when total duration >= 90 minutes.
+    """
+    try:
+        parts = time_str.replace("–", "-").split("-")
+        if len(parts) == 2:
+            s_h, s_m = [int(p) for p in parts[0].strip().split(":")]
+            e_h, e_m = [int(p) for p in parts[1].strip().split(":")]
+            total_duration = (e_h * 60 + e_m) - (s_h * 60 + s_m)
+            cutoff_str = parts[1].strip()
+            buffer = 10 if total_duration >= 90 else (5 if total_duration >= 60 else 0)
+            net = max(15, total_duration - buffer)
+            return net, cutoff_str
+    except Exception:
+        pass
+    return default_minutes, "16:30"
+
+
+def compute_phase_durations(total_net_min: int, scenario_type: str) -> Tuple[int, int, int]:
+    """
+    Allocates exact minutes across 3 execution phases so that:
+    phase_1 + phase_2 + phase_3 == total_net_min (100% exact parity).
+    """
+    if scenario_type in ("acute_school_defense", "urgent_hw"):
+        p1 = int(round(total_net_min * 0.41))
+        p2 = int(round(total_net_min * 0.41))
+        p3 = max(10, total_net_min - p1 - p2)
+        p1 = total_net_min - p2 - p3
+        return p1, p2, p3
+    elif scenario_type == "acute_essay":
+        p1 = int(round(total_net_min * 0.36))
+        p2 = int(round(total_net_min * 0.41))
+        p3 = max(10, total_net_min - p1 - p2)
+        p1 = total_net_min - p2 - p3
+        return p1, p2, p3
+    elif scenario_type == "medium_horizon":
+        p3 = int(round(total_net_min * 0.55))
+        rem = total_net_min - p3
+        p1 = rem // 2
+        p2 = rem - p1
+        return p1, p2, p3
+    elif scenario_type == "pure_tum":
+        p1 = int(round(total_net_min * 0.45))
+        p2 = int(round(total_net_min * 0.32))
+        p3 = max(10, total_net_min - p1 - p2)
+        p1 = total_net_min - p2 - p3
+        return p1, p2, p3
+    elif scenario_type == "us_travel":
+        p1 = int(round(total_net_min * 0.67))
+        p2 = int(round(total_net_min * 0.22))
+        p3 = total_net_min - p1 - p2
+        return p1, p2, p3
+    else:
+        p1 = total_net_min // 3
+        p2 = total_net_min // 3
+        p3 = total_net_min - p1 - p2
+        return p1, p2, p3
+
+
 def synthesize_adaptive_schedule(
     base_schedule: Dict[str, Any],
     date_str: Optional[str] = None,
@@ -538,6 +600,8 @@ def synthesize_adaptive_schedule(
             "category": "Algorithms",
             "quantity": 1,
         }
+        net_min, cutoff_str = parse_block_net_minutes("10:00 – 11:30", default_minutes=90)
+        p1, p2, p3 = compute_phase_durations(net_min, "us_travel")
         travel_blocks = [
             {
                 "time": "08:30 – 09:30",
@@ -548,11 +612,45 @@ def synthesize_adaptive_schedule(
             {
                 "time": "10:00 – 11:30",
                 "focus": f"US Hotel Deep Work • TUM Roadmap: {spec['title']}",
-                "activity": f"[US Hotel Sprint // {station_id}] 60m {spec['target_spec']} + 30m self-correction & vocabulary review.",
+                "activity": f"[US Hotel Sprint // {station_id}] {p1}m {spec['target_spec']} + {p2}m self-correction & proofs + {p3}m German vocabulary review.",
                 "type": "deep_work",
                 "is_tum_roadmap": True,
                 "is_school_dedicated": False,
                 "is_us_travel": True,
+                "net_minutes": net_min,
+                "commute_cutoff": cutoff_str,
+                "plan_phases": [
+                    {
+                        "phase_num": 1,
+                        "phase_key": "study_school",
+                        "badge_label": "[1. TUM ROADMAP SPRINT]",
+                        "duration_min": p1,
+                        "title": f"TUM Deliverable: {spec['title']}",
+                        "description": f"{p1}m {spec['target_spec']}.\nMilestone: {spec['category']} • Station {station_id}.",
+                        "type": "tum_deliverable",
+                        "color": "var(--accent-lavender)",
+                    },
+                    {
+                        "phase_num": 2,
+                        "phase_key": "study_matura",
+                        "badge_label": "[2. PROOFS & REVIEW]",
+                        "duration_min": p2,
+                        "title": "Unassisted Proofs & Error Analysis",
+                        "description": f"{p2}m self-correction and mathematical proofs verification without external aids.",
+                        "type": "matura_r",
+                        "color": "#0284c7",
+                    },
+                    {
+                        "phase_num": 3,
+                        "phase_key": "study_code",
+                        "badge_label": "[3. GERMAN VOCABULARY]",
+                        "duration_min": p3,
+                        "title": "German A2 Vocabulary Recall",
+                        "description": f"{p3}m active recall of German A2 vocabulary and grammar structures.",
+                        "type": "german_code",
+                        "color": "#10b981",
+                    },
+                ],
                 "deliverable": {
                     "deliverable_id": chosen_deliv["deliverable_id"] if chosen_deliv else "us_hotel_sprint",
                     "station_id": station_id,
@@ -641,6 +739,9 @@ def synthesize_adaptive_schedule(
                     subject_gpa=primary_ob.get("subject_gpa")
                 )
                 time_slot = "14:30 - 16:00" if weekday == 5 else "16:00 - 17:30"
+                net_min, cutoff_str = parse_block_net_minutes(time_slot, default_minutes=80)
+                p1, p2, p3 = compute_phase_durations(net_min, "acute_school_defense")
+                scope_str = primary_ob.get("scope") or primary_ob.get("title") or ""
                 weekend_block = {
                     "time": time_slot,
                     "focus": f"Weekend Deep Work • {primary_ob['subject']} Defense",
@@ -648,6 +749,40 @@ def synthesize_adaptive_schedule(
                     "activity": phased["activity"],
                     "is_school_dedicated": True,
                     "is_surge": analysis["mode"] == "SURGE",
+                    "net_minutes": net_min,
+                    "commute_cutoff": cutoff_str,
+                    "plan_phases": [
+                        {
+                            "phase_num": 1,
+                            "phase_key": "study_school",
+                            "badge_label": "[1. SCOPE & THEORY BLITZ]",
+                            "duration_min": p1,
+                            "title": f"{primary_ob['subject']}: Core Theory, Definitions & Formulas",
+                            "description": f"{p1}m active recall of {primary_ob['subject']} concepts ({scope_str[:40]}). Formulate flashcards.",
+                            "type": "school_defense",
+                            "color": "var(--accent-lavender)",
+                        },
+                        {
+                            "phase_num": 2,
+                            "phase_key": "study_matura",
+                            "badge_label": "[2. PROBLEM DRILLS & PAST PAPERS]",
+                            "duration_min": p2,
+                            "title": f"{primary_ob['subject']}: Past Papers & Timed Drills",
+                            "description": f"{p2}m unassisted problem solving on {primary_ob['subject']}. Red-pen verification.",
+                            "type": "school_defense",
+                            "color": "#0284c7",
+                        },
+                        {
+                            "phase_num": 3,
+                            "phase_key": "study_code",
+                            "badge_label": "[3. ERROR BANK & MOCK BLITZ]",
+                            "duration_min": p3,
+                            "title": f"{primary_ob['subject']}: Error Bank & High-Yield Blitz",
+                            "description": f"{p3}m rapid-fire drill of past mistakes and edge cases.",
+                            "type": "school_defense",
+                            "color": "#10b981",
+                        },
+                    ],
                 }
 
                 # Insert cleanly before evening/recovery blocks
@@ -666,20 +801,10 @@ def synthesize_adaptive_schedule(
     # --------------------------------------------------------------------------
     # 2. WEEKDAY SGH DEEP WORK SHAPING
     # --------------------------------------------------------------------------
-    # Identify acute writing tasks (essays due in 1 to 2 days)
     acute_essays = [h for h in homework if h.get("is_essay") and 1 <= h.get("days_left", 99) <= 2]
-    # Identify acute exams (exams due in 1 to 2 days - NEVER days_left == 0)
     acute_exams = [e for e in exams if 1 <= e.get("days_left", 99) <= 2]
-    # Identify major vulnerable exams in 3 days
-    impending_major = [
-        e for e in exams
-        if e.get("days_left", 99) == 3 and (e.get("is_vulnerable") or classify_obligation(e)["type"] == "major_exam")
-    ]
-    urgent_academic_exams = acute_exams + impending_major
     today_exams = analysis.get("today_exams", [])
     urgent_hw = analysis.get("urgent_homework", [])
-
-    has_acute_defense = bool(acute_essays) or bool(urgent_academic_exams) or bool(urgent_hw)
 
     deliv_dict = {
         "deliverable_id": top_deliv["deliverable_id"] if top_deliv else "sgh_tum_roadmap",
@@ -701,92 +826,280 @@ def synthesize_adaptive_schedule(
             continue
 
         b["is_surge"] = (analysis["mode"] == "SURGE")
+        time_slot = b.get("time", "14:30 – 16:30")
+        net_min, cutoff_str = parse_block_net_minutes(time_slot, default_minutes=110)
+        b["net_minutes"] = net_min
+        b["commute_cutoff"] = cutoff_str
 
         # Scenario A: Acute Essay Due in <= 2 days
         if acute_essays:
             top_essay = acute_essays[0]
-            phased = generate_phased_study_action(
-                top_essay,
-                days_left=top_essay.get("days_left", 1),
-                subject_gpa=top_essay.get("subject_gpa"),
-            )
-            b["focus"] = phased["focus"]
-            b["activity"] = phased["activity"]
-            b["is_school_dedicated"] = True
-            b["is_tum_roadmap"] = False
-            b["deliverable"] = None
-
-        # Scenario B: Multiple Urgent Exams in Acute Window (2+ due in <= 2 days)
-        elif len(urgent_academic_exams) >= 2:
-            e1, e2 = urgent_academic_exams[0], urgent_academic_exams[1]
-            b["focus"] = f"Deep Work • Dual Defense: {e1['subject']} + {e2['subject']}"
+            p1, p2, p3 = compute_phase_durations(net_min, "acute_essay")
+            b["focus"] = f"Deep Work • Essay Drafting: {top_essay['subject']}"
             b["activity"] = (
-                f"[{analysis['mode']} // Acute Dual Defense] 50m {e1['subject']} ({e1['title']}) problem drill + "
-                f"45m {e2['subject']} ({e2['title']}) concept check + 25m TUM LeetCode anchor."
+                f"[Essay Defense // T-{top_essay.get('days_left', 1)}] {p1}m Thesis & Textual Evidence + "
+                f"{p2}m Full Drafting Sprint + {p3}m Polish & Formatting."
             )
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
             b["deliverable"] = None
+            b["plan_phases"] = [
+                {
+                    "phase_num": 1,
+                    "phase_key": "study_school",
+                    "badge_label": "[1. THESIS & EVIDENCE]",
+                    "duration_min": p1,
+                    "title": f"{top_essay['subject']}: Thesis & Source Text Quotes",
+                    "description": f"{p1}m verify prompt criteria, structure central arguments, and extract quotes from source material ({top_essay['title']}).",
+                    "type": "school_defense",
+                    "color": "var(--accent-lavender)",
+                },
+                {
+                    "phase_num": 2,
+                    "phase_key": "study_matura",
+                    "badge_label": "[2. DRAFTING SPRINT]",
+                    "duration_min": p2,
+                    "title": f"{top_essay['subject']}: Rapid Drafting & Body Arguments",
+                    "description": f"{p2}m continuous writing sprint for core body paragraphs, counter-arguments, and synthesis.",
+                    "type": "school_defense",
+                    "color": "#0284c7",
+                },
+                {
+                    "phase_num": 3,
+                    "phase_key": "study_code",
+                    "badge_label": "[3. FINAL POLISH & FORMAT]",
+                    "duration_min": p3,
+                    "title": f"{top_essay['subject']}: Stylistic Polish & Citation Check",
+                    "description": f"{p3}m sentence flow, vocabulary richness, punctuation audit, word count verification, and final submission readiness.",
+                    "type": "school_defense",
+                    "color": "#10b981",
+                },
+            ]
 
-        # Scenario C: Single Urgent Exam Due in <= 2 days
-        elif urgent_academic_exams:
-            top_exam = urgent_academic_exams[0]
-            phased = generate_phased_study_action(
-                top_exam,
-                days_left=top_exam.get("days_left", 1),
-                subject_gpa=top_exam.get("subject_gpa"),
+        # Scenario B: Single Nearest Exam Dominance (1 to 2 days out)
+        elif acute_exams:
+            top_exam = acute_exams[0]
+            p1, p2, p3 = compute_phase_durations(net_min, "acute_school_defense")
+            scope_str = top_exam.get("scope") or top_exam.get("title") or ""
+            b["focus"] = f"Deep Work • {top_exam['subject']} Prep: Acute Defense"
+            b["activity"] = (
+                f"[Acute Defense // T-{top_exam.get('days_left', 1)}] {p1}m {top_exam['subject']} Scope & Core Theory + "
+                f"{p2}m Problem Sets & Past Paper Drills + {p3}m Error Bank Blitz."
             )
-            b["focus"] = phased["focus"]
-            b["activity"] = phased["activity"]
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
             b["deliverable"] = None
+            b["plan_phases"] = [
+                {
+                    "phase_num": 1,
+                    "phase_key": "study_school",
+                    "badge_label": "[1. SCOPE & THEORY BLITZ]",
+                    "duration_min": p1,
+                    "title": f"{top_exam['subject']}: Core Theory, Definitions & Formulas",
+                    "description": f"{p1}m active recall of {top_exam['subject']} concepts ({scope_str[:40]}). Formulate flashcards and synthesize cheat sheet.",
+                    "type": "school_defense",
+                    "color": "var(--accent-lavender)",
+                },
+                {
+                    "phase_num": 2,
+                    "phase_key": "study_matura",
+                    "badge_label": "[2. PROBLEM DRILLS & PAST PAPERS]",
+                    "duration_min": p2,
+                    "title": f"{top_exam['subject']}: Past Papers & Timed Drills",
+                    "description": f"{p2}m unassisted problem solving on {top_exam['subject']} ({top_exam.get('title')}). Red-pen verification and immediate mistake logging.",
+                    "type": "school_defense",
+                    "color": "#0284c7",
+                },
+                {
+                    "phase_num": 3,
+                    "phase_key": "study_code",
+                    "badge_label": "[3. ERROR BANK & MOCK BLITZ]",
+                    "duration_min": p3,
+                    "title": f"{top_exam['subject']}: Error Bank & High-Yield Blitz",
+                    "description": f"{p3}m rapid-fire drill of past mistakes, edge cases, and high-frequency exam traps before morning clearance.",
+                    "type": "school_defense",
+                    "color": "#10b981",
+                },
+            ]
 
-        # Scenario D: Urgent Homework Due Tomorrow
+        # Scenario C: Urgent Homework Due Tomorrow (days_left == 1)
         elif urgent_hw:
             hw = urgent_hw[0]
-            phased = generate_phased_study_action(hw, days_left=hw.get("days_left", 1), subject_gpa=hw.get("subject_gpa"))
-            b["focus"] = phased["focus"]
-            b["activity"] = phased["activity"]
+            p1, p2, p3 = compute_phase_durations(net_min, "urgent_hw")
+            b["focus"] = f"Deep Work • Homework Clearance: {hw['subject']}"
+            b["activity"] = (
+                f"[Homework Sprint // T-1] {p1}m Complete {hw['title']} + "
+                f"{p2}m Solution Verification + {p3}m Next-Day Class Prep."
+            )
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
             b["deliverable"] = None
+            b["plan_phases"] = [
+                {
+                    "phase_num": 1,
+                    "phase_key": "study_school",
+                    "badge_label": "[1. HOMEWORK COMPLETION]",
+                    "duration_min": p1,
+                    "title": f"{hw['subject']}: Complete Assignment Requirements",
+                    "description": f"{p1}m resolve all required problems for {hw['title']}. Step-by-step documentation.",
+                    "type": "school_defense",
+                    "color": "var(--accent-lavender)",
+                },
+                {
+                    "phase_num": 2,
+                    "phase_key": "study_matura",
+                    "badge_label": "[2. VERIFICATION & EXTENSION]",
+                    "duration_min": p2,
+                    "title": f"{hw['subject']}: Verify Solutions & Edge Cases",
+                    "description": f"{p2}m verify all calculation steps, check against answer keys or reference standards, and resolve adjacent problems.",
+                    "type": "school_defense",
+                    "color": "#0284c7",
+                },
+                {
+                    "phase_num": 3,
+                    "phase_key": "study_code",
+                    "badge_label": "[3. NEXT-DAY CLASS PREP]",
+                    "duration_min": p3,
+                    "title": "Next-Day Academic Buffer",
+                    "description": f"{p3}m preview tomorrow's syllabus topics so you are never caught unprepared during active classroom questioning.",
+                    "type": "school_defense",
+                    "color": "#10b981",
+                },
+            ]
 
-        # Scenario E: Exam Written Today (T-0) -> Test cleared in morning, afternoon dedicated to TUM Roadmap
+        # Scenario D: Exam Written Today (T-0) -> Morning cleared, 100% TUM Metro Pipeline
         elif today_exams:
+            p1, p2, p3 = compute_phase_durations(net_min, "pure_tum")
             b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']}"
             b["activity"] = (
                 f"[TUM Victory Sprint // {active_station_id}] Morning examination cleared. "
-                f"70m {deliv_spec['target_spec']} + 35m algorithm problem solving + 15m German vocabulary buffer."
+                f"{p1}m {deliv_spec['target_spec']} + {p2}m Matura R problem sets + {p3}m German vocabulary buffer."
             )
             b["is_school_dedicated"] = False
             b["is_tum_roadmap"] = True
             b["deliverable"] = deliv_dict
+            b["plan_phases"] = [
+                {
+                    "phase_num": 1,
+                    "phase_key": "study_school",
+                    "badge_label": "[1. TUM ROADMAP SPRINT]",
+                    "duration_min": p1,
+                    "title": f"TUM Roadmap: {deliv_spec['title']}",
+                    "description": f"{p1}m {deliv_spec['target_spec']}.\nMorning test cleared! Full momentum on TUM Heilbronn track.",
+                    "type": "tum_deliverable",
+                    "color": "var(--accent-lavender)",
+                },
+                {
+                    "phase_num": 2,
+                    "phase_key": "study_matura",
+                    "badge_label": "[2. MATURA R PROBLEM SETS]",
+                    "duration_min": p2,
+                    "title": "Matura R Mathematics: Analytical & Advanced Proofs",
+                    "description": f"{p2}m unassisted Matura R problem sets (CKE/Operon). Traced on paper, red-pen self-correction.",
+                    "type": "matura_r",
+                    "color": "#0284c7",
+                },
+                {
+                    "phase_num": 3,
+                    "phase_key": "study_code",
+                    "badge_label": "[3. GERMAN A2 VOCABULARY]",
+                    "duration_min": p3,
+                    "title": "German A2 (Nicos Weg) & LeetCode Recall",
+                    "description": f"{p3}m active recall of German A2 vocabulary, grammar structures, and algorithmic complexity review.",
+                    "type": "german_code",
+                    "color": "#10b981",
+                },
+            ]
 
-        # Scenario F: Non-Defense Day with Medium-Horizon Exam (Exam in 3 to 5 days, e.g. Chemia in 4d)
+        # Scenario E: Medium-Horizon Exam (3 to 5 days out) -> 50/50 Balanced Foundation
         elif exams and exams[0].get("days_left", 99) <= 5:
             e = exams[0]
+            p1, p2, p3 = compute_phase_durations(net_min, "medium_horizon")
             scope_info = f" ({e['scope'][:40]})" if e.get("scope") else ""
-            b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']} & {e['subject']} Preview"
+            b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']} & {e['subject']} Foundation"
             b["activity"] = (
-                f"[TUM Roadmap Sprint // {active_station_id}] 60m {deliv_spec['target_spec']} + "
-                f"35m {e['subject']} ({e['title']}) foundation prep{scope_info}: formulas & definitions + "
-                f"15m German vocabulary recall."
+                f"[TUM Roadmap & Foundation // {active_station_id}] {p1}m {e['subject']} Scope Mapping + "
+                f"{p2}m Formulas/Theorems + {p3}m {deliv_spec['target_spec']}."
             )
             b["is_school_dedicated"] = False
             b["is_tum_roadmap"] = True
             b["deliverable"] = deliv_dict
+            b["plan_phases"] = [
+                {
+                    "phase_num": 1,
+                    "phase_key": "study_school",
+                    "badge_label": "[1. EXAM SCOPE MAPPING]",
+                    "duration_min": p1,
+                    "title": f"{e['subject']} (in {e['days_left']}d): Scope & Core Definitions",
+                    "description": f"{p1}m structured mapping of {e['subject']} exam material{scope_info}. Formulate flashcards.",
+                    "type": "school_defense",
+                    "color": "var(--accent-lavender)",
+                },
+                {
+                    "phase_num": 2,
+                    "phase_key": "study_matura",
+                    "badge_label": "[2. THEOREM & FORMULA DRILL]",
+                    "duration_min": p2,
+                    "title": f"{e['subject']}: Key Formula Drills & Foundational Proofs",
+                    "description": f"{p2}m active recall of required formulas, reaction mechanisms, or physics laws with foundational exercises.",
+                    "type": "school_defense",
+                    "color": "#0284c7",
+                },
+                {
+                    "phase_num": 3,
+                    "phase_key": "study_code",
+                    "badge_label": "[3. TUM ROADMAP SPRINT]",
+                    "duration_min": p3,
+                    "title": f"TUM Roadmap: {deliv_spec['title']}",
+                    "description": f"{p3}m {deliv_spec['target_spec']}.\nMilestone: {deliv_spec['category']} • Station {active_station_id}.",
+                    "type": "tum_deliverable",
+                    "color": "#10b981",
+                },
+            ]
 
-        # Scenario G: Pure Cruise Mode / Clear Academic Horizon -> 100% TUM Acceleration
+        # Scenario F: Pure Cruise Mode / Clear Academic Horizon -> 100% TUM Metro Pipeline
         else:
+            p1, p2, p3 = compute_phase_durations(net_min, "pure_tum")
             b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']}"
             b["activity"] = (
-                f"[TUM Roadmap Sprint // {active_station_id}] 65m {deliv_spec['target_spec']} + "
-                f"35m self-correction & formula recall + 15m German vocabulary buffer."
+                f"[TUM Metro Pipeline // {active_station_id}] {p1}m {deliv_spec['target_spec']} + "
+                f"{p2}m Matura R Problem Sets + {p3}m German A2 Vocabulary."
             )
             b["is_school_dedicated"] = False
             b["is_tum_roadmap"] = True
             b["deliverable"] = deliv_dict
+            b["plan_phases"] = [
+                {
+                    "phase_num": 1,
+                    "phase_key": "study_school",
+                    "badge_label": "[1. TUM ROADMAP SPRINT]",
+                    "duration_min": p1,
+                    "title": f"TUM Roadmap: {deliv_spec['title']}",
+                    "description": f"{p1}m {deliv_spec['target_spec']}.\nCurrent Deliverable: {deliv_spec['category']} • Station {active_station_id}.",
+                    "type": "tum_deliverable",
+                    "color": "var(--accent-lavender)",
+                },
+                {
+                    "phase_num": 2,
+                    "phase_key": "study_matura",
+                    "badge_label": "[2. MATURA R PROBLEM SETS]",
+                    "duration_min": p2,
+                    "title": "Matura R Mathematics: Analytical & Advanced Proofs",
+                    "description": f"{p2}m unassisted Matura R problem sets (CKE/Operon). Traced on paper, red-pen self-correction.",
+                    "type": "matura_r",
+                    "color": "#0284c7",
+                },
+                {
+                    "phase_num": 3,
+                    "phase_key": "study_code",
+                    "badge_label": "[3. GERMAN A2 VOCABULARY]",
+                    "duration_min": p3,
+                    "title": "German A2 (Nicos Weg) & LeetCode Recall",
+                    "description": f"{p3}m active recall of German A2 vocabulary, grammar structures, and algorithmic complexity review.",
+                    "type": "german_code",
+                    "color": "#10b981",
+                },
+            ]
 
     schedule["blocks"] = blocks
     return schedule
