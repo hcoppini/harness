@@ -23,18 +23,20 @@ try:
 except Exception:
     pass
 
-# Preload state from Supabase on startup if configured
-try:
-    sync_service.sync_all()
-except Exception:
-    pass
+# Preload state from Supabase on startup if configured (skip during test suite execution)
+if not os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("TESTING") and not os.environ.get("PYTEST_VERSION"):
+    try:
+        sync_service.sync_all()
+    except Exception:
+        pass
 
-try:
-    from app.services import vulcan_service
-    vulcan_service.auto_sync_vulcan_if_needed()
-    vulcan_service.start_vulcan_daily_scheduler()
-except Exception:
-    pass
+if not os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("TESTING") and not os.environ.get("PYTEST_VERSION"):
+    try:
+        from app.services import vulcan_service
+        vulcan_service.auto_sync_vulcan_if_needed()
+        vulcan_service.start_vulcan_daily_scheduler()
+    except Exception:
+        pass
 
 BASE_DIR = Path(__file__).resolve().parent
 UI_DIR = BASE_DIR / "ui"
@@ -710,14 +712,15 @@ def sync_exchange_endpoint():
             except Exception:
                 server_state["metro_roadmap"] = {}
 
-        # Trigger background Supabase sync on server if configured
-        try:
-            cfg = sync_service.get_sync_config()
-            if cfg.get("supabase_key"):
-                import threading
-                threading.Thread(target=sync_service.sync_all, daemon=True).start()
-        except Exception:
-            pass
+        # Trigger background Supabase sync on server if configured (skip during testing)
+        if not app.config.get("TESTING") and not os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("TESTING"):
+            try:
+                cfg = sync_service.get_sync_config()
+                if cfg.get("supabase_key"):
+                    import threading
+                    threading.Thread(target=sync_service.sync_all, daemon=True).start()
+            except Exception:
+                pass
 
         return jsonify({
             "status": "ok",

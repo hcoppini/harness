@@ -1,15 +1,22 @@
 /**
- * Section 2: TUM METRO ROADMAP // 3-Zone Transit Trunk Canvas Architecture (Version 4.0)
+ * Section 2: TUM METRO ROADMAP // Sleek Transit Trunk Architecture (Version 5.0)
  *
  * Architecture:
- * - Zone 1 (Top, Y=14-160): Phase boundary headers + Staggered Exam Signal Flags.
- *   Completely eliminates overlapping collisions with active stations and beacon.
- * - Zone 2 (Middle, Y=220): Main Central Subway Trunk Track (12px rail) + Parallel
- *   Bundled Color Stream Lines (Academics, Code, SIGG, German, Physical).
- *   Features circular station transfer nodes with pulsing radar halo for active station.
- * - Zone 3 (Bottom, Y=264-520): Uniform horizontal Station Card Deck connected by
- *   clean vertical dashed stems to track nodes.
- * - Interactive filter highlights specific stream lines while keeping full transit context.
+ * - Single Clean Progression Rail: One continuous, elegant rail with satisfying circular
+ *   milestone station tokens.
+ * - Dynamic 45° Tributary Rails: Stream tracks (Academics, Code, SIGG, German, Physical)
+ *   are completely hidden from the track by default, appearing only as subtle colored
+ *   micro-dots on each station. Selecting a stream filter or focusing a milestone station
+ *   reveals smooth 45° tributary branches with chamfered connections.
+ * - Station Hierarchy:
+ *   - Active Station: Spotlight Hero Card with glowing visual emphasis, current focus,
+ *     and interactive top deliverables.
+ *   - Other Stations: Minimalist, airy milestone pills (Month + Title + Stream pips) with
+ *     generous breathing room.
+ * - Calm Today Beacon & Exam Radar: Eliminates the forest of tall red flags. Near the Today
+ *   beacon, a consolidated radar pill reveals upcoming tests in a clean popover on hover.
+ *   An optional toolbar toggle peeks at individual exam pins on demand.
+ * - TUM '28 Golden Terminal: Celebratory destination gate milestone crowned at the horizon.
  */
 
 const MetroMap = {
@@ -19,44 +26,49 @@ const MetroMap = {
   scrollLeft: 0,
   selectedStation: null,
   activeStreamFilter: "all",
+  focusedStationId: null,
+  showAllExams: false,
   currentBeaconX: 0,
+  stationProgress: [],
+  paceVelocity: null,
+  upcomingExams: [],
 
-  // Stream Definitions for Parallel Subway Trunk System
+  // Stream Definitions for Transit Branches
   streams: [
     {
       id: "academics",
       name: "Academics",
       code: "AC",
-      strokeWidth: 2.5,
-      yOffset: -16,
+      color: "#a855f7",
+      yOffset: -30,
     },
     {
       id: "code",
       name: "Code Sprint",
       code: "CD",
-      strokeWidth: 2.5,
-      yOffset: -8,
+      color: "#38bdf8",
+      yOffset: -16,
     },
     {
       id: "sigg",
       name: "SIGG GPW",
       code: "SG",
-      strokeWidth: 3.0,
-      yOffset: 0,
+      color: "#f59e0b",
+      yOffset: 22,
     },
     {
       id: "german",
       name: "German Ladder",
       code: "DE",
-      strokeWidth: 2.5,
-      yOffset: 8,
+      color: "#10b981",
+      yOffset: -44,
     },
     {
       id: "physical",
       name: "Physical / Mass",
       code: "PH",
-      strokeWidth: 2.5,
-      yOffset: 16,
+      color: "#f43f5e",
+      yOffset: 36,
     },
   ],
 
@@ -83,7 +95,16 @@ const MetroMap = {
 
     // Mouse drag scrolling
     container.addEventListener("mousedown", (e) => {
-      if (e.target.closest(".metro-station-card") || e.target.closest(".station-drawer") || e.target.closest("button") || e.target.closest(".metro-station-node")) return;
+      if (
+        e.target.closest(".metro-station-card") ||
+        e.target.closest(".metro-station-pill") ||
+        e.target.closest(".metro-hero-card") ||
+        e.target.closest(".metro-terminal-card") ||
+        e.target.closest(".station-drawer") ||
+        e.target.closest("button") ||
+        e.target.closest(".metro-station-node") ||
+        e.target.closest(".metro-exam-radar-pill")
+      ) return;
       this.isDragging = true;
       container.classList.add("grabbing");
       this.startX = e.pageX - container.offsetLeft;
@@ -138,7 +159,7 @@ const MetroMap = {
     }
 
     // Stream Filter Buttons
-    const filterBtns = document.querySelectorAll(".metro-filter-btn");
+    const filterBtns = document.querySelectorAll(".metro-filter-btn:not(#btnToggleExamPins)");
     filterBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
         filterBtns.forEach((b) => b.classList.remove("active"));
@@ -147,6 +168,17 @@ const MetroMap = {
         this.render();
       });
     });
+
+    // Optional Exam Pins Toggle Button
+    const toggleExamsBtn = document.getElementById("btnToggleExamPins");
+    if (toggleExamsBtn) {
+      toggleExamsBtn.addEventListener("click", () => {
+        this.showAllExams = !this.showAllExams;
+        toggleExamsBtn.classList.toggle("active", this.showAllExams);
+        toggleExamsBtn.textContent = this.showAllExams ? "📌 Hide Exams" : "📌 Show Exams";
+        this.render();
+      });
+    }
   },
 
   async load() {
@@ -154,10 +186,10 @@ const MetroMap = {
       if (!window.pywebview || !window.pywebview.api) return;
       this.data = await window.pywebview.api.get_metro_roadmap();
       if (window.pywebview.api.get_station_deliverables) {
-        this.stationProgress = await window.pywebview.api.get_station_deliverables("sep-2026") || [];
+        this.stationProgress = (await window.pywebview.api.get_station_deliverables("sep-2026")) || [];
       }
       if (window.pywebview.api.get_station_pace_velocity) {
-        this.paceVelocity = await window.pywebview.api.get_station_pace_velocity("sep-2026") || null;
+        this.paceVelocity = (await window.pywebview.api.get_station_pace_velocity("sep-2026")) || null;
       }
       if (window.pywebview.api.get_upcoming_exams) {
         const rawExams = await window.pywebview.api.get_upcoming_exams();
@@ -222,6 +254,27 @@ const MetroMap = {
     }
   },
 
+  setFocusStation(stationId) {
+    if (this.focusedStationId === stationId) return;
+    this.focusedStationId = stationId;
+    this.render();
+  },
+
+  showRadarPopover() {
+    const pop = document.getElementById("metroRadarPopover");
+    if (pop) pop.style.display = "block";
+  },
+
+  keepRadarPopover() {
+    const pop = document.getElementById("metroRadarPopover");
+    if (pop) pop.style.display = "block";
+  },
+
+  hideRadarPopover() {
+    const pop = document.getElementById("metroRadarPopover");
+    if (pop) pop.style.display = "none";
+  },
+
   render() {
     if (!this.data || !this.data.stations) return;
 
@@ -229,14 +282,15 @@ const MetroMap = {
     if (!canvasWrap) return;
 
     const stations = this.data.stations;
-    const spacing = 240;
-    const startX = 160;
-    const spineY = 220;
+    const spacing = 260;
+    const startX = 140;
+    const spineY = 170;
     const totalTrackLength = (stations.length - 1) * spacing;
-    const totalWidth = startX + totalTrackLength + 320;
+    const terminusX = startX + totalTrackLength + 140;
+    const totalWidth = terminusX + 220;
 
     canvasWrap.style.minWidth = `${totalWidth}px`;
-    canvasWrap.style.height = "560px";
+    canvasWrap.style.height = "520px";
 
     // Date calculations
     const startDate = new Date(2026, 8, 1);
@@ -253,8 +307,8 @@ const MetroMap = {
       const msDiff = startDate.getTime() - now.getTime();
       const daysUntil = Math.max(1, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
       currentX = startX - 35;
-      beaconTitle = "LAUNCH GATE // SEP 1, 2026";
-      beaconSub = `${daysUntil}d to kickoff • Pure Syntax`;
+      beaconTitle = "LAUNCH GATE";
+      beaconSub = `${daysUntil}d to kickoff`;
     } else {
       const totalMs = endDate.getTime() - startDate.getTime();
       const elapsedMs = Math.min(totalMs, Math.max(0, now.getTime() - startDate.getTime()));
@@ -270,7 +324,7 @@ const MetroMap = {
 
     this.currentBeaconX = currentX;
 
-    // Zone 1: Phase Milestones Headers (Top Zone)
+    // Zone 1: Phase Milestones Headers (Top Zone, Y=14)
     const phases = [
       { name: "Phase 1: Year 3 Liceum", startIdx: 0, endIdx: 6 },
       { name: "Phase 2: SIGG Finals & Year 3 Lock", startIdx: 7, endIdx: 10 },
@@ -281,8 +335,8 @@ const MetroMap = {
 
     let phaseHeadersHtml = phases
       .map((p) => {
-        const x1 = startX + p.startIdx * spacing - 40;
-        const x2 = startX + p.endIdx * spacing + 100;
+        const x1 = startX + p.startIdx * spacing - 30;
+        const x2 = startX + p.endIdx * spacing + 80;
         const width = Math.max(120, x2 - x1);
         return `
           <div style="position: absolute; top: 14px; left: ${x1}px; width: ${width}px; pointer-events: none; z-index: 5;">
@@ -297,121 +351,178 @@ const MetroMap = {
       })
       .join("");
 
-    // Zone 2: Central Subway Trunk Track Bed
+    // Zone 2: Single Clean Main Rail (6px stroke)
     const trunkHtml = `
-      <!-- Trunk Bed -->
-      <line x1="${startX - 40}" y1="${spineY}" x2="${startX + totalTrackLength + 40}" y2="${spineY}" 
-            stroke="var(--border-subtle)" stroke-width="12" stroke-linecap="round" />
-      <!-- Reached / Elapsed Trunk Rail -->
+      <!-- Base Main Rail -->
+      <line x1="${startX - 30}" y1="${spineY}" x2="${terminusX}" y2="${spineY}" 
+            stroke="var(--border-subtle)" stroke-width="6" stroke-linecap="round" />
+      
+      <!-- Completed / Progress Track up to Today -->
       ${
-        currentX > startX
-          ? `<line x1="${startX - 40}" y1="${spineY}" x2="${currentX}" y2="${spineY}" stroke="var(--border-medium)" stroke-width="12" stroke-linecap="round" />`
+        currentX > startX - 30
+          ? `<line x1="${startX - 30}" y1="${spineY}" x2="${Math.min(terminusX, currentX)}" y2="${spineY}" 
+                  stroke="var(--accent-lavender)" stroke-width="6" stroke-linecap="round" />`
           : ""
       }
     `;
 
-    // Zone 2: Parallel Stream Line Bundle
-    let streamPathsHtml = "";
-    let streamJunctionDotsHtml = "";
+    // Zone 2: Dynamic 45° Tributary Rails
+    // Only revealed when a stream filter is selected OR a station is hovered/focused
+    const streamsToHighlight = new Set();
+    if (this.activeStreamFilter !== "all") {
+      streamsToHighlight.add(this.activeStreamFilter);
+    }
+    if (this.focusedStationId) {
+      const fSt = stations.find((s) => s.id === this.focusedStationId);
+      if (fSt && fSt.branches) {
+        fSt.branches.forEach((b) => streamsToHighlight.add(b));
+      }
+    }
 
-    this.streams.forEach((stream) => {
-      const color = this.getStreamColor(stream.id);
-      const activeIndices = [];
-      stations.forEach((st, idx) => {
-        if ((st.branches || []).includes(stream.id)) {
-          activeIndices.push(idx);
+    let tributaryPathsHtml = "";
+    if (streamsToHighlight.size > 0) {
+      this.streams.forEach((stream) => {
+        if (!streamsToHighlight.has(stream.id)) return;
+        const color = this.getStreamColor(stream.id);
+        const yOffset = stream.yOffset;
+        const branchY = spineY + yOffset;
+        const ramp = Math.abs(yOffset);
+
+        // Find station indices where this stream is active
+        const indices = [];
+        stations.forEach((st, idx) => {
+          if ((st.branches || []).includes(stream.id)) {
+            indices.push(idx);
+          }
+        });
+        if (indices.length === 0) return;
+
+        // Group consecutive indices into segments
+        const segments = [];
+        let cur = [indices[0]];
+        for (let i = 1; i < indices.length; i++) {
+          if (indices[i] === indices[i - 1] + 1) {
+            cur.push(indices[i]);
+          } else {
+            segments.push(cur);
+            cur = [indices[i]];
+          }
         }
+        segments.push(cur);
+
+        segments.forEach((seg) => {
+          const firstIdx = seg[0];
+          const lastIdx = seg[seg.length - 1];
+          const segStartX = startX + firstIdx * spacing;
+          const segEndX = startX + lastIdx * spacing;
+
+          const ingressX = segStartX - ramp;
+          const egressX = segEndX + ramp;
+
+          const pathD = `M ${ingressX} ${spineY} L ${segStartX} ${branchY} L ${segEndX} ${branchY} L ${egressX} ${spineY}`;
+
+          tributaryPathsHtml += `
+            <g class="stream-tributary-branch">
+              <!-- 45° Chamfered Tributary Rail -->
+              <path d="${pathD}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
+          `;
+
+          seg.forEach((idx) => {
+            const px = startX + idx * spacing;
+            tributaryPathsHtml += `
+              <!-- Drop connector stem -->
+              <line x1="${px}" y1="${branchY}" x2="${px}" y2="${spineY}" stroke="${color}" stroke-width="1.5" stroke-dasharray="2 3" opacity="0.6" />
+              <!-- Junction dot on tributary rail -->
+              <circle cx="${px}" cy="${branchY}" r="3.5" fill="${color}" stroke="var(--bg-canvas)" stroke-width="1.5" />
+            `;
+          });
+
+          tributaryPathsHtml += `</g>`;
+        });
       });
+    }
 
-      if (activeIndices.length === 0) return;
-
-      const isFiltered = this.activeStreamFilter !== "all" && this.activeStreamFilter !== stream.id;
-      const opacity = isFiltered ? 0.08 : this.activeStreamFilter === stream.id ? 1.0 : 0.75;
-      const strokeW = this.activeStreamFilter === stream.id ? 4.5 : stream.strokeWidth;
-      const y = spineY + stream.yOffset;
-
-      const lineStartX = startX + activeIndices[0] * spacing - 24;
-      const lineEndX = startX + activeIndices[activeIndices.length - 1] * spacing + 24;
-
-      streamPathsHtml += `
-        <!-- Stream Line: ${stream.name} -->
-        <path 
-          d="M ${lineStartX} ${y} L ${lineEndX} ${y}" 
-          fill="none" 
-          stroke="${color}" 
-          stroke-width="${strokeW}" 
-          stroke-linecap="round" 
-          opacity="${opacity}" 
-        />
-      `;
-
-      // Junction dots for stations where this stream is active
-      activeIndices.forEach((idx) => {
-        const px = startX + idx * spacing;
-        streamJunctionDotsHtml += `
-          <circle cx="${px}" cy="${y}" r="2.5" fill="${color}" opacity="${opacity}" />
-        `;
-      });
-    });
-
-    // Zone 2: Station Transfer Nodes & Stems
-    let svgStationStemsHtml = "";
-    let svgStationCirclesHtml = "";
-
+    // Zone 2: Milestone Station Tokens & Stream Micro-Pips
+    let stationsSvgHtml = "";
     stations.forEach((station, idx) => {
       const posX = startX + idx * spacing;
-      const isMajor = station.is_major;
       const status = station.status || "upcoming";
+      const isMajor = station.is_major;
       const isPassed = posX <= currentX;
       const isActive = status === "active";
       const isCompleted = status === "completed" || (isPassed && !isPreLaunch);
-      const cardTop = spineY + 44;
+      const isHovered = this.focusedStationId === station.id;
 
-      // Vertical connecting stem from node down to station card
-      const stemColor = isActive ? "var(--accent-lavender)" : "var(--border-subtle)";
-      const stemWidth = isActive ? 2 : 1.5;
-      const stemDash = isActive ? "none" : "3 3";
-      svgStationStemsHtml += `
-        <line x1="${posX}" y1="${spineY + 14}" x2="${posX}" y2="${cardTop}" 
-              stroke="${stemColor}" stroke-width="${stemWidth}" stroke-dasharray="${stemDash}" />
-      `;
-
-      // Station Transfer Circle Node on Main Spine (posX, spineY)
-      const size = isMajor ? 20 : 16;
-      const r = size / 2;
-      let fill = "var(--bg-card)";
-      let stroke = "var(--border-medium)";
-      let strokeW = 2;
-      let innerCore = "";
+      // Node circles
       let aura = "";
-
-      if (isCompleted) {
-        fill = "var(--accent-lavender)";
-        stroke = "#ffffff";
-        strokeW = 2;
-        innerCore = `<circle cx="${posX}" cy="${spineY}" r="3" fill="#ffffff" />`;
-      } else if (isActive) {
-        fill = "#ffffff";
-        stroke = "var(--accent-lavender)";
-        strokeW = 3;
-        innerCore = `<circle cx="${posX}" cy="${spineY}" r="3.5" fill="var(--accent-lavender)" />`;
+      let nodeCircles = "";
+      if (isActive) {
         aura = `
-          <circle cx="${posX}" cy="${spineY}" r="22" fill="none" stroke="var(--accent-lavender)" stroke-width="1.5" opacity="0.4" class="beacon-pulse" />
+          <circle cx="${posX}" cy="${spineY}" r="22" fill="none" stroke="var(--accent-lavender)" stroke-width="2" opacity="0.4" class="beacon-pulse" />
+        `;
+        nodeCircles = `
+          <circle cx="${posX}" cy="${spineY}" r="11" fill="var(--bg-canvas)" stroke="var(--accent-lavender)" stroke-width="3.5" />
+          <circle cx="${posX}" cy="${spineY}" r="4.5" fill="var(--accent-lavender)" />
+        `;
+      } else if (isCompleted) {
+        nodeCircles = `
+          <circle cx="${posX}" cy="${spineY}" r="9" fill="var(--accent-lavender)" stroke="var(--bg-canvas)" stroke-width="2" />
+          <polyline points="${posX - 3},${spineY} ${posX - 1},${spineY + 2} ${posX + 3},${spineY - 2}" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+        `;
+      } else {
+        const r = isMajor ? 10 : 8;
+        const strokeW = isMajor ? 2.5 : 2;
+        const strokeColor = isHovered ? "var(--accent-lavender)" : "var(--border-medium)";
+        nodeCircles = `
+          <circle cx="${posX}" cy="${spineY}" r="${r}" fill="var(--bg-surface)" stroke="${strokeColor}" stroke-width="${strokeW}" />
         `;
       }
 
-      svgStationCirclesHtml += `
+      // Stream Micro-Pips (Colored indicator dots beneath the station token)
+      const branches = station.branches || [];
+      const pipSpacing = 7;
+      const pipsStartX = posX - ((branches.length - 1) * pipSpacing) / 2;
+      let pipsSvg = "";
+      branches.forEach((b, pIdx) => {
+        const c = this.getStreamColor(b);
+        pipsSvg += `<circle cx="${pipsStartX + pIdx * pipSpacing}" cy="${spineY + 16}" r="2.2" fill="${c}" />`;
+      });
+
+      // Connecting stem down to card/pill
+      const stemColor = isActive || isHovered ? "var(--accent-lavender)" : "var(--border-hairline)";
+      const stemWidth = isActive ? 1.5 : 1;
+      const cardTop = isActive ? spineY + 36 : spineY + 44;
+      const stemSvg = `
+        <line x1="${posX}" y1="${spineY + 20}" x2="${posX}" y2="${cardTop}" stroke="${stemColor}" stroke-width="${stemWidth}" stroke-dasharray="2 3" opacity="${isActive || isHovered ? 0.8 : 0.4}" />
+      `;
+
+      stationsSvgHtml += `
         ${aura}
-        <circle cx="${posX}" cy="${spineY}" r="${r}" fill="${fill}" stroke="${stroke}" stroke-width="${strokeW}" />
-        ${innerCore}
-        <!-- Click target overlay for station node -->
-        <circle cx="${posX}" cy="${spineY}" r="16" fill="transparent" cursor="pointer" onclick="MetroMap.selectStation('${station.id}')" style="pointer-events: all;" />
+        ${stemSvg}
+        ${nodeCircles}
+        ${pipsSvg}
+        <!-- Click & Hover Target -->
+        <circle cx="${posX}" cy="${spineY}" r="18" fill="transparent" cursor="pointer"
+                onclick="MetroMap.selectStation('${station.id}')"
+                onmouseenter="MetroMap.setFocusStation('${station.id}')"
+                onmouseleave="MetroMap.setFocusStation(null)"
+                style="pointer-events: all;" />
       `;
     });
 
-    // Zone 1: Upcoming School Test Milestone Pins & Signal Flags
-    let svgSchoolTestDotsHtml = "";
-    if (this.upcomingExams && this.upcomingExams.length > 0) {
+    // Zone 2: TUM '28 Golden Terminal Milestone Node
+    const terminalSvgHtml = `
+      <!-- TUM '28 Golden Terminal Milestone -->
+      <g style="pointer-events: all; cursor: pointer;" onclick="MetroMap.scrollToBeacon()">
+        <circle cx="${terminusX}" cy="${spineY}" r="22" fill="none" stroke="#f59e0b" stroke-width="2" opacity="0.35" class="beacon-pulse" />
+        <circle cx="${terminusX}" cy="${spineY}" r="12" fill="var(--bg-canvas)" stroke="#f59e0b" stroke-width="3" />
+        <circle cx="${terminusX}" cy="${spineY}" r="5" fill="#f59e0b" />
+      </g>
+    `;
+
+    // Optional Individual Exam Pins (Only visible if showAllExams is toggled ON)
+    let examsSvgHtml = "";
+    if (this.showAllExams && this.upcomingExams && this.upcomingExams.length > 0) {
       const sortedExams = [...this.upcomingExams].sort((a, b) => new Date(a.exam_date) - new Date(b.exam_date));
       sortedExams.forEach((exam, eIdx) => {
         try {
@@ -427,164 +538,271 @@ const MetroMap = {
             const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "TMRW" : diffDays > 0 ? `in ${diffDays}d` : `${Math.abs(diffDays)}d ago`;
             const isTodayExam = diffDays === 0;
 
-            // Staggered Y elevation in Zone 1 (Top) so adjacent exams never collide!
-            const flagY = spineY - 65 - (eIdx % 2) * 32;
+            const flagY = spineY - 55 - (eIdx % 2) * 28;
             const subjName = exam.subject || "Exam";
             const flagText = `[EXAM] ${dueLabel} • ${subjName}`;
-            const flagW = Math.max(96, flagText.length * 6.8 + 18);
+            const flagW = Math.max(90, flagText.length * 6.6 + 16);
 
-            svgSchoolTestDotsHtml += `
-              <!-- School Test Milestone Pin & Flag -->
+            examsSvgHtml += `
               <g class="metro-test-dot" data-id="${exam.id}" data-subject="${this.escapeHtml(exam.subject)}" data-title="${this.escapeHtml(exam.title)}" data-date="${exam.exam_date}" data-due="${dueLabel}" data-scope="${this.escapeHtml(exam.scope || '')}" style="cursor: pointer; pointer-events: all;">
-                <!-- Vertical schematic stem to flag -->
-                <line x1="${testX}" y1="${spineY - 8}" x2="${testX}" y2="${flagY + 22}" stroke="${isTodayExam ? '#ef4444' : 'var(--color-red)'}" stroke-width="1.5" stroke-dasharray="2 2" />
-                
-                <!-- Main Spine Milestone Pin -->
-                <circle cx="${testX}" cy="${spineY}" r="${isTodayExam ? 7 : 5}" fill="none" stroke="${isTodayExam ? '#ef4444' : 'var(--color-red)'}" stroke-width="1.5" opacity="0.8">
-                  <animate attributeName="r" values="${isTodayExam ? '6;10;6' : '4;7;4'}" dur="2s" repeatCount="indefinite"/>
-                  <animate attributeName="opacity" values="0.8;0.2;0.8" dur="2s" repeatCount="indefinite"/>
-                </circle>
+                <line x1="${testX}" y1="${spineY - 8}" x2="${testX}" y2="${flagY + 20}" stroke="${isTodayExam ? '#ef4444' : 'var(--color-red)'}" stroke-width="1.5" stroke-dasharray="2 2" />
                 <circle cx="${testX}" cy="${spineY}" r="4" fill="var(--bg-card)" stroke="${isTodayExam ? '#ef4444' : 'var(--color-red)'}" stroke-width="1.8" />
                 <circle cx="${testX}" cy="${spineY}" r="2" fill="${isTodayExam ? '#ef4444' : 'var(--color-red)'}" />
-
-                <!-- Floating Editorial Signal Flag -->
-                <rect x="${testX - flagW / 2}" y="${flagY}" width="${flagW}" height="22" rx="4" 
+                <rect x="${testX - flagW / 2}" y="${flagY}" width="${flagW}" height="20" rx="4" 
                       fill="${isTodayExam ? 'rgba(239, 68, 68, 0.16)' : 'var(--bg-surface-elevated)'}" 
                       stroke="${isTodayExam ? '#ef4444' : 'var(--border-medium)'}" 
                       stroke-width="1.2" />
-                <text x="${testX}" y="${flagY + 14}" font-family="var(--font-mono)" font-size="9.5" font-weight="700" text-anchor="middle" fill="${isTodayExam ? '#ef4444' : 'var(--text-primary)'}">
+                <text x="${testX}" y="${flagY + 13}" font-family="var(--font-mono)" font-size="9" font-weight="700" text-anchor="middle" fill="${isTodayExam ? '#ef4444' : 'var(--text-primary)'}">
                   ${flagText}
                 </text>
-
-                <!-- Expanded Hit Target -->
-                <rect x="${testX - flagW / 2 - 4}" y="${flagY - 4}" width="${flagW + 8}" height="50" fill="transparent" />
               </g>
             `;
           }
-        } catch (err) {
-          console.warn("[Metro] Error plotting test milestone:", err);
-        }
+        } catch (err) {}
       });
     }
 
     // Assemble SVG Layers
-    let svgHtml = `
-      <svg width="${totalWidth}" height="560" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 25;">
-        <!-- Phase Vertical Grid Lines -->
+    const svgHtml = `
+      <svg width="${totalWidth}" height="520" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 25;">
+        <!-- Phase Separation Vertical Guidelines -->
         ${phases
-          .map(
-            (p) => {
-              const px = startX + p.startIdx * spacing - 40;
-              return `<line x1="${px}" y1="36" x2="${px}" y2="520" stroke="rgba(255,255,255,0.03)" stroke-dasharray="3 4" stroke-width="1" />`;
-            }
-          )
+          .map((p) => {
+            const px = startX + p.startIdx * spacing - 30;
+            return `<line x1="${px}" y1="36" x2="${px}" y2="480" stroke="rgba(255,255,255,0.03)" stroke-dasharray="3 4" stroke-width="1" />`;
+          })
           .join("")}
 
-        <!-- Vertical Station Stems -->
-        ${svgStationStemsHtml}
-
-        <!-- Central Subway Trunk Bed -->
+        <!-- Single Main Progression Rail -->
         ${trunkHtml}
 
-        <!-- Bundled Parallel Stream Lines -->
-        ${streamPathsHtml}
+        <!-- Dynamic 45° Tributary Rails -->
+        ${tributaryPathsHtml}
 
-        <!-- Stream Active Junction Dots -->
-        ${streamJunctionDotsHtml}
+        <!-- Station Tokens along Spine -->
+        ${stationsSvgHtml}
 
-        <!-- Station Circles on Main Spine -->
-        ${svgStationCirclesHtml}
+        <!-- TUM '28 Golden Terminal -->
+        ${terminalSvgHtml}
 
-        <!-- School Test Milestone Pins & Flags -->
-        ${svgSchoolTestDotsHtml}
+        <!-- Optional Full Exam Pins Layer -->
+        ${examsSvgHtml}
       </svg>
     `;
 
-    // Zone 3: Station Cards Deck (Uniform Horizontal Deck below track)
+    // Zone 3: Cards Deck (Active Hero Card vs Minimalist Milestone Pills)
     let cardsHtml = stations
       .map((station, idx) => {
         const posX = startX + idx * spacing;
         const status = station.status || "upcoming";
         const branches = station.branches || [];
-        const cardTop = spineY + 44;
-        const cardLeft = posX - 100;
-
-        let isFilteredMatch = true;
-        if (this.activeStreamFilter !== "all") {
-          isFilteredMatch = branches.includes(this.activeStreamFilter);
-        }
+        const isFilteredMatch = this.activeStreamFilter === "all" || branches.includes(this.activeStreamFilter);
         const opacityStyle = isFilteredMatch ? "opacity: 1;" : "opacity: 0.25;";
 
-        const delivEntries = Object.keys(station.deliverables || {});
-        const totalDelivs = delivEntries.length;
-        const completedDelivs = (station.completed_deliverables || []).length;
-        let checklistBadge = "";
+        const delivEntries = Object.entries(station.deliverables || {});
+        const completedList = station.completed_deliverables || [];
+
+        // 1. ACTIVE STATION: Spotlight Hero Card
+        if (status === "active") {
+          const heroLeft = posX - 130;
+          const heroTop = spineY + 36;
+
+          let heroDelivsHtml = "";
+          if (delivEntries.length > 0) {
+            heroDelivsHtml = `
+              <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-hairline);">
+                ${delivEntries.slice(0, 3).map(([key, val]) => {
+                  const isChecked = completedList.includes(key);
+                  return `
+                    <div 
+                      style="display: flex; align-items: flex-start; gap: 6px; font-size: 10px; color: ${isChecked ? 'var(--text-muted)' : 'var(--text-secondary)'}; cursor: pointer;"
+                      onclick="event.stopPropagation(); MetroMap.toggleDeliverable('${station.id}', '${this.escapeHtml(key)}')"
+                      title="Click to toggle deliverable"
+                    >
+                      <span style="color: ${isChecked ? '#10b981' : 'var(--text-tertiary)'}; font-size: 11px; line-height: 1;">${isChecked ? '✓' : '○'}</span>
+                      <span style="line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 215px; ${isChecked ? 'text-decoration: line-through;' : ''}">${this.escapeHtml(val)}</span>
+                    </div>
+                  `;
+                }).join("")}
+              </div>
+            `;
+          }
+
+          let heroNextAction = "";
+          if (station.next_action) {
+            heroNextAction = `
+              <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--border-hairline); font-size: 9.5px; font-family: var(--font-mono); color: var(--accent-lavender); display: flex; align-items: center; gap: 4px;">
+                <span>&rarr;</span>
+                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;">${this.escapeHtml(station.next_action)}</span>
+              </div>
+            `;
+          }
+
+          return `
+            <div 
+              class="metro-hero-card"
+              style="left: ${heroLeft}px; top: ${heroTop}px; ${opacityStyle}"
+              onclick="MetroMap.selectStation('${station.id}')"
+              onmouseenter="MetroMap.setFocusStation('${station.id}')"
+              onmouseleave="MetroMap.setFocusStation(null)"
+            >
+              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
+                <span style="font-family: var(--font-mono); font-size: 8.5px; font-weight: 800; color: var(--accent-lavender); letter-spacing: 0.05em; text-transform: uppercase;">
+                  CURRENT FOCUS // ${station.month_label}
+                </span>
+                <span class="mono-chip" style="font-size: 8px; padding: 1px 5px; color: var(--accent-lavender); border-color: var(--accent-lavender-border); font-weight: 700;">
+                  ACTIVE
+                </span>
+              </div>
+              <div style="font-size: 14px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px;">
+                ${this.escapeHtml(station.name)}
+              </div>
+              <div style="font-size: 10.5px; color: var(--text-secondary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
+                ${this.escapeHtml(station.objective || "")}
+              </div>
+              ${heroDelivsHtml}
+              ${heroNextAction}
+              <div style="margin-top: 8px; display: flex; justify-content: flex-end;">
+                <span style="font-family: var(--font-mono); font-size: 8.5px; color: var(--text-tertiary); font-weight: 600;">Inspect Milestone &rarr;</span>
+              </div>
+            </div>
+          `;
+        }
+
+        // 2. OTHER STATIONS: Minimalist Milestone Pill
+        const pillLeft = posX - 70;
+        const pillTop = spineY + 44;
+
+        const pipsRow = branches
+          .map((b) => {
+            const color = this.getStreamColor(b);
+            return `<span class="stream-pip-dot" style="background: ${color};" title="${b.toUpperCase()}"></span>`;
+          })
+          .join("");
+
+        let statusChip = "";
         if (status === "completed") {
-          checklistBadge = `<span class="mono-chip done" style="font-size: 8.5px; padding: 1px 5px;">DONE</span>`;
-        } else if (status === "active") {
-          checklistBadge = `<span class="mono-chip" style="font-size: 8.5px; padding: 1px 5px; color: var(--accent-lavender); border-color: var(--accent-lavender-border); font-weight: 700;">ACTIVE</span>`;
-        } else if (totalDelivs > 0) {
-          checklistBadge = `<span class="mono-chip" style="font-size: 8.5px; padding: 1px 5px;">${completedDelivs}/${totalDelivs}</span>`;
+          statusChip = `<span class="mono-chip done" style="font-size: 8px; padding: 1px 4px;">DONE</span>`;
+        } else if (delivEntries.length > 0) {
+          statusChip = `<span class="mono-chip" style="font-size: 8px; padding: 1px 4px;">${completedList.length}/${delivEntries.length}</span>`;
         }
 
         return `
-          <!-- Station Card Centered at posX -->
           <div 
-            class="metro-station-card ${status === "completed" ? "completed-card" : ""} ${status === "active" ? "active-card" : ""}" 
-            style="left: ${cardLeft}px; top: ${cardTop}px; ${opacityStyle}"
+            class="metro-station-pill ${status === "completed" ? "completed-pill" : ""}" 
+            style="left: ${pillLeft}px; top: ${pillTop}px; ${opacityStyle}"
             onclick="MetroMap.selectStation('${station.id}')"
+            onmouseenter="MetroMap.setFocusStation('${station.id}')"
+            onmouseleave="MetroMap.setFocusStation(null)"
           >
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
-              <span style="font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; color: ${status === "active" ? "var(--accent-lavender)" : "var(--text-tertiary)"};">${station.month_label}</span>
-              ${checklistBadge}
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
+              <span style="font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; color: var(--text-tertiary);">${station.month_label}</span>
+              ${statusChip}
             </div>
-            <div style="font-size: 13px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 6px;" title="${this.escapeHtml(station.name)}">
+            <div style="font-size: 11.5px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;" title="${this.escapeHtml(station.name)}">
               ${this.escapeHtml(station.name)}
             </div>
-            <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 6px;">
-              ${branches
-                .map((b) => {
-                  const color = this.getStreamColor(b);
-                  return `<span style="font-family: var(--font-mono); font-size: 8px; font-weight: 700; color: ${color}; background: ${color}15; border: 1px solid ${color}30; padding: 1px 4px; border-radius: 3px;">${b.toUpperCase()}</span>`;
-                })
-                .join("")}
+            <div style="display: flex; align-items: center; gap: 3.5px;">
+              ${pipsRow}
             </div>
-            <div style="font-size: 10.5px; color: var(--text-secondary); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 4px;">
-              ${this.escapeHtml(station.objective || "")}
-            </div>
-            ${
-              status === "active" && this.paceVelocity
-                ? `
-                  <div style="margin-top: 6px; padding-top: 5px; border-top: 1px solid var(--border-hairline); font-family: var(--font-mono); font-size: 8.5px; font-weight: 600; display: flex; align-items: center; justify-content: space-between; ${this.paceVelocity.is_behind ? "color: #f59e0b;" : "color: var(--accent-lavender);"}">
-                    <span style="display: flex; align-items: center; gap: 4px;">
-                      <span class="beacon-dot ${this.paceVelocity.is_behind ? "pulse" : "optimal"}" style="width: 5px; height: 5px;"></span>
-                      <span>${this.paceVelocity.status_text}</span>
-                    </span>
-                    <span style="opacity: 0.8;">Day ${this.paceVelocity.day_of_month}/${this.paceVelocity.total_days}</span>
-                  </div>
-                `
-                : ""
-            }
           </div>
         `;
       })
       .join("");
 
+    // TUM '28 Golden Terminal Card
+    const terminalCardHtml = `
+      <div 
+        class="metro-terminal-card" 
+        style="left: ${terminusX - 88}px; top: ${spineY + 40}px;"
+        onclick="HarnessApp.switchView('study')"
+        title="Destination: TUM Campus Heilbronn"
+      >
+        <div style="font-family: var(--font-mono); font-size: 8.5px; font-weight: 800; color: #f59e0b; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px;">
+          ★ DESTINATION GATE ★
+        </div>
+        <div style="font-size: 13px; font-weight: 800; color: var(--text-primary); margin-bottom: 2px;">
+          TUM ’28
+        </div>
+        <div style="font-size: 9.5px; color: var(--text-secondary); line-height: 1.3;">
+          B.Sc. Management &amp; Data Science
+        </div>
+        <div style="margin-top: 5px; font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; color: #f59e0b;">
+          Aptitude Target: &ge; 88 pts
+        </div>
+      </div>
+    `;
+
+    // Today Beacon & Consolidated Next Exam Radar Pill
+    let nextExamRadarHtml = "";
+    if (this.upcomingExams && this.upcomingExams.length > 0) {
+      const sortedExams = [...this.upcomingExams]
+        .filter((e) => !e.completed)
+        .sort((a, b) => new Date(a.exam_date) - new Date(b.exam_date));
+
+      const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+      const upcomingValid = sortedExams.filter((e) => {
+        const eMid = new Date(e.exam_date + "T12:00:00").getTime();
+        return eMid - todayMid >= 0;
+      });
+
+      if (upcomingValid.length > 0) {
+        const nextEx = upcomingValid[0];
+        const exDate = new Date(nextEx.exam_date + "T12:00:00");
+        const diffDays = Math.round((exDate.getTime() - todayMid) / (1000 * 60 * 60 * 24));
+        const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "TMRW" : `in ${diffDays}d`;
+
+        const popoverItems = upcomingValid.slice(0, 3).map((e) => {
+          const ed = new Date(e.exam_date + "T12:00:00");
+          const dDays = Math.round((ed.getTime() - todayMid) / (1000 * 60 * 60 * 24));
+          const dLbl = dDays === 0 ? "TODAY" : dDays === 1 ? "TMRW" : `in ${dDays}d`;
+          return `
+            <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border-hairline);">
+              <div style="max-width: 190px;">
+                <div style="font-weight: 700; font-size: 10.5px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${this.escapeHtml(e.subject)}: ${this.escapeHtml(e.title)}</div>
+                <div style="font-size: 8.5px; color: var(--text-tertiary);">${e.exam_date}</div>
+              </div>
+              <span class="key-pill" style="font-size: 8.5px; padding: 1px 5px; flex-shrink: 0; margin-left: 8px;">${dLbl}</span>
+            </div>
+          `;
+        }).join("");
+
+        nextExamRadarHtml = `
+          <div style="position: absolute; left: ${currentX + 90}px; top: ${spineY - 30}px; transform: translateY(-50%); z-index: 36;">
+            <div class="metro-exam-radar-pill" id="metroRadarPill" onmouseenter="MetroMap.showRadarPopover()" onmouseleave="MetroMap.hideRadarPopover()">
+              <span>⚡</span>
+              <span>Next: ${this.escapeHtml(nextEx.subject)}</span>
+              <span style="opacity: 0.85; font-weight: 600;">(${dueLabel})</span>
+            </div>
+            <div id="metroRadarPopover" class="metro-exam-popover" onmouseenter="MetroMap.keepRadarPopover()" onmouseleave="MetroMap.hideRadarPopover()">
+              <div style="font-family: var(--font-mono); font-size: 8.5px; font-weight: 800; color: #ef4444; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase;">
+                UPCOMING SCHOOL TESTS
+              </div>
+              ${popoverItems}
+              <div style="margin-top: 8px; text-align: right;">
+                <button class="btn-ghost-icon" style="font-size: 9px; padding: 2px 6px;" onclick="HarnessApp.switchView('study')">View Study Ledger &rarr;</button>
+              </div>
+            </div>
+          </div>
+        `;
+      }
+    }
+
     // Real-Time Day Beacon (Above Spine, pointing down to track)
     const beaconTooltipHtml = `
-      <div style="position: absolute; left: ${currentX}px; top: ${spineY - 26}px; transform: translate(-50%, -100%); pointer-events: none; z-index: 35;">
+      <div style="position: absolute; left: ${currentX}px; top: ${spineY - 22}px; transform: translate(-50%, -100%); pointer-events: none; z-index: 35;">
         <div style="display: flex; flex-direction: column; align-items: center;">
           <div style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px; background: var(--accent-lavender); color: #ffffff; font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; box-shadow: var(--shadow-dropdown); letter-spacing: 0.02em; white-space: nowrap;">
             <span style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;" class="beacon-pulse"></span>
             <span>${beaconTitle} • ${beaconSub}</span>
           </div>
-          <div style="width: 2px; height: 12px; background: var(--accent-lavender);"></div>
-          <div style="width: 6px; height: 6px; border-radius: 50%; background: var(--accent-lavender); box-shadow: 0 0 8px var(--accent-lavender);"></div>
+          <div style="width: 2px; height: 10px; background: var(--accent-lavender);"></div>
+          <div style="width: 5px; height: 5px; border-radius: 50%; background: var(--accent-lavender); box-shadow: 0 0 8px var(--accent-lavender);"></div>
         </div>
       </div>
     `;
 
-    canvasWrap.innerHTML = phaseHeadersHtml + svgHtml + cardsHtml + beaconTooltipHtml;
+    canvasWrap.innerHTML = phaseHeadersHtml + svgHtml + cardsHtml + terminalCardHtml + beaconTooltipHtml + nextExamRadarHtml;
     this.attachTestDotEvents();
   },
 
@@ -730,7 +948,6 @@ const MetroMap = {
           const streamMatch = this.streams.find((s) => s.name.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(s.id));
           const lineBadgeColor = streamMatch ? streamMatch.color : "var(--accent-lavender)";
 
-          // Find linked deliverable in stationProgress
           const pMatch = (this.stationProgress || []).find(
             (p) => p.stream.toLowerCase() === key.toLowerCase() || (streamMatch && p.stream.toLowerCase() === streamMatch.id)
           );
