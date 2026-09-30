@@ -1,22 +1,21 @@
 /**
- * Section 2: TUM METRO ROADMAP // Sleek Transit Trunk Architecture (Version 5.0)
+ * Section 2: TUM METRO ROADMAP // Sleek Two-Tier Transit Architecture (Version 6.0)
  *
  * Architecture:
- * - Single Clean Progression Rail: One continuous, elegant rail with satisfying circular
- *   milestone station tokens.
- * - Dynamic 45° Tributary Rails: Stream tracks (Academics, Code, SIGG, German, Physical)
- *   are completely hidden from the track by default, appearing only as subtle colored
- *   micro-dots on each station. Selecting a stream filter or focusing a milestone station
- *   reveals smooth 45° tributary branches with chamfered connections.
- * - Station Hierarchy:
- *   - Active Station: Spotlight Hero Card with glowing visual emphasis, current focus,
- *     and interactive top deliverables.
- *   - Other Stations: Minimalist, airy milestone pills (Month + Title + Stream pips) with
- *     generous breathing room.
- * - Calm Today Beacon & Exam Radar: Eliminates the forest of tall red flags. Near the Today
- *   beacon, a consolidated radar pill reveals upcoming tests in a clean popover on hover.
- *   An optional toolbar toggle peeks at individual exam pins on demand.
- * - TUM '28 Golden Terminal: Celebratory destination gate milestone crowned at the horizon.
+ * - Tier 1: Crisp Horizontal Timeline Rail
+ *   - Continuous progression rail (solid elapsed stroke, light future stroke).
+ *   - Clean station nodes (Completed with ✓ checkmark, Active concentric blue ring with
+ *     "Active 'TUM' station" label, Future hollow nodes, and Golden Terminal).
+ *   - Clean Today vertical indicator with 2-line monospace date/progress typography.
+ *   - Dynamic Multi-Tier Staggered School Exams: displays ALL upcoming exams on vertical
+ *     leader lines with non-colliding staggered heights (Tier 0-3) and crisp '[Xd] Subject'
+ *     labels, eliminating stacked badge pills and visual clutter.
+ * - Tier 2: Responsive Milestone Cards Grid (Matching User Mockup)
+ *   - Uniform, elegant cards with Month tag, status chip, milestone title, stream micro-tags,
+ *     and slim progress bar.
+ *   - Active station spotlight with 1.5px accent border and elevated styling.
+ *   - Two-way interaction: hovering/clicking a card highlights the station node on the rail
+ *     above and opens the detailed milestone drawer.
  */
 
 const MetroMap = {
@@ -27,48 +26,47 @@ const MetroMap = {
   selectedStation: null,
   activeStreamFilter: "all",
   focusedStationId: null,
-  showAllExams: false,
   currentBeaconX: 0,
   stationProgress: [],
   paceVelocity: null,
   upcomingExams: [],
 
-  // Stream Definitions for Transit Branches
+  // Stream Definitions
   streams: [
     {
       id: "academics",
       name: "Academics",
       code: "AC",
       color: "#a855f7",
-      yOffset: -30,
+      yOffset: -28,
     },
     {
       id: "code",
       name: "Code Sprint",
       code: "CD",
       color: "#38bdf8",
-      yOffset: -16,
+      yOffset: -14,
     },
     {
       id: "sigg",
       name: "SIGG GPW",
       code: "SG",
       color: "#f59e0b",
-      yOffset: 22,
+      yOffset: 20,
     },
     {
       id: "german",
       name: "German Ladder",
       code: "DE",
       color: "#10b981",
-      yOffset: -44,
+      yOffset: -40,
     },
     {
       id: "physical",
       name: "Physical / Mass",
       code: "PH",
       color: "#f43f5e",
-      yOffset: 36,
+      yOffset: 34,
     },
   ],
 
@@ -97,13 +95,11 @@ const MetroMap = {
     container.addEventListener("mousedown", (e) => {
       if (
         e.target.closest(".metro-station-card") ||
-        e.target.closest(".metro-station-pill") ||
-        e.target.closest(".metro-hero-card") ||
-        e.target.closest(".metro-terminal-card") ||
+        e.target.closest(".metro-grid-card") ||
         e.target.closest(".station-drawer") ||
         e.target.closest("button") ||
         e.target.closest(".metro-station-node") ||
-        e.target.closest(".metro-exam-radar-pill")
+        e.target.closest(".metro-test-tick")
       ) return;
       this.isDragging = true;
       container.classList.add("grabbing");
@@ -159,7 +155,7 @@ const MetroMap = {
     }
 
     // Stream Filter Buttons
-    const filterBtns = document.querySelectorAll(".metro-filter-btn:not(#btnToggleExamPins)");
+    const filterBtns = document.querySelectorAll(".metro-filter-btn");
     filterBtns.forEach((btn) => {
       btn.addEventListener("click", () => {
         filterBtns.forEach((b) => b.classList.remove("active"));
@@ -168,17 +164,6 @@ const MetroMap = {
         this.render();
       });
     });
-
-    // Optional Exam Pins Toggle Button
-    const toggleExamsBtn = document.getElementById("btnToggleExamPins");
-    if (toggleExamsBtn) {
-      toggleExamsBtn.addEventListener("click", () => {
-        this.showAllExams = !this.showAllExams;
-        toggleExamsBtn.classList.toggle("active", this.showAllExams);
-        toggleExamsBtn.textContent = this.showAllExams ? "📌 Hide Exams" : "📌 Show Exams";
-        this.render();
-      });
-    }
   },
 
   async load() {
@@ -229,11 +214,35 @@ const MetroMap = {
               completed: false,
             },
             {
+              id: 13,
+              subject: "Chemia",
+              title: "Sprawdzian: Budowa atomu i wiązania",
+              exam_date: "2026-09-29",
+              scope: "Konfiguracje elektronowe, liczby kwantowe, typy wiązań.",
+              completed: false,
+            },
+            {
+              id: 16,
+              subject: "Fizyka",
+              title: "Kartkówka: Ruch jednostajny i przyspieszony",
+              exam_date: "2026-10-01",
+              scope: "Wykresy v(t), s(t), wzory na przyspieszenie.",
+              completed: false,
+            },
+            {
               id: 5,
               subject: "Geografia",
               title: "Sprawdzian: Mapa fizyczna Polski",
               exam_date: "2026-10-02",
               scope: "Sprawdzian wiadomości - Mapa fizyczna Polski.",
+              completed: false,
+            },
+            {
+              id: 15,
+              subject: "Fizyka",
+              title: "Sprawdzian: Kinematyka",
+              exam_date: "2026-10-05",
+              scope: "Rzuty pionowe, poziome i ukośne.",
               completed: false,
             },
             {
@@ -244,9 +253,18 @@ const MetroMap = {
               scope: "Rozprawka (romantyzm) - wstęp, teza, argument, przykład, kontekst.",
               completed: false,
             },
+            {
+              id: 14,
+              subject: "Matematyka",
+              title: "Sprawdzian: Funkcja kwadratowa",
+              exam_date: "2026-10-07",
+              scope: "Postać ogólna, kanoniczna, iloczynowa, nierówności kwadratowe.",
+              completed: false,
+            },
           ];
         }
       }
+
       this.render();
       setTimeout(() => this.scrollToBeacon(), 200);
     } catch (err) {
@@ -254,43 +272,58 @@ const MetroMap = {
     }
   },
 
-  setFocusStation(stationId) {
-    if (this.focusedStationId === stationId) return;
+  highlightStationOnRail(stationId) {
     this.focusedStationId = stationId;
-    this.render();
+    const ring = document.getElementById(`rail-ring-${stationId}`);
+    if (ring) {
+      ring.setAttribute("stroke-width", "3.5");
+      ring.setAttribute("stroke", "var(--accent-lavender)");
+    }
   },
 
-  showRadarPopover() {
-    const pop = document.getElementById("metroRadarPopover");
-    if (pop) pop.style.display = "block";
+  clearHighlightStationOnRail() {
+    this.focusedStationId = null;
+    document.querySelectorAll(".station-rail-node-ring").forEach((el) => {
+      const origStroke = el.getAttribute("data-orig-stroke");
+      const origWidth = el.getAttribute("data-orig-width");
+      if (origStroke) el.setAttribute("stroke", origStroke);
+      if (origWidth) el.setAttribute("stroke-width", origWidth);
+    });
   },
 
-  keepRadarPopover() {
-    const pop = document.getElementById("metroRadarPopover");
-    if (pop) pop.style.display = "block";
+  highlightCardInGrid(stationId) {
+    document.querySelectorAll(".metro-grid-card").forEach((card) => {
+      if (card.getAttribute("data-station-id") === stationId) {
+        card.classList.add("highlighted-card");
+      } else {
+        card.classList.remove("highlighted-card");
+      }
+    });
   },
 
-  hideRadarPopover() {
-    const pop = document.getElementById("metroRadarPopover");
-    if (pop) pop.style.display = "none";
+  clearHighlightCardInGrid() {
+    document.querySelectorAll(".metro-grid-card").forEach((card) => {
+      card.classList.remove("highlighted-card");
+    });
   },
 
   render() {
     if (!this.data || !this.data.stations) return;
 
     const canvasWrap = document.getElementById("metroCanvasWrap");
+    const cardsGrid = document.getElementById("metroCardsGrid");
     if (!canvasWrap) return;
 
     const stations = this.data.stations;
-    const spacing = 260;
-    const startX = 140;
-    const spineY = 170;
+    const spacing = 220;
+    const startX = 120;
+    const spineY = 110;
     const totalTrackLength = (stations.length - 1) * spacing;
-    const terminusX = startX + totalTrackLength + 140;
-    const totalWidth = terminusX + 220;
+    const terminusX = startX + totalTrackLength + 120;
+    const totalWidth = terminusX + 160;
 
     canvasWrap.style.minWidth = `${totalWidth}px`;
-    canvasWrap.style.height = "520px";
+    canvasWrap.style.height = "210px";
 
     // Date calculations
     const startDate = new Date(2026, 8, 1);
@@ -301,6 +334,9 @@ const MetroMap = {
     let beaconTitle = "";
     let beaconSub = "";
     let isPreLaunch = false;
+    let totalDays = 699;
+    let elapsedDays = 31;
+    let progressRatio = 0.044;
 
     if (now < startDate) {
       isPreLaunch = true;
@@ -312,19 +348,19 @@ const MetroMap = {
     } else {
       const totalMs = endDate.getTime() - startDate.getTime();
       const elapsedMs = Math.min(totalMs, Math.max(0, now.getTime() - startDate.getTime()));
-      const progressRatio = elapsedMs / totalMs;
-      const totalDays = Math.round(totalMs / (1000 * 60 * 60 * 24));
-      const elapsedDays = Math.min(totalDays, Math.round(elapsedMs / (1000 * 60 * 60 * 24)));
+      progressRatio = elapsedMs / totalMs;
+      totalDays = Math.round(totalMs / (1000 * 60 * 60 * 24));
+      elapsedDays = Math.min(totalDays, Math.round(elapsedMs / (1000 * 60 * 60 * 24)));
 
       currentX = startX + progressRatio * totalTrackLength;
       const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-      beaconTitle = `TODAY • DAY ${elapsedDays + 1} OF ${totalDays}`;
+      beaconTitle = `DAY ${elapsedDays + 1}/${totalDays}`;
       beaconSub = dateStr;
     }
 
     this.currentBeaconX = currentX;
 
-    // Zone 1: Phase Milestones Headers (Top Zone, Y=14)
+    // Phase Milestones Headers (Top Zone, Y=14)
     const phases = [
       { name: "Phase 1: Year 3 Liceum", startIdx: 0, endIdx: 6 },
       { name: "Phase 2: SIGG Finals & Year 3 Lock", startIdx: 7, endIdx: 10 },
@@ -339,9 +375,9 @@ const MetroMap = {
         const x2 = startX + p.endIdx * spacing + 80;
         const width = Math.max(120, x2 - x1);
         return `
-          <div style="position: absolute; top: 14px; left: ${x1}px; width: ${width}px; pointer-events: none; z-index: 5;">
+          <div style="position: absolute; top: 12px; left: ${x1}px; width: ${width}px; pointer-events: none; z-index: 5;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: 0.06em; white-space: nowrap;">
+              <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: 0.05em; white-space: nowrap;">
                 ${p.name}
               </span>
               <div style="flex: 1; height: 1px; background: var(--border-hairline);"></div>
@@ -351,458 +387,385 @@ const MetroMap = {
       })
       .join("");
 
-    // Zone 2: Single Clean Main Rail (6px stroke)
+    // Single Main Track (Elapsed solid black/dark, Future light subtle grey)
     const trunkHtml = `
-      <!-- Base Main Rail -->
-      <line x1="${startX - 30}" y1="${spineY}" x2="${terminusX}" y2="${spineY}" 
-            stroke="var(--border-subtle)" stroke-width="6" stroke-linecap="round" />
+      <!-- Future Track -->
+      <line x1="${startX - 20}" y1="${spineY}" x2="${terminusX}" y2="${spineY}" 
+            stroke="var(--border-subtle)" stroke-width="4" stroke-linecap="round" />
       
-      <!-- Completed / Progress Track up to Today -->
+      <!-- Completed / Active Track up to Today -->
       ${
-        currentX > startX - 30
-          ? `<line x1="${startX - 30}" y1="${spineY}" x2="${Math.min(terminusX, currentX)}" y2="${spineY}" 
-                  stroke="var(--accent-lavender)" stroke-width="6" stroke-linecap="round" />`
+        currentX > startX - 20
+          ? `<line x1="${startX - 20}" y1="${spineY}" x2="${Math.min(terminusX, currentX)}" y2="${spineY}" 
+                  stroke="var(--text-primary)" stroke-width="4" stroke-linecap="round" />`
           : ""
       }
     `;
 
-    // Zone 2: Dynamic 45° Tributary Rails
-    // Only revealed when a stream filter is selected OR a station is hovered/focused
-    const streamsToHighlight = new Set();
-    if (this.activeStreamFilter !== "all") {
-      streamsToHighlight.add(this.activeStreamFilter);
-    }
-    if (this.focusedStationId) {
-      const fSt = stations.find((s) => s.id === this.focusedStationId);
-      if (fSt && fSt.branches) {
-        fSt.branches.forEach((b) => streamsToHighlight.add(b));
-      }
-    }
-
+    // Dynamic 45° Tributary Rails (On demand when a stream filter is selected)
     let tributaryPathsHtml = "";
-    if (streamsToHighlight.size > 0) {
-      this.streams.forEach((stream) => {
-        if (!streamsToHighlight.has(stream.id)) return;
+    if (this.activeStreamFilter !== "all") {
+      const stream = this.streams.find((s) => s.id === this.activeStreamFilter);
+      if (stream) {
         const color = this.getStreamColor(stream.id);
         const yOffset = stream.yOffset;
         const branchY = spineY + yOffset;
         const ramp = Math.abs(yOffset);
 
-        // Find station indices where this stream is active
         const indices = [];
         stations.forEach((st, idx) => {
           if ((st.branches || []).includes(stream.id)) {
             indices.push(idx);
           }
         });
-        if (indices.length === 0) return;
 
-        // Group consecutive indices into segments
-        const segments = [];
-        let cur = [indices[0]];
-        for (let i = 1; i < indices.length; i++) {
-          if (indices[i] === indices[i - 1] + 1) {
-            cur.push(indices[i]);
-          } else {
-            segments.push(cur);
-            cur = [indices[i]];
+        if (indices.length > 0) {
+          const segments = [];
+          let cur = [indices[0]];
+          for (let i = 1; i < indices.length; i++) {
+            if (indices[i] === indices[i - 1] + 1) {
+              cur.push(indices[i]);
+            } else {
+              segments.push(cur);
+              cur = [indices[i]];
+            }
+          }
+          segments.push(cur);
+
+          segments.forEach((seg) => {
+            const firstIdx = seg[0];
+            const lastIdx = seg[seg.length - 1];
+            const segStartX = startX + firstIdx * spacing;
+            const segEndX = startX + lastIdx * spacing;
+            const ingressX = segStartX - ramp;
+            const egressX = segEndX + ramp;
+
+            const pathD = `M ${ingressX} ${spineY} L ${segStartX} ${branchY} L ${segEndX} ${branchY} L ${egressX} ${spineY}`;
+
+            tributaryPathsHtml += `
+              <g class="stream-tributary-branch">
+                <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
+            `;
+
+            seg.forEach((idx) => {
+              const px = startX + idx * spacing;
+              tributaryPathsHtml += `
+                <line x1="${px}" y1="${branchY}" x2="${px}" y2="${spineY}" stroke="${color}" stroke-width="1" stroke-dasharray="2 2" opacity="0.5" />
+                <circle cx="${px}" cy="${branchY}" r="3" fill="${color}" stroke="var(--bg-canvas)" stroke-width="1.2" />
+              `;
+            });
+
+            tributaryPathsHtml += `</g>`;
+          });
+        }
+      }
+    }
+
+    // Dynamic Multi-Tier Staggered School Exams on Track
+    let examsSvgHtml = "";
+    if (this.upcomingExams && this.upcomingExams.length > 0) {
+      const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+
+      const validExams = [];
+      this.upcomingExams
+        .filter((e) => !e.completed)
+        .forEach((exam) => {
+          try {
+            const exDate = new Date(exam.exam_date + "T12:00:00");
+            if (exDate >= startDate && exDate <= endDate) {
+              const elapsed = exDate.getTime() - startDate.getTime();
+              const totalMs = endDate.getTime() - startDate.getTime();
+              const ratio = elapsed / totalMs;
+              const testX = startX + ratio * totalTrackLength;
+              const diffDays = Math.round((exDate.getTime() - todayMid) / (1000 * 60 * 60 * 24));
+              const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "1d" : diffDays > 0 ? `${diffDays}d` : `${Math.abs(diffDays)}d ago`;
+              validExams.push({
+                ...exam,
+                testX,
+                diffDays,
+                dueLabel,
+              });
+            }
+          } catch (e) {}
+        });
+
+      // Sort by horizontal position
+      validExams.sort((a, b) => a.testX - b.testX);
+
+      // Stagger heights dynamically: Tier 0 (26px), Tier 1 (48px), Tier 2 (70px)
+      const tierHeights = [26, 48, 70];
+      const assignedTiers = [];
+
+      validExams.forEach((ex, idx) => {
+        const collidingTiers = new Set();
+        // Avoid collision with Today indicator around currentX
+        if (Math.abs(ex.testX - currentX) < 68) {
+          collidingTiers.add(0);
+          collidingTiers.add(1);
+        }
+        for (let j = 0; j < idx; j++) {
+          const prev = validExams[j];
+          if (Math.abs(ex.testX - prev.testX) < 82) {
+            collidingTiers.add(assignedTiers[j]);
           }
         }
-        segments.push(cur);
+        let chosenTier = 0;
+        while (collidingTiers.has(chosenTier) && chosenTier < 2) {
+          chosenTier++;
+        }
+        assignedTiers.push(chosenTier);
+        ex.tier = chosenTier;
+        ex.tickHeight = tierHeights[chosenTier];
+      });
 
-        segments.forEach((seg) => {
-          const firstIdx = seg[0];
-          const lastIdx = seg[seg.length - 1];
-          const segStartX = startX + firstIdx * spacing;
-          const segEndX = startX + lastIdx * spacing;
+      validExams.forEach((exam) => {
+        const testX = exam.testX;
+        const tickTopY = spineY - exam.tickHeight;
+        const isUrgent = exam.diffDays >= 0 && exam.diffDays <= 2;
+        const lineColor = isUrgent ? "#ef4444" : "var(--text-tertiary)";
+        const textColor = isUrgent ? "#ef4444" : "var(--text-primary)";
+        const labelText = `[${exam.dueLabel}] ${exam.subject}`;
 
-          const ingressX = segStartX - ramp;
-          const egressX = segEndX + ramp;
-
-          const pathD = `M ${ingressX} ${spineY} L ${segStartX} ${branchY} L ${segEndX} ${branchY} L ${egressX} ${spineY}`;
-
-          tributaryPathsHtml += `
-            <g class="stream-tributary-branch">
-              <!-- 45° Chamfered Tributary Rail -->
-              <path d="${pathD}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0.9" />
-          `;
-
-          seg.forEach((idx) => {
-            const px = startX + idx * spacing;
-            tributaryPathsHtml += `
-              <!-- Drop connector stem -->
-              <line x1="${px}" y1="${branchY}" x2="${px}" y2="${spineY}" stroke="${color}" stroke-width="1.5" stroke-dasharray="2 3" opacity="0.6" />
-              <!-- Junction dot on tributary rail -->
-              <circle cx="${px}" cy="${branchY}" r="3.5" fill="${color}" stroke="var(--bg-canvas)" stroke-width="1.5" />
-            `;
-          });
-
-          tributaryPathsHtml += `</g>`;
-        });
+        examsSvgHtml += `
+          <g class="metro-test-tick" data-id="${exam.id}" data-subject="${this.escapeHtml(exam.subject)}" data-title="${this.escapeHtml(exam.title)}" data-date="${exam.exam_date}" data-due="${exam.dueLabel}" data-scope="${this.escapeHtml(exam.scope || '')}" style="cursor: pointer; pointer-events: all;">
+            <!-- Pin dot on track -->
+            <circle cx="${testX}" cy="${spineY}" r="3" fill="${isUrgent ? '#ef4444' : 'var(--text-secondary)'}" stroke="var(--bg-card)" stroke-width="1.5" />
+            <!-- Vertical leader line -->
+            <line x1="${testX}" y1="${spineY - 4}" x2="${testX}" y2="${tickTopY + 2}" stroke="${lineColor}" stroke-width="1.2" stroke-dasharray="${isUrgent ? 'none' : '2 2'}" opacity="0.8" />
+            <!-- Small top notch pip -->
+            <circle cx="${testX}" cy="${tickTopY + 2}" r="1.5" fill="${lineColor}" />
+            <!-- Clean minimalist text label -->
+            <text x="${testX}" y="${tickTopY - 3}" font-family="var(--font-mono)" font-size="9" font-weight="${isUrgent ? '700' : '600'}" text-anchor="middle" fill="${textColor}">
+              ${this.escapeHtml(labelText)}
+            </text>
+          </g>
+        `;
       });
     }
 
-    // Zone 2: Milestone Station Tokens & Stream Micro-Pips
+    // Station Nodes along Track
     let stationsSvgHtml = "";
     stations.forEach((station, idx) => {
       const posX = startX + idx * spacing;
       const status = station.status || "upcoming";
-      const isMajor = station.is_major;
       const isPassed = posX <= currentX;
       const isActive = status === "active";
       const isCompleted = status === "completed" || (isPassed && !isPreLaunch);
-      const isHovered = this.focusedStationId === station.id;
+      const branches = station.branches || [];
 
-      // Node circles
-      let aura = "";
       let nodeCircles = "";
+      let labelSubText = station.month_label;
+      let labelSubColor = "var(--text-tertiary)";
+
       if (isActive) {
-        aura = `
-          <circle cx="${posX}" cy="${spineY}" r="22" fill="none" stroke="var(--accent-lavender)" stroke-width="2" opacity="0.4" class="beacon-pulse" />
-        `;
+        labelSubText = "Active 'TUM' station";
+        labelSubColor = "var(--accent-lavender)";
         nodeCircles = `
-          <circle cx="${posX}" cy="${spineY}" r="11" fill="var(--bg-canvas)" stroke="var(--accent-lavender)" stroke-width="3.5" />
-          <circle cx="${posX}" cy="${spineY}" r="4.5" fill="var(--accent-lavender)" />
+          <!-- Concentric Blue Rings for Active TUM Station (Matching Mockup) -->
+          <circle cx="${posX}" cy="${spineY}" r="20" fill="none" stroke="var(--accent-lavender)" stroke-width="1.5" opacity="0.3" class="beacon-pulse" />
+          <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--accent-lavender)" data-orig-width="2.5" cx="${posX}" cy="${spineY}" r="13" fill="none" stroke="var(--accent-lavender)" stroke-width="2.5" />
+          <circle cx="${posX}" cy="${spineY}" r="9" fill="var(--bg-card)" />
+          <circle cx="${posX}" cy="${spineY}" r="5.5" fill="var(--accent-lavender)" />
         `;
       } else if (isCompleted) {
+        labelSubText = "Completed";
         nodeCircles = `
-          <circle cx="${posX}" cy="${spineY}" r="9" fill="var(--accent-lavender)" stroke="var(--bg-canvas)" stroke-width="2" />
-          <polyline points="${posX - 3},${spineY} ${posX - 1},${spineY + 2} ${posX + 3},${spineY - 2}" fill="none" stroke="#ffffff" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" />
+          <!-- Solid Dark Circle with White Checkmark (Matching Mockup) -->
+          <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--bg-card)" data-orig-width="2" cx="${posX}" cy="${spineY}" r="8.5" fill="var(--text-primary)" stroke="var(--bg-card)" stroke-width="2" />
+          <polyline points="${posX - 3},${spineY} ${posX - 1},${spineY + 2} ${posX + 3},${spineY - 2}" fill="none" stroke="var(--bg-card)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
         `;
       } else {
-        const r = isMajor ? 10 : 8;
-        const strokeW = isMajor ? 2.5 : 2;
-        const strokeColor = isHovered ? "var(--accent-lavender)" : "var(--border-medium)";
         nodeCircles = `
-          <circle cx="${posX}" cy="${spineY}" r="${r}" fill="var(--bg-surface)" stroke="${strokeColor}" stroke-width="${strokeW}" />
+          <!-- Clean Hollow Circle for Future Stations (Matching Mockup) -->
+          <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--border-medium)" data-orig-width="2" cx="${posX}" cy="${spineY}" r="8.5" fill="var(--bg-card)" stroke="var(--border-medium)" stroke-width="2" />
         `;
       }
 
-      // Stream Micro-Pips (Colored indicator dots beneath the station token)
-      const branches = station.branches || [];
-      const pipSpacing = 7;
+      // Stream Micro-Pips beneath station
+      const pipSpacing = 6;
       const pipsStartX = posX - ((branches.length - 1) * pipSpacing) / 2;
       let pipsSvg = "";
       branches.forEach((b, pIdx) => {
         const c = this.getStreamColor(b);
-        pipsSvg += `<circle cx="${pipsStartX + pIdx * pipSpacing}" cy="${spineY + 16}" r="2.2" fill="${c}" />`;
+        pipsSvg += `<circle cx="${pipsStartX + pIdx * pipSpacing}" cy="${spineY + 44}" r="2" fill="${c}" />`;
       });
 
-      // Connecting stem down to card/pill
-      const stemColor = isActive || isHovered ? "var(--accent-lavender)" : "var(--border-hairline)";
-      const stemWidth = isActive ? 1.5 : 1;
-      const cardTop = isActive ? spineY + 36 : spineY + 44;
-      const stemSvg = `
-        <line x1="${posX}" y1="${spineY + 20}" x2="${posX}" y2="${cardTop}" stroke="${stemColor}" stroke-width="${stemWidth}" stroke-dasharray="2 3" opacity="${isActive || isHovered ? 0.8 : 0.4}" />
-      `;
+      // Station Labels Below the Rail (Matching Mockup)
+      const labelNameColor = isActive ? "var(--accent-lavender)" : isCompleted ? "var(--text-secondary)" : "var(--text-tertiary)";
+      const labelFontWeight = isActive ? "800" : "600";
 
       stationsSvgHtml += `
-        ${aura}
-        ${stemSvg}
-        ${nodeCircles}
-        ${pipsSvg}
-        <!-- Click & Hover Target -->
-        <circle cx="${posX}" cy="${spineY}" r="18" fill="transparent" cursor="pointer"
-                onclick="MetroMap.selectStation('${station.id}')"
-                onmouseenter="MetroMap.setFocusStation('${station.id}')"
-                onmouseleave="MetroMap.setFocusStation(null)"
-                style="pointer-events: all;" />
+        <g class="metro-rail-station-node" style="cursor: pointer; pointer-events: all;"
+           onclick="MetroMap.selectStation('${station.id}')"
+           onmouseenter="MetroMap.highlightCardInGrid('${station.id}')"
+           onmouseleave="MetroMap.clearHighlightCardInGrid()">
+          ${nodeCircles}
+          <!-- Station Title Below Node -->
+          <text x="${posX}" y="${spineY + 20}" text-anchor="middle" font-size="10.5" font-weight="${labelFontWeight}" fill="${labelNameColor}">
+            ${this.escapeHtml(station.name)}
+          </text>
+          <!-- Status / Subtitle Below -->
+          <text x="${posX}" y="${spineY + 32}" text-anchor="middle" font-family="var(--font-mono)" font-size="8.5" font-weight="${isActive ? '700' : '500'}" fill="${labelSubColor}">
+            ${labelSubText}
+          </text>
+          <!-- Stream Pips -->
+          ${pipsSvg}
+          <!-- Transparent Hit Target -->
+          <circle cx="${posX}" cy="${spineY}" r="20" fill="transparent" />
+        </g>
       `;
     });
 
-    // Zone 2: TUM '28 Golden Terminal Milestone Node
+    // TUM '28 Golden Terminal at the Horizon
     const terminalSvgHtml = `
-      <!-- TUM '28 Golden Terminal Milestone -->
-      <g style="pointer-events: all; cursor: pointer;" onclick="MetroMap.scrollToBeacon()">
-        <circle cx="${terminusX}" cy="${spineY}" r="22" fill="none" stroke="#f59e0b" stroke-width="2" opacity="0.35" class="beacon-pulse" />
-        <circle cx="${terminusX}" cy="${spineY}" r="12" fill="var(--bg-canvas)" stroke="#f59e0b" stroke-width="3" />
+      <g style="cursor: pointer; pointer-events: all;" onclick="HarnessApp.switchView('study')">
+        <circle cx="${terminusX}" cy="${spineY}" r="18" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0.3" class="beacon-pulse" />
+        <circle cx="${terminusX}" cy="${spineY}" r="12" fill="var(--bg-card)" stroke="#f59e0b" stroke-width="2.5" />
         <circle cx="${terminusX}" cy="${spineY}" r="5" fill="#f59e0b" />
+        <text x="${terminusX}" y="${spineY + 20}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#f59e0b">
+          TUM ’28
+        </text>
+        <text x="${terminusX}" y="${spineY + 32}" text-anchor="middle" font-family="var(--font-mono)" font-size="8" font-weight="700" fill="#f59e0b">
+          Campus Heilbronn
+        </text>
       </g>
     `;
 
-    // Optional Individual Exam Pins (Only visible if showAllExams is toggled ON)
-    let examsSvgHtml = "";
-    if (this.showAllExams && this.upcomingExams && this.upcomingExams.length > 0) {
-      const sortedExams = [...this.upcomingExams].sort((a, b) => new Date(a.exam_date) - new Date(b.exam_date));
-      sortedExams.forEach((exam, eIdx) => {
-        try {
-          const exDate = new Date(exam.exam_date + "T12:00:00");
-          if (exDate >= startDate && exDate <= endDate) {
-            const elapsed = exDate.getTime() - startDate.getTime();
-            const totalMs = endDate.getTime() - startDate.getTime();
-            const ratio = elapsed / totalMs;
-            const testX = startX + ratio * totalTrackLength;
-            const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-            const examMid = new Date(exDate.getFullYear(), exDate.getMonth(), exDate.getDate()).getTime();
-            const diffDays = Math.round((examMid - todayMid) / (1000 * 60 * 60 * 24));
-            const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "TMRW" : diffDays > 0 ? `in ${diffDays}d` : `${Math.abs(diffDays)}d ago`;
-            const isTodayExam = diffDays === 0;
+    // Today Vertical Indicator (Matching Mockup with 2-line minimalist text)
+    const todayBeaconSvg = `
+      <g class="metro-today-beacon" style="pointer-events: none;">
+        <!-- Clean vertical indicator line rising from rail -->
+        <line x1="${currentX}" y1="${spineY - 10}" x2="${currentX}" y2="${spineY - 42}" stroke="var(--accent-lavender)" stroke-width="1.8" />
+        <circle cx="${currentX}" cy="${spineY - 10}" r="2" fill="var(--accent-lavender)" />
+        <!-- 2-line clean monospace date and progress text -->
+        <text x="${currentX}" y="${spineY - 54}" font-family="var(--font-mono)" font-size="9.5" font-weight="800" text-anchor="middle" fill="var(--text-primary)" letter-spacing="0.04em">
+          ${beaconSub.toUpperCase()}
+        </text>
+        <text x="${currentX}" y="${spineY - 44}" font-family="var(--font-mono)" font-size="8.5" font-weight="700" text-anchor="middle" fill="var(--accent-lavender)">
+          ${beaconTitle} (${(progressRatio * 100).toFixed(1)}%)
+        </text>
+      </g>
+    `;
 
-            const flagY = spineY - 55 - (eIdx % 2) * 28;
-            const subjName = exam.subject || "Exam";
-            const flagText = `[EXAM] ${dueLabel} • ${subjName}`;
-            const flagW = Math.max(90, flagText.length * 6.6 + 16);
-
-            examsSvgHtml += `
-              <g class="metro-test-dot" data-id="${exam.id}" data-subject="${this.escapeHtml(exam.subject)}" data-title="${this.escapeHtml(exam.title)}" data-date="${exam.exam_date}" data-due="${dueLabel}" data-scope="${this.escapeHtml(exam.scope || '')}" style="cursor: pointer; pointer-events: all;">
-                <line x1="${testX}" y1="${spineY - 8}" x2="${testX}" y2="${flagY + 20}" stroke="${isTodayExam ? '#ef4444' : 'var(--color-red)'}" stroke-width="1.5" stroke-dasharray="2 2" />
-                <circle cx="${testX}" cy="${spineY}" r="4" fill="var(--bg-card)" stroke="${isTodayExam ? '#ef4444' : 'var(--color-red)'}" stroke-width="1.8" />
-                <circle cx="${testX}" cy="${spineY}" r="2" fill="${isTodayExam ? '#ef4444' : 'var(--color-red)'}" />
-                <rect x="${testX - flagW / 2}" y="${flagY}" width="${flagW}" height="20" rx="4" 
-                      fill="${isTodayExam ? 'rgba(239, 68, 68, 0.16)' : 'var(--bg-surface-elevated)'}" 
-                      stroke="${isTodayExam ? '#ef4444' : 'var(--border-medium)'}" 
-                      stroke-width="1.2" />
-                <text x="${testX}" y="${flagY + 13}" font-family="var(--font-mono)" font-size="9" font-weight="700" text-anchor="middle" fill="${isTodayExam ? '#ef4444' : 'var(--text-primary)'}">
-                  ${flagText}
-                </text>
-              </g>
-            `;
-          }
-        } catch (err) {}
-      });
-    }
-
-    // Assemble SVG Layers
-    const svgHtml = `
-      <svg width="${totalWidth}" height="520" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 25;">
-        <!-- Phase Separation Vertical Guidelines -->
-        ${phases
-          .map((p) => {
-            const px = startX + p.startIdx * spacing - 30;
-            return `<line x1="${px}" y1="36" x2="${px}" y2="480" stroke="rgba(255,255,255,0.03)" stroke-dasharray="3 4" stroke-width="1" />`;
-          })
-          .join("")}
-
-        <!-- Single Main Progression Rail -->
+    // Assemble Track SVG
+    canvasWrap.innerHTML = `
+      ${phaseHeadersHtml}
+      <svg width="${totalWidth}" height="210" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 20;">
         ${trunkHtml}
-
-        <!-- Dynamic 45° Tributary Rails -->
         ${tributaryPathsHtml}
-
-        <!-- Station Tokens along Spine -->
-        ${stationsSvgHtml}
-
-        <!-- TUM '28 Golden Terminal -->
-        ${terminalSvgHtml}
-
-        <!-- Optional Full Exam Pins Layer -->
         ${examsSvgHtml}
+        ${stationsSvgHtml}
+        ${terminalSvgHtml}
+        ${todayBeaconSvg}
       </svg>
     `;
 
-    // Zone 3: Cards Deck (Active Hero Card vs Minimalist Milestone Pills)
-    let cardsHtml = stations
-      .map((station, idx) => {
-        const posX = startX + idx * spacing;
-        const status = station.status || "upcoming";
-        const branches = station.branches || [];
-        const isFilteredMatch = this.activeStreamFilter === "all" || branches.includes(this.activeStreamFilter);
-        const opacityStyle = isFilteredMatch ? "opacity: 1;" : "opacity: 0.25;";
+    // Render Tier 2: Responsive Milestone Cards Grid (Matching User Mockup)
+    if (cardsGrid) {
+      let gridCardsHtml = stations
+        .map((station) => {
+          const status = station.status || "upcoming";
+          const isActive = status === "active";
+          const isCompleted = status === "completed";
+          const branches = station.branches || [];
 
-        const delivEntries = Object.entries(station.deliverables || {});
-        const completedList = station.completed_deliverables || [];
+          const isFilteredMatch = this.activeStreamFilter === "all" || branches.includes(this.activeStreamFilter);
+          const filterStyle = isFilteredMatch ? "" : "opacity: 0.28; filter: grayscale(0.5);";
 
-        // 1. ACTIVE STATION: Spotlight Hero Card
-        if (status === "active") {
-          const heroLeft = posX - 130;
-          const heroTop = spineY + 36;
+          const delivEntries = Object.entries(station.deliverables || {});
+          const completedList = station.completed_deliverables || [];
+          const totalDelivs = delivEntries.length;
+          const completedCount = completedList.length;
+          const progressPercent = totalDelivs > 0 ? Math.round((completedCount / totalDelivs) * 100) : isCompleted ? 100 : 0;
 
-          let heroDelivsHtml = "";
-          if (delivEntries.length > 0) {
-            heroDelivsHtml = `
-              <div style="display: flex; flex-direction: column; gap: 4px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border-hairline);">
-                ${delivEntries.slice(0, 3).map(([key, val]) => {
-                  const isChecked = completedList.includes(key);
-                  return `
-                    <div 
-                      style="display: flex; align-items: flex-start; gap: 6px; font-size: 10px; color: ${isChecked ? 'var(--text-muted)' : 'var(--text-secondary)'}; cursor: pointer;"
-                      onclick="event.stopPropagation(); MetroMap.toggleDeliverable('${station.id}', '${this.escapeHtml(key)}')"
-                      title="Click to toggle deliverable"
-                    >
-                      <span style="color: ${isChecked ? '#10b981' : 'var(--text-tertiary)'}; font-size: 11px; line-height: 1;">${isChecked ? '✓' : '○'}</span>
-                      <span style="line-height: 1.3; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 215px; ${isChecked ? 'text-decoration: line-through;' : ''}">${this.escapeHtml(val)}</span>
-                    </div>
-                  `;
-                }).join("")}
-              </div>
-            `;
+          // Header Chip
+          let chipHtml = "";
+          if (isActive) {
+            chipHtml = `<span class="metro-card-chip active">ACTIVE</span>`;
+          } else if (isCompleted) {
+            chipHtml = `<span class="metro-card-chip done">✓ DONE</span>`;
+          } else {
+            chipHtml = `<span class="metro-card-chip">${completedCount}/${totalDelivs}</span>`;
           }
 
-          let heroNextAction = "";
-          if (station.next_action) {
-            heroNextAction = `
-              <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--border-hairline); font-size: 9.5px; font-family: var(--font-mono); color: var(--accent-lavender); display: flex; align-items: center; gap: 4px;">
-                <span>&rarr;</span>
-                <span style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600;">${this.escapeHtml(station.next_action)}</span>
-              </div>
-            `;
-          }
+          // Micro-Tags
+          const tagsHtml = branches
+            .map((b) => {
+              const c = this.getStreamColor(b);
+              const streamObj = this.streams.find((s) => s.id === b);
+              const sName = streamObj ? streamObj.name : b.toUpperCase();
+              return `<span class="metro-micro-tag" style="background: ${c}15; color: ${c}; border: 1px solid ${c}35;">${sName}</span>`;
+            })
+            .join("");
 
           return `
             <div 
-              class="metro-hero-card"
-              style="left: ${heroLeft}px; top: ${heroTop}px; ${opacityStyle}"
+              class="metro-grid-card ${isActive ? 'active-card' : ''} ${isCompleted ? 'completed-card' : ''}"
+              data-station-id="${station.id}"
+              style="${filterStyle}"
               onclick="MetroMap.selectStation('${station.id}')"
-              onmouseenter="MetroMap.setFocusStation('${station.id}')"
-              onmouseleave="MetroMap.setFocusStation(null)"
+              onmouseenter="MetroMap.highlightStationOnRail('${station.id}')"
+              onmouseleave="MetroMap.clearHighlightStationOnRail()"
             >
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px;">
-                <span style="font-family: var(--font-mono); font-size: 8.5px; font-weight: 800; color: var(--accent-lavender); letter-spacing: 0.05em; text-transform: uppercase;">
-                  CURRENT FOCUS // ${station.month_label}
-                </span>
-                <span class="mono-chip" style="font-size: 8px; padding: 1px 5px; color: var(--accent-lavender); border-color: var(--accent-lavender-border); font-weight: 700;">
-                  ACTIVE
-                </span>
+              <!-- Card Header -->
+              <div class="metro-card-header">
+                <span class="metro-card-month">${station.month_label}:</span>
+                ${chipHtml}
               </div>
-              <div style="font-size: 14px; font-weight: 800; color: var(--text-primary); margin-bottom: 4px;">
-                ${this.escapeHtml(station.name)}
+
+              <!-- Milestone Title -->
+              <div class="metro-card-title" title="${this.escapeHtml(station.name)}">
+                ${this.escapeHtml(station.name.toUpperCase())}
               </div>
-              <div style="font-size: 10.5px; color: var(--text-secondary); line-height: 1.35; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;">
-                ${this.escapeHtml(station.objective || "")}
+
+              <!-- Micro-Tags Row -->
+              <div class="metro-micro-tags">
+                ${tagsHtml}
               </div>
-              ${heroDelivsHtml}
-              ${heroNextAction}
-              <div style="margin-top: 8px; display: flex; justify-content: flex-end;">
-                <span style="font-family: var(--font-mono); font-size: 8.5px; color: var(--text-tertiary); font-weight: 600;">Inspect Milestone &rarr;</span>
+
+              <!-- Slim Progress Bar -->
+              <div class="metro-card-progress">
+                <div class="metro-progress-track">
+                  <div class="metro-progress-fill" style="width: ${progressPercent}%; ${isActive ? 'background: var(--accent-lavender);' : ''}"></div>
+                </div>
+                <span class="metro-progress-pct">${progressPercent}%</span>
               </div>
             </div>
           `;
-        }
+        })
+        .join("");
 
-        // 2. OTHER STATIONS: Minimalist Milestone Pill
-        const pillLeft = posX - 70;
-        const pillTop = spineY + 44;
-
-        const pipsRow = branches
-          .map((b) => {
-            const color = this.getStreamColor(b);
-            return `<span class="stream-pip-dot" style="background: ${color};" title="${b.toUpperCase()}"></span>`;
-          })
-          .join("");
-
-        let statusChip = "";
-        if (status === "completed") {
-          statusChip = `<span class="mono-chip done" style="font-size: 8px; padding: 1px 4px;">DONE</span>`;
-        } else if (delivEntries.length > 0) {
-          statusChip = `<span class="mono-chip" style="font-size: 8px; padding: 1px 4px;">${completedList.length}/${delivEntries.length}</span>`;
-        }
-
-        return `
-          <div 
-            class="metro-station-pill ${status === "completed" ? "completed-pill" : ""}" 
-            style="left: ${pillLeft}px; top: ${pillTop}px; ${opacityStyle}"
-            onclick="MetroMap.selectStation('${station.id}')"
-            onmouseenter="MetroMap.setFocusStation('${station.id}')"
-            onmouseleave="MetroMap.setFocusStation(null)"
-          >
-            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-              <span style="font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; color: var(--text-tertiary);">${station.month_label}</span>
-              ${statusChip}
-            </div>
-            <div style="font-size: 11.5px; font-weight: 700; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-bottom: 4px;" title="${this.escapeHtml(station.name)}">
-              ${this.escapeHtml(station.name)}
-            </div>
-            <div style="display: flex; align-items: center; gap: 3.5px;">
-              ${pipsRow}
-            </div>
+      // Destination Milestone Card at the end of grid
+      gridCardsHtml += `
+        <div 
+          class="metro-grid-card" 
+          style="border: 1.5px solid rgba(245, 158, 11, 0.4); background: linear-gradient(135deg, rgba(245, 158, 11, 0.04), rgba(139, 92, 246, 0.04)); cursor: pointer;"
+          onclick="HarnessApp.switchView('study')"
+          title="TUM Campus Heilbronn Destination"
+        >
+          <div class="metro-card-header">
+            <span class="metro-card-month" style="color: #f59e0b;">OCT '28:</span>
+            <span class="metro-card-chip" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; border-color: rgba(245, 158, 11, 0.3);">TARGET</span>
           </div>
-        `;
-      })
-      .join("");
-
-    // TUM '28 Golden Terminal Card
-    const terminalCardHtml = `
-      <div 
-        class="metro-terminal-card" 
-        style="left: ${terminusX - 88}px; top: ${spineY + 40}px;"
-        onclick="HarnessApp.switchView('study')"
-        title="Destination: TUM Campus Heilbronn"
-      >
-        <div style="font-family: var(--font-mono); font-size: 8.5px; font-weight: 800; color: #f59e0b; letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 2px;">
-          ★ DESTINATION GATE ★
-        </div>
-        <div style="font-size: 13px; font-weight: 800; color: var(--text-primary); margin-bottom: 2px;">
-          TUM ’28
-        </div>
-        <div style="font-size: 9.5px; color: var(--text-secondary); line-height: 1.3;">
-          B.Sc. Management &amp; Data Science
-        </div>
-        <div style="margin-top: 5px; font-family: var(--font-mono); font-size: 8.5px; font-weight: 700; color: #f59e0b;">
-          Aptitude Target: &ge; 88 pts
-        </div>
-      </div>
-    `;
-
-    // Today Beacon & Consolidated Next Exam Radar Pill
-    let nextExamRadarHtml = "";
-    if (this.upcomingExams && this.upcomingExams.length > 0) {
-      const sortedExams = [...this.upcomingExams]
-        .filter((e) => !e.completed)
-        .sort((a, b) => new Date(a.exam_date) - new Date(b.exam_date));
-
-      const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
-      const upcomingValid = sortedExams.filter((e) => {
-        const eMid = new Date(e.exam_date + "T12:00:00").getTime();
-        return eMid - todayMid >= 0;
-      });
-
-      if (upcomingValid.length > 0) {
-        const nextEx = upcomingValid[0];
-        const exDate = new Date(nextEx.exam_date + "T12:00:00");
-        const diffDays = Math.round((exDate.getTime() - todayMid) / (1000 * 60 * 60 * 24));
-        const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "TMRW" : `in ${diffDays}d`;
-
-        const popoverItems = upcomingValid.slice(0, 3).map((e) => {
-          const ed = new Date(e.exam_date + "T12:00:00");
-          const dDays = Math.round((ed.getTime() - todayMid) / (1000 * 60 * 60 * 24));
-          const dLbl = dDays === 0 ? "TODAY" : dDays === 1 ? "TMRW" : `in ${dDays}d`;
-          return `
-            <div style="display: flex; align-items: center; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid var(--border-hairline);">
-              <div style="max-width: 190px;">
-                <div style="font-weight: 700; font-size: 10.5px; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${this.escapeHtml(e.subject)}: ${this.escapeHtml(e.title)}</div>
-                <div style="font-size: 8.5px; color: var(--text-tertiary);">${e.exam_date}</div>
-              </div>
-              <span class="key-pill" style="font-size: 8.5px; padding: 1px 5px; flex-shrink: 0; margin-left: 8px;">${dLbl}</span>
-            </div>
-          `;
-        }).join("");
-
-        nextExamRadarHtml = `
-          <div style="position: absolute; left: ${currentX + 90}px; top: ${spineY - 30}px; transform: translateY(-50%); z-index: 36;">
-            <div class="metro-exam-radar-pill" id="metroRadarPill" onmouseenter="MetroMap.showRadarPopover()" onmouseleave="MetroMap.hideRadarPopover()">
-              <span>⚡</span>
-              <span>Next: ${this.escapeHtml(nextEx.subject)}</span>
-              <span style="opacity: 0.85; font-weight: 600;">(${dueLabel})</span>
-            </div>
-            <div id="metroRadarPopover" class="metro-exam-popover" onmouseenter="MetroMap.keepRadarPopover()" onmouseleave="MetroMap.hideRadarPopover()">
-              <div style="font-family: var(--font-mono); font-size: 8.5px; font-weight: 800; color: #ef4444; margin-bottom: 6px; letter-spacing: 0.05em; text-transform: uppercase;">
-                UPCOMING SCHOOL TESTS
-              </div>
-              ${popoverItems}
-              <div style="margin-top: 8px; text-align: right;">
-                <button class="btn-ghost-icon" style="font-size: 9px; padding: 2px 6px;" onclick="HarnessApp.switchView('study')">View Study Ledger &rarr;</button>
-              </div>
-            </div>
+          <div class="metro-card-title" style="color: #f59e0b;">
+            TUM ’28 HEILBRONN
           </div>
-        `;
-      }
+          <div class="metro-micro-tags">
+            <span class="metro-micro-tag" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35);">B.Sc. MDS</span>
+            <span class="metro-micro-tag" style="background: rgba(139, 92, 246, 0.15); color: var(--accent-lavender); border: 1px solid rgba(139, 92, 246, 0.35);">&ge; 88 pts</span>
+          </div>
+          <div class="metro-card-progress">
+            <div class="metro-progress-track">
+              <div class="metro-progress-fill" style="width: ${(progressRatio * 100).toFixed(1)}%; background: #f59e0b;"></div>
+            </div>
+            <span class="metro-progress-pct" style="color: #f59e0b;">${(progressRatio * 100).toFixed(1)}%</span>
+          </div>
+        </div>
+      `;
+
+      cardsGrid.innerHTML = gridCardsHtml;
     }
 
-    // Real-Time Day Beacon (Above Spine, pointing down to track)
-    const beaconTooltipHtml = `
-      <div style="position: absolute; left: ${currentX}px; top: ${spineY - 22}px; transform: translate(-50%, -100%); pointer-events: none; z-index: 35;">
-        <div style="display: flex; flex-direction: column; align-items: center;">
-          <div style="display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 9999px; background: var(--accent-lavender); color: #ffffff; font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; box-shadow: var(--shadow-dropdown); letter-spacing: 0.02em; white-space: nowrap;">
-            <span style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;" class="beacon-pulse"></span>
-            <span>${beaconTitle} • ${beaconSub}</span>
-          </div>
-          <div style="width: 2px; height: 10px; background: var(--accent-lavender);"></div>
-          <div style="width: 5px; height: 5px; border-radius: 50%; background: var(--accent-lavender); box-shadow: 0 0 8px var(--accent-lavender);"></div>
-        </div>
-      </div>
-    `;
-
-    canvasWrap.innerHTML = phaseHeadersHtml + svgHtml + cardsHtml + terminalCardHtml + beaconTooltipHtml + nextExamRadarHtml;
     this.attachTestDotEvents();
   },
 
@@ -816,7 +779,7 @@ const MetroMap = {
       document.body.appendChild(tooltip);
     }
 
-    document.querySelectorAll(".metro-test-dot").forEach((dot) => {
+    document.querySelectorAll(".metro-test-tick").forEach((dot) => {
       dot.addEventListener("mouseenter", (e) => {
         const subj = dot.getAttribute("data-subject");
         const title = dot.getAttribute("data-title");

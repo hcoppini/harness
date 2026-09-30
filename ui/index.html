@@ -603,7 +603,6 @@
             <button class="metro-filter-btn" data-stream="sigg">SIGG GPW</button>
             <button class="metro-filter-btn" data-stream="german">German</button>
             <button class="metro-filter-btn" data-stream="physical">Physical</button>
-            <button id="btnToggleExamPins" class="metro-filter-btn" style="margin-left: 6px;" title="Toggle full school exam pins on track">📌 Show Exams</button>
           </div>
           <div style="font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono);">
             Scroll or drag track • Real-time timeline beacon
@@ -613,6 +612,21 @@
         <!-- Draggable Horizontal Track Container -->
         <div id="metroScrollContainer" class="metro-scroll-container">
           <div id="metroCanvasWrap" class="metro-canvas-wrap">
+            <!-- Rendered by MetroMap engine -->
+          </div>
+        </div>
+
+        <!-- Milestone Cards Grid Section (Tier 2) -->
+        <div class="metro-cards-section">
+          <div class="metro-cards-header">
+            <div>
+              <span class="card-label">Milestone Stations &amp; Deliverables</span>
+              <span style="font-size: 11px; color: var(--text-tertiary); margin-left: 8px;">
+                Click any milestone to open full deliverables and exam targets
+              </span>
+            </div>
+          </div>
+          <div id="metroCardsGrid" class="metro-cards-grid">
             <!-- Rendered by MetroMap engine -->
           </div>
         </div>

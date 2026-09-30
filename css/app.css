@@ -1382,7 +1382,8 @@ body {
   background: var(--bg-card);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-md);
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
 }
@@ -1430,12 +1431,16 @@ body {
 }
 
 .metro-scroll-container {
-  flex: 1;
+  height: 220px;
+  min-height: 220px;
+  flex-shrink: 0;
   overflow-x: auto;
   overflow-y: hidden;
   cursor: grab;
   position: relative;
   user-select: none;
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border-hairline);
 }
 
 .metro-scroll-container.grabbing {
@@ -1445,7 +1450,7 @@ body {
 .metro-canvas-wrap {
   position: relative;
   min-width: 3200px;
-  height: 100%;
+  height: 220px;
   padding: 0;
 }
 
@@ -1493,106 +1498,170 @@ body {
   opacity: 0.9;
 }
 
-/* Redesigned Metro Milestone Elements */
-.metro-station-pill {
-  position: absolute;
-  width: 140px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border-hairline);
-  border-radius: var(--radius-sm);
-  padding: 8px 10px;
-  cursor: pointer;
-  transition: transform 0.16s ease, border-color 0.16s ease, box-shadow 0.16s ease, background 0.16s ease;
-  z-index: 20;
-  box-shadow: var(--shadow-card);
+/* Tier 2: Milestone Cards Grid */
+.metro-cards-section {
+  padding: 16px 20px 24px 20px;
+  background: var(--bg-canvas);
+  flex: 1;
 }
 
-.metro-station-pill:hover {
-  transform: translateY(-3px);
+.metro-cards-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.metro-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.metro-grid-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-hairline);
+  border-radius: 12px;
+  padding: 12px 14px;
+  cursor: pointer;
+  transition: transform 0.14s ease, border-color 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: relative;
+}
+
+.metro-grid-card:hover {
+  transform: translateY(-2px);
   border-color: var(--accent-lavender);
   background: var(--bg-surface-elevated);
   box-shadow: var(--shadow-card-elevated);
-  z-index: 35;
 }
 
-.metro-station-pill.completed-pill {
-  border-color: var(--border-subtle);
-  opacity: 0.9;
-}
-
-.metro-hero-card {
-  position: absolute;
-  width: 260px;
-  background: var(--bg-surface-elevated);
+.metro-grid-card.active-card {
   border: 1.5px solid var(--accent-lavender);
-  border-radius: var(--radius-md);
-  padding: 14px 16px;
-  cursor: pointer;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
-  z-index: 30;
-  box-shadow: 0 6px 22px rgba(139, 92, 246, 0.18);
+  background: var(--bg-surface-elevated);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.12);
 }
 
-.metro-hero-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 10px 28px rgba(139, 92, 246, 0.25);
+.metro-grid-card.highlighted-card {
+  border-color: var(--accent-lavender);
+  box-shadow: 0 0 0 2px var(--accent-lavender-subtle);
 }
 
-.metro-exam-radar-pill {
-  display: inline-flex;
+.metro-grid-card.completed-card {
+  opacity: 0.82;
+  border-color: var(--border-subtle);
+}
+
+.metro-grid-card.completed-card:hover {
+  opacity: 1;
+}
+
+.metro-card-header {
+  display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 4px 10px;
-  border-radius: 9999px;
-  background: rgba(239, 68, 68, 0.1);
-  border: 1px solid rgba(239, 68, 68, 0.28);
-  color: #ef4444;
+  justify-content: space-between;
+}
+
+.metro-card-month {
   font-family: var(--font-mono);
   font-size: 10px;
   font-weight: 700;
-  cursor: pointer;
-  box-shadow: var(--shadow-card);
-  transition: all 0.15s ease;
-  pointer-events: all;
+  color: var(--text-tertiary);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
-.metro-exam-radar-pill:hover {
-  background: rgba(239, 68, 68, 0.18);
-  border-color: #ef4444;
-  transform: translateY(-1px);
+.metro-grid-card.active-card .metro-card-month {
+  color: var(--accent-lavender);
 }
 
-.metro-exam-popover {
-  position: absolute;
-  min-width: 250px;
-  max-width: 320px;
-  background: var(--bg-surface-elevated);
-  border: 1px solid var(--border-medium);
-  border-radius: var(--radius-sm);
-  padding: 10px 12px;
-  box-shadow: var(--shadow-dropdown);
-  z-index: 50;
-  pointer-events: all;
-  display: none;
+.metro-card-chip {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: var(--radius-xs);
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  color: var(--text-secondary);
 }
 
-.metro-terminal-card {
-  position: absolute;
-  width: 175px;
-  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(139, 92, 246, 0.08));
-  border: 1.5px solid rgba(245, 158, 11, 0.5);
-  border-radius: var(--radius-md);
-  padding: 10px 12px;
-  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.15);
-  z-index: 25;
-  text-align: center;
-  cursor: pointer;
-  transition: transform 0.16s ease, box-shadow 0.16s ease;
+.metro-card-chip.active {
+  background: var(--accent-lavender-subtle);
+  border-color: var(--accent-lavender-border);
+  color: var(--accent-lavender);
 }
 
-.metro-terminal-card:hover {
-  transform: translateY(-3px);
-  box-shadow: 0 8px 24px rgba(245, 158, 11, 0.25);
+.metro-card-chip.done {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: rgba(16, 185, 129, 0.3);
+  color: #10b981;
+}
+
+.metro-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.metro-micro-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.metro-micro-tag {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 4px;
+  line-height: 1.2;
+}
+
+.metro-card-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.metro-progress-track {
+  flex: 1;
+  height: 4px;
+  background: var(--border-subtle);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.metro-progress-fill {
+  height: 100%;
+  background: var(--accent-lavender);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.metro-progress-pct {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--text-tertiary);
+  min-width: 28px;
+  text-align: right;
+}
+
+.metro-test-tick {
+  transition: opacity 0.15s ease;
+}
+
+.metro-test-tick:hover {
+  filter: drop-shadow(0 2px 6px rgba(239, 68, 68, 0.4));
 }
 
 .stream-pip-dot {
