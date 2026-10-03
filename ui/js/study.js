@@ -97,24 +97,20 @@ window.Study = {
           : "";
 
         return `
-          <div id="study-exam-${ex.id}" data-exam-id="${ex.id}" class="study-exam-card" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 9px 12px; transition: outline 0.2s ease;">
-            <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-              <div>
-                <div style="display: flex; align-items: center; gap: 6px;">
-                  <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-primary);">
-                    [${this.escapeHtml(ex.subject)}]
-                  </span>
-                  <span style="font-size: 12px; font-weight: 600; color: var(--text-primary);">
-                    ${this.escapeHtml(ex.title)}
-                  </span>
-                </div>
-                ${scopeHtml}
-              </div>
+          <div id="study-exam-${ex.id}" data-exam-id="${ex.id}" class="study-exam-card" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 10px 12px; transition: outline 0.2s ease;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.04em;">
+                [${this.escapeHtml(ex.subject)}]
+              </span>
               <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
                 <span class="key-pill" style="font-size: 9px; padding: 2px 6px; ${badgeColor}">${dueLabel}</span>
-                <button type="button" class="btn-ghost-icon" style="padding: 2px 5px; font-size: 9px;" onclick="Study.deleteExam(${ex.id})" title="Delete test">&times;</button>
+                <button type="button" class="btn-ghost-icon" style="padding: 2px 6px; font-size: 13px; line-height: 1; min-height: 24px; min-width: 24px;" onclick="Study.deleteExam(${ex.id})" title="Delete test">&times;</button>
               </div>
             </div>
+            <div style="font-size: 13px; font-weight: 600; color: var(--text-primary); line-height: 1.35;">
+              ${this.escapeHtml(ex.title)}
+            </div>
+            ${scopeHtml}
           </div>
         `;
       })
@@ -158,24 +154,23 @@ window.Study = {
           : "";
 
         return `
-          <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 8px 10px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px; min-width: 0;">
+          <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 10px 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
                 <div class="check-dot ${hw.completed ? "checked" : ""}" onclick="Study.toggleHomework(${hw.id})" title="Toggle completion"></div>
-                <div style="min-width: 0;">
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-primary);">
-                      [${this.escapeHtml(hw.subject)}]
-                    </span>
-                    <span style="font-size: 11px; color: var(--text-primary); text-decoration: ${hw.completed ? "line-through" : "none"};">
-                      ${this.escapeHtml(hw.title)}
-                    </span>
-                  </div>
-                  ${notesHtml}
-                </div>
+                <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.04em;">
+                  [${this.escapeHtml(hw.subject)}]
+                </span>
               </div>
-              <span class="key-pill" style="font-size: 9px; padding: 1px 5px; flex-shrink: 0; ${badgeColor}">${dueLabel}</span>
+              <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
+                <span class="key-pill" style="font-size: 9px; padding: 2px 6px; ${badgeColor}">${dueLabel}</span>
+                <button type="button" class="btn-ghost-icon" style="padding: 2px 6px; font-size: 13px; line-height: 1; min-height: 24px; min-width: 24px;" onclick="Study.deleteHomework(${hw.id})" title="Delete homework">&times;</button>
+              </div>
             </div>
+            <div style="font-size: 13px; color: var(--text-primary); font-weight: 500; padding-left: 28px; line-height: 1.35; text-decoration: ${hw.completed ? "line-through" : "none"};">
+              ${this.escapeHtml(hw.title)}
+            </div>
+            ${notesHtml ? `<div style="padding-left: 28px;">${notesHtml}</div>` : ""}
           </div>
         `;
       })

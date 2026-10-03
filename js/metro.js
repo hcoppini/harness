@@ -492,26 +492,35 @@ const MetroMap = {
       // Sort by horizontal position
       validExams.sort((a, b) => a.testX - b.testX);
 
-      // Stagger heights dynamically: Tier 0 (26px), Tier 1 (48px), Tier 2 (70px)
-      const tierHeights = [26, 48, 70];
+      // Multi-tier heights to avoid collision with Today's indicator:
+      // Tier 0: 22px (low tick beneath Today's text)
+      // Tier 1: 52px (standard tick, used when far from Today's text)
+      // Tier 2: 78px (high tick towering above Today's text)
+      // Tier 3: 98px (extra high tick for dense exam clusters)
+      const tierHeights = [22, 52, 78, 98];
       const assignedTiers = [];
 
       validExams.forEach((ex, idx) => {
         const collidingTiers = new Set();
-        // Avoid collision with Today indicator around currentX
-        if (Math.abs(ex.testX - currentX) < 68) {
-          collidingTiers.add(0);
+        // The Today indicator label sits between spineY - 42 and spineY - 58.
+        // Any exam within 72px horizontally must avoid Tier 1 (52px).
+        const isNearToday = Math.abs(ex.testX - currentX) < 72;
+        if (isNearToday) {
           collidingTiers.add(1);
         }
         for (let j = 0; j < idx; j++) {
           const prev = validExams[j];
-          if (Math.abs(ex.testX - prev.testX) < 82) {
+          if (Math.abs(ex.testX - prev.testX) < 75) {
             collidingTiers.add(assignedTiers[j]);
           }
         }
         let chosenTier = 0;
-        while (collidingTiers.has(chosenTier) && chosenTier < 2) {
-          chosenTier++;
+        if (isNearToday && !collidingTiers.has(2)) {
+          chosenTier = 2; // Elevate above Today's indicator text
+        } else {
+          while (collidingTiers.has(chosenTier) && chosenTier < 3) {
+            chosenTier++;
+          }
         }
         assignedTiers.push(chosenTier);
         ex.tier = chosenTier;

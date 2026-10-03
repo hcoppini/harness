@@ -56,9 +56,6 @@
         <span id="themeToggleIcon">🌙</span>
         <span id="themeToggleText">DARK</span>
       </button>
-      <button id="btnMobileKillList" class="btn-ghost-icon mobile-only-btn" title="Open SGH Kill List" style="display: none;" onclick="window.KillListDrawer ? window.KillListDrawer.open() : null">
-        <span>[KILL]</span>
-      </button>
       <button id="syncStatusBadge" class="sync-badge" title="Click to sync Laptop and PC">
         <span class="sync-dot" id="syncDot"></span>
         <span class="sync-text" id="syncStatusText">Synced</span>
@@ -66,7 +63,7 @@
       <button id="btnOpenJsonModal" class="btn-ghost-icon" title="Standardized JSON Configuration">
         <span>JSON Hub</span>
       </button>
-      <div style="display: flex; align-items: baseline; gap: 8px; font-family: var(--font-mono); font-size: 11px;">
+      <div class="header-clock" style="display: flex; align-items: baseline; gap: 8px; font-family: var(--font-mono); font-size: 11px;">
         <span id="currentDatePill" style="color: var(--text-tertiary);">--</span>
         <span id="currentTimePill" style="color: var(--text-primary); font-weight: 600;">--:--</span>
       </div>
@@ -1688,21 +1685,21 @@
         <rect x="14" y="14" width="7" height="7"></rect>
         <rect x="3" y="14" width="7" height="7"></rect>
       </svg>
-      <span class="mobile-tab-label">0 Cockpit</span>
+      <span class="mobile-tab-label">Cockpit</span>
     </button>
     <button class="mobile-nav-tab" data-view="today" aria-label="Daily">
       <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <circle cx="12" cy="12" r="10"></circle>
         <polyline points="12 6 12 12 16 14"></polyline>
       </svg>
-      <span class="mobile-tab-label">1 Daily</span>
+      <span class="mobile-tab-label">Today</span>
     </button>
     <button class="mobile-nav-tab" data-view="study" aria-label="Study">
       <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
         <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
       </svg>
-      <span class="mobile-tab-label">2 Study</span>
+      <span class="mobile-tab-label">Study</span>
     </button>
     <button class="mobile-nav-tab" data-view="tum" aria-label="TUM '28">
       <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1711,7 +1708,7 @@
         <line x1="10" y1="3" x2="8" y2="21"></line>
         <line x1="16" y1="3" x2="14" y2="21"></line>
       </svg>
-      <span class="mobile-tab-label">3 TUM '28</span>
+      <span class="mobile-tab-label">Roadmap</span>
     </button>
   </nav>
 

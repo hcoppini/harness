@@ -226,6 +226,17 @@
   --shadow-dropdown: 0 16px 40px rgba(0, 0, 0, 0.85);
 }
 
+/* Suppress Injected Vercel Live Feedback / Toolbar on Mobile & Desktop to prevent blocking UI cards */
+vercel-live-feedback,
+#vercel-toolbar,
+[data-vercel-toolbar],
+.__vercel_toolbar,
+div[data-testid="vercel-toolbar-root"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -2263,7 +2274,8 @@ body {
     display: flex !important;
   }
 
-  .nav-tabs {
+  .nav-tabs,
+  .app-header .nav-tabs {
     display: none !important;
   }
 
@@ -2279,7 +2291,7 @@ body {
   .app-header {
     height: auto !important;
     min-height: 48px;
-    padding: max(8px, env(safe-area-inset-top, 0px)) 14px 8px 14px !important;
+    padding: max(8px, env(safe-area-inset-top, 0px)) 16px 8px !important;
     background: var(--bg-surface) !important;
     border-bottom: 1px solid var(--border-hairline) !important;
     backdrop-filter: blur(20px);
@@ -2289,20 +2301,61 @@ body {
     z-index: 100;
   }
 
-  .brand-caption, .brand-divider {
-    display: none;
+  .brand-wrap {
+    gap: 6px !important;
   }
 
-  #btnOpenJsonModal {
-    display: none;
+  .brand-mark {
+    width: 8px !important;
+    height: 8px !important;
   }
 
-  #currentDatePill {
-    display: none;
+  .brand-title {
+    font-size: 13px !important;
+    letter-spacing: 0.08em !important;
+  }
+
+  .brand-caption, 
+  .brand-divider,
+  #btnOpenJsonModal,
+  #currentDatePill,
+  #currentTimePill,
+  .header-clock,
+  #themeToggleText {
+    display: none !important;
+  }
+
+  .theme-toggle-btn {
+    width: 32px !important;
+    height: 32px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 50% !important;
+  }
+
+  .sync-badge {
+    padding: 3px 8px !important;
+    font-size: 10px !important;
   }
 
   .header-right {
-    gap: 8px;
+    gap: 6px !important;
+  }
+
+  /* Prevent iOS Safari 100% scale auto-zoom on input focus */
+  input[type="text"],
+  input[type="number"],
+  input[type="time"],
+  input[type="date"],
+  input[type="password"],
+  select,
+  textarea,
+  .quick-task-input,
+  .form-input,
+  .form-textarea {
+    font-size: 16px !important;
   }
 
   /* Responsive Main Viewport with Bottom Dock Spacing */
@@ -2314,7 +2367,7 @@ body {
   }
 
   .view-section {
-    padding: 6px 0 24px !important;
+    padding: 4px 0 20px !important;
     max-width: 100% !important;
   }
 
@@ -2322,17 +2375,18 @@ body {
     flex-direction: column !important;
     align-items: flex-start !important;
     gap: 8px !important;
-    margin-bottom: 14px !important;
+    margin-bottom: 12px !important;
+    padding-bottom: 8px !important;
   }
 
   .section-headline {
-    font-size: 19px !important;
-    line-height: 1.25 !important;
+    font-size: 18px !important;
+    line-height: 1.2 !important;
   }
 
   .section-caption {
     font-size: 11px !important;
-    line-height: 1.4 !important;
+    line-height: 1.35 !important;
   }
 
   /* Single-Column Stack for Cockpit, Today, Projects, Body */
@@ -2340,6 +2394,27 @@ body {
   .executive-cockpit-grid {
     grid-template-columns: 1fr !important;
     gap: 10px !important;
+  }
+
+  .cockpit-card {
+    padding: 14px 14px !important;
+    border-radius: 12px !important;
+  }
+
+  .heatmap-card {
+    padding: 14px 12px !important;
+    border-radius: 12px !important;
+  }
+
+  .heatmap-header-row {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+  }
+
+  .heatmap-legend {
+    width: 100%;
+    justify-content: flex-end;
   }
 
   .dashboard-layout {
@@ -2350,6 +2425,32 @@ body {
   .today-layout, .study-layout {
     grid-template-columns: 1fr !important;
     gap: 14px !important;
+  }
+
+  .schedule-banner {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 8px !important;
+    padding: 10px 12px !important;
+  }
+
+  .now-banner {
+    padding: 12px 12px !important;
+  }
+
+  .task-item {
+    padding: 10px 12px !important;
+    gap: 12px !important;
+  }
+
+  .task-label {
+    font-size: 13px !important;
+    line-height: 1.4 !important;
+  }
+
+  .study-exam-card {
+    padding: 10px 12px !important;
+    border-radius: 10px !important;
   }
 
   .projects-grid {
@@ -2370,35 +2471,66 @@ body {
   /* TUM Metro Roadmap Layer on Mobile */
   #view-tum.active {
     height: auto !important;
-    min-height: calc(100vh - 140px) !important;
+    min-height: auto !important;
     overflow: visible !important;
     padding: 6px 0 24px !important;
   }
 
   .metro-viewport {
-    height: 520px !important;
-    min-height: 460px !important;
+    height: 240px !important;
+    min-height: 240px !important;
+    border-radius: 12px !important;
+    margin-bottom: 12px !important;
   }
 
   .metro-toolbar {
     height: auto !important;
-    padding: 10px 12px !important;
-    flex-wrap: wrap !important;
-    gap: 8px !important;
+    padding: 6px 8px !important;
+    flex-wrap: nowrap !important;
   }
 
   .metro-filters {
+    display: flex !important;
+    flex-wrap: nowrap !important;
     overflow-x: auto !important;
     max-width: 100% !important;
     white-space: nowrap !important;
-    padding-bottom: 4px !important;
     -webkit-overflow-scrolling: touch !important;
+    padding-bottom: 4px !important;
+    gap: 6px !important;
+  }
+
+  .metro-filter-btn {
+    flex-shrink: 0 !important;
+    white-space: nowrap !important;
+    padding: 5px 10px !important;
+    font-size: 11px !important;
   }
 
   .metro-scroll-container {
     overflow-x: auto !important;
     -webkit-overflow-scrolling: touch !important;
     cursor: default !important;
+  }
+
+  .metro-cards-section {
+    margin-top: 14px !important;
+  }
+
+  .metro-cards-grid {
+    grid-template-columns: 1fr !important;
+    gap: 10px !important;
+  }
+
+  .metro-grid-card {
+    padding: 12px 14px !important;
+    border-radius: 12px !important;
+  }
+
+  .metro-grid-card.active-card {
+    border-color: var(--accent-lavender) !important;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(129, 140, 248, 0.05)) !important;
+    box-shadow: 0 0 0 1.5px var(--accent-lavender-border), var(--shadow-card-elevated) !important;
   }
 
   /* Full-Screen Mobile Station Drawer */
@@ -2428,10 +2560,11 @@ body {
   }
 
   /* Touch-Friendly Modals */
-  .modal-content, .modal-card, .json-modal-content {
+  .modal-content, .modal-card, .json-modal-content, .plan-modal-dialog {
     width: calc(100vw - 24px) !important;
     max-width: 480px !important;
     max-height: 85vh !important;
+    overflow-y: auto !important;
     padding: 16px !important;
     margin: 12px auto !important;
   }
@@ -2481,18 +2614,32 @@ body {
     -webkit-overflow-scrolling: touch !important;
   }
 
-  /* Touch-optimized task checkboxes */
+  /* Touch-optimized task checkboxes with 44px tap target */
   .check-dot {
-    width: 18px !important;
-    height: 18px !important;
+    width: 20px !important;
+    height: 20px !important;
+    min-width: 20px !important;
+    min-height: 20px !important;
     border-radius: 4px !important;
+  }
+
+  .check-dot::before {
+    top: -12px !important;
+    bottom: -12px !important;
+    left: -12px !important;
+    right: -12px !important;
   }
 
   .check-dot.checked::after {
     width: 5px !important;
-    height: 9px !important;
+    height: 10px !important;
     border-width: 0 2px 2px 0 !important;
     transform: rotate(45deg) translate(-0.5px, -1px) !important;
+  }
+
+  .btn-ghost-icon {
+    min-height: 32px;
+    touch-action: manipulation;
   }
 }
 
@@ -2671,24 +2818,6 @@ body {
   transform: scale(0.92);
 }
 
-@media (max-width: 768px) {
-  .mobile-bottom-nav {
-    display: flex;
-  }
-  .app-header .nav-tabs {
-    display: none;
-  }
-  .main-content {
-    padding-bottom: calc(64px + env(safe-area-inset-bottom, 0px));
-  }
-  .plan-modal-dialog {
-    width: calc(100vw - 24px) !important;
-    max-width: 480px !important;
-    max-height: 85vh !important;
-    overflow-y: auto !important;
-    margin: 12px auto !important;
-  }
-}
 
 /* ==========================================================================
    SGH Deep Focus Plan & Wind-Down Protocol Modal (Harness 3.5)
