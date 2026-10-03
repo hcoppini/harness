@@ -506,6 +506,16 @@ class HarnessAPI:
         self._trigger_auto_sync()
         return res
 
+    def advance_station(self, station_id: str, pass_over_unfinished: bool = True) -> Dict[str, Any]:
+        res = tum_service.advance_station(station_id, pass_over_unfinished)
+        self._trigger_auto_sync()
+        return res
+
+    def pass_over_station_deliverable(self, station_id: str, deliverable_key: str) -> Dict[str, Any]:
+        res = tum_service.pass_over_station_deliverable(station_id, deliverable_key)
+        self._trigger_auto_sync()
+        return res
+
     def get_all_configs(self) -> Dict[str, Any]:
         return tum_service.get_all_configs()
 

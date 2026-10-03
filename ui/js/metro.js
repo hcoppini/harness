@@ -82,6 +82,79 @@ const MetroMap = {
     }
   },
 
+  saveState() {
+    if (!this.data) return;
+    try {
+      localStorage.setItem("harness_metro_roadmap_v4", JSON.stringify(this.data));
+    } catch (e) {
+      console.warn("[MetroMap] saveState error:", e);
+    }
+  },
+
+  calculateStationProgress(station) {
+    if (!station || !station.deliverables) return 0;
+    if (station.status === "completed") return 100;
+    const entries = Object.entries(station.deliverables);
+    if (entries.length === 0) return 0;
+
+    const completedList = station.completed_deliverables || [];
+    const passedOverList = station.passed_over_deliverables || [];
+    const countsMap = station.deliverable_counts || {};
+
+    let totalScore = 0;
+    entries.forEach(([key, val]) => {
+      if (completedList.includes(key)) {
+        totalScore += 1.0;
+      } else if (passedOverList.includes(key)) {
+        totalScore += 1.0;
+      } else {
+        const countObj = countsMap[key] || this.getDeliverableCounter(station.id, key, val);
+        if (countObj && countObj.total > 0) {
+          const frac = Math.min(1.0, Math.max(0, countObj.count / countObj.total));
+          totalScore += frac;
+        }
+      }
+    });
+
+    return Math.min(100, Math.round((totalScore / entries.length) * 100));
+  },
+
+  getDeliverableCounter(stationId, key, val) {
+    const st = this.data?.stations?.find((s) => s.id === stationId);
+    if (st?.deliverable_counts?.[key]) {
+      return st.deliverable_counts[key];
+    }
+
+    const kLow = (key || "").toLowerCase();
+    const vLow = (val || "").toLowerCase();
+
+    if (kLow.includes("code") || kLow.includes("syntax") || vLow.includes("leetcode") || vLow.includes("program")) {
+      return { count: (stationId === "sep-2026" ? 4 : 0), total: 15, unit: "exercises" };
+    }
+    if (kLow.includes("math") || kLow.includes("academic") || vLow.includes("math") || vLow.includes("test")) {
+      return { count: 0, total: 40, unit: "problems" };
+    }
+    if (kLow.includes("german") || vLow.includes("anki") || vLow.includes("vocab") || vLow.includes("words")) {
+      return { count: 0, total: 100, unit: "words" };
+    }
+    if (kLow.includes("phys") || vLow.includes("protein") || vLow.includes("weight") || vLow.includes("fitness")) {
+      return { count: 0, total: 30, unit: "days" };
+    }
+    if (kLow.includes("sigg") || vLow.includes("module") || vLow.includes("elearning")) {
+      return { count: 0, total: 5, unit: "modules" };
+    }
+
+    const numMatch = (val || "").match(/\b(\d+)\b/);
+    if (numMatch) {
+      const parsedNum = parseInt(numMatch[1], 10);
+      if (parsedNum > 1 && parsedNum <= 500) {
+        return { count: 0, total: parsedNum, unit: "reps" };
+      }
+    }
+
+    return { count: 0, total: 10, unit: "reps" };
+  },
+
   async init() {
     this.bindEvents();
     await this.load();
@@ -168,25 +241,46 @@ const MetroMap = {
 
   async load() {
     try {
-      if (!window.pywebview || !window.pywebview.api) return;
-      this.data = await window.pywebview.api.get_metro_roadmap();
-      if (window.pywebview.api.get_station_deliverables) {
-        this.stationProgress = (await window.pywebview.api.get_station_deliverables("sep-2026")) || [];
+      // 1. Immediately hydrate from localStorage if available
+      let localRoadmap = null;
+      try {
+        const cached = localStorage.getItem("harness_metro_roadmap_v4");
+        if (cached) localRoadmap = JSON.parse(cached);
+      } catch (e) {}
+
+      if (localRoadmap && localRoadmap.stations) {
+        this.data = localRoadmap;
+        this.render();
       }
-      if (window.pywebview.api.get_station_pace_velocity) {
-        this.paceVelocity = (await window.pywebview.api.get_station_pace_velocity("sep-2026")) || null;
-      }
-      if (window.pywebview.api.get_upcoming_exams) {
-        const rawExams = await window.pywebview.api.get_upcoming_exams();
-        this.upcomingExams = (rawExams || []).filter((e) => {
-          const t = ((e.title || "") + " " + (e.scope || "")).toLowerCase();
-          return (
-            !t.includes("trygonometria") &&
-            !t.includes("kinematyka") &&
-            !t.includes("wyszukiwania") &&
-            !t.includes("powstanie styczniowe")
-          );
-        });
+
+      if (window.pywebview && window.pywebview.api) {
+        const apiRoadmap = await window.pywebview.api.get_metro_roadmap();
+        if (apiRoadmap && apiRoadmap.stations) {
+          this.data = apiRoadmap;
+          this.saveState();
+        }
+        if (window.pywebview.api.get_station_deliverables) {
+          const activeStation = this.data?.stations?.find((s) => s.status === "active") || this.data?.stations?.[0];
+          const stId = activeStation ? activeStation.id : "sep-2026";
+          this.stationProgress = (await window.pywebview.api.get_station_deliverables(stId)) || [];
+        }
+        if (window.pywebview.api.get_station_pace_velocity) {
+          const activeStation = this.data?.stations?.find((s) => s.status === "active") || this.data?.stations?.[0];
+          const stId = activeStation ? activeStation.id : "sep-2026";
+          this.paceVelocity = (await window.pywebview.api.get_station_pace_velocity(stId)) || null;
+        }
+        if (window.pywebview.api.get_upcoming_exams) {
+          const rawExams = await window.pywebview.api.get_upcoming_exams();
+          this.upcomingExams = (rawExams || []).filter((e) => {
+            const t = ((e.title || "") + " " + (e.scope || "")).toLowerCase();
+            return (
+              !t.includes("trygonometria") &&
+              !t.includes("kinematyka") &&
+              !t.includes("wyszukiwania") &&
+              !t.includes("powstanie styczniowe")
+            );
+          });
+        }
       }
 
       if (!this.upcomingExams || this.upcomingExams.length === 0) {
@@ -557,9 +651,8 @@ const MetroMap = {
     stations.forEach((station, idx) => {
       const posX = startX + idx * spacing;
       const status = station.status || "upcoming";
-      const isPassed = posX <= currentX;
       const isActive = status === "active";
-      const isCompleted = status === "completed" || (isPassed && !isPreLaunch);
+      const isCompleted = status === "completed";
       const branches = station.branches || [];
 
       let nodeCircles = "";
@@ -684,17 +777,16 @@ const MetroMap = {
           const delivEntries = Object.entries(station.deliverables || {});
           const completedList = station.completed_deliverables || [];
           const totalDelivs = delivEntries.length;
-          const completedCount = completedList.length;
-          const progressPercent = totalDelivs > 0 ? Math.round((completedCount / totalDelivs) * 100) : isCompleted ? 100 : 0;
+          const progressPercent = this.calculateStationProgress(station);
 
           // Header Chip
           let chipHtml = "";
           if (isActive) {
-            chipHtml = `<span class="metro-card-chip active">ACTIVE</span>`;
+            chipHtml = `<span class="metro-card-chip active">ACTIVE (${progressPercent}%)</span>`;
           } else if (isCompleted) {
             chipHtml = `<span class="metro-card-chip done">✓ DONE</span>`;
           } else {
-            chipHtml = `<span class="metro-card-chip">${completedCount}/${totalDelivs}</span>`;
+            chipHtml = `<span class="metro-card-chip">${progressPercent}%</span>`;
           }
 
           // Micro-Tags
@@ -884,9 +976,9 @@ const MetroMap = {
       const allEntries = Object.entries(station.deliverables);
       const totalDelivs = allEntries.length;
       const completedList = station.completed_deliverables || [];
-      const completedCount = completedList.length;
-      const progressPercent = totalDelivs > 0 ? Math.round((completedCount / totalDelivs) * 100) : 0;
-      const isAllComplete = totalDelivs > 0 && completedCount >= totalDelivs;
+      const passedOverList = station.passed_over_deliverables || [];
+      const progressPercent = this.calculateStationProgress(station);
+      const isAllComplete = progressPercent >= 100 || (totalDelivs > 0 && (completedList.length + passedOverList.length) >= totalDelivs);
 
       let velocityHeader = "";
       if (this.paceVelocity && station.status === "active") {
@@ -906,11 +998,11 @@ const MetroMap = {
         ${velocityHeader}
         <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 10px;">
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 10px; font-family: var(--font-mono);">
-            <span style="color: var(--text-tertiary);">DELIVERABLES (${completedCount}/${totalDelivs})</span>
+            <span style="color: var(--text-tertiary);">DELIVERABLES (${completedList.length}/${totalDelivs}${passedOverList.length > 0 ? ` + ${passedOverList.length} passed` : ""})</span>
             <span style="color: var(--accent-lavender); font-weight: 700;">${isAllComplete ? "DONE" : `${progressPercent}%`}</span>
           </div>
-          <div class="progress-bar-track" style="margin: 0; height: 2px;">
-            <div class="progress-bar-fill" style="width: ${progressPercent}%;"></div>
+          <div class="progress-bar-track" style="margin: 0; height: 3px;">
+            <div class="progress-bar-fill" style="width: ${progressPercent}%; ${station.status === 'active' ? 'background: var(--accent-lavender);' : ''}"></div>
           </div>
         </div>
       `;
@@ -924,62 +1016,73 @@ const MetroMap = {
             (p) => p.stream.toLowerCase() === key.toLowerCase() || (streamMatch && p.stream.toLowerCase() === streamMatch.id)
           );
 
-          const isChecked = completedList.includes(key) || (pMatch && pMatch.is_completed);
+          const isChecked = completedList.includes(key);
+          const isPassedOver = passedOverList.includes(key);
 
-          let counterPill = "";
-          let stepperControls = "";
+          const countObj = (station.deliverable_counts && station.deliverable_counts[key])
+            || (pMatch ? { count: pMatch.completed_count, total: pMatch.total_required, unit: pMatch.unit_label } : null)
+            || this.getDeliverableCounter(station.id, key, val);
 
-          if (pMatch) {
-            const delivId = pMatch.deliverable_id;
-            const curCount = pMatch.completed_count;
-            const totalReq = pMatch.total_required;
-            const unitLabel = pMatch.unit_label;
+          const curCount = isChecked ? countObj.total : countObj.count;
+          const totalReq = countObj.total;
+          const unitLabel = countObj.unit;
+          const itemPct = totalReq > 0 ? Math.round((curCount / totalReq) * 100) : 0;
+          const delivId = pMatch ? pMatch.deliverable_id : null;
 
-            counterPill = `<span style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-lavender); font-weight: 700; margin-left: 6px; background: rgba(196, 181, 253, 0.08); padding: 1px 5px; border-radius: 2px;">[${curCount} / ${totalReq} ${unitLabel}]</span>`;
-
-            let quickStepBtn = "";
-            if (pMatch.stream === "german") {
-              quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 6px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverable('${delivId}', 20)">+20 Words</button>`;
-            } else if (pMatch.stream === "code") {
-              quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 6px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverable('${delivId}', 1)">+1 Prob</button>`;
-            } else if (pMatch.stream === "academics") {
-              quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 6px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverable('${delivId}', 5)">+5 Probs</button>`;
-            }
-
-            stepperControls = `
-              <div class="deliv-stepper" onclick="event.stopPropagation();" style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(255, 255, 255, 0.08);">
-                <button type="button" class="deliv-stepper-btn" onclick="MetroMap.stepDeliverable('${delivId}', -1)" title="Decrement">&minus;</button>
-                <input 
-                  type="number" 
-                  class="deliv-input-count" 
-                  value="${curCount}" 
-                  min="0" 
-                  max="${totalReq}" 
-                  onchange="MetroMap.setDeliverableProgress('${delivId}', this.value)" 
-                  title="Direct rep count"
-                />
-                <button type="button" class="deliv-stepper-btn" onclick="MetroMap.stepDeliverable('${delivId}', 1)" title="Increment">+</button>
-                ${quickStepBtn}
-                <span style="color: var(--text-tertiary); font-size: 10px; font-family: var(--font-mono); margin-left: 2px;">/ ${totalReq} ${unitLabel}</span>
-              </div>
-            `;
+          let quickStepBtn = "";
+          if (streamMatch?.id === "german" || key.toLowerCase().includes("german")) {
+            quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 6px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 20, ${delivId ? `'${delivId}'` : 'null'})">+20 Words</button>`;
+          } else if (streamMatch?.id === "code" || key.toLowerCase().includes("code")) {
+            quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 6px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 1, ${delivId ? `'${delivId}'` : 'null'})">+1 Prob</button>`;
+          } else if (streamMatch?.id === "academics" || key.toLowerCase().includes("math")) {
+            quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 6px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 5, ${delivId ? `'${delivId}'` : 'null'})">+5 Probs</button>`;
           }
+
+          const counterPill = `<span style="font-family: var(--font-mono); font-size: 9px; color: var(--accent-lavender); font-weight: 700; margin-left: 6px; background: rgba(196, 181, 253, 0.08); padding: 1px 5px; border-radius: 2px;">[${curCount} / ${totalReq} ${unitLabel} (${itemPct}%)]</span>`;
+
+          const stepperControls = `
+            <div class="deliv-stepper" onclick="event.stopPropagation();" style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed rgba(255, 255, 255, 0.08);">
+              <button type="button" class="deliv-stepper-btn" onclick="MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', -1, ${delivId ? `'${delivId}'` : 'null'})" title="Decrement">&minus;</button>
+              <input 
+                type="number" 
+                class="deliv-input-count" 
+                value="${curCount}" 
+                min="0" 
+                max="${totalReq}" 
+                onchange="MetroMap.setDeliverableKeyProgress('${station.id}', '${this.escapeHtml(key)}', this.value, ${delivId ? `'${delivId}'` : 'null'})" 
+                title="Direct count"
+              />
+              <button type="button" class="deliv-stepper-btn" onclick="MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 1, ${delivId ? `'${delivId}'` : 'null'})" title="Increment">+</button>
+              ${quickStepBtn}
+              <span style="color: var(--text-tertiary); font-size: 10px; font-family: var(--font-mono); margin-left: 2px;">/ ${totalReq} ${unitLabel}</span>
+            </div>
+          `;
 
           return `
             <div 
-              class="deliverable-item ${isChecked ? "checked" : ""}" 
+              class="deliverable-item ${isChecked ? "checked" : ""} ${isPassedOver ? "passed-over" : ""}" 
               onclick="MetroMap.toggleDeliverable('${station.id}', '${this.escapeHtml(key)}')"
-              title="Click to toggle deliverable completion"
+              title="Click checkbox to toggle complete"
             >
               <div class="check-dot ${isChecked ? "checked" : ""}" style="margin-top: 2px;"></div>
               <div style="flex: 1; min-width: 0;">
-                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px;">
-                  <span style="font-family: var(--font-mono); font-size: 8px; font-weight: 700; text-transform: uppercase; color: ${lineBadgeColor};">
-                    ${key} STREAM
-                  </span>
-                  ${counterPill}
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 2px; gap: 4px;">
+                  <div style="display: flex; align-items: center; gap: 4px; overflow: hidden;">
+                    <span style="font-family: var(--font-mono); font-size: 8px; font-weight: 700; text-transform: uppercase; color: ${lineBadgeColor};">
+                      ${key} STREAM
+                    </span>
+                    ${counterPill}
+                  </div>
+                  <button 
+                    type="button" 
+                    class="deliv-pass-btn ${isPassedOver ? 'passed-over' : ''}" 
+                    onclick="event.stopPropagation(); MetroMap.passOverDeliverable('${station.id}', '${this.escapeHtml(key)}')"
+                    title="Pass over or defer this deliverable"
+                  >
+                    ${isPassedOver ? 'PASSED OVER' : 'PASS OVER'}
+                  </button>
                 </div>
-                <div class="deliverable-desc" style="font-size: 11px; color: var(--text-primary); line-height: 1.4;">
+                <div class="deliverable-desc" style="font-size: 11px; color: var(--text-primary); line-height: 1.4; ${isPassedOver ? 'text-decoration: line-through; opacity: 0.7;' : ''}">
                   ${this.escapeHtml(val)}
                 </div>
                 ${stepperControls}
@@ -989,10 +1092,137 @@ const MetroMap = {
         })
         .join("");
 
-      deliverablesList.innerHTML = progressHeader + itemsHtml;
+      const advanceFooter = `
+        <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-hairline);">
+          <button 
+            type="button" 
+            class="btn btn-secondary btn-advance-station" 
+            style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 12px; font-size: 11px; font-weight: 700; font-family: var(--font-mono); color: var(--accent-lavender); border-color: rgba(167, 139, 250, 0.3); background: rgba(167, 139, 250, 0.06); cursor: pointer;"
+            onclick="MetroMap.advanceStation('${station.id}')"
+          >
+            ADVANCE TO NEXT STATION &rarr;
+          </button>
+          <div style="text-align: center; font-size: 9px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 4px;">
+            Passes over any unfinished items and activates the next milestone.
+          </div>
+        </div>
+      `;
+
+      deliverablesList.innerHTML = progressHeader + itemsHtml + advanceFooter;
     }
 
     drawer.classList.add("open");
+  },
+
+  async stepDeliverableKey(stationId, key, delta, deliverableId = null) {
+    const st = this.data?.stations?.find((s) => s.id === stationId);
+    if (!st) return;
+
+    if (!st.deliverable_counts) st.deliverable_counts = {};
+    const cur = st.deliverable_counts[key] || this.getDeliverableCounter(stationId, key, st.deliverables?.[key]);
+    const newCount = Math.max(0, Math.min(cur.total, cur.count + delta));
+    cur.count = newCount;
+    st.deliverable_counts[key] = cur;
+
+    if (!st.completed_deliverables) st.completed_deliverables = [];
+    if (!st.passed_over_deliverables) st.passed_over_deliverables = [];
+
+    if (newCount >= cur.total && !st.completed_deliverables.includes(key)) {
+      st.completed_deliverables.push(key);
+      st.passed_over_deliverables = st.passed_over_deliverables.filter((k) => k !== key);
+    } else if (newCount < cur.total && st.completed_deliverables.includes(key)) {
+      st.completed_deliverables = st.completed_deliverables.filter((k) => k !== key);
+    }
+
+    // Check if station completes
+    const allKeys = Object.keys(st.deliverables || {});
+    let allDone = allKeys.length > 0 && allKeys.every((k) => st.completed_deliverables.includes(k) || st.passed_over_deliverables.includes(k));
+    let nextStation = null;
+    if (allDone) {
+      st.status = "completed";
+      const sIdx = this.data.stations.findIndex((s) => s.id === stationId);
+      if (sIdx !== -1 && sIdx + 1 < this.data.stations.length) {
+        nextStation = this.data.stations[sIdx + 1];
+        if (nextStation.status === "upcoming") {
+          nextStation.status = "active";
+        }
+      }
+    }
+
+    this.saveState();
+    this.render();
+    if (this.selectedStation && this.selectedStation.id === stationId) {
+      this.openDrawer(st);
+    }
+
+    // Sync to backend if deliverableId exists
+    if (deliverableId && window.pywebview?.api?.update_deliverable_progress) {
+      window.pywebview.api.update_deliverable_progress(deliverableId, newCount, 0).catch(() => {});
+    }
+
+    if (allDone && nextStation && window.HarnessApp?.showToast) {
+      window.HarnessApp.showToast(`Station Completed! Next: ${nextStation.name}`);
+    }
+
+    if (window.KillListDrawer) window.KillListDrawer.load();
+    if (window.Today) window.Today.load();
+    if (window.Dashboard) window.Dashboard.load();
+  },
+
+  async setDeliverableKeyProgress(stationId, key, newCountVal, deliverableId = null) {
+    const st = this.data?.stations?.find((s) => s.id === stationId);
+    if (!st) return;
+
+    const count = parseInt(newCountVal, 10);
+    if (isNaN(count)) return;
+
+    if (!st.deliverable_counts) st.deliverable_counts = {};
+    const cur = st.deliverable_counts[key] || this.getDeliverableCounter(stationId, key, st.deliverables?.[key]);
+    const newCount = Math.max(0, Math.min(cur.total, count));
+    cur.count = newCount;
+    st.deliverable_counts[key] = cur;
+
+    if (!st.completed_deliverables) st.completed_deliverables = [];
+    if (!st.passed_over_deliverables) st.passed_over_deliverables = [];
+
+    if (newCount >= cur.total && !st.completed_deliverables.includes(key)) {
+      st.completed_deliverables.push(key);
+      st.passed_over_deliverables = st.passed_over_deliverables.filter((k) => k !== key);
+    } else if (newCount < cur.total && st.completed_deliverables.includes(key)) {
+      st.completed_deliverables = st.completed_deliverables.filter((k) => k !== key);
+    }
+
+    const allKeys = Object.keys(st.deliverables || {});
+    let allDone = allKeys.length > 0 && allKeys.every((k) => st.completed_deliverables.includes(k) || st.passed_over_deliverables.includes(k));
+    let nextStation = null;
+    if (allDone) {
+      st.status = "completed";
+      const sIdx = this.data.stations.findIndex((s) => s.id === stationId);
+      if (sIdx !== -1 && sIdx + 1 < this.data.stations.length) {
+        nextStation = this.data.stations[sIdx + 1];
+        if (nextStation.status === "upcoming") {
+          nextStation.status = "active";
+        }
+      }
+    }
+
+    this.saveState();
+    this.render();
+    if (this.selectedStation && this.selectedStation.id === stationId) {
+      this.openDrawer(st);
+    }
+
+    if (deliverableId && window.pywebview?.api?.update_deliverable_progress) {
+      window.pywebview.api.update_deliverable_progress(deliverableId, newCount, 0).catch(() => {});
+    }
+
+    if (allDone && nextStation && window.HarnessApp?.showToast) {
+      window.HarnessApp.showToast(`Station Completed! Next: ${nextStation.name}`);
+    }
+
+    if (window.KillListDrawer) window.KillListDrawer.load();
+    if (window.Today) window.Today.load();
+    if (window.Dashboard) window.Dashboard.load();
   },
 
   async stepDeliverable(deliverableId, delta) {
@@ -1045,30 +1275,185 @@ const MetroMap = {
 
   async toggleDeliverable(stationId, deliverableKey) {
     try {
-      if (!window.pywebview || !window.pywebview.api) return;
-      const res = await window.pywebview.api.toggle_station_deliverable(stationId, deliverableKey);
-      if (res && res.success) {
-        const st = this.data.stations.find((s) => s.id === stationId);
-        if (st) {
+      const st = this.data?.stations?.find((s) => s.id === stationId);
+      if (!st) return;
+
+      if (!st.completed_deliverables) st.completed_deliverables = [];
+      if (!st.passed_over_deliverables) st.passed_over_deliverables = [];
+      if (!st.deliverable_counts) st.deliverable_counts = {};
+
+      const isChecked = st.completed_deliverables.includes(deliverableKey);
+      const counter = st.deliverable_counts[deliverableKey] || this.getDeliverableCounter(stationId, deliverableKey, st.deliverables?.[deliverableKey]);
+
+      if (isChecked) {
+        st.completed_deliverables = st.completed_deliverables.filter((k) => k !== deliverableKey);
+        if (counter) {
+          counter.count = 0;
+          st.deliverable_counts[deliverableKey] = counter;
+        }
+        if (st.status === "completed") {
+          st.status = "active";
+        }
+      } else {
+        st.completed_deliverables.push(deliverableKey);
+        st.passed_over_deliverables = st.passed_over_deliverables.filter((k) => k !== deliverableKey);
+        if (counter) {
+          counter.count = counter.total;
+          st.deliverable_counts[deliverableKey] = counter;
+        }
+      }
+
+      const allKeys = Object.keys(st.deliverables || {});
+      let nextStation = null;
+      if (allKeys.length > 0 && allKeys.every((k) => st.completed_deliverables.includes(k) || st.passed_over_deliverables.includes(k))) {
+        st.status = "completed";
+        const sIdx = this.data.stations.findIndex((s) => s.id === stationId);
+        if (sIdx !== -1 && sIdx + 1 < this.data.stations.length) {
+          nextStation = this.data.stations[sIdx + 1];
+          if (nextStation.status === "upcoming") {
+            nextStation.status = "active";
+          }
+        }
+      }
+
+      this.saveState();
+
+      let res = null;
+      if (window.pywebview?.api?.toggle_station_deliverable) {
+        res = await window.pywebview.api.toggle_station_deliverable(stationId, deliverableKey);
+        if (res && res.success && res.completed_deliverables) {
           st.completed_deliverables = res.completed_deliverables;
           st.status = res.station_status;
-          this.selectedStation = st;
+          this.saveState();
         }
-
-        this.render();
-        if (this.selectedStation && this.selectedStation.id === stationId) {
-          this.openDrawer(this.selectedStation);
-        }
-
-        if (res.station_completed) {
-          window.HarnessApp.showToast(`Station Completed: ${st.name}!`);
-        } else if (res.is_checked) {
-          window.HarnessApp.showToast(`Checked: ${deliverableKey}`);
-        }
-        if (window.Dashboard) window.Dashboard.load();
       }
+
+      this.render();
+      if (this.selectedStation && this.selectedStation.id === stationId) {
+        this.openDrawer(st);
+      }
+
+      if (window.HarnessApp?.showToast) {
+        if (st.status === "completed" && (nextStation || res?.next_station_name)) {
+          const nextName = nextStation?.name || res?.next_station_name;
+          window.HarnessApp.showToast(`Station Completed! Next: ${nextName}`);
+        } else if (!isChecked) {
+          window.HarnessApp.showToast(`Checked: ${deliverableKey}`);
+        } else {
+          window.HarnessApp.showToast(`Unchecked: ${deliverableKey}`);
+        }
+      }
+
+      if (window.Dashboard) window.Dashboard.load();
     } catch (err) {
       console.error("Error toggling deliverable:", err);
+    }
+  },
+
+  async passOverDeliverable(stationId, deliverableKey) {
+    try {
+      const st = this.data?.stations?.find((s) => s.id === stationId);
+      if (!st) return;
+
+      if (!st.completed_deliverables) st.completed_deliverables = [];
+      if (!st.passed_over_deliverables) st.passed_over_deliverables = [];
+
+      let isPassedOver = false;
+      if (st.passed_over_deliverables.includes(deliverableKey)) {
+        st.passed_over_deliverables = st.passed_over_deliverables.filter((k) => k !== deliverableKey);
+        isPassedOver = false;
+      } else {
+        st.passed_over_deliverables.push(deliverableKey);
+        st.completed_deliverables = st.completed_deliverables.filter((k) => k !== deliverableKey);
+        isPassedOver = true;
+      }
+
+      const allKeys = Object.keys(st.deliverables || {});
+      let nextStation = null;
+      if (allKeys.length > 0 && allKeys.every((k) => st.completed_deliverables.includes(k) || st.passed_over_deliverables.includes(k))) {
+        st.status = "completed";
+        const sIdx = this.data.stations.findIndex((s) => s.id === stationId);
+        if (sIdx !== -1 && sIdx + 1 < this.data.stations.length) {
+          nextStation = this.data.stations[sIdx + 1];
+          if (nextStation.status === "upcoming") {
+            nextStation.status = "active";
+          }
+        }
+      }
+
+      this.saveState();
+
+      if (window.pywebview?.api?.pass_over_station_deliverable) {
+        await window.pywebview.api.pass_over_station_deliverable(stationId, deliverableKey);
+      }
+
+      this.render();
+      if (this.selectedStation && this.selectedStation.id === stationId) {
+        this.openDrawer(st);
+      }
+
+      if (window.HarnessApp?.showToast) {
+        if (st.status === "completed" && nextStation) {
+          window.HarnessApp.showToast(`Station Completed! Next: ${nextStation.name}`);
+        } else {
+          window.HarnessApp.showToast(isPassedOver ? `Passed over: ${deliverableKey}` : `Restored: ${deliverableKey}`);
+        }
+      }
+
+      if (window.Dashboard) window.Dashboard.load();
+    } catch (err) {
+      console.error("Error passing over deliverable:", err);
+    }
+  },
+
+  async advanceStation(stationId) {
+    try {
+      const st = this.data?.stations?.find((s) => s.id === stationId);
+      if (!st) return;
+
+      if (!st.completed_deliverables) st.completed_deliverables = [];
+      if (!st.passed_over_deliverables) st.passed_over_deliverables = [];
+
+      const allKeys = Object.keys(st.deliverables || {});
+      allKeys.forEach((k) => {
+        if (!st.completed_deliverables.includes(k) && !st.passed_over_deliverables.includes(k)) {
+          st.passed_over_deliverables.push(k);
+        }
+      });
+
+      st.status = "completed";
+
+      const sIdx = this.data.stations.findIndex((s) => s.id === stationId);
+      let nextStation = null;
+      if (sIdx !== -1 && sIdx + 1 < this.data.stations.length) {
+        nextStation = this.data.stations[sIdx + 1];
+        nextStation.status = "active";
+      }
+
+      this.saveState();
+
+      if (window.pywebview?.api?.advance_station) {
+        await window.pywebview.api.advance_station(stationId, true);
+      }
+
+      this.render();
+
+      if (nextStation) {
+        this.selectedStation = nextStation;
+        this.openDrawer(nextStation);
+        if (window.HarnessApp?.showToast) {
+          window.HarnessApp.showToast(`Advanced to ${nextStation.name}!`);
+        }
+      } else {
+        this.closeDrawer();
+        if (window.HarnessApp?.showToast) {
+          window.HarnessApp.showToast(`Station ${st.name} completed!`);
+        }
+      }
+
+      if (window.Dashboard) window.Dashboard.load();
+    } catch (err) {
+      console.error("Error advancing station:", err);
     }
   },
 
@@ -1077,6 +1462,7 @@ const MetroMap = {
       await window.pywebview.api.update_station_status(stationId, newStatus);
       const st = this.data.stations.find((s) => s.id === stationId);
       if (st) st.status = newStatus;
+      this.saveState();
       this.render();
       window.HarnessApp.showToast(`Station status updated to ${newStatus}`);
       if (window.Dashboard) window.Dashboard.load();
@@ -1087,8 +1473,17 @@ const MetroMap = {
 
   scrollToBeacon() {
     const container = document.getElementById("metroScrollContainer");
-    if (container && this.currentBeaconX) {
-      const targetScroll = Math.max(0, this.currentBeaconX - container.clientWidth / 2);
+    if (!container) return;
+    const activeStation = this.data?.stations?.find((s) => s.status === "active");
+    let targetX = this.currentBeaconX;
+    if (activeStation) {
+      const idx = this.data.stations.indexOf(activeStation);
+      if (idx !== -1) {
+        targetX = 120 + idx * 220;
+      }
+    }
+    if (targetX) {
+      const targetScroll = Math.max(0, targetX - container.clientWidth / 2);
       container.scrollTo({ left: targetScroll, behavior: "smooth" });
     }
   },

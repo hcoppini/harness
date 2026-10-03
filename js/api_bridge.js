@@ -897,6 +897,227 @@
             };
           }
 
+          // 2.5 TUM Metro Roadmap Layer & Progressive Deliverables
+          if (prop === "get_metro_roadmap") {
+            return async function () {
+              const localRoadmap = getStore(STORAGE_KEYS.METRO, null);
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("get_metro_roadmap", []);
+              } catch (e) {}
+
+              if (serverRes && serverRes.stations) {
+                // Merge server with any optimistic local completions and counts
+                if (localRoadmap && Array.isArray(localRoadmap.stations)) {
+                  const localStationsMap = {};
+                  localRoadmap.stations.forEach((ls) => { localStationsMap[ls.id] = ls; });
+                  serverRes.stations.forEach((ss) => {
+                    const ls = localStationsMap[ss.id];
+                    if (ls) {
+                      if (Array.isArray(ls.completed_deliverables) && ls.completed_deliverables.length > (ss.completed_deliverables || []).length) {
+                        ss.completed_deliverables = ls.completed_deliverables;
+                      }
+                      if (Array.isArray(ls.passed_over_deliverables)) {
+                        ss.passed_over_deliverables = ls.passed_over_deliverables;
+                      }
+                      if (ls.deliverable_counts) {
+                        ss.deliverable_counts = { ...(ss.deliverable_counts || {}), ...ls.deliverable_counts };
+                      }
+                      if (ls.status === "completed" && ss.status !== "completed") {
+                        ss.status = "completed";
+                      }
+                    }
+                  });
+                }
+                setStore(STORAGE_KEYS.METRO, serverRes);
+                syncCloudDocument("cloud_metro_roadmap", serverRes);
+                return serverRes;
+              }
+
+              if (localRoadmap && Array.isArray(localRoadmap.stations)) {
+                return localRoadmap;
+              }
+
+              // Try fetching from static json if available
+              try {
+                const staticResp = await fetch("/data/metro_roadmap.json");
+                if (staticResp.ok) {
+                  const staticData = await staticResp.json();
+                  setStore(STORAGE_KEYS.METRO, staticData);
+                  return staticData;
+                }
+              } catch (_) {}
+
+              return { title: "TUM Roadmap", stations: [] };
+            };
+          }
+
+          if (prop === "toggle_station_deliverable") {
+            return async function (stationId, deliverableKey) {
+              let roadmap = getStore(STORAGE_KEYS.METRO, null);
+              if (!roadmap || !Array.isArray(roadmap.stations)) {
+                roadmap = await apiProxy.get_metro_roadmap();
+              }
+
+              const targetStation = (roadmap.stations || []).find((s) => s.id === stationId);
+              if (!targetStation) {
+                return { success: false, error: `Station ${stationId} not found` };
+              }
+
+              targetStation.completed_deliverables = targetStation.completed_deliverables || [];
+              targetStation.passed_over_deliverables = targetStation.passed_over_deliverables || [];
+              targetStation.deliverable_counts = targetStation.deliverable_counts || {};
+
+              const isChecked = targetStation.completed_deliverables.includes(deliverableKey);
+              if (isChecked) {
+                targetStation.completed_deliverables = targetStation.completed_deliverables.filter((k) => k !== deliverableKey);
+              } else {
+                targetStation.completed_deliverables.push(deliverableKey);
+                targetStation.passed_over_deliverables = targetStation.passed_over_deliverables.filter((k) => k !== deliverableKey);
+              }
+
+              const allKeys = Object.keys(targetStation.deliverables || {});
+              const totalCount = allKeys.length;
+              const completedCount = targetStation.completed_deliverables.length;
+              const isAllDone = totalCount > 0 && completedCount >= totalCount;
+
+              let nextStation = null;
+              if (isAllDone) {
+                targetStation.status = "completed";
+                const sIdx = roadmap.stations.findIndex((s) => s.id === stationId);
+                if (sIdx !== -1 && sIdx + 1 < roadmap.stations.length) {
+                  nextStation = roadmap.stations[sIdx + 1];
+                  if (nextStation.status === "upcoming") {
+                    nextStation.status = "active";
+                  }
+                }
+              } else if (targetStation.status === "completed") {
+                targetStation.status = "active";
+              }
+
+              setStore(STORAGE_KEYS.METRO, roadmap);
+              syncCloudDocument("cloud_metro_roadmap", roadmap);
+              rpcCall("toggle_station_deliverable", [stationId, deliverableKey]).catch(() => {});
+
+              return {
+                success: true,
+                station_id: stationId,
+                deliverable_key: deliverableKey,
+                is_checked: !isChecked,
+                completed_deliverables: targetStation.completed_deliverables,
+                completed_count: completedCount,
+                total_count: totalCount,
+                station_status: targetStation.status,
+                station_completed: targetStation.status === "completed",
+                next_station_id: nextStation ? nextStation.id : null,
+                next_station_name: nextStation ? nextStation.name : null,
+              };
+            };
+          }
+
+          if (prop === "advance_station") {
+            return async function (stationId, passOverUnfinished = true) {
+              let roadmap = getStore(STORAGE_KEYS.METRO, null);
+              if (!roadmap || !Array.isArray(roadmap.stations)) {
+                roadmap = await apiProxy.get_metro_roadmap();
+              }
+
+              const sIdx = (roadmap.stations || []).findIndex((s) => s.id === stationId);
+              if (sIdx === -1) {
+                return { success: false, error: `Station ${stationId} not found` };
+              }
+
+              const targetStation = roadmap.stations[sIdx];
+              targetStation.completed_deliverables = targetStation.completed_deliverables || [];
+              targetStation.passed_over_deliverables = targetStation.passed_over_deliverables || [];
+
+              const allKeys = Object.keys(targetStation.deliverables || {});
+              if (passOverUnfinished) {
+                allKeys.forEach((k) => {
+                  if (!targetStation.completed_deliverables.includes(k) && !targetStation.passed_over_deliverables.includes(k)) {
+                    targetStation.passed_over_deliverables.push(k);
+                  }
+                });
+              }
+
+              targetStation.status = "completed";
+
+              let nextStation = null;
+              if (sIdx + 1 < roadmap.stations.length) {
+                nextStation = roadmap.stations[sIdx + 1];
+                nextStation.status = "active";
+              }
+
+              setStore(STORAGE_KEYS.METRO, roadmap);
+              syncCloudDocument("cloud_metro_roadmap", roadmap);
+              rpcCall("advance_station", [stationId, passOverUnfinished]).catch(() => {});
+
+              return {
+                success: true,
+                station_id: stationId,
+                station_status: "completed",
+                passed_over_deliverables: targetStation.passed_over_deliverables,
+                next_station_id: nextStation ? nextStation.id : null,
+                next_station_name: nextStation ? nextStation.name : null,
+              };
+            };
+          }
+
+          if (prop === "pass_over_station_deliverable") {
+            return async function (stationId, deliverableKey) {
+              let roadmap = getStore(STORAGE_KEYS.METRO, null);
+              if (!roadmap || !Array.isArray(roadmap.stations)) {
+                roadmap = await apiProxy.get_metro_roadmap();
+              }
+
+              const targetStation = (roadmap.stations || []).find((s) => s.id === stationId);
+              if (!targetStation) {
+                return { success: false, error: `Station ${stationId} not found` };
+              }
+
+              targetStation.completed_deliverables = targetStation.completed_deliverables || [];
+              targetStation.passed_over_deliverables = targetStation.passed_over_deliverables || [];
+
+              const isPassedOver = targetStation.passed_over_deliverables.includes(deliverableKey);
+              if (isPassedOver) {
+                targetStation.passed_over_deliverables = targetStation.passed_over_deliverables.filter((k) => k !== deliverableKey);
+              } else {
+                targetStation.passed_over_deliverables.push(deliverableKey);
+                targetStation.completed_deliverables = targetStation.completed_deliverables.filter((k) => k !== deliverableKey);
+              }
+
+              setStore(STORAGE_KEYS.METRO, roadmap);
+              syncCloudDocument("cloud_metro_roadmap", roadmap);
+              rpcCall("pass_over_station_deliverable", [stationId, deliverableKey]).catch(() => {});
+
+              return {
+                success: true,
+                station_id: stationId,
+                deliverable_key: deliverableKey,
+                is_passed_over: !isPassedOver,
+                passed_over_deliverables: targetStation.passed_over_deliverables,
+                completed_deliverables: targetStation.completed_deliverables,
+              };
+            };
+          }
+
+          if (prop === "update_station_status") {
+            return async function (stationId, newStatus) {
+              let roadmap = getStore(STORAGE_KEYS.METRO, null);
+              if (!roadmap || !Array.isArray(roadmap.stations)) {
+                roadmap = await apiProxy.get_metro_roadmap();
+              }
+              const targetStation = (roadmap.stations || []).find((s) => s.id === stationId);
+              if (targetStation) {
+                targetStation.status = newStatus;
+                setStore(STORAGE_KEYS.METRO, roadmap);
+                syncCloudDocument("cloud_metro_roadmap", roadmap);
+              }
+              rpcCall("update_station_status", [stationId, newStatus]).catch(() => {});
+              return true;
+            };
+          }
+
           // 3. System Links & General Utilities
           if (prop === "open_external_url") {
             return async function (url) {

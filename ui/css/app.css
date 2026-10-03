@@ -2106,6 +2106,49 @@ body {
   outline: none;
 }
 
+.deliv-pass-btn {
+  background: transparent;
+  border: 1px solid var(--border-subtle);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 3px;
+  cursor: pointer;
+  transition: all 0.12s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.deliv-pass-btn:hover {
+  border-color: var(--color-amber-border);
+  color: var(--color-amber);
+  background: var(--color-amber-subtle);
+}
+
+.deliv-pass-btn.passed-over {
+  border-color: var(--color-amber-border);
+  color: var(--color-amber);
+  background: var(--color-amber-subtle);
+  font-weight: 700;
+}
+
+.deliverable-item.passed-over {
+  opacity: 0.72;
+  border-left: 2px solid var(--color-amber);
+}
+
+.btn-advance-station {
+  transition: all 0.15s ease;
+}
+
+.btn-advance-station:hover {
+  background: var(--bg-surface-hover) !important;
+  border-color: var(--accent-lavender) !important;
+  transform: translateY(-1px);
+}
+
 /* --------------------------------------------------------------------------
    Upcoming Schedule Forecast & Detailed Plan Modal
    -------------------------------------------------------------------------- */

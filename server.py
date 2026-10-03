@@ -1016,6 +1016,22 @@ def update_metro_status(station_id):
     success = api.update_station_status(station_id, status)
     return jsonify({"success": success})
 
+@app.route("/api/metro/<station_id>/advance", methods=["POST"])
+def advance_metro_station(station_id):
+    payload = request.get_json(silent=True) or {}
+    pass_over = payload.get("pass_over_unfinished", True)
+    res = api.advance_station(station_id, pass_over)
+    return jsonify(res)
+
+@app.route("/api/metro/<station_id>/pass_over", methods=["POST"])
+def pass_over_metro_deliverable(station_id):
+    payload = request.get_json(silent=True) or {}
+    key = payload.get("deliverable_key", "")
+    if not key:
+        return jsonify({"error": "deliverable_key is required"}), 400
+    res = api.pass_over_station_deliverable(station_id, key)
+    return jsonify(res)
+
 # --- Layer 3: Projects ---
 @app.route("/api/projects", methods=["GET"])
 def get_projects():

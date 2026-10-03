@@ -605,10 +605,25 @@ def toggle_station_deliverable(station_id: str, deliverable_key: str) -> Dict[st
         completed_count = len(completed_list)
 
         # Automatic station completion trigger
+        next_station = None
         if total_count > 0 and completed_count >= total_count:
             target_station["status"] = "completed"
+            stations = data.get("stations", [])
+            for idx, s in enumerate(stations):
+                if s.get("id") == station_id:
+                    if idx + 1 < len(stations) and stations[idx + 1].get("status") == "upcoming":
+                        stations[idx + 1]["status"] = "active"
+                        next_station = stations[idx + 1]
+                    break
         elif target_station.get("status") == "completed":
             target_station["status"] = "active"
+            stations = data.get("stations", [])
+            for idx, s in enumerate(stations):
+                if s.get("id") == station_id:
+                    if idx + 1 < len(stations) and stations[idx + 1].get("status") == "active":
+                        if not stations[idx + 1].get("completed_deliverables"):
+                            stations[idx + 1]["status"] = "upcoming"
+                    break
 
         with open(roadmap_file, "w", encoding="utf-8") as f:
             json.dump(data, f, indent=2, ensure_ascii=False)
@@ -623,6 +638,116 @@ def toggle_station_deliverable(station_id: str, deliverable_key: str) -> Dict[st
             "total_count": total_count,
             "station_status": target_station["status"],
             "station_completed": target_station["status"] == "completed",
+            "next_station_id": next_station.get("id") if next_station else None,
+            "next_station_name": next_station.get("name") if next_station else None,
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def advance_station(station_id: str, pass_over_unfinished: bool = True) -> Dict[str, Any]:
+    """Advances from the current station to the next station.
+    Marks unfinished deliverables as passed over, marks current station completed,
+    and activates the next station along the metro line.
+    """
+    roadmap_file = DATA_DIR / "metro_roadmap.json"
+    if not roadmap_file.exists():
+        return {"success": False, "error": "Roadmap file not found"}
+
+    try:
+        with open(roadmap_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        stations = data.get("stations", [])
+        target_idx = None
+        target_station = None
+        for idx, s in enumerate(stations):
+            if s.get("id") == station_id:
+                target_idx = idx
+                target_station = s
+                break
+
+        if target_station is None:
+            return {"success": False, "error": f"Station {station_id} not found"}
+
+        completed_list = target_station.get("completed_deliverables", [])
+        passed_over_list = target_station.get("passed_over_deliverables", [])
+        all_keys = list(target_station.get("deliverables", {}).keys())
+
+        if pass_over_unfinished:
+            for k in all_keys:
+                if k not in completed_list and k not in passed_over_list:
+                    passed_over_list.append(k)
+            target_station["passed_over_deliverables"] = passed_over_list
+
+        target_station["status"] = "completed"
+
+        next_station = None
+        if target_idx is not None and target_idx + 1 < len(stations):
+            next_station = stations[target_idx + 1]
+            next_station["status"] = "active"
+
+        with open(roadmap_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        return {
+            "success": True,
+            "station_id": station_id,
+            "station_status": "completed",
+            "passed_over_deliverables": passed_over_list,
+            "next_station_id": next_station.get("id") if next_station else None,
+            "next_station_name": next_station.get("name") if next_station else None,
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def pass_over_station_deliverable(station_id: str, deliverable_key: str) -> Dict[str, Any]:
+    """Toggles a deliverable as passed over / deferred for a station.
+    Allows passing over items that could not be completed without blocking milestone progress.
+    """
+    roadmap_file = DATA_DIR / "metro_roadmap.json"
+    if not roadmap_file.exists():
+        return {"success": False, "error": "Roadmap file not found"}
+
+    try:
+        with open(roadmap_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        target_station = None
+        for s in data.get("stations", []):
+            if s.get("id") == station_id:
+                target_station = s
+                break
+
+        if not target_station:
+            return {"success": False, "error": f"Station {station_id} not found"}
+
+        passed_over_list = target_station.get("passed_over_deliverables", [])
+        completed_list = target_station.get("completed_deliverables", [])
+
+        if deliverable_key in passed_over_list:
+            passed_over_list.remove(deliverable_key)
+            is_passed_over = False
+        else:
+            passed_over_list.append(deliverable_key)
+            if deliverable_key in completed_list:
+                completed_list.remove(deliverable_key)
+            is_passed_over = True
+
+        target_station["passed_over_deliverables"] = passed_over_list
+        target_station["completed_deliverables"] = completed_list
+
+        with open(roadmap_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        return {
+            "success": True,
+            "station_id": station_id,
+            "deliverable_key": deliverable_key,
+            "is_passed_over": is_passed_over,
+            "passed_over_deliverables": passed_over_list,
+            "completed_deliverables": completed_list,
         }
     except Exception as e:
         return {"success": False, "error": str(e)}
