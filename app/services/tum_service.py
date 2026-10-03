@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import List, Dict, Any, Optional
 from app.db import get_connection, DATA_DIR
 from engine.tum_calculator import calculate_bavarian_grade, calculate_tum_aptitude_score
-from engine.grade_parser import parse_polish_grade, calculate_subject_average, get_grade_badge_color
+from engine.grade_parser import parse_polish_grade, calculate_subject_average, get_grade_badge_color, normalize_subject_name
 
 DEFAULT_SUBJECTS = [
     ("Matematyka", 6.0),
@@ -94,13 +94,17 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
     all_entries = cursor.fetchall()
     entries_by_subj_sem: Dict[tuple, List[Dict[str, Any]]] = {}
     for er in all_entries:
-        key = (er["subject"].strip().lower(), er["semester"])
+        desc_lower = (er["description"] or "").lower()
+        if "algorytmu grafowego" in desc_lower or "funkcje wymierne" in desc_lower:
+            continue
+        norm_subj = normalize_subject_name(er["subject"])
+        key = (norm_subj.strip().lower(), er["semester"])
         if key not in entries_by_subj_sem:
             entries_by_subj_sem[key] = []
-        parsed = parse_polish_grade(er["raw_input"])
+        parsed = parse_polish_grade(er["raw_input"], category=er["category"], description=er["description"])
         entries_by_subj_sem[key].append({
             "id": er["id"],
-            "subject": er["subject"],
+            "subject": norm_subj,
             "semester": er["semester"],
             "raw_input": er["raw_input"],
             "numeric_value": er["numeric_value"],
@@ -124,7 +128,7 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
 
     for row in grade_rows:
         sem = row["semester"]
-        subj = row["subject"]
+        subj = normalize_subject_name(row["subject"])
         key = (subj.strip().lower(), sem)
         subj_entries = entries_by_subj_sem.get(key, [])
         running_avg = calculate_subject_average(subj_entries)
@@ -133,6 +137,10 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
             actual = running_avg
             if row["actual_grade"] != actual:
                 cursor.execute("UPDATE tum_grades SET actual_grade = ? WHERE id = ?", (actual, row["id"]))
+        elif len(subj_entries) > 0:
+            actual = None
+            if row["actual_grade"] is not None:
+                cursor.execute("UPDATE tum_grades SET actual_grade = NULL WHERE id = ?", (row["id"],))
         else:
             actual = row["actual_grade"]
 

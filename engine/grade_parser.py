@@ -178,6 +178,24 @@ def parse_polish_grade(
         except ValueError:
             pass
 
+    # 2b. Grade with percentage in parentheses: e.g. "3 (70%)", "4+ (85%)", "5 (92.5%)"
+    grade_pct_match = re.match(r"^([1-6][+-]?)\s*\(\s*(\d+(?:[.,]\d+)?)\s*%\s*\)$", cleaned)
+    if grade_pct_match:
+        grade_part = grade_pct_match.group(1)
+        pct_part = float(grade_pct_match.group(2).replace(",", "."))
+        parsed_grade = parse_polish_grade(grade_part)
+        if parsed_grade["valid"]:
+            return {
+                "valid": True,
+                "raw_input": cleaned,
+                "numeric_value": parsed_grade["numeric_value"],
+                "display_label": f"{parsed_grade['display_label']} ({pct_part:.0f}%)",
+                "counts_in_average": True,
+                "percentage": pct_part,
+                "grade_type": "standard",
+                "badge_color": parsed_grade["badge_color"],
+            }
+
     # 3. Percentages: e.g. "85%", "92.5 %"
     percent_match = re.match(r"^(\d+(?:[.,]\d+)?)\s*%$", cleaned)
     if percent_match:
@@ -288,3 +306,29 @@ def calculate_subject_average(entries: List[Dict[str, Any]]) -> Optional[float]:
     if total_weights > 0:
         return round(total_weighted / total_weights, 2)
     return None
+
+
+def normalize_subject_name(raw_name: str) -> str:
+    """Maps various Polish school / Vulcan subject names to canonical TUM ledger subjects."""
+    s = (raw_name or "").strip()
+    low = s.lower()
+    if "matem" in low:
+        return "Matematyka"
+    if "inform" in low:
+        return "Informatyka"
+    if "angiel" in low:
+        return "Język Angielski"
+    if "polsk" in low:
+        return "Język Polski"
+    if "fizyk" in low:
+        return "Fizyka"
+    if "histor" in low or "hit" in low or "wos" in low:
+        return "Historia"
+    if "geogr" in low:
+        return "Geografia"
+    if "chem" in low or "biol" in low:
+        return "Biologia / Chemia"
+    if "niemiec" in low:
+        return "Język Niemiecki"
+    return s
+

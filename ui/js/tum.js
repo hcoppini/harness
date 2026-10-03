@@ -90,14 +90,37 @@ const Tum = {
       return;
     }
 
+    const activeSubjectAvgs = [];
+
     const rowsHtml = list
       .map((grade) => {
         const entries = (grade.entries || []).filter((e) => {
           const d = ((e.description || "") + " " + (e.raw_input || "")).toLowerCase();
           return !d.includes("funkcje wymierne") && !d.includes("algorytmu grafowego");
         });
-        const runningAvg = grade.running_average;
-        const actual = grade.actual_grade;
+
+        // Compute running average dynamically from visible entries
+        let runningAvg = null;
+        let weightedSum = 0;
+        let totalWeight = 0;
+        entries.forEach((e) => {
+          if (e.counts_in_average && e.numeric_value !== null && e.numeric_value !== undefined) {
+            const w = (e.weight !== undefined && e.weight !== null && e.weight > 0) ? Number(e.weight) : 1.0;
+            weightedSum += Number(e.numeric_value) * w;
+            totalWeight += w;
+          }
+        });
+        if (totalWeight > 0) {
+          runningAvg = Math.round((weightedSum / totalWeight) * 100) / 100;
+        } else if (grade.running_average !== null && grade.running_average !== undefined && entries.length > 0) {
+          const hasCounted = entries.some((e) => e.counts_in_average && e.numeric_value !== null);
+          runningAvg = hasCounted ? grade.running_average : null;
+        }
+
+        if (runningAvg !== null && runningAvg !== undefined) {
+          activeSubjectAvgs.push(runningAvg);
+        }
+
         const target = grade.target_grade || 5.0;
 
         // Render chips for individual marks
@@ -200,8 +223,11 @@ const Tum = {
       .join("");
 
     // Semester summary footer row
-    const gpaDisplay = semGpa && semGpa > 0 ? semGpa.toFixed(2) : "--";
-    const overallDisplay = this.data.overall_gpa && this.data.overall_gpa > 0 ? this.data.overall_gpa.toFixed(2) : "--";
+    const effectiveSemGpa = activeSubjectAvgs.length > 0
+      ? (activeSubjectAvgs.reduce((a, b) => a + b, 0) / activeSubjectAvgs.length)
+      : (semGpa && semGpa > 0 ? semGpa : null);
+    const gpaDisplay = effectiveSemGpa && effectiveSemGpa > 0 ? effectiveSemGpa.toFixed(2) : "--";
+    const overallDisplay = this.data.overall_gpa && this.data.overall_gpa > 0 ? this.data.overall_gpa.toFixed(2) : (effectiveSemGpa && effectiveSemGpa > 0 ? effectiveSemGpa.toFixed(2) : "--");
 
     const footerHtml = `
       <tr style="border-top: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.02); font-family: var(--font-mono); font-size: 11px;">

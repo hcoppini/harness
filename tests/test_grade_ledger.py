@@ -102,6 +102,39 @@ def test_grade_parser_non_ordinary_np_bz():
     assert p_date_np2["counts_in_average"] is False
     assert p_date_np2["display_label"] == "NP (20.09)"
 
+    p_np_dot = parse_polish_grade("np.")
+    assert p_np_dot["valid"] is True
+    assert p_np_dot["numeric_value"] is None
+    assert p_np_dot["counts_in_average"] is False
+    assert p_np_dot["display_label"] == "NP"
+
+
+def test_grade_parser_percentage_in_parentheses():
+    p = parse_polish_grade("3 (70%)")
+    assert p["valid"] is True
+    assert p["numeric_value"] == 3.0
+    assert p["counts_in_average"] is True
+    assert p["percentage"] == 70.0
+    assert p["display_label"] == "3 (70%)"
+
+    p2 = parse_polish_grade("4+ (85%)")
+    assert p2["valid"] is True
+    assert p2["numeric_value"] == 4.5
+    assert p2["counts_in_average"] is True
+    assert p2["percentage"] == 85.0
+
+
+def test_normalize_subject_name():
+    from engine.grade_parser import normalize_subject_name
+    assert normalize_subject_name("Chemia") == "Biologia / Chemia"
+    assert normalize_subject_name("Biologia") == "Biologia / Chemia"
+    assert normalize_subject_name("j.angielski") == "Język Angielski"
+    assert normalize_subject_name("Język angielski") == "Język Angielski"
+    assert normalize_subject_name("Język niemiecki") == "Język Niemiecki"
+    assert normalize_subject_name("Język polski") == "Język Polski"
+    assert normalize_subject_name("Informatyka") == "Informatyka"
+    assert normalize_subject_name("Matematyka") == "Matematyka"
+
 
 def test_singular_grade_impact_on_running_average(test_db):
     # Initial state

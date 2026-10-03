@@ -18,7 +18,7 @@ from pathlib import Path
 from typing import Dict, Any, List, Optional, Tuple
 
 from app.db import get_connection, DATA_DIR
-from engine.grade_parser import parse_polish_grade, calculate_subject_average
+from engine.grade_parser import parse_polish_grade, calculate_subject_average, normalize_subject_name
 
 CONFIG_FILE = DATA_DIR / "vulcan_config.json"
 
@@ -677,7 +677,8 @@ def _fetch_live_vulcan_payload(cfg: Dict[str, Any], target_date: str) -> Optiona
     if isinstance(raw_grades, list):
         for g in raw_grades:
             col = g.get("Column", {}) if isinstance(col := g.get("Column"), dict) else {}
-            subj = col.get("Subject", {}).get("Name", "General") if isinstance(col.get("Subject"), dict) else "General"
+            raw_subj = col.get("Subject", {}).get("Name", "General") if isinstance(col.get("Subject"), dict) else "General"
+            subj = normalize_subject_name(raw_subj)
             val = g.get("Value")
             num = g.get("Numerator")
             den = g.get("Denominator")
@@ -826,7 +827,8 @@ def sync_vulcan_data(
     # 3. Merge grades into Grade Ledger (tum_grade_entries & tum_grades)
     affected_subjects = set()
     for g in payload.get("grades", []):
-        subj = g.get("subject", "General").strip()
+        raw_subj = g.get("subject", "General").strip()
+        subj = normalize_subject_name(raw_subj)
         sem = int(g.get("semester", 1))
         raw = str(g.get("raw_input", "5")).strip()
         weight = float(g.get("weight", 1.0))
@@ -843,12 +845,10 @@ def sync_vulcan_data(
                 cat = "Nieprzygotowanie"
                 raw = parsed.get("display_label", "NP")
         else:
-            num = g.get("numeric_value")
-            if num is None and parsed.get("numeric_value") is not None:
-                num = parsed["numeric_value"]
-            elif num is not None:
+            num = parsed.get("numeric_value")
+            if num is None and g.get("numeric_value") is not None:
                 try:
-                    num = float(num)
+                    num = float(g["numeric_value"])
                 except Exception:
                     num = None
             counts = 1 if (parsed.get("counts_in_average") and weight > 0.0) else 0
@@ -858,21 +858,32 @@ def sync_vulcan_data(
             SELECT id FROM tum_grade_entries 
             WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) 
               AND semester = ? 
-              AND (description = ? OR (description = '' AND raw_input = ?))
-              AND date = ?
+              AND (
+                (description != '' AND description = ?)
+                OR (date = ? AND raw_input = ?)
+                OR (description = ? AND date = ?)
+              )
+            ORDER BY id ASC
             """,
-            (subj, sem, desc, raw, g_date),
+            (subj, sem, desc, g_date, raw, desc, g_date),
         )
-        existing = cursor.fetchone()
-        if existing:
+        existing_rows = cursor.fetchall()
+        if existing_rows:
+            primary_id = existing_rows[0]["id"]
             cursor.execute(
                 """
                 UPDATE tum_grade_entries
-                SET raw_input = ?, numeric_value = ?, weight = ?, category = ?, counts_in_average = ?
+                SET subject = ?, raw_input = ?, numeric_value = ?, weight = ?, category = ?, description = ?, counts_in_average = ?
                 WHERE id = ?
                 """,
-                (raw, num, weight, cat, counts, existing["id"]),
+                (subj, raw, num, weight, cat, desc, counts, primary_id),
             )
+            if len(existing_rows) > 1:
+                dup_ids = [r["id"] for r in existing_rows[1:]]
+                cursor.execute(
+                    f"DELETE FROM tum_grade_entries WHERE id IN ({','.join(['?']*len(dup_ids))})",
+                    dup_ids,
+                )
         else:
             cursor.execute(
                 """
@@ -888,14 +899,15 @@ def sync_vulcan_data(
 
     # Recalculate running averages and update tum_grades for affected subjects
     for subj, sem in affected_subjects:
+        norm_subj = normalize_subject_name(subj)
         cursor.execute(
             "SELECT id FROM tum_grades WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) AND semester = ?",
-            (subj, sem),
+            (norm_subj, sem),
         )
         if not cursor.fetchone():
             cursor.execute(
                 "INSERT INTO tum_grades (subject, semester, target_grade, actual_grade) VALUES (?, ?, 5.0, NULL)",
-                (subj, sem),
+                (norm_subj, sem),
             )
 
         cursor.execute(
@@ -903,7 +915,7 @@ def sync_vulcan_data(
             SELECT * FROM tum_grade_entries 
             WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) AND semester = ?
             """,
-            (subj, sem),
+            (norm_subj, sem),
         )
         rows = cursor.fetchall()
         entries = [dict(r) for r in rows]
@@ -914,7 +926,7 @@ def sync_vulcan_data(
             SET actual_grade = ? 
             WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) AND semester = ?
             """,
-            (running_avg, subj, sem),
+            (running_avg, norm_subj, sem),
         )
 
     conn.commit()

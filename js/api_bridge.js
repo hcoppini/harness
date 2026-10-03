@@ -1896,31 +1896,144 @@
                 }
               } catch (e) {}
 
+              // Try Supabase live fetch if serverRes is not available
+              try {
+                const [sbGrades, sbEntries] = await Promise.all([
+                  supabaseRequest("tum_grades?select=*&order=semester.asc,id.asc"),
+                  supabaseRequest("tum_grade_entries?select=*&order=date.asc,id.asc"),
+                ]);
+                if (Array.isArray(sbGrades) && sbGrades.length > 0) {
+                  const normalizeSubj = (name) => {
+                    const low = (name || "").toLowerCase();
+                    if (low.includes("matem")) return "Matematyka";
+                    if (low.includes("inform")) return "Informatyka";
+                    if (low.includes("angiel")) return "Język Angielski";
+                    if (low.includes("polsk")) return "Język Polski";
+                    if (low.includes("fizyk")) return "Fizyka";
+                    if (low.includes("histor") || low.includes("hit") || low.includes("wos")) return "Historia";
+                    if (low.includes("geogr")) return "Geografia";
+                    if (low.includes("chem") || low.includes("biol")) return "Biologia / Chemia";
+                    if (low.includes("niemiec")) return "Język Niemiecki";
+                    return name;
+                  };
+
+                  const cleanEntries = (sbEntries || []).filter((e) => {
+                    const desc = (e.description || "").toLowerCase();
+                    return !desc.includes("funkcje wymierne") && !desc.includes("algorytmu grafowego");
+                  });
+
+                  const entriesMap = {};
+                  cleanEntries.forEach((e) => {
+                    const norm = normalizeSubj(e.subject);
+                    const k = `${norm.toLowerCase()}_${e.semester}`;
+                    if (!entriesMap[k]) entriesMap[k] = [];
+                    entriesMap[k].push({
+                      id: e.id,
+                      subject: norm,
+                      semester: e.semester,
+                      raw_input: e.raw_input,
+                      numeric_value: e.numeric_value,
+                      weight: e.weight !== undefined ? Number(e.weight) : 1.0,
+                      category: e.category,
+                      description: e.description || "",
+                      date: e.date,
+                      counts_in_average: Boolean(e.counts_in_average),
+                      display_label: e.display_label || e.raw_input,
+                      badge_color: e.badge_color || (e.counts_in_average ? "#1e40af" : "#6b7280"),
+                      grade_type: e.grade_type || "standard",
+                    });
+                  });
+
+                  const semesters = { 1: [], 2: [], 3: [], 4: [] };
+                  const totalGrades = [];
+                  sbGrades.forEach((g) => {
+                    const norm = normalizeSubj(g.subject);
+                    const sem = g.semester || 1;
+                    const k = `${norm.toLowerCase()}_${sem}`;
+                    const subEntries = entriesMap[k] || [];
+
+                    let runningAvg = null;
+                    let sumW = 0, totalW = 0;
+                    subEntries.forEach((se) => {
+                      if (se.counts_in_average && se.numeric_value !== null && se.numeric_value !== undefined && se.weight > 0) {
+                        sumW += Number(se.numeric_value) * Number(se.weight);
+                        totalW += Number(se.weight);
+                      }
+                    });
+                    if (totalW > 0) {
+                      runningAvg = Math.round((sumW / totalW) * 100) / 100;
+                      totalGrades.push(runningAvg);
+                    }
+
+                    if (!semesters[sem]) semesters[sem] = [];
+                    semesters[sem].push({
+                      id: g.id,
+                      subject: norm,
+                      semester: sem,
+                      target_grade: g.target_grade || 5.0,
+                      actual_grade: runningAvg,
+                      running_average: runningAvg,
+                      entries: subEntries,
+                      percentage: g.percentage,
+                      notes: g.notes || "",
+                    });
+                  });
+
+                  const semester_gpas = { 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0 };
+                  for (let s = 1; s <= 4; s++) {
+                    const actuals = (semesters[s] || []).map((x) => x.actual_grade).filter((x) => x !== null && x !== undefined);
+                    semester_gpas[s] = actuals.length > 0 ? Math.round((actuals.reduce((a, b) => a + b, 0) / actuals.length) * 100) / 100 : 0.0;
+                  }
+
+                  const overall_gpa = totalGrades.length > 0 ? Math.round((totalGrades.reduce((a, b) => a + b, 0) / totalGrades.length) * 100) / 100 : 0.0;
+
+                  return {
+                    gpa: overall_gpa,
+                    overall_gpa: overall_gpa,
+                    semesters: semesters,
+                    semester_gpas: semester_gpas,
+                  };
+                }
+              } catch (e) {}
+
               // Resilient offline fallback with clean real grades only
               return {
-                gpa: 4.33,
+                gpa: 3.75,
                 bavarian_gpa: 1.13,
                 semesters: {
                   1: [
                     { id: 1, subject: "Matematyka", actual_grade: null, running_average: null, target_grade: 6.0, entries: [
                       { id: 12, raw_input: "NP (21.09)", display_label: "NP (21.09)", numeric_value: null, weight: 0.0, category: "Nieprzygotowanie", description: "nieprzygotowanie", counts_in_average: false, badge_color: "#6b7280" }
                     ]},
-                    { id: 2, subject: "Informatyka", actual_grade: null, running_average: null, target_grade: 6.0, entries: [
-                      { id: 6, raw_input: "14", display_label: "14", numeric_value: null, weight: 0.0, category: "Aktywność", description: "Stanowisko komputerowe", counts_in_average: false, badge_color: "#6b7280" }
+                    { id: 2, subject: "Informatyka", actual_grade: 3.0, running_average: 3.0, target_grade: 6.0, entries: [
+                      { id: 6, raw_input: "14", display_label: "14", numeric_value: null, weight: 0.0, category: "Aktywność", description: "Stanowisko komputerowe", counts_in_average: false, badge_color: "#6b7280" },
+                      { id: 15, raw_input: "3", display_label: "3", numeric_value: 3.0, weight: 1.0, category: "Bieżące", description: "Podstawy programowania w c++", counts_in_average: true, badge_color: "#5b21b6" }
                     ]},
-                    { id: 3, subject: "Język Angielski", actual_grade: 4.67, running_average: 4.67, target_grade: 5.5, entries: [
-                      { id: 7, raw_input: "14.0/15.0", display_label: "5", numeric_value: 5.0, weight: 1.0, category: "Bieżące", description: "Matura - listening", counts_in_average: true, badge_color: "#15803d" },
-                      { id: 8, raw_input: "17.0/18.0", display_label: "5", numeric_value: 5.0, weight: 1.0, category: "Bieżące", description: "Matura - reading", counts_in_average: true, badge_color: "#15803d" },
-                      { id: 9, raw_input: "11.0/14.0", display_label: "4", numeric_value: 4.0, weight: 1.0, category: "Bieżące", description: "Matura - use of English", counts_in_average: true, badge_color: "#3b82f6" }
+                    { id: 3, subject: "Język Angielski", actual_grade: 5.0, running_average: 5.0, target_grade: 5.5, entries: [
+                      { id: 7, raw_input: "14.0/15.0", display_label: "14.0/15.0 (93%)", numeric_value: 5.0, weight: 1.0, category: "Bieżące", description: "Matura - listening", counts_in_average: true, badge_color: "#166534" },
+                      { id: 8, raw_input: "17.0/18.0", display_label: "17.0/18.0 (94%)", numeric_value: 5.0, weight: 1.0, category: "Bieżące", description: "Matura - reading", counts_in_average: true, badge_color: "#166534" },
+                      { id: 9, raw_input: "11.0/14.0", display_label: "11.0/14.0 (79%)", numeric_value: 4.0, weight: 1.0, category: "Bieżące", description: "Matura - use of English", counts_in_average: true, badge_color: "#1e40af" },
+                      { id: 13, raw_input: "10.0/10.0", display_label: "10.0/10.0 (100%)", numeric_value: 6.0, weight: 1.0, category: "Bieżące", description: "Wypowiedź ustna", counts_in_average: true, badge_color: "#166534" }
                     ]},
+                    { id: 4, subject: "Język Polski", actual_grade: null, running_average: null, target_grade: 4.5, entries: [
+                      { id: 18, raw_input: "np.", display_label: "NP", numeric_value: null, weight: 0.0, category: "Nieprzygotowanie", description: "", counts_in_average: false, badge_color: "#6b7280" }
+                    ]},
+                    { id: 5, subject: "Fizyka", actual_grade: null, running_average: null, target_grade: 4.5, entries: [] },
                     { id: 6, subject: "Historia", actual_grade: 4.0, running_average: 4.0, target_grade: 4.0, entries: [
-                      { id: 1, raw_input: "+", display_label: "+", numeric_value: null, weight: 1.0, category: "Aktywność", description: "", counts_in_average: false, badge_color: "#6b7280" },
-                      { id: 4, raw_input: "+", display_label: "+", numeric_value: null, weight: 1.0, category: "Bieżące", description: "Praca na lekcji", counts_in_average: false, badge_color: "#6b7280" },
-                      { id: 5, raw_input: "4", display_label: "4", numeric_value: 4.0, weight: 1.0, category: "Bieżące", description: "Kartkówka 1 - bitwy Powstania listopadowego", counts_in_average: true, badge_color: "#3b82f6" }
+                      { id: 4, raw_input: "+", display_label: "+", numeric_value: null, weight: 0.0, category: "Bieżące", description: "Praca na lekcji", counts_in_average: false, badge_color: "#6b7280" },
+                      { id: 5, raw_input: "4", display_label: "4", numeric_value: 4.0, weight: 1.0, category: "Bieżące", description: "Kartkówka 1  - bitwy Powstania listopadowego.", counts_in_average: true, badge_color: "#1e40af" },
+                      { id: 14, raw_input: "+", display_label: "+", numeric_value: null, weight: 0.0, category: "Bieżące", description: "zadanie dodatkowe", counts_in_average: false, badge_color: "#6b7280" }
+                    ]},
+                    { id: 7, subject: "Geografia", actual_grade: null, running_average: null, target_grade: 4.0, entries: [] },
+                    { id: 8, subject: "Biologia / Chemia", actual_grade: 3.0, running_average: 3.0, target_grade: 4.0, entries: [
+                      { id: 20, raw_input: "3 (70%)", display_label: "3 (70%)", numeric_value: 3.0, weight: 1.0, category: "Bieżące", description: "Alkany (70%)", counts_in_average: true, badge_color: "#5b21b6" }
+                    ]},
+                    { id: 9, subject: "Język Niemiecki", actual_grade: null, running_average: null, target_grade: 5.0, entries: [
+                      { id: 19, raw_input: "4-", display_label: "4-", numeric_value: 4.0, weight: 0.0, category: "Bieżące", description: "praca w grupie: podróż marzeń", counts_in_average: false, badge_color: "#6b7280" }
                     ]}
                   ]
                 },
-                semester_gpas: { 1: 4.33, 2: null, 3: null, 4: null }
+                semester_gpas: { 1: 3.75, 2: null, 3: null, 4: null }
               };
             };
           }
