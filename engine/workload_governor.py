@@ -449,9 +449,9 @@ def get_workload_analysis(
 
     if is_travel:
         mode = "TRAVEL"
-        mode_label = "US Travel Protocol • Hotel Deep Work"
+        mode_label = "Travel Mode • Minimal Maintenance"
         badge_class = "travel"
-        desc = "US Trip Active (Oct 4–18). Warsaw Liceum timetable suspended. Academic surge mode frozen. 75m flexible hotel deep work scheduled for TUM roadmap."
+        desc = "Travel Mode Active (Oct 4–18). Warsaw Liceum timetable suspended. School surge frozen. 60m minimal maintenance study hour to keep pace with zero guilt. Enjoy your trip."
         score = 1.0
     elif score <= 2.5:
         mode = "CRUISE"
@@ -552,8 +552,9 @@ def compute_phase_durations(total_net_min: int, scenario_type: str) -> Tuple[int
         p1 = total_net_min - p2 - p3
         return p1, p2, p3
     elif scenario_type == "us_travel":
-        p1 = int(round(total_net_min * 0.67))
-        p2 = int(round(total_net_min * 0.22))
+        # 60m minimal maintenance hour: 30m anchor deliverable + 15m review/proofs + 15m German vocab
+        p1 = int(round(total_net_min * 0.50))
+        p2 = int(round(total_net_min * 0.25))
         p3 = total_net_min - p1 - p2
         return p1, p2, p3
     else:
@@ -600,19 +601,19 @@ def synthesize_adaptive_schedule(
             "category": "Algorithms",
             "quantity": 1,
         }
-        net_min, cutoff_str = parse_block_net_minutes("10:00 – 11:30", default_minutes=90)
+        net_min, cutoff_str = parse_block_net_minutes("09:30 – 10:30", default_minutes=60)
         p1, p2, p3 = compute_phase_durations(net_min, "us_travel")
         travel_blocks = [
             {
                 "time": "08:30 – 09:30",
-                "focus": "Morning Fuel & US Launch",
-                "activity": "Wake up, hydration, high-protein breakfast, plan day exploration/program.",
+                "focus": "Morning Fuel & Launch",
+                "activity": "Wake up, hydration, high-protein breakfast, plan day exploration/activities.",
                 "type": "routine",
             },
             {
-                "time": "10:00 – 11:30",
-                "focus": f"US Hotel Deep Work • TUM Roadmap: {spec['title']}",
-                "activity": f"[US Hotel Sprint // {station_id}] {p1}m {spec['target_spec']} + {p2}m self-correction & proofs + {p3}m German vocabulary review.",
+                "time": "09:30 – 10:30",
+                "focus": f"US Hotel Deep Work • 60m Maintenance Anchor: {spec['title']}",
+                "activity": f"[US Travel Maintenance // {station_id}] 60m low-friction anchor: {p1}m {spec['target_spec']} + {p2}m self-correction + {p3}m German vocabulary. Momentum sustained; zero guilt.",
                 "type": "deep_work",
                 "is_tum_roadmap": True,
                 "is_school_dedicated": False,
@@ -623,7 +624,7 @@ def synthesize_adaptive_schedule(
                     {
                         "phase_num": 1,
                         "phase_key": "study_school",
-                        "badge_label": "[1. TUM ROADMAP SPRINT]",
+                        "badge_label": "[1. TUM ROADMAP ANCHOR]",
                         "duration_min": p1,
                         "title": f"TUM Deliverable: {spec['title']}",
                         "description": f"{p1}m {spec['target_spec']}.\nMilestone: {spec['category']} • Station {station_id}.",
@@ -633,7 +634,7 @@ def synthesize_adaptive_schedule(
                     {
                         "phase_num": 2,
                         "phase_key": "study_matura",
-                        "badge_label": "[2. PROOFS & REVIEW]",
+                        "badge_label": "[2. ACTIVE REVIEW]",
                         "duration_min": p2,
                         "title": "Unassisted Proofs & Error Analysis",
                         "description": f"{p2}m self-correction and mathematical proofs verification without external aids.",
@@ -666,15 +667,15 @@ def synthesize_adaptive_schedule(
                 } if chosen_deliv else None,
             },
             {
-                "time": "11:30 – 18:30",
-                "focus": "US Travel Program & Cultural Immersion",
-                "activity": "Scheduled trip activities, city transit, cultural immersion, conferences, and exploration.",
+                "time": "10:30 – 18:30",
+                "focus": "Travel Program, Exploration & Free Time",
+                "activity": "Scheduled trip activities, city transit, cultural immersion, boxing, and exploration. Zero guilt.",
                 "type": "travel",
             },
             {
                 "time": "18:30 – 19:15",
-                "focus": "Hotel Fitness & Mobility Routine",
-                "activity": "45 min hotel room / gym bodyweight workout (pushups, core circuit, mobility).",
+                "focus": "Fitness & Mobility Routine",
+                "activity": "45 min hotel workout / gym / running session (pushups, mobility, or run).",
                 "type": "training",
             },
             {
@@ -698,7 +699,7 @@ def synthesize_adaptive_schedule(
         ]
         schedule["blocks"] = travel_blocks
         schedule["name"] = f"US Travel Protocol ({target_dt.strftime('%A')})"
-        schedule["description"] = "Warsaw timetable suspended. 90m hotel deep work on active TUM Roadmap deliverable."
+        schedule["description"] = "Travel Mode Active (Oct 4–18). Warsaw schedule suspended. 60m minimal maintenance anchor to keep pace with zero guilt. Enjoy your trip."
         return schedule
 
     exams = analysis.get("upcoming_exams", [])

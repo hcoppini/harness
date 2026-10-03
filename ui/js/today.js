@@ -402,8 +402,8 @@ const Today = {
           <div style="display: flex; align-items: center; gap: 10px;">
             <span style="font-size: 18px;">✈️</span>
             <div>
-              <div style="font-size: 11px; font-weight: 700; color: #60a5fa; letter-spacing: 0.05em; font-family: var(--font-mono);">US TRAVEL PROTOCOL ACTIVE (OCT 4–18)</div>
-              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Warsaw school schedule suspended. 90m US Hotel deep work prioritized for TUM Station roadmap.</div>
+              <div style="font-size: 11px; font-weight: 700; color: #60a5fa; letter-spacing: 0.05em; font-family: var(--font-mono);">TRAVEL MODE ACTIVE (OCT 4–18)</div>
+              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Warsaw school schedule suspended. 60m minimal maintenance study hour to keep pace with zero guilt. Enjoy the trip.</div>
             </div>
           </div>
           <span class="mono-chip" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); font-size: 10px;">Travel Mode</span>
@@ -1088,11 +1088,11 @@ const Today = {
 
     if (isUsTravel) {
       if (currentMins < 9 * 60 + 30) {
-        period = { name: "Morning Fuel & US Launch", focus: "Wake up, hydration, high-protein breakfast, plan day program", endMins: 9 * 60 + 30 };
-      } else if (currentMins < 11 * 60 + 30) {
-        period = { name: "US Hotel Deep Work Session", focus: "TUM Roadmap sprint, algorithm practice & review", endMins: 11 * 60 + 30, action: "Deep Work" };
+        period = { name: "Morning Fuel & Launch", focus: "Wake up, hydration, high-protein breakfast, plan day exploration", endMins: 9 * 60 + 30 };
+      } else if (currentMins < 10 * 60 + 30) {
+        period = { name: "US Hotel Maintenance Anchor (60m)", focus: "60m low-friction anchor: 30m deliverable + 15m review + 15m German. Keep pace & finish early.", endMins: 10 * 60 + 30, action: "Deep Work" };
       } else if (currentMins < 20 * 60) {
-        period = { name: "US Program & Exploration", focus: "Active travel, university/tech site visits, networking, recovery", endMins: 20 * 60 };
+        period = { name: "Travel Program & Exploration", focus: "Zero guilt. NYC/Houston sights, food, boxing, exploration & downtime.", endMins: 20 * 60 };
       } else {
         period = { name: "Evening Recovery & Rest", focus: "Diary, hydration, wind-down and restful recovery", endMins: 24 * 60 };
       }

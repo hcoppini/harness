@@ -107,7 +107,7 @@ def test_us_travel_mode_schedule_and_exam_freezing(clean_db):
     sched = today_service.get_schedule_for_date(travel_date, conn=clean_db)
     blocks = sched["blocks"]
 
-    # Verify absence of Warsaw school and presence of US Hotel Deep Work
+    # Verify absence of Warsaw school and presence of US Hotel Deep Work (60m minimal maintenance anchor)
     assert not any("Liceum" in b.get("focus", "") for b in blocks)
     hotel_block = next((b for b in blocks if "US Hotel Deep Work" in b.get("focus", "")), None)
     assert hotel_block is not None
@@ -115,6 +115,14 @@ def test_us_travel_mode_schedule_and_exam_freezing(clean_db):
     assert hotel_block["is_tum_roadmap"] is True
     assert hotel_block.get("is_us_travel") is True
     assert "deliverable" in hotel_block
+    assert hotel_block["net_minutes"] == 55
+    assert sum(p["duration_min"] for p in hotel_block["plan_phases"]) == 55
+
+    # Verify Kill List controller limits to 1 maintenance anchor deliverable during travel mode
+    from engine import kill_list_controller
+    kill_data = kill_list_controller.auto_populate_kill_list(date_str=travel_date, conn=clean_db)
+    assert kill_data["count"] == 1
+    assert kill_data["items"][0]["category"].lower() in ["math r", "algorithms", "german"]
 
 
 def test_phased_exam_preparation_syllabus():

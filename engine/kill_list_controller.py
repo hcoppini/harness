@@ -904,10 +904,14 @@ def auto_populate_kill_list(
         conn = get_connection()
         close_conn = True
 
+    from engine.workload_governor import is_us_travel_date
+    is_travel = is_us_travel_date(target_date)
+    max_items = 1 if is_travel else 3
+
     cursor = conn.cursor()
     cursor.execute("SELECT COUNT(*) AS cnt FROM kill_list_items WHERE date = ?", (target_date,))
     count = cursor.fetchone()["cnt"]
-    if count >= 3:
+    if count >= max_items:
         res = get_kill_list(target_date, conn=conn)
         if close_conn:
             conn.close()
@@ -998,10 +1002,12 @@ def auto_populate_kill_list(
                 pass
 
     # 2. Fetch station deliverables for active station
+    # During travel mode, cap daily deliverables to 1 single maintenance anchor to prevent guilt and overwhelm.
+    target_cap = 1 if is_travel else 3
     station_delivs = get_station_deliverables(station_id, conn=conn)
 
     # Slot: Math R
-    if count < 3:
+    if count < target_cap:
         math_delivs = [
             d for d in station_delivs
             if "math" in d["deliverable_id"].lower()
@@ -1019,7 +1025,7 @@ def auto_populate_kill_list(
                 pass
 
     # Slot: LeetCode / Unassisted Algorithms
-    if count < 3:
+    if count < target_cap:
         code_delivs = [
             d for d in station_delivs
             if any(k in d["deliverable_id"].lower() for k in ["leetcode", "code", "algo"])
@@ -1037,7 +1043,7 @@ def auto_populate_kill_list(
                 pass
 
     # Slot: German / Language
-    if count < 3:
+    if count < target_cap:
         lang_delivs = [
             d for d in station_delivs
             if any(k in d["deliverable_id"].lower() for k in ["german", "anki", "lang"])
@@ -1055,13 +1061,13 @@ def auto_populate_kill_list(
                 pass
 
     # Fallback: Any other incomplete station deliverable
-    if count < 3:
+    if count < target_cap:
         other_delivs = [
             d for d in station_delivs
             if not d["is_completed"] and d["deliverable_id"] not in existing_deliv_ids
         ]
         for d in other_delivs:
-            if count >= 3:
+            if count >= target_cap:
                 break
             try:
                 enqueue_progressive_deliverable(d["deliverable_id"], date_str=target_date, conn=conn)
