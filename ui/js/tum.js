@@ -132,20 +132,32 @@ const Tum = {
             <div class="grade-chip-container">
               ${entries
                 .map((e) => {
-                  const color = e.badge_color || "#a1a1aa";
-                  const weightStr = e.weight && e.weight !== 1.0 ? `<span style="font-size: 8px; opacity: 0.75;"> &times;${e.weight}</span>` : "";
-                  const countMarker = !e.counts_in_average ? ' <span style="font-size: 8px; opacity: 0.6;">(0x)</span>' : "";
+                  const chipClass = !e.counts_in_average || e.numeric_value === null || e.numeric_value === undefined
+                    ? "chip-neutral"
+                    : e.numeric_value >= 5.0
+                    ? "chip-green"
+                    : e.numeric_value >= 4.0
+                    ? "chip-blue"
+                    : e.numeric_value >= 3.0
+                    ? "chip-purple"
+                    : e.numeric_value >= 2.0
+                    ? "chip-amber"
+                    : "chip-red";
+
+                  const weightStr = e.weight && Number(e.weight) !== 1.0 && e.counts_in_average
+                    ? `<span style="font-size: 8.5px; opacity: 0.8; font-weight: 600;"> &times;${e.weight}</span>`
+                    : "";
+                  const countMarker = !e.counts_in_average ? ' <span style="font-size: 8px; opacity: 0.7;">(0x)</span>' : "";
                   const titleTip = `${this.escapeHtml(e.category || "Grade")} • Weight: ${e.weight}${e.description ? ` • ${this.escapeHtml(e.description)}` : ""}${e.date ? ` • ${e.date}` : ""} (Click to remove)`;
 
                   return `
                     <span 
-                      class="grade-chip" 
-                      style="color: ${color}; border-color: ${color}44; background: ${color}12;" 
+                      class="grade-chip ${chipClass}" 
                       title="${titleTip}"
                       onclick="Tum.confirmDeleteGradeEntry(${e.id}, '${this.escapeJs(e.raw_input)}', '${this.escapeJs(grade.subject)}')"
                     >
                       <span>${this.escapeHtml(e.display_label || e.raw_input)}</span>${weightStr}${countMarker}
-                      <span class="chip-del-btn">&times;</span>
+                      <span class="chip-del-btn" title="Delete mark">&times;</span>
                     </span>
                   `;
                 })
@@ -157,60 +169,52 @@ const Tum = {
         // Running average badge styling
         let avgHtml = `<span style="color: var(--text-tertiary); font-family: var(--font-mono); font-size: 11px;">--</span>`;
         if (runningAvg !== null && runningAvg !== undefined) {
-          let avgBg = "rgba(196, 181, 253, 0.1)";
-          let avgColor = "var(--accent-lavender)";
-          let avgBorder = "rgba(196, 181, 253, 0.3)";
-
+          let avgClass = "on-track";
           if (runningAvg < 4.0) {
-            avgBg = "var(--color-red-subtle)";
-            avgColor = "var(--color-red)";
-            avgBorder = "var(--color-red-border)";
+            avgClass = "risk";
           } else if (runningAvg >= target) {
-            avgBg = "var(--color-green-subtle)";
-            avgColor = "var(--color-green)";
-            avgBorder = "var(--color-green-border)";
+            avgClass = "optimal";
           }
 
           avgHtml = `
-            <span class="grade-avg-pill" style="background: ${avgBg}; color: ${avgColor}; border: 1px solid ${avgBorder};">
+            <span class="grade-avg-pill ${avgClass}">
               ${runningAvg.toFixed(2)}
             </span>
           `;
         }
 
         // Status badge
-        let statusBadge = `<span class="key-pill">Pending</span>`;
+        let statusBadge = `<span class="status-pill pending">Pending</span>`;
         if (runningAvg !== null && runningAvg !== undefined) {
           if (runningAvg < 4.0) {
-            statusBadge = `<span class="key-pill rose">Risk (&lt; 4.0)</span>`;
+            statusBadge = `<span class="status-pill risk">Risk (&lt; 4.0)</span>`;
           } else if (runningAvg >= target) {
-            statusBadge = `<span class="key-pill done">Target Met</span>`;
+            statusBadge = `<span class="status-pill target-met">Target Met</span>`;
           } else {
-            statusBadge = `<span class="key-pill" style="color: var(--text-primary);">On Track</span>`;
+            statusBadge = `<span class="status-pill on-track">On Track</span>`;
           }
         }
 
         return `
-          <tr style="border-bottom: 1px solid var(--border-hairline);">
-            <td style="padding: 10px 0; font-weight: 600; color: var(--text-primary); font-size: 12px;">
+          <tr>
+            <td style="font-weight: 600; color: var(--text-primary); font-size: 12.5px;">
               ${this.escapeHtml(grade.subject)}
             </td>
-            <td style="padding: 10px 10px;">
+            <td>
               ${chipsHtml}
             </td>
-            <td style="padding: 10px 10px;">
+            <td style="text-align: center;">
               ${avgHtml}
             </td>
-            <td style="padding: 10px 10px; font-family: var(--font-mono); color: var(--text-secondary); font-size: 11px;">
+            <td style="text-align: center; font-family: var(--font-mono); color: var(--text-secondary); font-size: 11.5px; font-weight: 500;">
               ${target.toFixed(1)}
             </td>
-            <td style="padding: 10px 10px;">
+            <td style="text-align: center;">
               ${statusBadge}
             </td>
-            <td style="padding: 10px 0; text-align: right;">
+            <td style="text-align: right;">
               <button 
-                class="btn-ghost-icon" 
-                style="padding: 3px 8px; font-size: 10px;" 
+                class="btn-row-action" 
                 onclick="Tum.openAddGradeModal('${this.escapeJs(grade.subject)}', ${this.activeSemester})"
                 title="Log a new grade for ${this.escapeHtml(grade.subject)}"
               >
@@ -230,16 +234,16 @@ const Tum = {
     const overallDisplay = this.data.overall_gpa && this.data.overall_gpa > 0 ? this.data.overall_gpa.toFixed(2) : (effectiveSemGpa && effectiveSemGpa > 0 ? effectiveSemGpa.toFixed(2) : "--");
 
     const footerHtml = `
-      <tr style="border-top: 1px solid rgba(255, 255, 255, 0.12); background: rgba(255, 255, 255, 0.02); font-family: var(--font-mono); font-size: 11px;">
-        <td colspan="2" style="padding: 10px 0; font-weight: 700; color: var(--text-primary);">
+      <tr style="border-top: 1px solid var(--border-subtle); background: var(--bg-surface-elevated); font-family: var(--font-mono); font-size: 11px;">
+        <td colspan="2" style="font-weight: 700; color: var(--text-primary); letter-spacing: 0.02em;">
           SEMESTER ${this.activeSemester} RUNNING GPA
         </td>
-        <td colspan="2" style="padding: 10px 10px;">
-          <span class="mono-chip lavender" style="font-weight: 700; font-size: 11px; padding: 3px 8px;">
+        <td colspan="2" style="text-align: center;">
+          <span class="grade-avg-pill on-track" style="font-weight: 700; font-size: 11.5px; padding: 3px 10px;">
             ${gpaDisplay} GPA
           </span>
         </td>
-        <td colspan="2" style="padding: 10px 0; text-align: right; color: var(--text-tertiary);">
+        <td colspan="2" style="text-align: right; color: var(--text-tertiary);">
           Overall: <strong style="color: var(--text-primary);">${overallDisplay}</strong>
         </td>
       </tr>
@@ -366,14 +370,12 @@ const Tum = {
     if (simModeBadge) {
       if (isSimulating) {
         simModeBadge.textContent = "What-If Simulated";
-        simModeBadge.style.color = "#f59e0b";
-        simModeBadge.style.background = "rgba(245, 158, 11, 0.1)";
-        simModeBadge.style.borderColor = "rgba(245, 158, 11, 0.3)";
+        simModeBadge.className = "mono-chip amber";
+        simModeBadge.removeAttribute("style");
       } else {
         simModeBadge.textContent = "Live Ledger Linked";
-        simModeBadge.style.color = "var(--accent-lavender)";
-        simModeBadge.style.background = "rgba(196, 181, 253, 0.1)";
-        simModeBadge.style.borderColor = "rgba(196, 181, 253, 0.2)";
+        simModeBadge.className = "mono-chip lavender";
+        simModeBadge.removeAttribute("style");
       }
     }
 
@@ -390,15 +392,23 @@ const Tum = {
     if (plGpaEl) plGpaEl.textContent = `Polish: ${Number(calc.gpa_pl).toFixed(2)}`;
     if (totalEl) totalEl.textContent = `${Number(calc.total_tum_points).toFixed(1)} / 100`;
     if (subjEl) subjEl.textContent = `${Number(calc.pts_subject).toFixed(1)} pts`;
-    if (verdictEl) verdictEl.textContent = calc.verdict;
+    if (verdictEl) {
+      let vColor = "var(--color-amber-light)";
+      if (calc.total_tum_points >= 88.0) {
+        vColor = "var(--color-green-light)";
+      } else if (calc.total_tum_points < 70.0) {
+        vColor = "var(--color-red-light)";
+      }
+      verdictEl.innerHTML = `<span style="color: ${vColor}; font-size: 11px; font-weight: 700;">${calc.verdict}</span>`;
+    }
 
     if (badgeEl) {
       if (calc.total_tum_points >= 88.0) {
-        badgeEl.innerHTML = `<span class="mono-chip done" style="font-size: 11px; padding: 4px 10px; font-weight: 700;">DIRECT ADMISSION SAFE (Level 1)</span>`;
+        badgeEl.innerHTML = `<span class="verdict-badge safe">Direct Admission Safe (Level 1)</span>`;
       } else if (calc.total_tum_points >= 70.0) {
-        badgeEl.innerHTML = `<span class="mono-chip amber" style="font-size: 11px; padding: 4px 10px; font-weight: 700;">INTERVIEW THRESHOLD (Level 2)</span>`;
+        badgeEl.innerHTML = `<span class="verdict-badge interview">Interview Threshold (Level 2)</span>`;
       } else {
-        badgeEl.innerHTML = `<span class="mono-chip rose" style="font-size: 11px; padding: 4px 10px; font-weight: 700;">DEFICIT: MATH/CS RECOVERY NEEDED</span>`;
+        badgeEl.innerHTML = `<span class="verdict-badge risk">Deficit: Math/CS Recovery Needed</span>`;
       }
     }
   },

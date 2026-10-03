@@ -679,41 +679,41 @@
       <!-- Collapsible 4-Semester Grade Ledger -->
       <div id="gradesTableDrawer" class="monotone-card" style="display: none; margin-top: 16px;">
         <!-- Bavarian Formula & TUM Stage 1 Aptitude Card -->
-        <div style="background: rgba(196, 181, 253, 0.03); border: 1px solid rgba(196, 181, 253, 0.12); border-radius: var(--radius-sm); padding: 14px; margin-bottom: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+        <div class="aptitude-banner-card">
+          <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14px; gap: 12px; flex-wrap: wrap;">
             <div>
               <div class="card-label" style="color: var(--accent-lavender); font-size: 10px;">TUM STAGE 1 APTITUDE ASSESSMENT // BAVARIAN FORMULA</div>
-              <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 2px;">
+              <div style="font-size: 11px; color: var(--text-tertiary); margin-top: 3px;">
                 N = 1 + 3 &times; (P_max - P) / (P_max - P_min) &bull; 65% Overall GPA + 35% Curricular Subjects (Math 2x, CS 2x, Lang 1x)
               </div>
             </div>
             <div id="tumAdmissionBadge">
-              <span class="mono-chip done" style="font-size: 11px; padding: 4px 10px; font-weight: 700;">Loading...</span>
+              <span class="verdict-badge interview">Loading...</span>
             </div>
           </div>
 
           <div class="aptitude-score-grid">
-            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
-              <div style="font-size: 9px; color: var(--text-tertiary);">GERMAN GPA (1.0-4.0)</div>
-              <div id="tumGermanGpaVal" style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">--</div>
-              <div id="tumPolishGpaVal" style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Polish: --</div>
+            <div class="aptitude-metric-card">
+              <div class="aptitude-metric-label">German GPA (1.0-4.0)</div>
+              <div id="tumGermanGpaVal" class="aptitude-metric-value">--</div>
+              <div id="tumPolishGpaVal" class="aptitude-metric-sub">Polish: --</div>
             </div>
 
-            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
-              <div style="font-size: 9px; color: var(--text-tertiary);">TOTAL TUM SCORE</div>
-              <div id="tumTotalScoreVal" style="font-size: 18px; font-weight: 700; color: var(--accent-lavender); margin-top: 2px;">-- / 100</div>
-              <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Safe &ge; 88.0 pts</div>
+            <div class="aptitude-metric-card">
+              <div class="aptitude-metric-label">Total TUM Score</div>
+              <div id="tumTotalScoreVal" class="aptitude-metric-value accent">-- / 100</div>
+              <div class="aptitude-metric-sub">Safe &ge; 88.0 pts</div>
             </div>
 
-            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
-              <div style="font-size: 9px; color: var(--text-tertiary);">CURRICULAR SCORE</div>
-              <div id="tumSubjectScoreVal" style="font-size: 18px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">--</div>
-              <div style="font-size: 9px; color: var(--text-muted); margin-top: 2px;">Math 2x, CS 2x, Lang 1x</div>
+            <div class="aptitude-metric-card">
+              <div class="aptitude-metric-label">Curricular Score</div>
+              <div id="tumSubjectScoreVal" class="aptitude-metric-value">--</div>
+              <div class="aptitude-metric-sub">Math 2x, CS 2x, Lang 1x</div>
             </div>
 
-            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 10px;">
-              <div style="font-size: 9px; color: var(--text-tertiary);">ADMISSION VERDICT</div>
-              <div id="tumVerdictText" style="font-size: 10px; font-weight: 700; color: var(--text-primary); margin-top: 4px; line-height: 1.3;">
+            <div class="aptitude-metric-card">
+              <div class="aptitude-metric-label">Admission Verdict</div>
+              <div id="tumVerdictText" class="aptitude-metric-verdict">
                 --
               </div>
             </div>
@@ -726,7 +726,7 @@
                 <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-lavender); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em;">
                   Interactive Simulator // What-If Grade Scenario
                 </span>
-                <span id="simModeBadge" class="mono-chip" style="font-size: 9px; padding: 1px 6px; background: var(--accent-lavender-subtle); color: var(--accent-lavender); border-color: var(--accent-lavender-border);">
+                <span id="simModeBadge" class="mono-chip lavender">
                   Live Ledger Linked
                 </span>
               </div>
@@ -736,36 +736,36 @@
             </div>
 
             <div class="simulator-slider-grid">
-              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <span style="font-size: 9px; color: var(--text-tertiary);">OVERALL GPA (65%)</span>
-                  <span id="simValGpa" style="font-size: 12px; font-weight: 700; color: var(--accent-lavender);">5.00</span>
+              <div class="simulator-slider-card">
+                <div class="simulator-slider-header">
+                  <span class="simulator-slider-label">OVERALL GPA (65%)</span>
+                  <span id="simValGpa" class="simulator-slider-value">5.00</span>
                 </div>
-                <input type="range" id="simSliderGpa" min="2.0" max="6.0" step="0.05" value="5.0" style="width: 100%; height: 4px; accent-color: var(--accent-lavender); cursor: pointer;" />
+                <input type="range" id="simSliderGpa" min="2.0" max="6.0" step="0.05" value="5.0" class="custom-slider" />
               </div>
 
-              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <span style="font-size: 9px; color: var(--text-tertiary);">MATH R (2x)</span>
-                  <span id="simValMath" style="font-size: 12px; font-weight: 700; color: var(--accent-lavender);">5.50</span>
+              <div class="simulator-slider-card">
+                <div class="simulator-slider-header">
+                  <span class="simulator-slider-label">MATH R (2x)</span>
+                  <span id="simValMath" class="simulator-slider-value">5.50</span>
                 </div>
-                <input type="range" id="simSliderMath" min="2.0" max="6.0" step="0.1" value="5.5" style="width: 100%; height: 4px; accent-color: var(--accent-lavender); cursor: pointer;" />
+                <input type="range" id="simSliderMath" min="2.0" max="6.0" step="0.1" value="5.5" class="custom-slider" />
               </div>
 
-              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <span style="font-size: 9px; color: var(--text-tertiary);">CS / ALGO (2x)</span>
-                  <span id="simValCs" style="font-size: 12px; font-weight: 700; color: var(--accent-lavender);">5.50</span>
+              <div class="simulator-slider-card">
+                <div class="simulator-slider-header">
+                  <span class="simulator-slider-label">CS / ALGO (2x)</span>
+                  <span id="simValCs" class="simulator-slider-value">5.50</span>
                 </div>
-                <input type="range" id="simSliderCs" min="2.0" max="6.0" step="0.1" value="5.5" style="width: 100%; height: 4px; accent-color: var(--accent-lavender); cursor: pointer;" />
+                <input type="range" id="simSliderCs" min="2.0" max="6.0" step="0.1" value="5.5" class="custom-slider" />
               </div>
 
-              <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; padding: 8px 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                  <span style="font-size: 9px; color: var(--text-tertiary);">LANGUAGE (1x)</span>
-                  <span id="simValLang" style="font-size: 12px; font-weight: 700; color: var(--accent-lavender);">5.50</span>
+              <div class="simulator-slider-card">
+                <div class="simulator-slider-header">
+                  <span class="simulator-slider-label">LANGUAGE (1x)</span>
+                  <span id="simValLang" class="simulator-slider-value">5.50</span>
                 </div>
-                <input type="range" id="simSliderLang" min="2.0" max="6.0" step="0.1" value="5.5" style="width: 100%; height: 4px; accent-color: var(--accent-lavender); cursor: pointer;" />
+                <input type="range" id="simSliderLang" min="2.0" max="6.0" step="0.1" value="5.5" class="custom-slider" />
               </div>
             </div>
           </div>
@@ -785,19 +785,19 @@
               <button class="btn-ghost-icon" data-sem="3">Sem 3</button>
               <button class="btn-ghost-icon" data-sem="4">Sem 4</button>
             </div>
-            <button id="btnOpenAddGradeModal" class="btn-primary" style="padding: 3px 8px; font-size: 11px;">+ Log Grade</button>
+            <button id="btnOpenAddGradeModal" class="btn-primary" style="padding: 3px 10px; font-size: 11px;">+ Log Grade</button>
           </div>
         </div>
-        <div style="overflow-x: auto;">
-          <table style="width: 100%; border-collapse: collapse; font-size: 12px;">
+        <div style="overflow-x: auto; margin-top: 8px;">
+          <table class="grade-ledger-table">
             <thead>
-              <tr style="border-bottom: 1px solid var(--border-hairline); text-align: left; color: var(--text-tertiary); font-size: 10px; font-weight: 600; font-family: var(--font-mono);">
-                <th style="padding: 8px 0; width: 140px;">SUBJECT</th>
-                <th style="padding: 8px 10px;">GRADE LEDGER (CHIPS)</th>
-                <th style="padding: 8px 10px; width: 95px;">RUNNING AVG</th>
-                <th style="padding: 8px 10px; width: 65px;">TARGET</th>
-                <th style="padding: 8px 10px; width: 95px;">STATUS</th>
-                <th style="padding: 8px 0; width: 75px; text-align: right;">ACTION</th>
+              <tr>
+                <th style="width: 150px;">SUBJECT</th>
+                <th>GRADE LEDGER (CHIPS)</th>
+                <th style="width: 105px; text-align: center;">RUNNING AVG</th>
+                <th style="width: 70px; text-align: center;">TARGET</th>
+                <th style="width: 110px; text-align: center;">STATUS</th>
+                <th style="width: 80px; text-align: right;">ACTION</th>
               </tr>
             </thead>
             <tbody id="gradesTableBody">

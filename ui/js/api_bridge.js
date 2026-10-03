@@ -2003,33 +2003,33 @@
                 semesters: {
                   1: [
                     { id: 1, subject: "Matematyka", actual_grade: null, running_average: null, target_grade: 6.0, entries: [
-                      { id: 12, raw_input: "NP (21.09)", display_label: "NP (21.09)", numeric_value: null, weight: 0.0, category: "Nieprzygotowanie", description: "nieprzygotowanie", counts_in_average: false, badge_color: "#6b7280" }
+                      { id: 12, raw_input: "NP (21.09)", display_label: "NP (21.09)", numeric_value: null, weight: 0.0, category: "Nieprzygotowanie", description: "nieprzygotowanie", counts_in_average: false, badge_color: "#71717a" }
                     ]},
                     { id: 2, subject: "Informatyka", actual_grade: 3.0, running_average: 3.0, target_grade: 6.0, entries: [
-                      { id: 6, raw_input: "14", display_label: "14", numeric_value: null, weight: 0.0, category: "Aktywność", description: "Stanowisko komputerowe", counts_in_average: false, badge_color: "#6b7280" },
-                      { id: 15, raw_input: "3", display_label: "3", numeric_value: 3.0, weight: 1.0, category: "Bieżące", description: "Podstawy programowania w c++", counts_in_average: true, badge_color: "#5b21b6" }
+                      { id: 6, raw_input: "14", display_label: "14", numeric_value: null, weight: 0.0, category: "Aktywność", description: "Stanowisko komputerowe", counts_in_average: false, badge_color: "#71717a" },
+                      { id: 15, raw_input: "3", display_label: "3", numeric_value: 3.0, weight: 1.0, category: "Bieżące", description: "Podstawy programowania w c++", counts_in_average: true, badge_color: "#a855f7" }
                     ]},
                     { id: 3, subject: "Język Angielski", actual_grade: 5.0, running_average: 5.0, target_grade: 5.5, entries: [
-                      { id: 7, raw_input: "14.0/15.0", display_label: "14.0/15.0 (93%)", numeric_value: 5.0, weight: 1.0, category: "Bieżące", description: "Matura - listening", counts_in_average: true, badge_color: "#166534" },
-                      { id: 8, raw_input: "17.0/18.0", display_label: "17.0/18.0 (94%)", numeric_value: 5.0, weight: 1.0, category: "Bieżące", description: "Matura - reading", counts_in_average: true, badge_color: "#166534" },
-                      { id: 9, raw_input: "11.0/14.0", display_label: "11.0/14.0 (79%)", numeric_value: 4.0, weight: 1.0, category: "Bieżące", description: "Matura - use of English", counts_in_average: true, badge_color: "#1e40af" },
-                      { id: 13, raw_input: "10.0/10.0", display_label: "10.0/10.0 (100%)", numeric_value: 6.0, weight: 1.0, category: "Bieżące", description: "Wypowiedź ustna", counts_in_average: true, badge_color: "#166534" }
+                      { id: 7, raw_input: "14.0/15.0", display_label: "14.0/15.0 (93%)", numeric_value: 5.0, weight: 1.0, category: "Bieżące", description: "Matura - listening", counts_in_average: true, badge_color: "#10b981" },
+                      { id: 8, raw_input: "17.0/18.0", display_label: "17.0/18.0 (94%)", numeric_value: 5.0, weight: 1.0, category: "Bieżące", description: "Matura - reading", counts_in_average: true, badge_color: "#10b981" },
+                      { id: 9, raw_input: "11.0/14.0", display_label: "11.0/14.0 (79%)", numeric_value: 4.0, weight: 1.0, category: "Bieżące", description: "Matura - use of English", counts_in_average: true, badge_color: "#0ea5e9" },
+                      { id: 13, raw_input: "10.0/10.0", display_label: "10.0/10.0 (100%)", numeric_value: 6.0, weight: 1.0, category: "Bieżące", description: "Wypowiedź ustna", counts_in_average: true, badge_color: "#10b981" }
                     ]},
                     { id: 4, subject: "Język Polski", actual_grade: null, running_average: null, target_grade: 4.5, entries: [
-                      { id: 18, raw_input: "np.", display_label: "NP", numeric_value: null, weight: 0.0, category: "Nieprzygotowanie", description: "", counts_in_average: false, badge_color: "#6b7280" }
+                      { id: 18, raw_input: "np.", display_label: "NP", numeric_value: null, weight: 0.0, category: "Nieprzygotowanie", description: "", counts_in_average: false, badge_color: "#71717a" }
                     ]},
                     { id: 5, subject: "Fizyka", actual_grade: null, running_average: null, target_grade: 4.5, entries: [] },
                     { id: 6, subject: "Historia", actual_grade: 4.0, running_average: 4.0, target_grade: 4.0, entries: [
-                      { id: 4, raw_input: "+", display_label: "+", numeric_value: null, weight: 0.0, category: "Bieżące", description: "Praca na lekcji", counts_in_average: false, badge_color: "#6b7280" },
-                      { id: 5, raw_input: "4", display_label: "4", numeric_value: 4.0, weight: 1.0, category: "Bieżące", description: "Kartkówka 1  - bitwy Powstania listopadowego.", counts_in_average: true, badge_color: "#1e40af" },
-                      { id: 14, raw_input: "+", display_label: "+", numeric_value: null, weight: 0.0, category: "Bieżące", description: "zadanie dodatkowe", counts_in_average: false, badge_color: "#6b7280" }
+                      { id: 4, raw_input: "+", display_label: "+", numeric_value: null, weight: 0.0, category: "Bieżące", description: "Praca na lekcji", counts_in_average: false, badge_color: "#71717a" },
+                      { id: 5, raw_input: "4", display_label: "4", numeric_value: 4.0, weight: 1.0, category: "Bieżące", description: "Kartkówka 1  - bitwy Powstania listopadowego.", counts_in_average: true, badge_color: "#0ea5e9" },
+                      { id: 14, raw_input: "+", display_label: "+", numeric_value: null, weight: 0.0, category: "Bieżące", description: "zadanie dodatkowe", counts_in_average: false, badge_color: "#71717a" }
                     ]},
                     { id: 7, subject: "Geografia", actual_grade: null, running_average: null, target_grade: 4.0, entries: [] },
                     { id: 8, subject: "Biologia / Chemia", actual_grade: 3.0, running_average: 3.0, target_grade: 4.0, entries: [
-                      { id: 20, raw_input: "3 (70%)", display_label: "3 (70%)", numeric_value: 3.0, weight: 1.0, category: "Bieżące", description: "Alkany (70%)", counts_in_average: true, badge_color: "#5b21b6" }
+                      { id: 20, raw_input: "3 (70%)", display_label: "3 (70%)", numeric_value: 3.0, weight: 1.0, category: "Bieżące", description: "Alkany (70%)", counts_in_average: true, badge_color: "#a855f7" }
                     ]},
                     { id: 9, subject: "Język Niemiecki", actual_grade: null, running_average: null, target_grade: 5.0, entries: [
-                      { id: 19, raw_input: "4-", display_label: "4-", numeric_value: 4.0, weight: 0.0, category: "Bieżące", description: "praca w grupie: podróż marzeń", counts_in_average: false, badge_color: "#6b7280" }
+                      { id: 19, raw_input: "4-", display_label: "4-", numeric_value: 4.0, weight: 0.0, category: "Bieżące", description: "praca w grupie: podróż marzeń", counts_in_average: false, badge_color: "#71717a" }
                     ]}
                   ]
                 },

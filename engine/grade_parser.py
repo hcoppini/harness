@@ -278,16 +278,16 @@ def parse_polish_grade(
 def get_grade_badge_color(val: Optional[float]) -> str:
     """Returns aesthetic color hex for grade badge according to Polish scale."""
     if val is None:
-        return "#6b7280"
+        return "#71717a"
     if val >= 5.0:
-        return "#166534"  # Deep Forest Emerald / Celujący / Bdb
+        return "#10b981"  # Emerald / Celujący / Bdb
     if val >= 4.0:
-        return "#1e40af"  # Deep Navy / Dobry
+        return "#0ea5e9"  # Sky Blue / Dobry
     if val >= 3.0:
-        return "#5b21b6"  # Deep Lavender/Violet / Dostateczny
+        return "#a855f7"  # Purple / Dostateczny
     if val >= 2.0:
-        return "#92400e"  # Deep Warm Amber / Dopuszczający
-    return "#9f1239"      # Deep Crimson / Niedostateczny
+        return "#f59e0b"  # Amber / Dopuszczający
+    return "#ef4444"      # Red / Niedostateczny
 
 
 def calculate_subject_average(entries: List[Dict[str, Any]]) -> Optional[float]:
