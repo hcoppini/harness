@@ -193,6 +193,34 @@ const MetroMap = {
       container.scrollLeft = this.scrollLeft - walk;
     });
 
+    // Touch swipe scrolling for mobile devices
+    let touchStartX = 0;
+    let touchScrollLeft = 0;
+
+    container.addEventListener("touchstart", (e) => {
+      if (
+        e.target.closest(".metro-station-card") ||
+        e.target.closest(".metro-grid-card") ||
+        e.target.closest(".station-drawer") ||
+        e.target.closest("button") ||
+        e.target.closest(".metro-station-node") ||
+        e.target.closest(".metro-test-tick")
+      ) return;
+      touchStartX = e.touches[0].pageX - container.offsetLeft;
+      touchScrollLeft = container.scrollLeft;
+    }, { passive: true });
+
+    container.addEventListener("touchmove", (e) => {
+      if (!touchStartX) return;
+      const x = e.touches[0].pageX - container.offsetLeft;
+      const walk = (x - touchStartX) * 1.3;
+      container.scrollLeft = touchScrollLeft - walk;
+    }, { passive: true });
+
+    container.addEventListener("touchend", () => {
+      touchStartX = 0;
+    }, { passive: true });
+
     // Horizontal wheel navigation
     container.addEventListener(
       "wheel",

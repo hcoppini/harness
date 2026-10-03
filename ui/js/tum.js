@@ -196,23 +196,24 @@ const Tum = {
         }
 
         return `
-          <tr>
-            <td style="font-weight: 600; color: var(--text-primary); font-size: 12.5px;">
-              ${this.escapeHtml(grade.subject)}
+          <tr class="ledger-row">
+            <td class="ledger-col-subject" style="font-weight: 600; color: var(--text-primary); font-size: 12.5px;">
+              <span class="ledger-subject-title">${this.escapeHtml(grade.subject)}</span>
             </td>
-            <td>
+            <td class="ledger-col-chips">
               ${chipsHtml}
             </td>
-            <td style="text-align: center;">
+            <td class="ledger-col-avg" style="text-align: center;">
               ${avgHtml}
             </td>
-            <td style="text-align: center; font-family: var(--font-mono); color: var(--text-secondary); font-size: 11.5px; font-weight: 500;">
+            <td class="ledger-col-target" style="text-align: center; font-family: var(--font-mono); color: var(--text-secondary); font-size: 11.5px; font-weight: 500;">
               ${target.toFixed(1)}
             </td>
-            <td style="text-align: center;">
+            <td class="ledger-col-status" style="text-align: center;">
+              <span class="ledger-mobile-target-tag">Target: ${target.toFixed(1)}</span>
               ${statusBadge}
             </td>
-            <td style="text-align: right;">
+            <td class="ledger-col-action" style="text-align: right;">
               <button 
                 class="btn-row-action" 
                 onclick="Tum.openAddGradeModal('${this.escapeJs(grade.subject)}', ${this.activeSemester})"
@@ -234,16 +235,16 @@ const Tum = {
     const overallDisplay = this.data.overall_gpa && this.data.overall_gpa > 0 ? this.data.overall_gpa.toFixed(2) : (effectiveSemGpa && effectiveSemGpa > 0 ? effectiveSemGpa.toFixed(2) : "--");
 
     const footerHtml = `
-      <tr style="border-top: 1px solid var(--border-subtle); background: var(--bg-surface-elevated); font-family: var(--font-mono); font-size: 11px;">
-        <td colspan="2" style="font-weight: 700; color: var(--text-primary); letter-spacing: 0.02em;">
+      <tr class="ledger-footer-row" style="border-top: 1px solid var(--border-subtle); background: var(--bg-surface-elevated); font-family: var(--font-mono); font-size: 11px;">
+        <td colspan="2" class="ledger-footer-title" style="font-weight: 700; color: var(--text-primary); letter-spacing: 0.02em;">
           SEMESTER ${this.activeSemester} RUNNING GPA
         </td>
-        <td colspan="2" style="text-align: center;">
+        <td colspan="2" class="ledger-footer-gpa" style="text-align: center;">
           <span class="grade-avg-pill on-track" style="font-weight: 700; font-size: 11.5px; padding: 3px 10px;">
             ${gpaDisplay} GPA
           </span>
         </td>
-        <td colspan="2" style="text-align: right; color: var(--text-tertiary);">
+        <td colspan="2" class="ledger-footer-overall" style="text-align: right; color: var(--text-tertiary);">
           Overall: <strong style="color: var(--text-primary);">${overallDisplay}</strong>
         </td>
       </tr>
