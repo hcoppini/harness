@@ -3212,6 +3212,31 @@ input[type="range"]::-moz-range-thumb {
     margin: 12px auto !important;
   }
 
+  /* AI Diary Modal Mobile Full-Height Container */
+  #aiDiaryModal .modal-card {
+    padding: 0 !important;
+    width: calc(100vw - 16px) !important;
+    max-width: 540px !important;
+    height: 85vh !important;
+    max-height: 85vh !important;
+    margin: 8px auto !important;
+    display: flex !important;
+    flex-direction: column !important;
+    border-radius: 12px !important;
+    overflow: hidden !important;
+  }
+
+  #aiDiaryModal #aiDiaryChatStream {
+    padding: 10px 12px !important;
+    gap: 8px !important;
+    max-height: none !important;
+    flex: 1 !important;
+  }
+
+  #aiDiaryModal #aiDiaryInput {
+    font-size: 14px !important;
+  }
+
   /* Priority Radar Mobile Stack */
   .priority-radar-grid {
     grid-template-columns: 1fr !important;
