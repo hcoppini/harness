@@ -54,16 +54,73 @@ def calculate_tum_aptitude_score(
     # TUM Weighted Total: 65% Overall GPA + 35% Curricular Subjects
     total_score = round(0.65 * pts_gpa + 0.35 * subject_score, 1)
 
-    if total_score >= 88.0:
+    target_direct = 88.0
+    target_interview = 70.0
+    target_german_gpa = 1.36
+
+    points_to_direct = max(0.0, round(target_direct - total_score, 1))
+    points_to_interview = max(0.0, round(target_interview - total_score, 1))
+    gpa_gap = round(g_gpa - target_german_gpa, 2)
+
+    if total_score >= target_direct:
         verdict = "DIRECT ADMISSION SAFE (Level 1)"
-    elif total_score >= 70.0:
+        status_level = "safe"
+        distance_summary = f"+{round(total_score - target_direct, 1)} pts above Direct Admission (88.0)"
+    elif total_score >= target_interview:
         verdict = "INTERVIEW THRESHOLD (Level 2)"
+        status_level = "interview"
+        distance_summary = f"{points_to_direct} pts to Direct Admission (88.0)"
     else:
         verdict = "DEFICIT: MATH/CS RECOVERY NEEDED"
+        status_level = "deficit"
+        distance_summary = f"{points_to_direct} pts to Direct Admission | {points_to_interview} pts to Interview"
+
+    # Identify primary drags on score
+    subject_drags = []
+    if cs_pl < 5.0:
+        cs_gain = round((5.0 - cs_pl) * 5.3, 1)
+        subject_drags.append({
+            "subject": "Informatyka",
+            "current": cs_pl,
+            "target": 5.0,
+            "potential_gain_pts": cs_gain,
+            "recommendation": f"Raise CS to 5.0 (+{cs_gain} pts)",
+        })
+    if math_pl < 5.0:
+        math_gain = round((5.0 - math_pl) * 5.3, 1)
+        subject_drags.append({
+            "subject": "Matematyka",
+            "current": math_pl,
+            "target": 5.0,
+            "potential_gain_pts": math_gain,
+            "recommendation": f"Raise Math to 5.0 (+{math_gain} pts)",
+        })
+    if lang_pl < 5.0:
+        lang_gain = round((5.0 - lang_pl) * 2.7, 1)
+        subject_drags.append({
+            "subject": "Język Angielski",
+            "current": lang_pl,
+            "target": 5.0,
+            "potential_gain_pts": lang_gain,
+            "recommendation": f"Raise English to 5.0 (+{lang_gain} pts)",
+        })
+
+    subject_drags.sort(key=lambda x: x["potential_gain_pts"], reverse=True)
+    primary_action = subject_drags[0]["recommendation"] if subject_drags else "Maintain current trajectory across all 3 key subjects."
 
     return {
         "german_gpa": g_gpa,
+        "target_german_gpa": target_german_gpa,
+        "german_gpa_gap": gpa_gap,
         "total_tum_points": total_score,
+        "target_direct_points": target_direct,
+        "target_interview_points": target_interview,
+        "points_to_direct": points_to_direct,
+        "points_to_interview": points_to_interview,
+        "distance_summary": distance_summary,
+        "status_level": status_level,
+        "primary_action": primary_action,
+        "subject_drags": subject_drags,
         "verdict": verdict,
         "gpa_pl": gpa_pl,
         "math_pl": math_pl,

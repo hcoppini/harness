@@ -27,8 +27,8 @@
       "next_action": "Sprint on Pure Syntax deliverables due by end of September.",
       "completed_deliverables": [
         "Physical",
-        "Code",
-        "Academics"
+        "Academics",
+        "Code"
       ]
     },
     {
@@ -50,20 +50,18 @@
       "deliverables": {
         "Academics": "Benchmark diagnostic test in Math Rozszerzona. Target first-month grade average >= 4.75.",
         "Code": "Zero AI copilot rule activated. Complete 15 foundational LeetCode Easy problems writing pure algorithms by hand (4/15 solved).",
-        "SIGG": "Team registered with teacher-guardian; test environment accounts setup.",
+        "SIGG": "25. edycja SIGG: Rejestracja drużyny (2-4 osoby) przez nauczyciela-opiekuna na sigg.gpw.pl (okno do 30 października 2026).",
         "German": "20 min/day active input (Nicos Weg A2 module). Target: 100 new vocabulary items in Anki.",
         "Physical": "Weight 68.5 kg, daily protein floor at 140g."
       },
       "next_action": "Solve LeetCode Problem #5 without AI and trace variables by hand.",
-      "completed_deliverables": [
-        "Physical"
-      ]
+      "completed_deliverables": []
     },
     {
       "id": "oct-2026",
       "date": "2026-10",
       "month_label": "OCT '26",
-      "name": "Gra Testowa",
+      "name": "Gra Testowa & Moduły",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": false,
       "status": "upcoming",
@@ -73,20 +71,20 @@
         "sigg",
         "german"
       ],
-      "objective": "Max out educational bonus capital (+2 PLN/point) & first major school exams.",
+      "objective": "25. edycja SIGG: Rejestracja (do 30.10), Gra Testowa na GPWtr@der & moduły edukacyjne.",
       "deliverables": {
         "Academics": "First major sprawdziany in Math & CS. Maintain grade 5.0 in both.",
         "Code": "Solve 20 past CKE Matura task 1s (computational thinking/math logic on paper).",
-        "SIGG": "Gra Testowa (Oct 13 - Nov 16). Complete all individual educational e-learning modules to max out bonus multiplier.",
+        "SIGG": "Dokończyć rejestrację zespołu (do 30.10). Gra testowa na platformie GPWtr@der (2–13.11). Zaliczyć moduły e-learningowe i testy wiedzy.",
         "German": "Finish A2.1 vocabulary deck."
       },
-      "next_action": "Complete all SIGG educational quizzes to unlock maximum initial capital leverage."
+      "next_action": "Sprawdzić rejestrację zespołu i przejść moduły edukacyjne na platformie GPWtr@der."
     },
     {
       "id": "nov-2026",
       "date": "2026-11",
       "month_label": "NOV '26",
-      "name": "Stage 1 Deployment",
+      "name": "Etap Główny (20k PLN)",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": true,
       "status": "upcoming",
@@ -96,14 +94,14 @@
         "sigg",
         "physical"
       ],
-      "objective": "Launch real trading in Stage 1 & CKE data parsing tasks.",
+      "objective": "Launch 25. edycja SIGG Etap Główny (20 000 PLN capital) & CKE data parsing tasks.",
       "deliverables": {
         "Academics": "Mid-semester review. All subjects > 4.0, Math and CS locked at 5.0+.",
-        "SIGG": "Stage 1 begins (Nov 17). Execute first transaction within mandatory 14 days. Focus strictly on WIG20/mWIG40 momentum setups (respect 1 order/10s throttle).",
+        "SIGG": "Start Etapu Głównego (16 listopada 2026 – 12 marca 2027). Kapitał 20 000 zł na akcje WIG20/mWIG40 i ETF-y. Złożyć obowiązkową pierwszą transakcję. Śledzić 4 premie lotne w trakcie etapu.",
         "Code": "Transition to CKE Matura programming tasks in Python/C++ (file operations, data parsing).",
         "Physical": "Weight 69.5 kg; 5k run pace under 4:40."
       },
-      "next_action": "Execute first transaction in SIGG Stage 1 within the 14-day mandatory window."
+      "next_action": "Złożyć pierwsze zlecenie w Etapie Głównym SIGG (WIG20/mWIG40/ETF) z kapitału 20 000 zł."
     },
     {
       "id": "dec-2026",
@@ -122,7 +120,7 @@
       "objective": "Lock in high grades on Sem 1 transcript & audit stock scanner.",
       "deliverables": {
         "Academics": "Finalize Semester 1 proposed grades. No grade below 4; Math, CS, English at 5 or 6.",
-        "SIGG": "Mid-Stage 1 portfolio review. Rebalance positions before holiday low-liquidity periods.",
+        "SIGG": "Etap Główny (20 000 zł): Przegląd portfela akcji/ETF przed przerwą świąteczną i okresem niskiej płynności. Polowanie na premię lotną.",
         "German": "A2 certification test (self-assessment or mock). Begin transition to B1 materials.",
         "Code": "Audit desktop/polish_stocks_day_trade-main and understand every function without AI explanation."
       },
@@ -132,7 +130,7 @@
       "id": "jan-2027",
       "date": "2027-01",
       "month_label": "JAN '27",
-      "name": "Stage 1 Finish",
+      "name": "Etap Główny Midpoint",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": false,
       "status": "upcoming",
@@ -141,13 +139,13 @@
         "code",
         "sigg"
       ],
-      "objective": "Stage 1 competition conclusion & dynamic programming drills.",
+      "objective": "SIGG Etap Główny portfolio midpoint audit & dynamic programming drills.",
       "deliverables": {
         "Academics": "Formal Semester 1 grades locked onto official transcript.",
-        "SIGG": "Stage 1 closes (Jan 16). Review rank. If top 12: secure direct Finals spot; if not: prepare for Stage 2.",
+        "SIGG": "Półmetek Etapu Głównego (trwa do 12 marca). Audyt portfela akcji/ETF, kontrola obsunięcia kapitału (drawdown) i rywalizacja w modułach wiedzy.",
         "Code": "Solve 10 dynamic programming and recursion problems from previous Matura sheets."
       },
-      "next_action": "Check national rank in Stage 1 and configure Stage 2 futures strategy."
+      "next_action": "Zoptymalizować pozycje w portfelu SIGG (akcje i ETF-y) pod kątem dynamiki sektorowej."
     },
     {
       "id": "feb-2027",
@@ -166,7 +164,7 @@
       "objective": "Winter break math acceleration & futures simulation.",
       "deliverables": {
         "Academics": "Complete 5 full Math Rozszerzona past sheets (CKE 2020-2024).",
-        "SIGG": "Futures simulation prep: paper-trade WIG20 futures (FW20) leverage and short mechanics.",
+        "SIGG": "Etap Główny w fazie finałowej (do 12 marca). Przygotowanie do rozgrywki na kontraktach terminowych (start 15 marca): symulacja mechaniki dźwigni FW20 i pozycji krótkich.",
         "German": "B1 grammar foundations (Subjunctive II, passive voice, subordinate clauses).",
         "Physical": "Weight 71.0 kg; bench/squat/deadlift baseline increase of 5%."
       },
@@ -176,7 +174,7 @@
       "id": "mar-2027",
       "date": "2027-03",
       "month_label": "MAR '27",
-      "name": "Stage 2 Derivatives",
+      "name": "Kontrakty Terminowe",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": true,
       "status": "upcoming",
@@ -185,19 +183,19 @@
         "code",
         "sigg"
       ],
-      "objective": "Stage 2 live futures trading & Matura SQL database mastery.",
+      "objective": "Finisz Etapu Głównego (12.03) i rozgrywka na kontraktach terminowych (15-26.03).",
       "deliverables": {
-        "SIGG": "Stage 2 live (Mar 2 - Mar 27) with 10,000 PLN capital. Execute trade in first 7 days. Apply strict stop-losses on short positions.",
+        "SIGG": "12 marca: Zakończenie Etapu Głównego. 15–26 marca: Dedykowana rozgrywka na kontraktach terminowych z osobną pulą 10 000 zł. Ścisły risk management i stop-loss na kontraktach FW20.",
         "Academics": "Q3 school grades checkup. Ensure Polish, History, and Biology stay >= 4.0.",
         "Code": "Master SQL databases and Access/Excel data processing modules required for Matura Informatyka."
       },
-      "next_action": "Trade FW20 contracts with strict risk-to-reward ratio."
+      "next_action": "Obrót kontraktami terminowymi FW20 w dedykowanym etapie (15–26 marca) z puli 10 000 zł."
     },
     {
       "id": "apr-2027",
       "date": "2027-04",
       "month_label": "APR '27",
-      "name": "Regional Play-offs & Finals",
+      "name": "Ranking & Wielki Finał GPW",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": false,
       "status": "upcoming",
@@ -206,13 +204,13 @@
         "sigg",
         "german"
       ],
-      "objective": "GPW Warsaw Trading Floor finals sprint.",
+      "objective": "Oficjalny ranking (12.04) i Wielki Finał w Sali Notowań GPW w Warszawie (22.04).",
       "deliverables": {
-        "SIGG": "Dogrywka (Apr 13-17) or live Finals at GPW Warsaw Trading Floor (Apr 23).",
+        "SIGG": "12 kwietnia: Ogłoszenie rankingu oficjalnego. 22 kwietnia: Wielki Finał 25. edycji w Sali Notowań GPW w Warszawie dla 50 najlepszych zespołów w Polsce (pula nagród >200 tys. zł, laptopy MacBook).",
         "Academics": "End-of-year sprint begins. Target 5.0+ in all core STEM subjects.",
         "German": "B1 intermediate listening comprehension (DW Langsam gesprochene Nachrichten)."
       },
-      "next_action": "Prepare live portfolio strategy for Warsaw Trading Floor final."
+      "next_action": "Udział w Wielkim Finale 25. edycji SIGG w Sali Notowań GPW w Warszawie (22 kwietnia)."
     },
     {
       "id": "may-2027",

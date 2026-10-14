@@ -1923,9 +1923,18 @@
                   });
 
                   const entriesMap = {};
+                  const seenEntrySigs = new Set();
                   cleanEntries.forEach((e) => {
                     const norm = normalizeSubj(e.subject);
                     const k = `${norm.toLowerCase()}_${e.semester}`;
+                    const raw = (e.raw_input || "").trim();
+                    const dt = (e.date || "").trim();
+                    const desc = (e.description || "").trim().toLowerCase();
+                    const wt = e.weight !== undefined ? Number(e.weight) : 1.0;
+                    const sig = `${k}|${raw}|${dt}|${desc}|${wt}`;
+                    if (seenEntrySigs.has(sig)) return;
+                    seenEntrySigs.add(sig);
+
                     if (!entriesMap[k]) entriesMap[k] = [];
                     entriesMap[k].push({
                       id: e.id,
@@ -1933,7 +1942,7 @@
                       semester: e.semester,
                       raw_input: e.raw_input,
                       numeric_value: e.numeric_value,
-                      weight: e.weight !== undefined ? Number(e.weight) : 1.0,
+                      weight: wt,
                       category: e.category,
                       description: e.description || "",
                       date: e.date,

@@ -325,6 +325,7 @@ const Today = {
       this.renderTasks();
       this.renderUnitedStudyCard();
       this.updateNowBanner();
+      await this.loadBookReadingStatus();
 
       // Refresh Kill List items and render inline on Today view
       if (window.pywebview && window.pywebview.api && window.pywebview.api.get_kill_list) {
@@ -2000,7 +2001,271 @@ const Today = {
     }
   },
 
-  escapeHtml(str) {
+  // --------------------------------------------------------------------------
+  // Book Reading Protocol (1 Book/Month & Daily Page Target)
+  // --------------------------------------------------------------------------
+  async loadBookReadingStatus() {
+    try {
+      if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_book_reading_status) return;
+      const data = await window.pywebview.api.get_book_reading_status(this.selectedDateStr);
+      if (!data || !data.book) return;
+
+      const titleEl = document.getElementById("bookTitleDisplay");
+      const authorEl = document.getElementById("bookAuthorDisplay");
+      const targetTextEl = document.getElementById("bookTodayTargetText");
+      const paceTextEl = document.getElementById("bookRequiredPaceText");
+      const progressTextEl = document.getElementById("bookPagesProgressText");
+      const daysLeftEl = document.getElementById("bookDaysLeftText");
+      const progressBarEl = document.getElementById("bookProgressBar");
+      const badgeEl = document.getElementById("bookReadingStatusBadge");
+      const inputEnd = document.getElementById("bookInputEndPage");
+
+      if (titleEl) titleEl.textContent = data.book.title || "Untitled Book";
+      if (authorEl) authorEl.textContent = data.book.author ? `by ${data.book.author}` : "";
+      if (targetTextEl) targetTextEl.textContent = `Page ${data.start_page_today} → ${data.target_page_today} (+${data.daily_quota}p)`;
+      if (paceTextEl) paceTextEl.textContent = `${data.required_daily_pace} pages/day`;
+      if (progressTextEl) progressTextEl.textContent = `${data.current_page} / ${data.total_pages} pages (${data.percent_completed}%)`;
+      if (daysLeftEl) daysLeftEl.textContent = `${data.days_left_in_month} days left`;
+      if (progressBarEl) progressBarEl.style.width = `${Math.min(100, data.percent_completed)}%`;
+
+      if (badgeEl) {
+        if (data.completed_today) {
+          badgeEl.className = "mono-chip green";
+          badgeEl.textContent = `Goal Met Today (+${data.pages_read_today}p)`;
+        } else {
+          badgeEl.className = "mono-chip lavender";
+          badgeEl.textContent = `${data.daily_quota}p Today's Target`;
+        }
+      }
+
+      if (inputEnd && !inputEnd.value) {
+        inputEnd.value = data.target_page_today || "";
+      }
+
+      this._currentBookData = data;
+    } catch (err) {
+      console.error("Error loading book reading status:", err);
+    }
+  },
+
+  async logReadingPages() {
+    const inputEnd = document.getElementById("bookInputEndPage");
+    if (!inputEnd || !inputEnd.value) return;
+    const endPage = parseInt(inputEnd.value, 10);
+    if (isNaN(endPage) || endPage < 1) return;
+
+    try {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.log_reading_progress) {
+        await window.pywebview.api.log_reading_progress(endPage, null, null, "", this.selectedDateStr);
+        const pill = document.getElementById("bookLogSuccessPill");
+        if (pill) {
+          pill.style.display = "inline-block";
+          setTimeout(() => { pill.style.display = "none"; }, 2500);
+        }
+        await this.loadBookReadingStatus();
+        if (window.HarnessApp && window.HarnessApp.showToast) {
+          window.HarnessApp.showToast(`Logged reading up to page ${endPage}!`);
+        }
+      }
+    } catch (err) {
+      console.error("Error logging reading progress:", err);
+      alert(err.message || "Failed to log pages");
+    }
+  },
+
+  openEditBookModal() {
+    const modal = document.getElementById("editBookModal");
+    if (!modal) return;
+    const cur = this._currentBookData ? this._currentBookData.book : null;
+    const idInput = document.getElementById("editBookId");
+    const titleInput = document.getElementById("editBookTitle");
+    const authorInput = document.getElementById("editBookAuthor");
+    const totInput = document.getElementById("editBookTotalPages");
+    const curInput = document.getElementById("editBookCurrentPage");
+
+    if (idInput) idInput.value = cur ? cur.id : "";
+    if (titleInput) titleInput.value = cur ? cur.title : "";
+    if (authorInput) authorInput.value = cur ? cur.author || "" : "";
+    if (totInput) totInput.value = cur ? cur.total_pages : 300;
+    if (curInput) curInput.value = cur ? cur.current_page : 0;
+
+    modal.classList.add("open");
+  },
+
+  closeEditBookModal() {
+    const modal = document.getElementById("editBookModal");
+    if (modal) modal.classList.remove("open");
+  },
+
+  async saveBookDetails() {
+    const idInput = document.getElementById("editBookId");
+    const titleInput = document.getElementById("editBookTitle");
+    const authorInput = document.getElementById("editBookAuthor");
+    const totInput = document.getElementById("editBookTotalPages");
+    const curInput = document.getElementById("editBookCurrentPage");
+
+    const bookId = idInput && idInput.value ? parseInt(idInput.value, 10) : 1;
+    const title = titleInput ? titleInput.value.trim() : "Untitled Book";
+    const author = authorInput ? authorInput.value.trim() : "";
+    const totalPages = totInput ? parseInt(totInput.value, 10) : 300;
+    const currentPage = curInput ? parseInt(curInput.value, 10) : 0;
+
+    try {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.update_book_details) {
+        await window.pywebview.api.update_book_details(bookId, title, author, totalPages, currentPage);
+        this.closeEditBookModal();
+        await this.loadBookReadingStatus();
+        if (window.HarnessApp && window.HarnessApp.showToast) {
+          window.HarnessApp.showToast(`Updated book: ${title}`);
+        }
+      }
+    } catch (err) {
+      console.error("Error updating book details:", err);
+      alert(err.message || "Failed to save book");
+    }
+  },
+
+  // --------------------------------------------------------------------------
+  // AI Coach, Friend & Diary Modal Controller
+  // --------------------------------------------------------------------------
+  diaryStance: "coach",
+
+  async openAiDiaryModal() {
+    const modal = document.getElementById("aiDiaryModal");
+    if (!modal) return;
+    const datePill = document.getElementById("aiDiaryDatePill");
+    if (datePill) datePill.textContent = this.selectedDateStr;
+    modal.classList.add("open");
+    await this.loadAiDiary();
+    const input = document.getElementById("aiDiaryInput");
+    if (input) input.focus();
+  },
+
+  closeAiDiaryModal() {
+    const modal = document.getElementById("aiDiaryModal");
+    if (modal) modal.classList.remove("open");
+  },
+
+  switchDiaryStance(stance) {
+    this.diaryStance = stance;
+    const btnCoach = document.getElementById("btnStanceCoach");
+    const btnFriend = document.getElementById("btnStanceFriend");
+    const btnMirror = document.getElementById("btnStanceMirror");
+    if (btnCoach) btnCoach.classList.toggle("active", stance === "coach");
+    if (btnFriend) btnFriend.classList.toggle("active", stance === "friend");
+    if (btnMirror) btnMirror.classList.toggle("active", stance === "mirror");
+  },
+
+  async loadAiDiary() {
+    const stream = document.getElementById("aiDiaryChatStream");
+    if (!stream) return;
+    try {
+      if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_diary_conversation) return;
+      const conv = await window.pywebview.api.get_diary_conversation(this.selectedDateStr);
+      if (conv && conv.stance) {
+        this.switchDiaryStance(conv.stance);
+      }
+      this.renderDiaryMessages(conv ? conv.messages || [] : []);
+    } catch (err) {
+      console.error("Error loading diary conversation:", err);
+    }
+  },
+
+  renderDiaryMessages(messages) {
+    const stream = document.getElementById("aiDiaryChatStream");
+    if (!stream) return;
+    if (!messages || messages.length === 0) {
+      stream.innerHTML = `
+        <div style="text-align: center; color: var(--text-tertiary); font-size: 11.5px; padding: 24px 12px; line-height: 1.6;">
+          <div style="font-size: 24px; margin-bottom: 8px;">🧠</div>
+          <strong style="color: var(--text-secondary);">Executive Mind Dump &amp; Reflection</strong><br>
+          Type your raw thoughts about school, fatigue, workouts, or goals.<br>
+          Your AI Companion will reflect, challenge, and synthesize them into execution.
+        </div>
+      `;
+      return;
+    }
+
+    stream.innerHTML = messages
+      .map((m) => {
+        const isUser = m.role === "user";
+        const bubbleBg = isUser ? "var(--bg-surface-elevated)" : "rgba(67, 56, 202, 0.08)";
+        const borderCol = isUser ? "var(--border-hairline)" : "var(--accent-lavender-border)";
+        const alignSelf = isUser ? "flex-end" : "flex-start";
+        const roleLabel = isUser ? "Heitor" : `AI (${m.stance || this.diaryStance || "Coach"})`;
+
+        return `
+          <div style="max-width: 82%; align-self: ${alignSelf}; background: ${bubbleBg}; border: 1px solid ${borderCol}; border-radius: 10px; padding: 8px 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 3px; font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary);">
+              <span style="font-weight: 700; color: ${isUser ? "var(--text-secondary)" : "var(--accent-lavender)};">${this.escapeHtml(roleLabel)}</span>
+              <span>${m.timestamp || ""}</span>
+            </div>
+            <div style="font-size: 12px; color: var(--text-primary); line-height: 1.45; white-space: pre-wrap;">${this.escapeHtml(m.content)}</div>
+          </div>
+        `;
+      })
+      .join("");
+
+    stream.scrollTop = stream.scrollHeight;
+  },
+
+  async sendDiaryMessage() {
+    const input = document.getElementById("aiDiaryInput");
+    if (!input || !input.value.trim()) return;
+    const text = input.value.trim();
+    input.value = "";
+
+    const stream = document.getElementById("aiDiaryChatStream");
+    if (stream) {
+      // Append temporary user bubble
+      const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      stream.insertAdjacentHTML("beforeend", `
+        <div style="max-width: 82%; align-self: flex-end; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 10px; padding: 8px 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 3px; font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary);">
+            <span style="font-weight: 700; color: var(--text-secondary);">Heitor</span>
+            <span>${nowTime}</span>
+          </div>
+          <div style="font-size: 12px; color: var(--text-primary); line-height: 1.45; white-space: pre-wrap;">${this.escapeHtml(text)}</div>
+        </div>
+      `);
+      stream.scrollTop = stream.scrollHeight;
+    }
+
+    try {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.send_diary_message) {
+        const conv = await window.pywebview.api.send_diary_message(text, this.diaryStance, this.selectedDateStr);
+        if (conv && conv.messages) {
+          this.renderDiaryMessages(conv.messages);
+        }
+      }
+    } catch (err) {
+      console.error("Error sending diary message:", err);
+    }
+  },
+
+  async synthesizeDiarySession() {
+    const btn = document.getElementById("btnSynthesizeDiary");
+    if (btn) btn.textContent = "Synthesizing...";
+    try {
+      if (window.pywebview && window.pywebview.api && window.pywebview.api.synthesize_diary_session) {
+        const res = await window.pywebview.api.synthesize_diary_session(this.selectedDateStr, true);
+        if (res && res.structured_entry) {
+          const refWorked = document.getElementById("reflectionWorked");
+          if (refWorked) refWorked.value = res.structured_entry;
+          if (window.HarnessApp && window.HarnessApp.showToast) {
+            window.HarnessApp.showToast(`Committed diary & extracted ${res.actions_created || 0} tasks!`);
+          }
+          this.closeAiDiaryModal();
+          await this.load(this.selectedDateStr);
+        }
+      }
+    } catch (err) {
+      console.error("Error synthesizing diary session:", err);
+      alert(err.message || "Synthesis failed");
+    } finally {
+      if (btn) btn.textContent = "✨ Synthesize & Commit to Today";
+    }
+  },
     if (!str) return "";
     return String(str)
       .replace(/&/g, "&amp;")

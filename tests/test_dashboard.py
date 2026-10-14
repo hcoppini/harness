@@ -45,18 +45,23 @@ def test_heatmap_activity_aggregation(test_db):
     today_service.toggle_task(t2["id"], conn=test_db)
     today_service.toggle_task(t3["id"], conn=test_db)
 
-    # Update daily log with all 3 Sunday routine blocks completed (3/3)
+    # Update daily log with all Sunday routine blocks completed
+    sched = today_service.get_schedule_for_date(today_str)
+    num_blocks = len(sched["blocks"])
+    all_blocks_str = ",".join(str(i) for i in range(num_blocks))
+
     today_service.update_daily_log(
         date_str=today_str,
-        completed_blocks="0,1,2",
+        completed_blocks=all_blocks_str,
         reflection_worked="Focused on syntax",
         conn=test_db,
     )
 
     heatmap = dashboard_service.get_heatmap_data(end_date=today_str, conn=test_db, include_git=False)
-    
-    # 3 tasks checked + 3 routine blocks checked = 6 checked boxes
-    assert heatmap["total_contributions"] == 6
+
+    # 3 tasks checked + routine blocks checked = checked boxes
+    expected_total = 3 + num_blocks
+    assert heatmap["total_contributions"] == expected_total
     assert heatmap["current_streak"] >= 1
 
     # Find today's day cell in the heatmap weeks
@@ -65,8 +70,8 @@ def test_heatmap_activity_aggregation(test_db):
         for day in week["days"]:
             if day and day["date"] == today_str:
                 found_today = True
-                assert day["count"] == 6
-                assert day["total_boxes"] == 6  # 3 routine blocks + 3 tasks
+                assert day["count"] == expected_total
+                assert day["total_boxes"] == expected_total  # routine blocks + 3 tasks
                 assert day["level"] == 4  # 100% completion = Brightest Purple
                 assert "activities" in day
                 assert len(day["activities"]) >= 4

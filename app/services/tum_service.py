@@ -93,12 +93,18 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
     cursor.execute("SELECT * FROM tum_grade_entries ORDER BY date ASC, id ASC")
     all_entries = cursor.fetchall()
     entries_by_subj_sem: Dict[tuple, List[Dict[str, Any]]] = {}
+    seen_entries = set()
     for er in all_entries:
         desc_lower = (er["description"] or "").lower()
         if "algorytmu grafowego" in desc_lower or "funkcje wymierne" in desc_lower:
             continue
         norm_subj = normalize_subject_name(er["subject"])
         key = (norm_subj.strip().lower(), er["semester"])
+        sig = (key, er["raw_input"].strip(), er["date"], (er["description"] or "").strip().lower(), float(er["weight"] if er["weight"] is not None else 1.0))
+        if sig in seen_entries:
+            continue
+        seen_entries.add(sig)
+
         if key not in entries_by_subj_sem:
             entries_by_subj_sem[key] = []
         parsed = parse_polish_grade(er["raw_input"], category=er["category"], description=er["description"])
@@ -271,23 +277,46 @@ def add_grade_entry(
     cursor = conn.cursor()
     cursor.execute(
         """
-        INSERT INTO tum_grade_entries 
-        (subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        SELECT id FROM tum_grade_entries 
+        WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) 
+          AND semester = ? 
+          AND raw_input = ? 
+          AND date = ? 
+          AND (description = ? OR (description IS NULL AND ? = ''))
         """,
-        (
-            subject.strip(),
-            int(semester),
-            raw_input.strip(),
-            num_val,
-            wt,
-            category.strip(),
-            description.strip(),
-            target_date,
-            counts,
-        ),
+        (subject.strip(), int(semester), raw_input.strip(), target_date, description.strip(), description.strip()),
     )
-    entry_id = cursor.lastrowid
+    existing = cursor.fetchone()
+    if existing:
+        entry_id = existing["id"]
+        cursor.execute(
+            """
+            UPDATE tum_grade_entries 
+            SET numeric_value = ?, weight = ?, category = ?, counts_in_average = ?
+            WHERE id = ?
+            """,
+            (num_val, wt, category.strip(), counts, entry_id),
+        )
+    else:
+        cursor.execute(
+            """
+            INSERT INTO tum_grade_entries 
+            (subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                subject.strip(),
+                int(semester),
+                raw_input.strip(),
+                num_val,
+                wt,
+                category.strip(),
+                description.strip(),
+                target_date,
+                counts,
+            ),
+        )
+        entry_id = cursor.lastrowid
 
     # Ensure subject exists in tum_grades for this semester
     cursor.execute(

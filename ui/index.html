@@ -346,22 +346,79 @@
             <!-- Dynamic task items -->
           </div>
 
-          <!-- Evening Honesty Diary Card -->
+          <!-- Daily Book Reading Tracker Card (1 Book / Month) -->
+          <div class="monotone-card" id="todayBookCard" style="margin-top: 14px; border: 1px solid var(--accent-lavender-border); background: var(--bg-surface-elevated);">
+            <div class="card-label-row" style="margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="card-label" style="font-weight: 700; font-size: 11px; letter-spacing: 0.06em; color: var(--accent-lavender);">DAILY BOOK PROTOCOL</span>
+                <span class="mono-chip lavender" id="bookReadingStatusBadge" style="font-size: 9px;">1 Book / Month</span>
+              </div>
+              <button type="button" class="btn-ghost-icon" id="btnEditBookModal" onclick="Today.openEditBookModal()" style="font-size: 10px; padding: 2px 6px;" title="Change current book or total pages">Edit Book</button>
+            </div>
+            
+            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
+              <div style="font-weight: 700; font-size: 13px; color: var(--text-primary);" id="bookTitleDisplay">
+                Loading book...
+              </div>
+              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);" id="bookAuthorDisplay">
+                --
+              </div>
+            </div>
+
+            <!-- Page-to-Page Target Indicator -->
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--bg-surface); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); margin-bottom: 8px;">
+              <div>
+                <div style="font-size: 9.5px; font-family: var(--font-mono); color: var(--text-tertiary); text-transform: uppercase;">Today's Page Target</div>
+                <div style="font-size: 12.5px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary);" id="bookTodayTargetText">
+                  Page 0 &rarr; 25 (+25 pages)
+                </div>
+              </div>
+              <div style="text-align: right;">
+                <div style="font-size: 9.5px; font-family: var(--font-mono); color: var(--text-tertiary); text-transform: uppercase;">Required Pace</div>
+                <div style="font-size: 12px; font-weight: 600; font-family: var(--font-mono); color: var(--accent-lavender);" id="bookRequiredPaceText">
+                  -- pages/day
+                </div>
+              </div>
+            </div>
+
+            <!-- Progress Bar -->
+            <div style="margin-bottom: 8px;">
+              <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 3px;">
+                <span id="bookPagesProgressText">0 / 300 pages (0%)</span>
+                <span id="bookDaysLeftText">-- days left</span>
+              </div>
+              <div style="height: 6px; background: var(--border-hairline); border-radius: 3px; overflow: hidden;">
+                <div id="bookProgressBar" style="width: 0%; height: 100%; background: var(--accent-lavender); transition: width 0.3s ease;"></div>
+              </div>
+            </div>
+
+            <!-- Quick Log Row -->
+            <form id="bookQuickLogForm" onsubmit="event.preventDefault(); Today.logReadingPages();" style="display: flex; gap: 6px; align-items: center; margin-top: 8px;">
+              <span style="font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono);">Read to page:</span>
+              <input type="number" id="bookInputEndPage" class="form-input" style="width: 75px; padding: 3px 6px; font-size: 11.5px; font-family: var(--font-mono); text-align: center;" placeholder="Page #" required min="1" />
+              <button type="submit" class="btn-primary" style="padding: 3px 10px; font-size: 11px;">Log Reading</button>
+              <span id="bookLogSuccessPill" class="mono-chip green" style="display: none; font-size: 9px; padding: 2px 6px;">Logged!</span>
+            </form>
+          </div>
+
+          <!-- Evening Honesty Diary Card with AI Coach Trigger -->
           <div class="monotone-card" style="margin-top: 14px; border: 1px solid var(--border-medium);">
             <div class="card-label-row" style="margin-bottom: 8px;">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span class="card-label" style="font-weight: 700; font-size: 11px; letter-spacing: 0.06em; color: var(--text-primary);">EVENING HONESTY DIARY</span>
                 <span class="mono-chip" id="honestyDiarySavePill" style="font-size: 9px;">Auto-saving</span>
               </div>
-              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Zero Rationalizations</span>
+              <button type="button" class="btn-ghost-icon" id="btnOpenAiDiaryModal" onclick="Today.openAiDiaryModal()" style="font-size: 10.5px; padding: 2px 8px; color: var(--accent-lavender); border-color: var(--accent-lavender-border); font-weight: 600; display: flex; align-items: center; gap: 4px;" title="Chat with AI Coach, Friend, or Objective Mirror to structure raw thoughts">
+                <span>💬 AI Coach &amp; Diary</span>
+              </button>
             </div>
             <p style="font-size: 11px; color: var(--text-tertiary); margin-bottom: 8px; line-height: 1.4;">
-              Did I drift today? Was the 60-minute honest output delivered? What actually happened?
+              Did I drift today? Was the honest output delivered? What actually happened? (Type directly or use AI Coach to structure your thoughts).
             </p>
             <textarea 
               id="reflectionWorked" 
               class="form-textarea" 
-              placeholder="Record the raw truth here. No intellectual excuses, no architecture escapes..."
+              placeholder="Record the raw truth here or click 'AI Coach & Diary' above to reflect interactively..."
               spellcheck="false"
               style="width: 100%; height: 95px; font-family: var(--font-sans); font-size: 12px; line-height: 1.5; resize: vertical;"
             ></textarea>
@@ -716,6 +773,20 @@
               <div id="tumVerdictText" class="aptitude-metric-verdict">
                 --
               </div>
+            </div>
+          </div>
+
+          <!-- Distance-to-Goal Diagnostic Banner -->
+          <div id="tumAdmissionDistanceBanner" style="margin-top: 12px; padding: 10px 14px; background: rgba(67, 56, 202, 0.08); border: 1px solid var(--accent-lavender-border); border-radius: var(--radius-sm); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span style="font-size: 15px;">🎯</span>
+              <div>
+                <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--accent-lavender); letter-spacing: 0.05em; text-transform: uppercase;">DISTANCE TO TUM DIRECT ADMISSION (88.0 PTS):</span>
+                <span id="tumDistanceSummaryText" style="font-family: var(--font-mono); font-size: 12px; font-weight: 700; color: var(--text-primary); margin-left: 6px;">--</span>
+              </div>
+            </div>
+            <div id="tumDistanceActionText" style="font-size: 11px; font-weight: 600; color: var(--accent-lavender); font-family: var(--font-mono);">
+              --
             </div>
           </div>
 
@@ -1654,6 +1725,107 @@
           + Enqueue
         </button>
       </form>
+    </div>
+  </div>
+
+  <!-- 9. Edit Book Details Modal -->
+  <div id="editBookModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 440px;">
+      <div class="card-label-row" style="margin-bottom: 14px;">
+        <div>
+          <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--accent-lavender); letter-spacing: 0.06em;">BOOK PROTOCOL</span>
+          <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">Configure Monthly Book</h2>
+        </div>
+        <button type="button" class="drawer-close-btn" onclick="Today.closeEditBookModal()">&times;</button>
+      </div>
+      <form id="editBookForm" onsubmit="event.preventDefault(); Today.saveBookDetails();">
+        <input type="hidden" id="editBookId" />
+        <div class="form-group">
+          <label class="form-label">BOOK TITLE</label>
+          <input type="text" id="editBookTitle" class="form-input" placeholder="e.g. Dune / Deep Work" required />
+        </div>
+        <div class="form-group">
+          <label class="form-label">AUTHOR</label>
+          <input type="text" id="editBookAuthor" class="form-input" placeholder="e.g. Frank Herbert" />
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div class="form-group">
+            <label class="form-label">TOTAL PAGES</label>
+            <input type="number" id="editBookTotalPages" class="form-input" value="300" min="1" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">CURRENT PAGE</label>
+            <input type="number" id="editBookCurrentPage" class="form-input" value="0" min="0" required />
+          </div>
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px;">
+          <button type="button" class="btn-ghost-icon" onclick="Today.closeEditBookModal()">Cancel</button>
+          <button type="submit" class="btn-primary">Save Book</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- 10. AI Coach, Friend & Diary Modal -->
+  <div id="aiDiaryModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 620px; width: 94%; max-height: 85vh; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
+      <!-- Modal Header -->
+      <div style="padding: 14px 18px 12px; border-bottom: 1px solid var(--border-hairline); display: flex; justify-content: space-between; align-items: flex-start; background: var(--bg-surface-elevated);">
+        <div>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--accent-lavender); letter-spacing: 0.08em; text-transform: uppercase;">EXECUTIVE DIARY // AI COMPANION</span>
+            <span id="aiDiaryDatePill" class="mono-chip lavender" style="font-size: 9.5px;">Today</span>
+          </div>
+          <div style="font-size: 12px; color: var(--text-tertiary); margin-top: 2px;">
+            Turn raw thoughts into structured ideas, extract actions, and calibrate execution.
+          </div>
+        </div>
+        <button type="button" class="drawer-close-btn" onclick="Today.closeAiDiaryModal()">&times;</button>
+      </div>
+
+      <!-- Stance Selector Pills -->
+      <div style="display: flex; gap: 6px; padding: 10px 18px; border-bottom: 1px solid var(--border-hairline); background: var(--bg-surface); align-items: center;">
+        <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); text-transform: uppercase;">STANCE:</span>
+        <button type="button" class="btn-ghost-icon active" id="btnStanceCoach" onclick="Today.switchDiaryStance('coach')" style="font-size: 11px; padding: 3px 10px;" title="Challenging, cuts through excuses, TUM lens">
+          🎯 Coach
+        </button>
+        <button type="button" class="btn-ghost-icon" id="btnStanceFriend" onclick="Today.switchDiaryStance('friend')" style="font-size: 11px; padding: 3px 10px;" title="Grounding, safe harbor, de-escalates school fatigue">
+          🤝 Friend
+        </button>
+        <button type="button" class="btn-ghost-icon" id="btnStanceMirror" onclick="Today.switchDiaryStance('mirror')" style="font-size: 11px; padding: 3px 10px;" title="Stoic, objective auditor, removes cognitive distortions">
+          🪞 Objective Mirror
+        </button>
+      </div>
+
+      <!-- Chat Stream Container -->
+      <div id="aiDiaryChatStream" style="flex: 1; overflow-y: auto; padding: 16px 18px; display: flex; flex-direction: column; gap: 12px; min-height: 240px; max-height: 380px; background: var(--bg-canvas);">
+        <!-- Messages rendered dynamically -->
+      </div>
+
+      <!-- Input & Action Bar -->
+      <div style="padding: 12px 18px; border-top: 1px solid var(--border-hairline); background: var(--bg-surface);">
+        <form id="aiDiarySendForm" onsubmit="event.preventDefault(); Today.sendDiaryMessage();" style="display: flex; gap: 8px; align-items: center; margin-bottom: 8px;">
+          <input 
+            type="text" 
+            id="aiDiaryInput" 
+            class="form-input" 
+            placeholder="Dump your thoughts (school, fatigue, running, Matura, wins)..." 
+            autocomplete="off"
+            style="flex: 1; font-size: 12px; padding: 8px 12px;"
+          />
+          <button type="submit" class="btn-primary" style="padding: 8px 14px; font-size: 11.5px; font-weight: 600;">
+            Send
+          </button>
+        </form>
+        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <span style="font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono);">
+            Press Enter to talk • Click Synthesize when ready to commit
+          </span>
+          <button type="button" class="btn-ghost-icon" id="btnSynthesizeDiary" onclick="Today.synthesizeDiarySession()" style="font-size: 11px; padding: 4px 10px; color: var(--accent-lavender); border-color: var(--accent-lavender-border); font-weight: 700;">
+            ✨ Synthesize &amp; Commit to Today
+          </button>
+        </div>
+      </div>
     </div>
   </div>
 

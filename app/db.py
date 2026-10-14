@@ -410,11 +410,6 @@ def init_db(db_path: Optional[Path] = None) -> None:
                     insert_sql = f"INSERT OR IGNORE INTO daily_logs ({', '.join(cols)}) VALUES ({placeholders})"
                     for r in rows:
                         cursor.execute(insert_sql, [r.get(c) for c in cols])
-                        if r.get("completed_blocks"):
-                            cursor.execute(
-                                "UPDATE daily_logs SET completed_blocks = ? WHERE date = ? AND (completed_blocks IS NULL OR completed_blocks = '')",
-                                (r["completed_blocks"], r["date"]),
-                            )
                         if r.get("completed_exercises"):
                             cursor.execute(
                                 "UPDATE daily_logs SET completed_exercises = ? WHERE date = ? AND (completed_exercises IS NULL OR completed_exercises = '')",
@@ -422,6 +417,20 @@ def init_db(db_path: Optional[Path] = None) -> None:
                             )
         except Exception as e:
             print(f"Warning: SEED_DATA initialization notice: {e}")
+
+    # 8. Books & Daily Reading Tracker
+    try:
+        from app.services.book_service import ensure_book_tables
+        ensure_book_tables(conn)
+    except Exception as e:
+        print(f"Warning: book tables init notice: {e}")
+
+    # 9. AI Diary & Reflection Sessions
+    try:
+        from app.services.diary_service import ensure_diary_tables
+        ensure_diary_tables(conn)
+    except Exception as e:
+        print(f"Warning: diary tables init notice: {e}")
 
     conn.commit()
     conn.close()

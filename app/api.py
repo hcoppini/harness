@@ -864,5 +864,87 @@ class HarnessAPI:
         from app.services import vulcan_service
         return vulcan_service.setup_windows_scheduled_sync(target_time)
 
+    # --- Book Reading Tracker (1 Book/Month) ---
+    def get_book_reading_status(self, date_str: Optional[str] = None) -> Dict[str, Any]:
+        """Returns active book, daily reading quota, current pace, and progress."""
+        from app.services import book_service
+        return book_service.get_active_book(date_str)
+
+    def log_reading_progress(
+        self,
+        end_page: int,
+        start_page: Optional[int] = None,
+        book_id: Optional[int] = None,
+        notes: str = "",
+        date_str: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Logs daily page-to-page reading progress."""
+        from app.services import book_service
+        res = book_service.log_reading_progress(
+            end_page=end_page,
+            start_page=start_page,
+            book_id=book_id,
+            notes=notes,
+            date_str=date_str,
+        )
+        self._trigger_auto_sync()
+        return res
+
+    def update_book_details(
+        self,
+        book_id: int,
+        title: str,
+        author: str = "",
+        total_pages: int = 300,
+        current_page: int = 0,
+    ) -> Dict[str, Any]:
+        """Updates active book details or sets a new title."""
+        from app.services import book_service
+        res = book_service.update_book_details(
+            book_id=book_id,
+            title=title,
+            author=author,
+            total_pages=total_pages,
+            current_page=current_page,
+        )
+        self._trigger_auto_sync()
+        return res
+
+    # --- AI Diary, Executive Coach & Reflection ---
+    def get_diary_conversation(self, date_str: Optional[str] = None) -> Dict[str, Any]:
+        """Retrieves conversational messages and structured reflection for the selected day."""
+        from app.services import diary_service
+        return diary_service.get_diary_conversation(date_str)
+
+    def send_diary_message(
+        self,
+        user_message: str,
+        stance: str = "coach",
+        date_str: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Sends raw thought to the AI coach/friend/mirror and returns conversational response."""
+        from app.services import diary_service
+        res = diary_service.send_diary_message(
+            user_message=user_message,
+            stance=stance,
+            date_str=date_str,
+        )
+        self._trigger_auto_sync()
+        return res
+
+    def synthesize_diary_session(
+        self,
+        date_str: Optional[str] = None,
+        auto_push_tasks: bool = True,
+    ) -> Dict[str, Any]:
+        """Distills raw chat conversation into structured executive takeaways and action items."""
+        from app.services import diary_service
+        res = diary_service.synthesize_diary_session(
+            date_str=date_str,
+            auto_push_tasks=auto_push_tasks,
+        )
+        self._trigger_auto_sync()
+        return res
+
 
 

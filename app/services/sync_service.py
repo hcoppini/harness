@@ -1337,7 +1337,17 @@ def sync_tum_grade_entries(conn) -> int:
     try:
         cursor = conn.cursor()
         cursor.execute("SELECT id, subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average FROM tum_grade_entries")
-        local_items = {row["id"]: dict(row) for row in cursor.fetchall()}
+        local_rows = cursor.fetchall()
+        local_items = {row["id"]: dict(row) for row in local_rows}
+        local_by_sig = {}
+        for row in local_rows:
+            subj = (row["subject"] or "").strip().lower()
+            sem = row["semester"]
+            raw = (row["raw_input"] or "").strip()
+            dt = (row["date"] or "").strip()
+            desc = (row["description"] or "").strip().lower()
+            sig = (subj, sem, raw, dt, desc)
+            local_by_sig[sig] = row["id"]
     except Exception:
         return 0
 
@@ -1345,23 +1355,71 @@ def sync_tum_grade_entries(conn) -> int:
     if remote_items is None:
         return 0
 
-    synced_count = 0
+    # Clean duplicates in remote items before processing
+    seen_remote_sigs = set()
+    unique_remote_items = []
+    remote_duplicates_to_delete = []
+
     for re in remote_items:
         r_id = re.get("id")
         if not r_id:
             continue
+        subj = (re.get("subject") or "").strip().lower()
+        sem = re.get("semester")
+        raw = (re.get("raw_input") or "").strip()
+        dt = (re.get("date") or "").strip()
+        desc = (re.get("description") or "").strip().lower()
+        sig = (subj, sem, raw, dt, desc)
+
+        if sig in seen_remote_sigs:
+            remote_duplicates_to_delete.append(r_id)
+            continue
+        seen_remote_sigs.add(sig)
+        unique_remote_items.append(re)
+
+    # Purge duplicate entries from Supabase
+    for dup_id in remote_duplicates_to_delete:
+        try:
+            _make_supabase_request(f"tum_grade_entries?id=eq.{dup_id}", method="DELETE")
+        except Exception:
+            pass
+
+    synced_count = 0
+    for re in unique_remote_items:
+        r_id = re.get("id")
+        subj = (re.get("subject") or "").strip().lower()
+        sem = re.get("semester")
+        raw = (re.get("raw_input") or "").strip()
+        dt = (re.get("date") or "").strip()
+        desc = (re.get("description") or "").strip().lower()
+        sig = (subj, sem, raw, dt, desc)
+
+        if sig in local_by_sig:
+            loc_id = local_by_sig[sig]
+            if loc_id != r_id and r_id not in local_items:
+                cursor.execute("UPDATE tum_grade_entries SET id = ? WHERE id = ?", (r_id, loc_id))
+                synced_count += 1
+            continue
+
         if r_id not in local_items:
             cursor.execute(
                 "INSERT OR REPLACE INTO tum_grade_entries (id, subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (r_id, re.get("subject"), re.get("semester"), re.get("raw_input"), re.get("numeric_value"), re.get("weight"), re.get("category"), re.get("description"), re.get("date"), 1 if re.get("counts_in_average") else 0)
             )
+            local_by_sig[sig] = r_id
             synced_count += 1
-        else:
-            pass
 
-    remote_ids = {re.get("id") for re in remote_items if re.get("id")}
+    remote_ids = {re.get("id") for re in unique_remote_items if re.get("id")}
     for l_id, loc in local_items.items():
         if l_id not in remote_ids:
+            subj = (loc.get("subject") or "").strip().lower()
+            sem = loc.get("semester")
+            raw = (loc.get("raw_input") or "").strip()
+            dt = (loc.get("date") or "").strip()
+            desc = (loc.get("description") or "").strip().lower()
+            sig = (subj, sem, raw, dt, desc)
+            if sig in seen_remote_sigs:
+                continue
             payload = dict(loc)
             payload["counts_in_average"] = bool(payload["counts_in_average"])
             _make_supabase_request(

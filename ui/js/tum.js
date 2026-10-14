@@ -94,9 +94,15 @@ const Tum = {
 
     const rowsHtml = list
       .map((grade) => {
+        const seenSigs = new Set();
         const entries = (grade.entries || []).filter((e) => {
           const d = ((e.description || "") + " " + (e.raw_input || "")).toLowerCase();
-          return !d.includes("funkcje wymierne") && !d.includes("algorytmu grafowego");
+          if (d.includes("funkcje wymierne") || d.includes("algorytmu grafowego")) return false;
+          // Signature deduplication: subject, raw_input, date, description, weight
+          const sig = `${grade.subject}|${e.raw_input}|${e.date || ""}|${(e.description || "").trim()}|${e.weight || 1}`;
+          if (seenSigs.has(sig)) return false;
+          seenSigs.add(sig);
+          return true;
         });
 
         // Compute running average dynamically from visible entries
@@ -122,6 +128,15 @@ const Tum = {
         }
 
         const target = grade.target_grade || 5.0;
+        const diff = (runningAvg !== null && runningAvg !== undefined)
+          ? Math.round((runningAvg - target) * 100) / 100
+          : null;
+        let diffBadge = "";
+        if (diff !== null) {
+          const sign = diff >= 0 ? "+" : "";
+          const color = diff >= 0 ? "var(--color-green-light)" : "var(--color-red-light)";
+          diffBadge = `<span class="ledger-diff-tag" style="font-size: 10px; font-weight: 700; font-family: var(--font-mono); color: ${color}; margin-left: 4px;">(${sign}${diff.toFixed(2)})</span>`;
+        }
 
         // Render chips for individual marks
         let chipsHtml = "";
@@ -177,9 +192,12 @@ const Tum = {
           }
 
           avgHtml = `
-            <span class="grade-avg-pill ${avgClass}">
-              ${runningAvg.toFixed(2)}
-            </span>
+            <div style="display: inline-flex; align-items: center; justify-content: center; gap: 4px;">
+              <span class="grade-avg-pill ${avgClass}">
+                ${runningAvg.toFixed(2)}
+              </span>
+              ${diffBadge}
+            </div>
           `;
         }
 
@@ -199,6 +217,7 @@ const Tum = {
           <tr class="ledger-row">
             <td class="ledger-col-subject" style="font-weight: 600; color: var(--text-primary); font-size: 12.5px;">
               <span class="ledger-subject-title">${this.escapeHtml(grade.subject)}</span>
+              <span class="ledger-mobile-target-sub">Target: ${target.toFixed(1)}${diff !== null ? ` ${diffBadge}` : ""}</span>
             </td>
             <td class="ledger-col-chips">
               ${chipsHtml}
@@ -210,7 +229,7 @@ const Tum = {
               ${target.toFixed(1)}
             </td>
             <td class="ledger-col-status" style="text-align: center;">
-              <span class="ledger-mobile-target-tag">Target: ${target.toFixed(1)}</span>
+              <span class="ledger-mobile-target-tag">Target: ${target.toFixed(1)}${diff !== null ? ` ${diffBadge}` : ""}</span>
               ${statusBadge}
             </td>
             <td class="ledger-col-action" style="text-align: right;">
@@ -338,15 +357,60 @@ const Tum = {
     const totalScore = Math.round((0.65 * ptsGpa + 0.35 * subjectScore) * 10) / 10;
 
     let verdict = "DEFICIT: MATH/CS RECOVERY NEEDED";
+    let statusLevel = "deficit";
     if (totalScore >= 88.0) {
       verdict = "DIRECT ADMISSION SAFE (Level 1)";
+      statusLevel = "safe";
     } else if (totalScore >= 70.0) {
       verdict = "INTERVIEW THRESHOLD (Level 2)";
+      statusLevel = "interview";
     }
+
+    const pointsToDirect = Math.max(0, Math.round((88.0 - totalScore) * 10) / 10);
+    const pointsToInterview = Math.max(0, Math.round((70.0 - totalScore) * 10) / 10);
+
+    // Identify drag factors
+    const subjectDrags = [];
+    if (csPl < 5.0) {
+      const gain = Math.round((5.0 - csPl) * 5.3 * 10) / 10;
+      subjectDrags.push({
+        subject: "Informatyka",
+        current: csPl,
+        potential: gain,
+        rec: `Raise CS to 5.0 (+${gain} pts)`
+      });
+    }
+    if (mathPl < 5.0) {
+      const gain = Math.round((5.0 - mathPl) * 5.3 * 10) / 10;
+      subjectDrags.push({
+        subject: "Matematyka",
+        current: mathPl,
+        potential: gain,
+        rec: `Raise Math to 5.0 (+${gain} pts)`
+      });
+    }
+    if (langPl < 5.0) {
+      const gain = Math.round((5.0 - langPl) * 2.7 * 10) / 10;
+      subjectDrags.push({
+        subject: "Język Angielski",
+        current: langPl,
+        potential: gain,
+        rec: `Raise English to 5.0 (+${gain} pts)`
+      });
+    }
+    subjectDrags.sort((a, b) => b.potential - a.potential);
+    const primaryAction = subjectDrags.length > 0
+      ? subjectDrags[0].rec
+      : "Maintain current trajectory across all 3 key subjects.";
 
     return {
       german_gpa: gGpa,
       total_tum_points: totalScore,
+      points_to_direct: pointsToDirect,
+      points_to_interview: pointsToInterview,
+      status_level: statusLevel,
+      primary_action: primaryAction,
+      subject_drags: subjectDrags,
       verdict,
       gpa_pl: gpaPl,
       math_pl: mathPl,
@@ -411,6 +475,23 @@ const Tum = {
       } else {
         badgeEl.innerHTML = `<span class="verdict-badge risk">Deficit: Math/CS Recovery Needed</span>`;
       }
+    }
+
+    // Distance-to-Goal Diagnostic Banner
+    const distSummaryEl = document.getElementById("tumDistanceSummaryText");
+    const distActionEl = document.getElementById("tumDistanceActionText");
+    if (distSummaryEl) {
+      if (calc.total_tum_points >= 88.0) {
+        const excess = (calc.total_tum_points - 88.0).toFixed(1);
+        distSummaryEl.innerHTML = `<span style="color: var(--color-green-light); font-weight: 700;">+${excess} pts above Direct Admission threshold</span>`;
+      } else if (calc.total_tum_points >= 70.0) {
+        distSummaryEl.innerHTML = `<span style="color: var(--color-amber-light); font-weight: 700;">${calc.points_to_direct.toFixed(1)} pts needed for Direct Admission (88.0)</span>`;
+      } else {
+        distSummaryEl.innerHTML = `<span style="color: var(--color-red-light); font-weight: 700;">${calc.points_to_direct.toFixed(1)} pts to Direct | ${calc.points_to_interview.toFixed(1)} pts to Interview</span>`;
+      }
+    }
+    if (distActionEl) {
+      distActionEl.innerHTML = `<span><strong>Sprint:</strong> ${this.escapeHtml(calc.primary_action)}</span>`;
     }
   },
 
