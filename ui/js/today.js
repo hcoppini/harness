@@ -2197,7 +2197,7 @@ const Today = {
         return `
           <div style="max-width: 82%; align-self: ${alignSelf}; background: ${bubbleBg}; border: 1px solid ${borderCol}; border-radius: 10px; padding: 8px 12px;">
             <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 3px; font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary);">
-              <span style="font-weight: 700; color: ${isUser ? "var(--text-secondary)" : "var(--accent-lavender)};">${this.escapeHtml(roleLabel)}</span>
+              <span style="font-weight: 700; color: ${isUser ? "var(--text-secondary)" : "var(--accent-lavender)"};">${this.escapeHtml(roleLabel)}</span>
               <span>${m.timestamp || ""}</span>
             </div>
             <div style="font-size: 12px; color: var(--text-primary); line-height: 1.45; white-space: pre-wrap;">${this.escapeHtml(m.content)}</div>
@@ -2266,6 +2266,7 @@ const Today = {
       if (btn) btn.textContent = "✨ Synthesize & Commit to Today";
     }
   },
+  escapeHtml(str) {
     if (!str) return "";
     return String(str)
       .replace(/&/g, "&amp;")

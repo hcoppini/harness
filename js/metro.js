@@ -319,73 +319,18 @@ const MetroMap = {
         } catch (e) {}
 
         if (Array.isArray(cachedExams) && cachedExams.length > 0) {
+          const todayStr = (() => {
+            const d = new Date();
+            return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+          })();
           this.upcomingExams = cachedExams.filter((e) => {
+            if (e.completed || (e.exam_date && e.exam_date < todayStr)) return false;
             const t = ((e.title || "") + " " + (e.scope || "")).toLowerCase();
             return !t.includes("trygonometria") && !t.includes("kinematyka") && !t.includes("wyszukiwania") && !t.includes("powstanie styczniowe");
           });
         }
-
-        if (!this.upcomingExams || this.upcomingExams.length === 0) {
-          this.upcomingExams = [
-            {
-              id: 7,
-              subject: "Informatyka",
-              title: "Sprawdzian: Podstawy programowania (C++)",
-              exam_date: "2026-09-21",
-              scope: "Podstawy programowania - pojęcia (algorytmy, cout, cin, instrukcja if)",
-              completed: false,
-            },
-            {
-              id: 13,
-              subject: "Chemia",
-              title: "Sprawdzian: Budowa atomu i wiązania",
-              exam_date: "2026-09-29",
-              scope: "Konfiguracje elektronowe, liczby kwantowe, typy wiązań.",
-              completed: false,
-            },
-            {
-              id: 16,
-              subject: "Fizyka",
-              title: "Kartkówka: Ruch jednostajny i przyspieszony",
-              exam_date: "2026-10-01",
-              scope: "Wykresy v(t), s(t), wzory na przyspieszenie.",
-              completed: false,
-            },
-            {
-              id: 5,
-              subject: "Geografia",
-              title: "Sprawdzian: Mapa fizyczna Polski",
-              exam_date: "2026-10-02",
-              scope: "Sprawdzian wiadomości - Mapa fizyczna Polski.",
-              completed: false,
-            },
-            {
-              id: 15,
-              subject: "Fizyka",
-              title: "Sprawdzian: Kinematyka",
-              exam_date: "2026-10-05",
-              scope: "Rzuty pionowe, poziome i ukośne.",
-              completed: false,
-            },
-            {
-              id: 6,
-              subject: "Język polski",
-              title: "Sprawdzian: Rozprawka (romantyzm)",
-              exam_date: "2026-10-06",
-              scope: "Rozprawka (romantyzm) - wstęp, teza, argument, przykład, kontekst.",
-              completed: false,
-            },
-            {
-              id: 14,
-              subject: "Matematyka",
-              title: "Sprawdzian: Funkcja kwadratowa",
-              exam_date: "2026-10-07",
-              scope: "Postać ogólna, kanoniczna, iloczynowa, nierówności kwadratowe.",
-              completed: false,
-            },
-          ];
-        }
       }
+      if (!this.upcomingExams) this.upcomingExams = [];
 
       this.render();
       setTimeout(() => this.scrollToBeacon(), 200);
@@ -583,9 +528,10 @@ const MetroMap = {
       }
     }
 
-    // Dynamic Multi-Tier Staggered School Exams on Track
+    // Dynamic Multi-Tier Staggered School Exams on Track (Clean, Clutter-Free, Upcoming-Only)
     let examsSvgHtml = "";
-    if (this.upcomingExams && this.upcomingExams.length > 0) {
+    const showExamsOnTrack = this.activeStreamFilter === "all" || this.activeStreamFilter === "academics";
+    if (showExamsOnTrack && this.upcomingExams && this.upcomingExams.length > 0) {
       const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
       const validExams = [];
@@ -594,15 +540,17 @@ const MetroMap = {
         .forEach((exam) => {
           try {
             const exDate = new Date(exam.exam_date + "T12:00:00");
-            if (exDate >= startDate && exDate <= endDate) {
+            const diffDays = Math.round((exDate.getTime() - todayMid) / (1000 * 60 * 60 * 24));
+            // Only upcoming exams (diffDays >= 0) within roadmap horizon
+            if (diffDays >= 0 && exDate >= startDate && exDate <= endDate) {
               const elapsed = exDate.getTime() - startDate.getTime();
               const totalMs = endDate.getTime() - startDate.getTime();
               const ratio = elapsed / totalMs;
               const testX = startX + ratio * totalTrackLength;
-              const diffDays = Math.round((exDate.getTime() - todayMid) / (1000 * 60 * 60 * 24));
-              const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "1d" : diffDays > 0 ? `${diffDays}d` : `${Math.abs(diffDays)}d ago`;
+              const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "1d" : `${diffDays}d`;
               validExams.push({
                 ...exam,
+                exDate,
                 testX,
                 diffDays,
                 dueLabel,
@@ -611,28 +559,43 @@ const MetroMap = {
           } catch (e) {}
         });
 
-      // Sort by horizontal position
+      // Sort by horizontal position / date
       validExams.sort((a, b) => a.testX - b.testX);
 
-      // Multi-tier heights to avoid collision with Today's indicator:
-      // Tier 0: 22px (low tick beneath Today's text)
-      // Tier 1: 52px (standard tick, used when far from Today's text)
-      // Tier 2: 78px (high tick towering above Today's text)
-      // Tier 3: 98px (extra high tick for dense exam clusters)
-      const tierHeights = [22, 52, 78, 98];
+      // Group nearby exams into non-overlapping clusters to prevent track clutter
+      const clusters = [];
+      validExams.forEach((exam) => {
+        const lastCluster = clusters[clusters.length - 1];
+        if (lastCluster && Math.abs(exam.testX - lastCluster.centerX) < 40) {
+          lastCluster.exams.push(exam);
+          if (exam.diffDays < lastCluster.diffDays) {
+            lastCluster.diffDays = exam.diffDays;
+            lastCluster.dueLabel = exam.dueLabel;
+          }
+        } else {
+          clusters.push({
+            centerX: exam.testX,
+            diffDays: exam.diffDays,
+            dueLabel: exam.dueLabel,
+            exams: [exam],
+          });
+        }
+      });
+
+      // Multi-tier heights to avoid collisions between adjacent clusters & Today beacon
+      const tierHeights = [36, 64, 92];
       const assignedTiers = [];
 
-      validExams.forEach((ex, idx) => {
+      clusters.forEach((cl, idx) => {
         const collidingTiers = new Set();
-        // The Today indicator label sits between spineY - 42 and spineY - 58.
-        // Any exam within 72px horizontally must avoid Tier 1 (52px).
-        const isNearToday = Math.abs(ex.testX - currentX) < 72;
+        // The Today indicator label sits between spineY - 42 and spineY - 58
+        const isNearToday = Math.abs(cl.centerX - currentX) < 70;
         if (isNearToday) {
           collidingTiers.add(1);
         }
         for (let j = 0; j < idx; j++) {
-          const prev = validExams[j];
-          if (Math.abs(ex.testX - prev.testX) < 75) {
+          const prev = clusters[j];
+          if (Math.abs(cl.centerX - prev.centerX) < 90) {
             collidingTiers.add(assignedTiers[j]);
           }
         }
@@ -640,31 +603,57 @@ const MetroMap = {
         if (isNearToday && !collidingTiers.has(2)) {
           chosenTier = 2; // Elevate above Today's indicator text
         } else {
-          while (collidingTiers.has(chosenTier) && chosenTier < 3) {
+          while (collidingTiers.has(chosenTier) && chosenTier < tierHeights.length - 1) {
             chosenTier++;
           }
         }
         assignedTiers.push(chosenTier);
-        ex.tier = chosenTier;
-        ex.tickHeight = tierHeights[chosenTier];
+        cl.tier = chosenTier;
+        cl.tickHeight = tierHeights[chosenTier];
       });
 
-      validExams.forEach((exam) => {
-        const testX = exam.testX;
-        const tickTopY = spineY - exam.tickHeight;
-        const isUrgent = exam.diffDays >= 0 && exam.diffDays <= 2;
+      clusters.forEach((cl) => {
+        const testX = cl.centerX;
+        const tickTopY = spineY - cl.tickHeight;
+        const isUrgent = cl.diffDays >= 0 && cl.diffDays <= 2;
         const lineColor = isUrgent ? "#ef4444" : "var(--text-tertiary)";
         const textColor = isUrgent ? "#ef4444" : "var(--text-primary)";
-        const labelText = `[${exam.dueLabel}] ${exam.subject}`;
+
+        let labelText = "";
+        if (cl.exams.length === 1) {
+          labelText = `[${cl.dueLabel}] ${cl.exams[0].subject}`;
+        } else if (cl.exams.length === 2) {
+          const s1 = cl.exams[0].subject;
+          const s2 = cl.exams[1].subject;
+          const short1 = s1.length > 8 ? s1.slice(0, 7) + "." : s1;
+          const short2 = s2.length > 8 ? s2.slice(0, 7) + "." : s2;
+          labelText = `[${cl.dueLabel}] ${short1} & ${short2}`;
+        } else {
+          labelText = `[${cl.dueLabel}] ${cl.exams.length} Tests`;
+        }
+
+        const firstExam = cl.exams[0];
+        const examsPayload = encodeURIComponent(
+          JSON.stringify(
+            cl.exams.map((e) => ({
+              id: e.id,
+              subject: e.subject,
+              title: e.title,
+              exam_date: e.exam_date,
+              due: cl.dueLabel,
+              scope: e.scope || "",
+            }))
+          )
+        );
 
         examsSvgHtml += `
-          <g class="metro-test-tick" data-id="${exam.id}" data-subject="${this.escapeHtml(exam.subject)}" data-title="${this.escapeHtml(exam.title)}" data-date="${exam.exam_date}" data-due="${exam.dueLabel}" data-scope="${this.escapeHtml(exam.scope || '')}" style="cursor: pointer; pointer-events: all;">
+          <g class="metro-test-tick" data-cluster="${examsPayload}" data-id="${firstExam.id}" data-subject="${this.escapeHtml(firstExam.subject)}" data-title="${this.escapeHtml(firstExam.title)}" data-date="${firstExam.exam_date}" data-due="${cl.dueLabel}" data-count="${cl.exams.length}" style="cursor: pointer; pointer-events: all;">
             <!-- Pin dot on track -->
-            <circle cx="${testX}" cy="${spineY}" r="3" fill="${isUrgent ? '#ef4444' : 'var(--text-secondary)'}" stroke="var(--bg-card)" stroke-width="1.5" />
+            <circle cx="${testX}" cy="${spineY}" r="${cl.exams.length > 1 ? 4 : 3}" fill="${isUrgent ? '#ef4444' : 'var(--text-secondary)'}" stroke="var(--bg-card)" stroke-width="1.5" />
             <!-- Vertical leader line -->
             <line x1="${testX}" y1="${spineY - 4}" x2="${testX}" y2="${tickTopY + 2}" stroke="${lineColor}" stroke-width="1.2" stroke-dasharray="${isUrgent ? 'none' : '2 2'}" opacity="0.8" />
             <!-- Small top notch pip -->
-            <circle cx="${testX}" cy="${tickTopY + 2}" r="1.5" fill="${lineColor}" />
+            <circle cx="${testX}" cy="${tickTopY + 2}" r="${cl.exams.length > 1 ? 2.5 : 1.5}" fill="${lineColor}" />
             <!-- Clean minimalist text label -->
             <text x="${testX}" y="${tickTopY - 3}" font-family="var(--font-mono)" font-size="9" font-weight="${isUrgent ? '700' : '600'}" text-anchor="middle" fill="${textColor}">
               ${this.escapeHtml(labelText)}
@@ -910,24 +899,56 @@ const MetroMap = {
 
     document.querySelectorAll(".metro-test-tick").forEach((dot) => {
       dot.addEventListener("mouseenter", (e) => {
+        const clusterRaw = dot.getAttribute("data-cluster");
+        let clusterExams = null;
+        if (clusterRaw) {
+          try {
+            clusterExams = JSON.parse(decodeURIComponent(clusterRaw));
+          } catch (err) {}
+        }
+
         const subj = dot.getAttribute("data-subject");
         const title = dot.getAttribute("data-title");
         const dateStr = dot.getAttribute("data-date");
         const due = dot.getAttribute("data-due");
         const scope = dot.getAttribute("data-scope");
 
-        let content = `
-          <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
-            <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-primary);">[${subj}]</span>
-            <span style="font-size: 12px; font-weight: 700; color: var(--text-primary);">${title}</span>
-            <span class="key-pill" style="font-size: 9px; padding: 1px 5px;">${due}</span>
-          </div>
-          <div style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary);">${dateStr}</div>
-        `;
-        if (scope) {
-          content += `<div style="font-size: 10px; color: var(--text-secondary); margin-top: 3px; max-width: 260px;">${scope}</div>`;
+        let content = "";
+        if (Array.isArray(clusterExams) && clusterExams.length > 1) {
+          content = `
+            <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 6px;">
+              <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--accent-lavender);">${clusterExams.length} Scheduled Tests</span>
+              <span class="key-pill" style="font-size: 9px; padding: 1px 5px;">${due}</span>
+            </div>
+            <div style="display: flex; flex-direction: column; gap: 5px;">
+              ${clusterExams
+                .map(
+                  (ex) => `
+                <div style="border-left: 2px solid var(--accent-lavender); padding-left: 6px;">
+                  <div style="font-size: 11px; font-weight: 700; color: var(--text-primary);">[${this.escapeHtml(ex.subject)}] ${this.escapeHtml(ex.title)}</div>
+                  <div style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary);">${ex.exam_date}</div>
+                  ${ex.scope ? `<div style="font-size: 9.5px; color: var(--text-secondary); margin-top: 2px;">${this.escapeHtml(ex.scope)}</div>` : ""}
+                </div>
+              `
+                )
+                .join("")}
+            </div>
+            <div style="font-size: 9px; color: var(--text-muted); margin-top: 6px; font-style: italic;">Click to open in Study ledger</div>
+          `;
+        } else {
+          content = `
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+              <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-primary);">[${subj}]</span>
+              <span style="font-size: 12px; font-weight: 700; color: var(--text-primary);">${title}</span>
+              <span class="key-pill" style="font-size: 9px; padding: 1px 5px;">${due}</span>
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary);">${dateStr}</div>
+          `;
+          if (scope) {
+            content += `<div style="font-size: 10px; color: var(--text-secondary); margin-top: 3px; max-width: 260px;">${scope}</div>`;
+          }
+          content += `<div style="font-size: 9px; color: var(--text-muted); margin-top: 4px; font-style: italic;">Click to open in Study ledger</div>`;
         }
-        content += `<div style="font-size: 9px; color: var(--text-muted); margin-top: 4px; font-style: italic;">Click to open in Study ledger</div>`;
 
         tooltip.innerHTML = content;
         tooltip.style.display = "block";
