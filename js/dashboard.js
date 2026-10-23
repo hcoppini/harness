@@ -113,8 +113,10 @@ window.Dashboard = {
     const workloadDescEl = document.getElementById("dashWorkloadDesc");
 
     if (modeBadge) {
-      modeBadge.textContent = acBalance.mode || "CRUISE";
-      modeBadge.className = `mono-chip ${acBalance.badge_class || ""}`;
+      const mode = acBalance.mode || "DEFENSE";
+      modeBadge.textContent = mode;
+      const badgeCls = mode === "DEFENSE" ? "rose" : (acBalance.badge_class || "");
+      modeBadge.className = `mono-chip ${badgeCls}`;
     }
     if (nearestExamEl) {
       if (acBalance.nearest_exam) {
@@ -146,12 +148,23 @@ window.Dashboard = {
       const de = metrics.bavarian_gpa ? ` (DE: ${Number(metrics.bavarian_gpa).toFixed(2)})` : "";
       gpaEl.textContent = `${pl}${de}`;
     }
+    const tumScore = metrics.tum_score !== undefined ? Number(metrics.tum_score) : 90.0;
+    const isRejection = Boolean(metrics.tum_rejection_breached || tumScore < 67.0);
     if (tumScoreEl) {
-      tumScoreEl.textContent = `${(metrics.tum_score || 90.0).toFixed(0)} pts`;
+      tumScoreEl.textContent = `${tumScore.toFixed(1)} pts`;
+      if (isRejection) {
+        tumScoreEl.style.color = "var(--color-red)";
+      } else {
+        tumScoreEl.style.color = "";
+      }
     }
     if (germanEl) germanEl.textContent = metrics.german_stage || "A2 Active";
     if (stName) {
-      stName.textContent = `Station: ${metrics.active_station?.name || "Pure Syntax"} (${metrics.active_station?.month || "SEP '26"})`;
+      if (isRejection) {
+        stName.innerHTML = `<span style="color: var(--color-red); font-weight: 700;">⚠ REJECTION THRESHOLD BREACHED (&lt; 67.0)</span>`;
+      } else {
+        stName.textContent = `Station: ${metrics.active_station?.name || "Pure Syntax"} (${metrics.active_station?.month || "SEP '26"})`;
+      }
     }
   },
 

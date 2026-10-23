@@ -53,5 +53,6 @@ def test_tum_aptitude_score_interview_threshold():
 def test_tum_aptitude_score_deficit():
     # Polish grades: GPA 3.5, Math 3.0, CS 3.5, Lang 3.0
     res = calculate_tum_aptitude_score(gpa_pl=3.5, math_pl=3.0, cs_pl=3.5, lang_pl=3.0)
-    assert res["total_tum_points"] < 70.0
-    assert res["verdict"] == "DEFICIT: MATH/CS RECOVERY NEEDED"
+    assert res["total_tum_points"] < 67.0
+    assert res["verdict"] == "REJECTION THRESHOLD BREACHED: INFORMATYKA / MATEMATYKA DEFICIT"
+    assert res["is_rejection_breached"] is True

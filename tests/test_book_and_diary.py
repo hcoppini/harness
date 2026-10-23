@@ -175,7 +175,7 @@ def test_tum_distance_to_goal_engine():
     assert "primary_action" in calc
     assert "subject_drags" in calc
     assert calc["target_direct_points"] == 88.0
-    assert calc["target_interview_points"] == 70.0
+    assert calc["target_interview_points"] == 67.0
     assert calc["points_to_direct"] > 0
     # Math is 4.0 so it should be flagged as potential gain
     math_drags = [d for d in calc["subject_drags"] if d["subject"] == "Matematyka"]

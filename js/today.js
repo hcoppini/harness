@@ -586,7 +586,7 @@ const Today = {
             <div style="flex: 1; min-width: 0;">
               <div style="display: flex; justify-content: space-between; align-items: center;">
                 <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: ${p.color || "var(--accent-lavender)"};">${this.escapeHtml(p.badge_label || `[${pIdx + 1}. PHASE]`)}</span>
-                <span class="key-pill" style="font-size: 9px;">${p.duration_min} MIN</span>
+                <span class="key-pill" style="font-size: 9px; text-transform: uppercase;">${this.escapeHtml(p.unit_target || (p.duration_min ? p.duration_min + " MIN" : "PROOF OF WORK"))}</span>
               </div>
               <div id="${titleId}" style="font-size: 13px; font-weight: 600; color: var(--text-primary); margin-top: 3px; text-decoration: ${isChecked ? "line-through" : "none"};">${this.escapeHtml(p.title)}</div>
               <div style="font-size: 12px; color: var(--text-secondary); line-height: 1.45; margin-top: 3px; white-space: pre-line;">${this.escapeHtml(p.description)}</div>
@@ -604,39 +604,40 @@ const Today = {
       const todayExams = (wl && wl.today_exams && wl.today_exams.length > 0) ? wl.today_exams : [];
 
       let step1Title = "School Defense: Homework & Next-Day Class Prep";
-      let step1Desc = "Clear pending homework backlog • 15-min preview so you are never surprised in class.";
-      let step1Badge = "45 MIN";
-      let step2Badge = "45 MIN";
-      let step3Badge = "20 MIN";
+      let step1Desc = "Complete and self-correct all pending homework items in ink on paper.";
+      let step1Badge = "INK ON PAPER";
+      let step2Badge = "4 CKE TASKS";
+      let step3Badge = "20 ANKI / 1 COMMIT";
 
       if (todayExams.length > 0) {
         step1Title = `Exam Cleared: [${todayExams[0].subject}] Written This Morning`;
         step1Desc = `Morning examination cleared at school. Zero afternoon school pressure. 100% capacity focused on TUM roadmap.`;
-        step1Badge = "50 MIN";
-        step2Badge = "35 MIN";
-        step3Badge = "25 MIN";
+        step1Badge = "EXAM CLEARED";
+        step2Badge = "4 CKE TASKS";
+        step3Badge = "20 ANKI / 1 COMMIT";
       } else if (isSchool) {
         step1Title = `Academic Defense: ${block ? (block.focus || "Exam / Essay Priority") : "Exam Priority"}`;
-        step1Desc = (block ? block.activity : "") || "45m zero-distraction focus sprint on upcoming exam / essay.";
+        step1Desc = (block ? block.activity : "") || "Complete and self-correct designated problem sets in ink.";
+        step1Badge = "INK ON PAPER";
       } else if (nextExam && nextExam.days_left <= 5) {
         const dueText = nextExam.days_left === 1 ? "TOMORROW" : `in ${nextExam.days_left}d (${nextExam.exam_date})`;
-        step1Title = `Upcoming Exam Foundation: [${nextExam.subject}] (${dueText})`;
+        step1Title = `Upcoming Exam Defense: [${nextExam.subject}] (${dueText})`;
         const scopeText = nextExam.scope ? ` • Scope: ${nextExam.scope}` : "";
-        step1Desc = `${nextExam.title}${scopeText}\nReview core definitions and theorem mapping (25 MIN).`;
-        step1Badge = "25 MIN";
-        step2Badge = "25 MIN";
-        step3Badge = "60 MIN";
+        step1Desc = `${nextExam.title}${scopeText}\nSolve 4 diagnostic exam problems on paper without notes.`;
+        step1Badge = "4 PROBLEMS (INK)";
+        step2Badge = "4 CKE TASKS";
+        step3Badge = "1 COMMIT / 20 ANKI";
       }
 
       let step2Title = deliv
         ? `TUM Roadmap: ${deliv.title || deliv.category || "Station Sprint"}`
-        : "TUM Roadmap: Pure Syntax & Diagnostic Proofs";
+        : "Matura R Problem Sets & CKE Verification";
       let step2Desc = deliv
         ? `[Target Spec] ${deliv.target_spec || deliv.title}.\nCurrent Progress: ${deliv.completed_count || 0} / ${deliv.total_required || deliv.quantity || 1} ${deliv.unit_label || "reps"} completed.`
-        : "Core milestone problem sets unassisted • Diagnostic mastery & unassisted proofs on TUM Heilbronn track.";
+        : "Complete and self-correct 4 CKE tasks (2023 May exam) • Strict unassisted proof-of-work in notebook.";
 
-      let step3Title = "German Vocabulary & LeetCode Recall";
-      let step3Desc = "Active recall of German A2 vocabulary, grammar structures, and algorithmic complexity review.";
+      let step3Title = "German Vocabulary & LeetCode Diff";
+      let step3Desc = "Active recall of 20 German A2 vocabulary cards + 1 verified LeetCode solution committed to Git.";
 
       phasesHtml = `
         <div class="plan-phase-card phase-1" style="display: flex; gap: 12px; align-items: flex-start;">
@@ -1388,16 +1389,36 @@ const Today = {
     try {
       if (!window.pywebview || !window.pywebview.api) return;
       if (window.pywebview.api.auto_sync_vulcan) {
-        const res = await window.pywebview.api.auto_sync_vulcan(this.selectedDateStr);
-        if (res && res.status !== "fresh") {
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Vulcan auto-sync timed out (10s)")), 10000)
+        );
+        const res = await Promise.race([
+          window.pywebview.api.auto_sync_vulcan(this.selectedDateStr),
+          timeoutPromise,
+        ]);
+        if (res && (res.status === "token_expired" || res.session_expired)) {
+          if (window.HarnessApp && window.HarnessApp.setVulcanAlarm) {
+            window.HarnessApp.setVulcanAlarm(true, res.alarm_message || "API DISCONNECTED: MANUAL ENTRY REQUIRED");
+          }
+        } else if (res && res.status !== "fresh") {
+          if (window.HarnessApp && window.HarnessApp.setVulcanAlarm) {
+            window.HarnessApp.setVulcanAlarm(false);
+          }
           await this.loadHomeworkAndExams();
           if (window.KillListDrawer) await window.KillListDrawer.load();
           if (window.Dashboard) await window.Dashboard.load();
           if (window.Tum) await window.Tum.load();
+        } else if (res) {
+          if (window.HarnessApp && window.HarnessApp.setVulcanAlarm) {
+            window.HarnessApp.setVulcanAlarm(false);
+          }
         }
       }
     } catch (err) {
       console.warn("Silent Vulcan auto-sync check:", err);
+      if (window.HarnessApp && window.HarnessApp.setVulcanAlarm) {
+        window.HarnessApp.setVulcanAlarm(true, "API DISCONNECTED: MANUAL ENTRY REQUIRED");
+      }
     }
   },
 
@@ -1778,7 +1799,29 @@ const Today = {
         if (window.HarnessApp && window.HarnessApp.showToast) {
           window.HarnessApp.showToast("Connecting to Vulcan / eduVULCAN...");
         }
-        const res = await window.pywebview.api.sync_vulcan_data(this.selectedDateStr, forceRefresh);
+        // 10-second timeout guard to prevent infinite hang on expired token
+        const timeoutPromise = new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Vulcan API request timed out (10s)")), 10000)
+        );
+        const res = await Promise.race([
+          window.pywebview.api.sync_vulcan_data(this.selectedDateStr, forceRefresh),
+          timeoutPromise,
+        ]);
+
+        if (res && (res.status === "token_expired" || res.session_expired)) {
+          if (window.HarnessApp && window.HarnessApp.setVulcanAlarm) {
+            window.HarnessApp.setVulcanAlarm(true, res.alarm_message || "API DISCONNECTED: MANUAL ENTRY REQUIRED");
+          }
+          if (window.HarnessApp && window.HarnessApp.showToast) {
+            window.HarnessApp.showToast("Vulcan Session Expired. API Disconnected.");
+          }
+          return;
+        } else {
+          if (window.HarnessApp && window.HarnessApp.setVulcanAlarm) {
+            window.HarnessApp.setVulcanAlarm(false);
+          }
+        }
+
         await this.load(this.selectedDateStr);
         await this.loadHomeworkAndExams();
         if (window.KillListDrawer && window.KillListDrawer.isOpen) {
@@ -1800,7 +1843,12 @@ const Today = {
       }
     } catch (err) {
       console.error("Error syncing Vulcan:", err);
-      alert(err.message || "Failed to sync Vulcan data");
+      if (window.HarnessApp && window.HarnessApp.setVulcanAlarm) {
+        window.HarnessApp.setVulcanAlarm(true, "API DISCONNECTED: MANUAL ENTRY REQUIRED");
+      }
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast("API DISCONNECTED: MANUAL ENTRY REQUIRED");
+      }
     }
   },
 
@@ -1836,19 +1884,28 @@ const Today = {
     const infoEl = document.getElementById("vulcanSchoolInfo");
     const syncEl = document.getElementById("vulcanLastSyncTime");
 
-    const isLive = status.is_connected || status.mode === "live";
+    const isExpired = Boolean(status.session_expired || status.status === "token_expired");
+    const isLive = !isExpired && (status.is_connected || status.mode === "live");
 
     if (badge) {
-      badge.textContent = isLive ? `LIVE (${(status.student_symbol || "Warszawa").toUpperCase()})` : "DEMO SIMULATOR";
-      badge.className = isLive ? "mono-chip emerald" : "mono-chip";
-      if (isLive) {
-        badge.style.background = "rgba(16, 185, 129, 0.15)";
-        badge.style.color = "#34d399";
-        badge.style.border = "1px solid rgba(16, 185, 129, 0.35)";
+      if (isExpired) {
+        badge.textContent = "API DISCONNECTED: MANUAL ENTRY REQUIRED";
+        badge.className = "mono-chip rose";
+        badge.style.background = "rgba(239, 68, 68, 0.15)";
+        badge.style.color = "#ef4444";
+        badge.style.border = "1px solid rgba(239, 68, 68, 0.4)";
       } else {
-        badge.style.background = "";
-        badge.style.color = "";
-        badge.style.border = "";
+        badge.textContent = isLive ? `LIVE (${(status.student_symbol || "Warszawa").toUpperCase()})` : "DEMO SIMULATOR";
+        badge.className = isLive ? "mono-chip emerald" : "mono-chip";
+        if (isLive) {
+          badge.style.background = "rgba(16, 185, 129, 0.15)";
+          badge.style.color = "#34d399";
+          badge.style.border = "1px solid rgba(16, 185, 129, 0.35)";
+        } else {
+          badge.style.background = "";
+          badge.style.color = "";
+          badge.style.border = "";
+        }
       }
     }
 

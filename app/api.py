@@ -179,6 +179,53 @@ class HarnessAPI:
         self._trigger_auto_sync()
         return res
 
+    def quick_add_verbal_obligation(
+        self,
+        subject: str,
+        obligation_type: str,
+        date_str: str,
+        scope: str = "",
+    ) -> Dict[str, Any]:
+        """
+        Instantly logs a verbal test, kartkówka, or homework in 3 seconds directly from Cockpit.
+        Replicates directly to Supabase cloud.
+        """
+        from app.services import homework_service, sync_service
+        s = subject.strip()
+        t = (obligation_type or "Kartkówka").strip()
+        dt = date_str.strip()
+        topics = scope.strip()
+
+        if t.lower() in ("zadanie domowe", "homework", "hw"):
+            title = topics if topics else f"Zadanie domowe: {s}"
+            res = homework_service.add_homework(subject=s, title=title, due_date=dt, priority=2, notes=topics)
+            if res and isinstance(res, dict) and res.get("id"):
+                sync_service.upsert_remote_item("homework_items", "id", {
+                    "id": res["id"],
+                    "subject": s,
+                    "title": title,
+                    "due_date": dt,
+                    "completed": False,
+                    "priority": 2,
+                    "notes": topics,
+                }, async_mode=True)
+            self._trigger_auto_sync()
+            return {"success": True, "type": "homework", "item": res}
+        else:
+            full_title = f"{t}: {topics}" if topics else t
+            res = homework_service.add_exam(subject=s, title=full_title, exam_date=dt, scope=topics)
+            if res and isinstance(res, dict) and res.get("id"):
+                sync_service.upsert_remote_item("school_exams", "id", {
+                    "id": res["id"],
+                    "subject": s,
+                    "title": full_title,
+                    "exam_date": dt,
+                    "scope": topics,
+                    "completed": False,
+                }, async_mode=True)
+            self._trigger_auto_sync()
+            return {"success": True, "type": "exam", "item": res}
+
 
     # --- Layer 1: TODAY ---
     def get_today(self, date_str: Optional[str] = None) -> Dict[str, Any]:

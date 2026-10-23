@@ -393,14 +393,14 @@ def get_workload_analysis(
             else:
                 tier_2_exams.append(e)
 
-    # 2. Fetch pending homework
+    # 2. Fetch pending homework (including overdue items that require triage)
     cursor.execute(
         """
         SELECT * FROM homework_items
-        WHERE completed = 0 AND due_date >= ? AND due_date <= ?
+        WHERE completed = 0 AND due_date <= ?
         ORDER BY due_date ASC
         """,
-        (target_dt.strftime("%Y-%m-%d"), hw_end_dt.strftime("%Y-%m-%d")),
+        (hw_end_dt.strftime("%Y-%m-%d"),),
     )
     homework = [dict(r) for r in cursor.fetchall()]
 
@@ -425,10 +425,79 @@ def get_workload_analysis(
             h["is_travel_excused"] = True
 
         if not h.get("is_travel_excused"):
-            if days_left == 1:
+            # Acute homework deliverables due <= 24h: includes overdue (days_left <= 0) and due tomorrow (days_left == 1)
+            if days_left <= 1:
                 urgent_homework.append(h)
             elif 2 <= days_left <= 5:
                 active_homework.append(h)
+
+    # Sort urgent homework so today's deliverables (days_left == 0) and essays are triaged first
+    urgent_homework.sort(key=lambda x: (
+        0 if x.get("days_left") == 0 and x.get("is_essay") else (
+            1 if x.get("days_left") == 0 else (
+                2 if x.get("is_essay") else (
+                    3 if x.get("days_left") == 1 else 4
+                )
+            )
+        ),
+        x.get("due_date", "")
+    ))
+
+    # 3. Check Ledger Tripwires: unexcused 'nb' marks, open 'np' tripwires, and failing marks <= 2.5
+    try:
+        cursor.execute("SELECT * FROM tum_grade_entries ORDER BY date ASC")
+        all_grades = [dict(r) for r in cursor.fetchall()]
+    except Exception:
+        all_grades = []
+
+    open_nb_marks = [
+        g for g in all_grades
+        if "nb" in (g.get("raw_input") or "").lower()
+        or "nb" in (g.get("category") or "").lower()
+        or "nieobecno" in (g.get("description") or "").lower()
+    ]
+
+    open_np_marks = [
+        g for g in all_grades
+        if "np" in (g.get("raw_input") or "").lower()
+        or "nieprzygotowanie" in (g.get("category") or "").lower()
+    ]
+
+    failing_marks = [
+        g for g in all_grades
+        if g.get("numeric_value") is not None and g["numeric_value"] <= 2.5
+    ]
+
+    # 4. Check Scheduled Retakes (poprawy)
+    try:
+        cursor.execute("SELECT * FROM school_exams WHERE completed = 0")
+        all_uncompleted_exams = [dict(r) for r in cursor.fetchall()]
+    except Exception:
+        all_uncompleted_exams = []
+
+    scheduled_poprawy = [
+        e for e in all_uncompleted_exams
+        if "popraw" in (e.get("title") or "").lower() or "popraw" in (e.get("scope") or "").lower()
+    ]
+
+    # --------------------------------------------------------------------------
+    # STATE MACHINE INVERSION: DEFENSE PROTOCOL IS THE PERSISTENT DEFAULT STATE.
+    # CRUISE PROTOCOL only unlocks if and only if ALL THREE conditions pass:
+    # 1. Active Homework Deliverables with due date <= 24h == 0.
+    # 2. Zero unexcused nb marks open on the current semester ledger.
+    # 3. No pending retakes (poprawy) scheduled for marks <= 3 (and zero open np tripwires).
+    # --------------------------------------------------------------------------
+    has_active_hw_le_24h = len(urgent_homework) > 0
+    has_open_nb = len(open_nb_marks) > 0
+    has_pending_retakes_or_tripwires = (len(scheduled_poprawy) > 0 or len(failing_marks) > 0 or len(open_np_marks) > 0)
+    has_acute_exams = len(immediate_exams) > 0
+
+    cruise_unlocked = (
+        not has_active_hw_le_24h
+        and not has_open_nb
+        and not has_pending_retakes_or_tripwires
+        and not has_acute_exams
+    )
 
     # Composite Workload score calculation:
     score = (len(tier_1_exams) * 2.5) + (len(tier_2_exams) * 1.0)
@@ -439,12 +508,12 @@ def get_workload_analysis(
             score += 1.5
     if len(week_exams) > 1:
         score += (len(week_exams) - 1) * 1.5
-    score += (len(urgent_homework) * 1.5)
+    score += (len(urgent_homework) * 2.0)
     for h in homework:
-        if h.get("is_essay") and 1 <= h.get("days_left", 99) <= 3 and not h.get("is_travel_excused"):
-            score += 2.0
-        elif h.get("is_vulnerable") and 1 <= h.get("days_left", 99) <= 3 and not h.get("is_travel_excused"):
-            score += 1.0
+        if h.get("is_essay") and h.get("days_left", 99) <= 2 and not h.get("is_travel_excused"):
+            score += 2.5
+        elif h.get("is_vulnerable") and h.get("days_left", 99) <= 2 and not h.get("is_travel_excused"):
+            score += 1.5
     score += (len(active_homework) * 0.5)
 
     if is_travel:
@@ -453,23 +522,41 @@ def get_workload_analysis(
         badge_class = "travel"
         desc = "Travel Mode Active (Oct 4–18). Warsaw Liceum timetable suspended. School surge frozen. 60m minimal maintenance study hour to keep pace with zero guilt. Enjoy your trip."
         score = 1.0
-    elif score <= 2.5:
-        mode = "CRUISE"
-        mode_label = "Cruise Mode • TUM Acceleration"
-        badge_class = "optimal"
-        desc = "Standard academic load. Maximum capacity allocated to raw LeetCode coding, Math R diagnostic mastery, and SIGG scanner."
-    elif score <= 6.0:
-        mode = "BALANCED"
-        mode_label = "Balanced Mode • Dual Track Focus"
-        badge_class = "lavender"
-        hw_info = f", {len(urgent_homework)} urgent hw" if urgent_homework else ""
-        desc = f"Moderate academic load ({len(tier_1_exams) + len(tier_2_exams)} exam(s){hw_info}). SGH library deep work calibrated between test prep and core TUM deliverables."
-    else:
+    elif score > 6.0:
         mode = "SURGE"
         mode_label = "Surge Protocol • High Academic Density"
         badge_class = "amber"
         hw_info = f", {len(urgent_homework)} urgent homework" if urgent_homework else ""
         desc = f"High academic load ({len(tier_1_exams) + len(tier_2_exams)} upcoming test(s){hw_info}). SGH deep work blocks dynamically re-routed to phased exam defense and submission clearance."
+    elif not cruise_unlocked:
+        mode = "DEFENSE"
+        mode_label = "Defense Protocol • School Triage"
+        badge_class = "surge"
+        triage_reasons = []
+        if has_active_hw_le_24h:
+            triage_reasons.append(f"{len(urgent_homework)} homework deliverable(s) due ≤24h")
+        if has_open_nb:
+            triage_reasons.append(f"{len(open_nb_marks)} unexcused nb mark(s)")
+        if scheduled_poprawy:
+            triage_reasons.append(f"{len(scheduled_poprawy)} scheduled retake(s)")
+        if failing_marks:
+            triage_reasons.append(f"{len(failing_marks)} failing mark(s) ≤2.5")
+        if open_np_marks:
+            triage_reasons.append(f"{len(open_np_marks)} open np tripwire(s)")
+        if has_acute_exams:
+            triage_reasons.append(f"{len(immediate_exams)} acute exam(s) in ≤2d")
+        reason_str = ", ".join(triage_reasons) if triage_reasons else "Active school defense commitments"
+        desc = f"DEFENSE PROTOCOL LOCKED: {reason_str}. Long-term aspirational work suspended until school triage is cleared."
+    elif score > 2.5:
+        mode = "BALANCED"
+        mode_label = "Balanced Mode • Dual Track Focus"
+        badge_class = "lavender"
+        desc = "Moderate academic load. All acute defense conditions cleared; balanced SGH deep work."
+    else:
+        mode = "CRUISE"
+        mode_label = "Cruise Mode • TUM Acceleration"
+        badge_class = "optimal"
+        desc = "CRUISE PROTOCOL UNLOCKED: 0 acute homework ≤24h, 0 open nb marks, 0 pending retakes. 100% capacity focused on TUM roadmap & Matura R."
 
     if close_conn:
         conn.close()
@@ -496,6 +583,13 @@ def get_workload_analysis(
         "urgent_homework_count": len(urgent_homework),
         "urgent_homework": urgent_homework,
         "active_homework": active_homework,
+        "open_nb_count": len(open_nb_marks),
+        "open_nb_marks": open_nb_marks,
+        "scheduled_poprawy_count": len(scheduled_poprawy),
+        "scheduled_poprawy": scheduled_poprawy,
+        "failing_marks_count": len(failing_marks),
+        "open_np_count": len(open_np_marks),
+        "cruise_unlocked": cruise_unlocked,
         "vulnerabilities": vulnerabilities,
         "is_us_travel_mode": is_travel,
     }
@@ -838,8 +932,8 @@ def synthesize_adaptive_schedule(
             p1, p2, p3 = compute_phase_durations(net_min, "acute_essay")
             b["focus"] = f"Deep Work • Essay Drafting: {top_essay['subject']}"
             b["activity"] = (
-                f"[Essay Defense // T-{top_essay.get('days_left', 1)}] {p1}m Thesis & Textual Evidence + "
-                f"{p2}m Full Drafting Sprint + {p3}m Polish & Formatting."
+                f"[Essay Defense // T-{top_essay.get('days_left', 1)}] Thesis & Textual Evidence + "
+                f"Full Drafting Sprint (400+ words) + Polish & Citation Check."
             )
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
@@ -849,9 +943,11 @@ def synthesize_adaptive_schedule(
                     "phase_num": 1,
                     "phase_key": "study_school",
                     "badge_label": "[1. THESIS & EVIDENCE]",
+                    "unit_target": "Outline + 3 Textual Citations",
+                    "proof_type": "paper_ink",
                     "duration_min": p1,
                     "title": f"{top_essay['subject']}: Thesis & Source Text Quotes",
-                    "description": f"{p1}m verify prompt criteria, structure central arguments, and extract quotes from source material ({top_essay['title']}).",
+                    "description": f"Verify prompt criteria, structure central arguments, and extract exact quotes from source material ({top_essay['title']}).",
                     "type": "school_defense",
                     "color": "var(--accent-lavender)",
                 },
@@ -859,9 +955,11 @@ def synthesize_adaptive_schedule(
                     "phase_num": 2,
                     "phase_key": "study_matura",
                     "badge_label": "[2. DRAFTING SPRINT]",
+                    "unit_target": "Complete 400+ Word Core Draft",
+                    "proof_type": "paper_ink",
                     "duration_min": p2,
                     "title": f"{top_essay['subject']}: Rapid Drafting & Body Arguments",
-                    "description": f"{p2}m continuous writing sprint for core body paragraphs, counter-arguments, and synthesis.",
+                    "description": "Continuous writing sprint for core body paragraphs, counter-arguments, and synthesis. Finite ink/doc deliverable.",
                     "type": "school_defense",
                     "color": "#0284c7",
                 },
@@ -869,9 +967,11 @@ def synthesize_adaptive_schedule(
                     "phase_num": 3,
                     "phase_key": "study_code",
                     "badge_label": "[3. FINAL POLISH & FORMAT]",
+                    "unit_target": "Final Submission Ready Document",
+                    "proof_type": "completed_artifact",
                     "duration_min": p3,
                     "title": f"{top_essay['subject']}: Stylistic Polish & Citation Check",
-                    "description": f"{p3}m sentence flow, vocabulary richness, punctuation audit, word count verification, and final submission readiness.",
+                    "description": "Sentence flow, vocabulary richness, punctuation audit, word count verification, and final submission readiness.",
                     "type": "school_defense",
                     "color": "#10b981",
                 },
@@ -884,8 +984,8 @@ def synthesize_adaptive_schedule(
             scope_str = top_exam.get("scope") or top_exam.get("title") or ""
             b["focus"] = f"Deep Work • {top_exam['subject']} Prep: Acute Defense"
             b["activity"] = (
-                f"[Acute Defense // T-{top_exam.get('days_left', 1)}] {p1}m {top_exam['subject']} Scope & Core Theory + "
-                f"{p2}m Problem Sets & Past Paper Drills + {p3}m Error Bank Blitz."
+                f"[Acute Defense // T-{top_exam.get('days_left', 1)}] {top_exam['subject']} Scope & Core Theory + "
+                f"6 Past Paper Problems + Error Bank Blitz."
             )
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
@@ -895,6 +995,8 @@ def synthesize_adaptive_schedule(
                     "phase_num": 1,
                     "phase_key": "study_school",
                     "badge_label": "[1. SCOPE & THEORY BLITZ]",
+                    "unit_target": "1 Condensed Formula/Concept Sheet",
+                    "proof_type": "paper_ink",
                     "duration_min": p1,
                     "title": f"{top_exam['subject']}: Core Theory, Definitions & Formulas",
                     "description": f"{p1}m active recall of {top_exam['subject']} concepts ({scope_str[:40]}). Formulate flashcards and synthesize cheat sheet.",
@@ -905,6 +1007,8 @@ def synthesize_adaptive_schedule(
                     "phase_num": 2,
                     "phase_key": "study_matura",
                     "badge_label": "[2. PROBLEM DRILLS & PAST PAPERS]",
+                    "unit_target": "6 Unassisted Problems (Self-Corrected)",
+                    "proof_type": "cke_tasks",
                     "duration_min": p2,
                     "title": f"{top_exam['subject']}: Past Papers & Timed Drills",
                     "description": f"{p2}m unassisted problem solving on {top_exam['subject']} ({top_exam.get('title')}). Red-pen verification and immediate mistake logging.",
@@ -915,6 +1019,8 @@ def synthesize_adaptive_schedule(
                     "phase_num": 3,
                     "phase_key": "study_code",
                     "badge_label": "[3. ERROR BANK & MOCK BLITZ]",
+                    "unit_target": "5 Edge Cases / Trap Cards Logged",
+                    "proof_type": "problem_count",
                     "duration_min": p3,
                     "title": f"{top_exam['subject']}: Error Bank & High-Yield Blitz",
                     "description": f"{p3}m rapid-fire drill of past mistakes, edge cases, and high-frequency exam traps before morning clearance.",
@@ -923,46 +1029,93 @@ def synthesize_adaptive_schedule(
                 },
             ]
 
-        # Scenario C: Urgent Homework Due Tomorrow (days_left == 1)
-        elif urgent_hw:
-            hw = urgent_hw[0]
+        # Scenario C: Defense Protocol Active OR Urgent Homework Due <= 24h
+        elif analysis.get("mode") == "DEFENSE" or urgent_hw:
             p1, p2, p3 = compute_phase_durations(net_min, "urgent_hw")
-            b["focus"] = f"Deep Work • Homework Clearance: {hw['subject']}"
+            primary_hw = urgent_hw[0] if urgent_hw else None
+            second_hw = urgent_hw[1] if len(urgent_hw) > 1 else None
+            open_nbs = analysis.get("open_nb_marks", [])
+            retakes = analysis.get("scheduled_poprawy", [])
+
+            b["focus"] = "Deep Work • School Defense Triage"
             b["activity"] = (
-                f"[Homework Sprint // T-1] {p1}m Complete {hw['title']} + "
-                f"{p2}m Solution Verification + {p3}m Next-Day Class Prep."
+                "[DEFENSE TRIAGE] Forceful assignment to school clearance: "
+                "acute homework due <= 24h, test retake problem sets, and open nb lab triage."
             )
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
             b["deliverable"] = None
+
+            # Phase 1: Primary Urgent Homework Deliverable
+            if primary_hw:
+                p1_title = f"{primary_hw['subject']}: Complete {primary_hw['title']}"
+                p1_desc = f"Resolve all required exercises for {primary_hw['title']}. Step-by-step documentation in ink on paper."
+                p1_unit = f"Complete {primary_hw['subject']} HW (Ink)"
+            else:
+                p1_title = "School Triage: Immediate Homework Clearance"
+                p1_desc = "Audit classroom agenda and complete all outstanding homework deliverables on paper."
+                p1_unit = "1 Complete HW Sheet (Ink)"
+
+            # Phase 2: Secondary Homework OR Retake Problem Sets
+            if second_hw:
+                p2_title = f"{second_hw['subject']}: Complete {second_hw['title']}"
+                p2_desc = f"Solve required problem set for {second_hw['title']}. Check answers against textbook/class notes."
+                p2_unit = f"Complete {second_hw['subject']} HW (Paper)"
+            elif retakes:
+                top_retake = retakes[0]
+                p2_title = f"Exam Retake Defense: {top_retake['subject']} ({top_retake['title']})"
+                p2_desc = f"Solve and self-correct 4 practice problems targeting failed exam topics ({top_retake.get('scope', '')[:35]})."
+                p2_unit = "4 Retake Problems (Self-Corrected)"
+            else:
+                p2_title = "Vulnerability Defense: Re-solving Failed Test Problems"
+                p2_desc = "Re-solve 4 problems from past low kartkówka / sprawdzian marks (History / CS / Geography) with red-pen self-correction."
+                p2_unit = "4 Past Problems (Self-Corrected)"
+
+            # Phase 3: Open nb Absence Clearance OR Next-Day Prep
+            if open_nbs:
+                top_nb = open_nbs[0]
+                p3_title = f"Clear Open Absence (nb): {top_nb.get('subject', 'School')} ({top_nb.get('description', '')[:30]})"
+                p3_desc = "Complete missed class lab exercise or synthesize 1 page of lesson notes to clear open unexcused nb mark."
+                p3_unit = "1 Lab Script / Class Notes Sheet"
+            else:
+                p3_title = "Next-Day Syllabus & Questioning Buffer"
+                p3_desc = "Preview tomorrow's syllabus topics so you are never caught unprepared during active classroom questioning."
+                p3_unit = "Tomorrow's Lesson Preview Notes"
+
             b["plan_phases"] = [
                 {
                     "phase_num": 1,
                     "phase_key": "study_school",
-                    "badge_label": "[1. HOMEWORK COMPLETION]",
+                    "badge_label": "[1. HOMEWORK PROOF OF WORK]",
+                    "unit_target": p1_unit,
+                    "proof_type": "paper_ink",
                     "duration_min": p1,
-                    "title": f"{hw['subject']}: Complete Assignment Requirements",
-                    "description": f"{p1}m resolve all required problems for {hw['title']}. Step-by-step documentation.",
+                    "title": p1_title,
+                    "description": p1_desc,
                     "type": "school_defense",
                     "color": "var(--accent-lavender)",
                 },
                 {
                     "phase_num": 2,
                     "phase_key": "study_matura",
-                    "badge_label": "[2. VERIFICATION & EXTENSION]",
+                    "badge_label": "[2. RETAKE / DEFICIT DRILL]",
+                    "unit_target": p2_unit,
+                    "proof_type": "problem_count",
                     "duration_min": p2,
-                    "title": f"{hw['subject']}: Verify Solutions & Edge Cases",
-                    "description": f"{p2}m verify all calculation steps, check against answer keys or reference standards, and resolve adjacent problems.",
+                    "title": p2_title,
+                    "description": p2_desc,
                     "type": "school_defense",
                     "color": "#0284c7",
                 },
                 {
                     "phase_num": 3,
                     "phase_key": "study_code",
-                    "badge_label": "[3. NEXT-DAY CLASS PREP]",
+                    "badge_label": "[3. NB / CLASS PREP]",
+                    "unit_target": p3_unit,
+                    "proof_type": "completed_artifact",
                     "duration_min": p3,
-                    "title": "Next-Day Academic Buffer",
-                    "description": f"{p3}m preview tomorrow's syllabus topics so you are never caught unprepared during active classroom questioning.",
+                    "title": p3_title,
+                    "description": p3_desc,
                     "type": "school_defense",
                     "color": "#10b981",
                 },
@@ -974,7 +1127,7 @@ def synthesize_adaptive_schedule(
             b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']}"
             b["activity"] = (
                 f"[TUM Victory Sprint // {active_station_id}] Morning examination cleared. "
-                f"{p1}m {deliv_spec['target_spec']} + {p2}m Matura R problem sets + {p3}m German vocabulary buffer."
+                f"1 TUM Milestone Rep + 4 CKE Matura R Tasks + 20 German A2 Vocab Units."
             )
             b["is_school_dedicated"] = False
             b["is_tum_roadmap"] = True
@@ -983,30 +1136,36 @@ def synthesize_adaptive_schedule(
                 {
                     "phase_num": 1,
                     "phase_key": "study_school",
-                    "badge_label": "[1. TUM ROADMAP SPRINT]",
+                    "badge_label": "[1. TUM ROADMAP • REPS]",
+                    "unit_target": "1 Milestone Rep (Unassisted)",
+                    "proof_type": "code_or_math",
                     "duration_min": p1,
                     "title": f"TUM Roadmap: {deliv_spec['title']}",
-                    "description": f"{p1}m {deliv_spec['target_spec']}.\nMorning test cleared! Full momentum on TUM Heilbronn track.",
+                    "description": f"{deliv_spec['target_spec']}.\nMorning test cleared! Full momentum on TUM Heilbronn track.",
                     "type": "tum_deliverable",
                     "color": "var(--accent-lavender)",
                 },
                 {
                     "phase_num": 2,
                     "phase_key": "study_matura",
-                    "badge_label": "[2. MATURA R PROBLEM SETS]",
+                    "badge_label": "[2. MATURA R • PROBLEM COUNT]",
+                    "unit_target": "4 CKE Exam Tasks (Self-Corrected)",
+                    "proof_type": "cke_tasks",
                     "duration_min": p2,
                     "title": "Matura R Mathematics: Analytical & Advanced Proofs",
-                    "description": f"{p2}m unassisted Matura R problem sets (CKE/Operon). Traced on paper, red-pen self-correction.",
+                    "description": "Complete and self-correct 4 CKE tasks (2023 May exam). Traced on paper, red-pen self-correction.",
                     "type": "matura_r",
                     "color": "#0284c7",
                 },
                 {
                     "phase_num": 3,
                     "phase_key": "study_code",
-                    "badge_label": "[3. GERMAN A2 VOCABULARY]",
+                    "badge_label": "[3. GERMAN / LEETCODE • UNIT COUNT]",
+                    "unit_target": "20 Vocab Cards or 1 LeetCode Commit",
+                    "proof_type": "vocab_or_git",
                     "duration_min": p3,
-                    "title": "German A2 (Nicos Weg) & LeetCode Recall",
-                    "description": f"{p3}m active recall of German A2 vocabulary, grammar structures, and algorithmic complexity review.",
+                    "title": "German A2 (Nicos Weg) & Algorithmic Recall",
+                    "description": "Master 20 German A2 vocabulary cards (Nicos Weg) or commit 1 clean algorithm solution to Git.",
                     "type": "german_code",
                     "color": "#10b981",
                 },
@@ -1019,8 +1178,8 @@ def synthesize_adaptive_schedule(
             scope_info = f" ({e['scope'][:40]})" if e.get("scope") else ""
             b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']} & {e['subject']} Foundation"
             b["activity"] = (
-                f"[TUM Roadmap & Foundation // {active_station_id}] {p1}m {e['subject']} Scope Mapping + "
-                f"{p2}m Formulas/Theorems + {p3}m {deliv_spec['target_spec']}."
+                f"[TUM Roadmap & Foundation // {active_station_id}] 1 Formula Sheet + "
+                f"4 Theorem Proofs + {deliv_spec['target_spec']}."
             )
             b["is_school_dedicated"] = False
             b["is_tum_roadmap"] = True
@@ -1030,9 +1189,11 @@ def synthesize_adaptive_schedule(
                     "phase_num": 1,
                     "phase_key": "study_school",
                     "badge_label": "[1. EXAM SCOPE MAPPING]",
+                    "unit_target": "1 Concept & Scope Map",
+                    "proof_type": "paper_ink",
                     "duration_min": p1,
                     "title": f"{e['subject']} (in {e['days_left']}d): Scope & Core Definitions",
-                    "description": f"{p1}m structured mapping of {e['subject']} exam material{scope_info}. Formulate flashcards.",
+                    "description": f"Structured mapping of {e['subject']} exam material{scope_info}. Formulate flashcards.",
                     "type": "school_defense",
                     "color": "var(--accent-lavender)",
                 },
@@ -1040,9 +1201,11 @@ def synthesize_adaptive_schedule(
                     "phase_num": 2,
                     "phase_key": "study_matura",
                     "badge_label": "[2. THEOREM & FORMULA DRILL]",
+                    "unit_target": "4 Foundational Proofs",
+                    "proof_type": "problem_count",
                     "duration_min": p2,
                     "title": f"{e['subject']}: Key Formula Drills & Foundational Proofs",
-                    "description": f"{p2}m active recall of required formulas, reaction mechanisms, or physics laws with foundational exercises.",
+                    "description": "Active recall of required formulas, reaction mechanisms, or physics laws with foundational exercises.",
                     "type": "school_defense",
                     "color": "#0284c7",
                 },
@@ -1050,9 +1213,11 @@ def synthesize_adaptive_schedule(
                     "phase_num": 3,
                     "phase_key": "study_code",
                     "badge_label": "[3. TUM ROADMAP SPRINT]",
+                    "unit_target": "1 Station Rep",
+                    "proof_type": "code_or_math",
                     "duration_min": p3,
                     "title": f"TUM Roadmap: {deliv_spec['title']}",
-                    "description": f"{p3}m {deliv_spec['target_spec']}.\nMilestone: {deliv_spec['category']} • Station {active_station_id}.",
+                    "description": f"{deliv_spec['target_spec']}.\nMilestone: {deliv_spec['category']} • Station {active_station_id}.",
                     "type": "tum_deliverable",
                     "color": "#10b981",
                 },
@@ -1063,8 +1228,8 @@ def synthesize_adaptive_schedule(
             p1, p2, p3 = compute_phase_durations(net_min, "pure_tum")
             b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']}"
             b["activity"] = (
-                f"[TUM Metro Pipeline // {active_station_id}] {p1}m {deliv_spec['target_spec']} + "
-                f"{p2}m Matura R Problem Sets + {p3}m German A2 Vocabulary."
+                f"[TUM Metro Pipeline // {active_station_id}] 1 Milestone Rep + "
+                f"4 CKE Tasks (2023 May) + 20 German A2 Vocab Units."
             )
             b["is_school_dedicated"] = False
             b["is_tum_roadmap"] = True
@@ -1073,30 +1238,36 @@ def synthesize_adaptive_schedule(
                 {
                     "phase_num": 1,
                     "phase_key": "study_school",
-                    "badge_label": "[1. TUM ROADMAP SPRINT]",
+                    "badge_label": "[1. TUM ROADMAP • REPS]",
+                    "unit_target": "1 Milestone Rep (Unassisted)",
+                    "proof_type": "code_or_math",
                     "duration_min": p1,
                     "title": f"TUM Roadmap: {deliv_spec['title']}",
-                    "description": f"{p1}m {deliv_spec['target_spec']}.\nCurrent Deliverable: {deliv_spec['category']} • Station {active_station_id}.",
+                    "description": f"{deliv_spec['target_spec']}.\nCurrent Deliverable: {deliv_spec['category']} • Station {active_station_id}.",
                     "type": "tum_deliverable",
                     "color": "var(--accent-lavender)",
                 },
                 {
                     "phase_num": 2,
                     "phase_key": "study_matura",
-                    "badge_label": "[2. MATURA R PROBLEM SETS]",
+                    "badge_label": "[2. MATURA R • PROBLEM COUNT]",
+                    "unit_target": "4 CKE Exam Tasks (Self-Corrected)",
+                    "proof_type": "cke_tasks",
                     "duration_min": p2,
                     "title": "Matura R Mathematics: Analytical & Advanced Proofs",
-                    "description": f"{p2}m unassisted Matura R problem sets (CKE/Operon). Traced on paper, red-pen self-correction.",
+                    "description": "Complete and self-correct 4 CKE tasks (2023 May exam). Traced on paper, red-pen self-correction.",
                     "type": "matura_r",
                     "color": "#0284c7",
                 },
                 {
                     "phase_num": 3,
                     "phase_key": "study_code",
-                    "badge_label": "[3. GERMAN A2 VOCABULARY]",
+                    "badge_label": "[3. GERMAN / LEETCODE • UNIT COUNT]",
+                    "unit_target": "20 Vocab Cards or 1 LeetCode Commit",
+                    "proof_type": "vocab_or_git",
                     "duration_min": p3,
-                    "title": "German A2 (Nicos Weg) & LeetCode Recall",
-                    "description": f"{p3}m active recall of German A2 vocabulary, grammar structures, and algorithmic complexity review.",
+                    "title": "German A2 (Nicos Weg) & Algorithmic Recall",
+                    "description": "Master 20 German A2 vocabulary cards (Nicos Weg) or commit 1 clean algorithm solution to Git.",
                     "type": "german_code",
                     "color": "#10b981",
                 },

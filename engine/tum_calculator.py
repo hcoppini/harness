@@ -55,12 +55,14 @@ def calculate_tum_aptitude_score(
     total_score = round(0.65 * pts_gpa + 0.35 * subject_score, 1)
 
     target_direct = 88.0
-    target_interview = 70.0
+    target_interview = 67.0
     target_german_gpa = 1.36
 
     points_to_direct = max(0.0, round(target_direct - total_score, 1))
     points_to_interview = max(0.0, round(target_interview - total_score, 1))
     gpa_gap = round(g_gpa - target_german_gpa, 2)
+
+    is_rejection_breached = total_score < target_interview
 
     if total_score >= target_direct:
         verdict = "DIRECT ADMISSION SAFE (Level 1)"
@@ -71,9 +73,9 @@ def calculate_tum_aptitude_score(
         status_level = "interview"
         distance_summary = f"{points_to_direct} pts to Direct Admission (88.0)"
     else:
-        verdict = "DEFICIT: MATH/CS RECOVERY NEEDED"
-        status_level = "deficit"
-        distance_summary = f"{points_to_direct} pts to Direct Admission | {points_to_interview} pts to Interview"
+        verdict = "REJECTION THRESHOLD BREACHED: INFORMATYKA / MATEMATYKA DEFICIT"
+        status_level = "rejection"
+        distance_summary = f"{points_to_interview} pts below Stage 2 Cutoff (67.0) | REJECTION ZONE"
 
     # Identify primary drags on score
     subject_drags = []
@@ -119,6 +121,7 @@ def calculate_tum_aptitude_score(
         "points_to_interview": points_to_interview,
         "distance_summary": distance_summary,
         "status_level": status_level,
+        "is_rejection_breached": is_rejection_breached,
         "primary_action": primary_action,
         "subject_drags": subject_drags,
         "verdict": verdict,

@@ -56,6 +56,13 @@
         <span id="themeToggleIcon">🌙</span>
         <span id="themeToggleText">DARK</span>
       </button>
+      <button id="vulcanAlarmBadge" class="vulcan-alarm-badge" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--color-red); color: var(--color-red); border-radius: 6px; padding: 4px 8px; font-size: 10px; font-weight: 700; font-family: var(--font-mono); cursor: pointer; align-items: center; gap: 6px;" title="Vulcan Session Expired. Click to re-authenticate or log tests manually." onclick="window.Today && window.Today.openVulcanConfig ? window.Today.openVulcanConfig() : window.HarnessApp.openQuickTestModal();">
+        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-red); animation: pulse 1.5s infinite;"></span>
+        <span>API DISCONNECTED: MANUAL ENTRY REQUIRED</span>
+      </button>
+      <button id="btnOpenQuickTest" class="btn-ghost-icon" onclick="window.HarnessApp.openQuickTestModal()" title="Quick Log Verbal Test / Obligation (Hotkeys: N or +)" style="font-weight: 700; color: var(--accent-lavender); border: 1px solid var(--border-medium); padding: 4px 8px; font-size: 11px;">
+        <span>+ Test (N)</span>
+      </button>
       <button id="syncStatusBadge" class="sync-badge" title="Click to sync Laptop and PC">
         <span class="sync-dot" id="syncDot"></span>
         <span class="sync-text" id="syncStatusText">Synced</span>
@@ -83,6 +90,10 @@
           <p class="section-caption">High-signal trajectory: daily execution velocity, school defense balance, and TUM Heilbronn readiness.</p>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
+          <button type="button" class="btn-primary" onclick="window.HarnessApp.openQuickTestModal()" style="font-size: 11px; font-weight: 700; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;" title="Quick Log Verbal Test / Obligation (Hotkeys: N or +)">
+            <span>+ Quick Test / HW</span>
+            <span class="key-pill" style="font-size: 9px; padding: 1px 4px; background: rgba(0,0,0,0.2);">N</span>
+          </button>
           <div class="mono-chip" id="dashboardStreakPill" title="Consecutive execution streak" style="padding: 4px 8px;">
             <span id="streakCountVal">0</span>d streak
           </div>
@@ -1826,6 +1837,66 @@
           </button>
         </div>
       </div>
+    </div>
+  <!-- Quick-Add Verbal Test / Kartkówka / HW Modal (N or +) -->
+  <div id="quickTestModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 480px; width: 90%;">
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+        <div>
+          <h2 style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin: 0;">Quick Log Verbal Obligation</h2>
+          <p style="font-size: 11px; color: var(--text-tertiary); margin: 2px 0 0 0;">Log a verbal test, kartkówka, or homework in 3 seconds directly from Cockpit.</p>
+        </div>
+        <button type="button" class="btn-ghost-icon" onclick="window.HarnessApp.closeQuickTestModal()" style="font-size: 18px; line-height: 1; padding: 2px 6px;">&times;</button>
+      </div>
+
+      <form id="quickTestForm" onsubmit="event.preventDefault(); window.HarnessApp.submitQuickTest();">
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Subject</label>
+            <select id="quickTestSubject" class="theme-select" style="width: 100%; padding: 8px 10px; font-size: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-medium); background: var(--bg-card); color: var(--text-primary);" required>
+              <option value="Matematyka">Matematyka</option>
+              <option value="Informatyka">Informatyka</option>
+              <option value="Fizyka">Fizyka</option>
+              <option value="Język polski">Język polski</option>
+              <option value="Język angielski">Język angielski</option>
+              <option value="Historia">Historia</option>
+              <option value="Geografia">Geografia</option>
+              <option value="Biologia / Chemia">Biologia / Chemia</option>
+              <option value="Język niemiecki">Język niemiecki</option>
+            </select>
+          </div>
+          <div>
+            <label style="display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Type</label>
+            <select id="quickTestType" class="theme-select" style="width: 100%; padding: 8px 10px; font-size: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-medium); background: var(--bg-card); color: var(--text-primary);" required>
+              <option value="Kartkówka">Kartkówka (Quiz)</option>
+              <option value="Sprawdzian">Sprawdzian (Major Exam)</option>
+              <option value="Poprawa">Poprawa (Retake)</option>
+              <option value="Zadanie domowe">Zadanie domowe (Homework)</option>
+            </select>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 10px;">
+          <label style="display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Date / Deadline</label>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <input type="date" id="quickTestDate" class="theme-input" style="flex: 1; padding: 7px 10px; font-size: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-medium); background: var(--bg-card); color: var(--text-primary);" required />
+            <button type="button" class="btn-subtle" onclick="window.HarnessApp.setQuickTestDateOffset(0)" style="font-size: 10px; padding: 6px 8px;">Today</button>
+            <button type="button" class="btn-subtle" onclick="window.HarnessApp.setQuickTestDateOffset(1)" style="font-size: 10px; padding: 6px 8px;">T+1</button>
+            <button type="button" class="btn-subtle" onclick="window.HarnessApp.setQuickTestDateOffset(2)" style="font-size: 10px; padding: 6px 8px;">T+2</button>
+            <button type="button" class="btn-subtle" onclick="window.HarnessApp.setQuickTestDateOffset(7)" style="font-size: 10px; padding: 6px 8px;">+7d</button>
+          </div>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <label style="display: block; font-size: 11px; font-weight: 600; color: var(--text-secondary); margin-bottom: 4px;">Topics / Scope / Exercises</label>
+          <input type="text" id="quickTestTopics" class="theme-input" placeholder="e.g. Zad. 5.33-5.38, Wzory redukcyjne, or Rozprawka Soplica" style="width: 100%; padding: 8px 10px; font-size: 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-medium); background: var(--bg-card); color: var(--text-primary);" autofocus required />
+        </div>
+
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn-subtle" onclick="window.HarnessApp.closeQuickTestModal()" style="font-size: 11px; padding: 6px 14px;">Cancel (Esc)</button>
+          <button type="submit" id="btnSubmitQuickTest" class="btn-primary" style="font-size: 11px; padding: 6px 16px; font-weight: 700;">Save Obligation (↵)</button>
+        </div>
+      </form>
     </div>
   </div>
 

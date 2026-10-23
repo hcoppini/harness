@@ -264,11 +264,9 @@ window.HarnessApp = {
         this.switchView("dashboard");
       }
 
-      if (e.key === "n" || e.key === "N") {
+      if (e.key === "n" || e.key === "N" || e.key === "+") {
         e.preventDefault();
-        this.switchView("today");
-        const quickInput = document.getElementById("quickTaskInput");
-        if (quickInput) quickInput.focus();
+        this.openQuickTestModal();
       }
 
       if (e.key === "r" || e.key === "R") {
@@ -285,6 +283,72 @@ window.HarnessApp = {
         this.closeAllModals();
       }
     });
+  },
+
+  openQuickTestModal() {
+    const modal = document.getElementById("quickTestModal");
+    if (!modal) return;
+    modal.classList.add("open");
+    const dateInput = document.getElementById("quickTestDate");
+    if (dateInput && !dateInput.value) {
+      const d = new Date();
+      d.setDate(d.getDate() + 1);
+      dateInput.value = d.toISOString().slice(0, 10);
+    }
+    const topicsInput = document.getElementById("quickTestTopics");
+    if (topicsInput) {
+      topicsInput.value = "";
+      setTimeout(() => topicsInput.focus(), 60);
+    }
+  },
+
+  closeQuickTestModal() {
+    const modal = document.getElementById("quickTestModal");
+    if (modal) modal.classList.remove("open");
+  },
+
+  setQuickTestDateOffset(days = 0) {
+    const dateInput = document.getElementById("quickTestDate");
+    if (!dateInput) return;
+    const d = new Date();
+    d.setDate(d.getDate() + days);
+    dateInput.value = d.toISOString().slice(0, 10);
+  },
+
+  async submitQuickTest() {
+    const subjEl = document.getElementById("quickTestSubject");
+    const typeEl = document.getElementById("quickTestType");
+    const dateEl = document.getElementById("quickTestDate");
+    const topicsEl = document.getElementById("quickTestTopics");
+
+    if (!subjEl || !typeEl || !dateEl || !topicsEl) return;
+    const subject = subjEl.value.trim();
+    const type = typeEl.value.trim();
+    const dateStr = dateEl.value.trim();
+    const topics = topicsEl.value.trim();
+
+    if (!subject || !dateStr || !topics) {
+      this.showToast("Please enter subject, date, and topics.");
+      return;
+    }
+
+    try {
+      if (window.pywebview && window.pywebview.api) {
+        const method = window.pywebview.api.quick_add_verbal_obligation || window.pywebview.api.add_exam;
+        await method(subject, type, dateStr, topics);
+        this.showToast(`Logged ${type}: ${subject}!`);
+        this.closeQuickTestModal();
+
+        // Immediately refresh active views
+        if (window.Dashboard && typeof window.Dashboard.load === "function") window.Dashboard.load();
+        if (window.Today && typeof window.Today.load === "function") window.Today.load();
+        if (window.Today && typeof window.Today.loadHomeworkAndExams === "function") window.Today.loadHomeworkAndExams();
+        if (window.KillListDrawer && typeof window.KillListDrawer.load === "function") window.KillListDrawer.load();
+      }
+    } catch (err) {
+      console.error("Error logging quick obligation:", err);
+      this.showToast("Failed to log obligation: " + (err.message || err));
+    }
   },
 
   closeAllModals() {
@@ -692,11 +756,42 @@ window.HarnessApp = {
           if ((curStatus.has_key || curStatus.has_web_url || curStatus.local_detected_url) && curStatus.auto_sync) {
             await this.triggerSync(true);
           }
+          await this.checkVulcanStatus();
         }
       }, 30 * 1000);
+
+      // Check Vulcan session status on init
+      setTimeout(() => this.checkVulcanStatus(), 500);
     } catch (e) {
       console.warn("[Sync] Init failed:", e);
       this.updateSyncBadge("offline");
+    }
+  },
+
+  setVulcanAlarm(show, message = "API DISCONNECTED: MANUAL ENTRY REQUIRED") {
+    const badge = document.getElementById("vulcanAlarmBadge");
+    if (!badge) return;
+    if (show) {
+      badge.style.display = "inline-flex";
+      const textSpan = badge.querySelector("span:last-child");
+      if (textSpan) textSpan.textContent = message;
+      badge.title = `${message} (Click to re-authenticate or log tests manually)`;
+    } else {
+      badge.style.display = "none";
+    }
+  },
+
+  async checkVulcanStatus() {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_vulcan_status) return;
+    try {
+      const status = await window.pywebview.api.get_vulcan_status();
+      if (status && (status.session_expired || status.status === "token_expired")) {
+        this.setVulcanAlarm(true, status.alarm_message || "API DISCONNECTED: MANUAL ENTRY REQUIRED");
+      } else {
+        this.setVulcanAlarm(false);
+      }
+    } catch (e) {
+      console.warn("Could not check Vulcan alarm status:", e);
     }
   },
 
@@ -732,7 +827,15 @@ window.HarnessApp = {
     this.updateSyncBadge("syncing");
 
     try {
-      const res = await window.pywebview.api.sync_now();
+      // 10-second timeout guard to prevent infinite "Syncing..." hang
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("Sync timed out (10s)")), 10000)
+      );
+      const res = await Promise.race([
+        window.pywebview.api.sync_now(),
+        timeoutPromise,
+      ]);
+
       if (res.status === "synced") {
         this.updateSyncBadge("synced");
         if (!isBackground) {

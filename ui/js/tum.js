@@ -356,18 +356,18 @@ const Tum = {
     const subjectScore = (ptsMath * 2 + ptsCs * 2 + ptsLang * 1) / 5.0;
     const totalScore = Math.round((0.65 * ptsGpa + 0.35 * subjectScore) * 10) / 10;
 
-    let verdict = "DEFICIT: MATH/CS RECOVERY NEEDED";
-    let statusLevel = "deficit";
+    let verdict = "REJECTION THRESHOLD BREACHED: INFORMATYKA / MATEMATYKA DEFICIT";
+    let statusLevel = "rejection";
     if (totalScore >= 88.0) {
       verdict = "DIRECT ADMISSION SAFE (Level 1)";
       statusLevel = "safe";
-    } else if (totalScore >= 70.0) {
+    } else if (totalScore >= 67.0) {
       verdict = "INTERVIEW THRESHOLD (Level 2)";
       statusLevel = "interview";
     }
 
     const pointsToDirect = Math.max(0, Math.round((88.0 - totalScore) * 10) / 10);
-    const pointsToInterview = Math.max(0, Math.round((70.0 - totalScore) * 10) / 10);
+    const pointsToInterview = Math.max(0, Math.round((67.0 - totalScore) * 10) / 10);
 
     // Identify drag factors
     const subjectDrags = [];
@@ -461,8 +461,8 @@ const Tum = {
       let vColor = "var(--color-amber-light)";
       if (calc.total_tum_points >= 88.0) {
         vColor = "var(--color-green-light)";
-      } else if (calc.total_tum_points < 70.0) {
-        vColor = "var(--color-red-light)";
+      } else if (calc.total_tum_points < 67.0) {
+        vColor = "var(--color-red)";
       }
       verdictEl.innerHTML = `<span style="color: ${vColor}; font-size: 11px; font-weight: 700;">${calc.verdict}</span>`;
     }
@@ -470,10 +470,10 @@ const Tum = {
     if (badgeEl) {
       if (calc.total_tum_points >= 88.0) {
         badgeEl.innerHTML = `<span class="verdict-badge safe">Direct Admission Safe (Level 1)</span>`;
-      } else if (calc.total_tum_points >= 70.0) {
+      } else if (calc.total_tum_points >= 67.0) {
         badgeEl.innerHTML = `<span class="verdict-badge interview">Interview Threshold (Level 2)</span>`;
       } else {
-        badgeEl.innerHTML = `<span class="verdict-badge risk">Deficit: Math/CS Recovery Needed</span>`;
+        badgeEl.innerHTML = `<span class="verdict-badge risk" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4); font-weight: 700;">REJECTION THRESHOLD BREACHED (&lt; 67.0)</span>`;
       }
     }
 
@@ -484,10 +484,10 @@ const Tum = {
       if (calc.total_tum_points >= 88.0) {
         const excess = (calc.total_tum_points - 88.0).toFixed(1);
         distSummaryEl.innerHTML = `<span style="color: var(--color-green-light); font-weight: 700;">+${excess} pts above Direct Admission threshold</span>`;
-      } else if (calc.total_tum_points >= 70.0) {
+      } else if (calc.total_tum_points >= 67.0) {
         distSummaryEl.innerHTML = `<span style="color: var(--color-amber-light); font-weight: 700;">${calc.points_to_direct.toFixed(1)} pts needed for Direct Admission (88.0)</span>`;
       } else {
-        distSummaryEl.innerHTML = `<span style="color: var(--color-red-light); font-weight: 700;">${calc.points_to_direct.toFixed(1)} pts to Direct | ${calc.points_to_interview.toFixed(1)} pts to Interview</span>`;
+        distSummaryEl.innerHTML = `<span style="color: var(--color-red); font-weight: 700;">🚨 REJECTION THRESHOLD BREACHED: ${calc.points_to_interview.toFixed(1)} pts below Stage 2 Cutoff (67.0)</span>`;
       }
     }
     if (distActionEl) {

@@ -1875,6 +1875,50 @@
             };
           }
 
+          if (prop === "quick_add_verbal_obligation") {
+            return async function (subject, obligationType, dateStr, scope = "") {
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("quick_add_verbal_obligation", [subject, obligationType, dateStr, scope]);
+              } catch (e) {
+                console.warn("[Harness Bridge] quick_add_verbal_obligation RPC notice:", e);
+              }
+
+              const isHw = (obligationType || "").toLowerCase().includes("zadanie") || (obligationType || "").toLowerCase().includes("hw");
+              if (isHw) {
+                const newHw = {
+                  id: (serverRes && serverRes.item && serverRes.item.id) || Date.now(),
+                  subject,
+                  title: scope || `Zadanie domowe: ${subject}`,
+                  due_date: dateStr,
+                  completed: false,
+                  priority: 2,
+                  notes: scope,
+                };
+                supabaseRequest("homework_items", "POST", newHw).catch(() => {});
+                const localHw = getStore(STORAGE_KEYS.HOMEWORK, []);
+                localHw.push(newHw);
+                setStore(STORAGE_KEYS.HOMEWORK, localHw);
+                return serverRes || { success: true, type: "homework", item: newHw };
+              } else {
+                const fullTitle = scope ? `${obligationType}: ${scope}` : obligationType;
+                const newExam = {
+                  id: (serverRes && serverRes.item && serverRes.item.id) || Date.now(),
+                  subject,
+                  title: fullTitle,
+                  exam_date: dateStr,
+                  scope,
+                  completed: false,
+                };
+                supabaseRequest("school_exams", "POST", newExam).catch(() => {});
+                const localExams = getStore(STORAGE_KEYS.EXAMS, []);
+                localExams.push(newExam);
+                setStore(STORAGE_KEYS.EXAMS, localExams);
+                return serverRes || { success: true, type: "exam", item: newExam };
+              }
+            };
+          }
+
           if (prop === "add_grade_entry") {
             return async function (subject, semester, raw_input, weight = 1.0, category = "Grade", description = "", date_str = null) {
               let serverRes = null;

@@ -313,7 +313,22 @@ def make_hebe_request(
                         status = data.get("Status", {})
                         if status.get("Code", 0) == 0:
                             return data.get("Envelope")
+                        if status.get("Code", 0) in (100, 101, 102, 108):
+                            # Token invalid / expired reported in Vulcan status
+                            cfg = get_vulcan_config()
+                            cfg["session_expired"] = True
+                            cfg["last_error"] = "API DISCONNECTED: MANUAL ENTRY REQUIRED"
+                            save_vulcan_config(cfg)
+                            return {"error": "token_expired", "code": 401}
                     return data
+        except urllib.error.HTTPError as he:
+            if he.code in (401, 403):
+                cfg = get_vulcan_config()
+                cfg["session_expired"] = True
+                cfg["last_error"] = "API DISCONNECTED: MANUAL ENTRY REQUIRED"
+                save_vulcan_config(cfg)
+                return {"error": "token_expired", "code": he.code}
+            continue
         except Exception:
             continue
     return None
@@ -454,15 +469,20 @@ def get_vulcan_status() -> Dict[str, Any]:
     """Returns the current connection status, mode, and student metadata."""
     cfg = get_vulcan_config()
     is_live = not cfg.get("demo_mode", True) and cfg.get("registered_device") is not None
+    is_expired = bool(cfg.get("session_expired", False))
     reg = cfg.get("registered_device") or {}
     return {
-        "is_connected": is_live,
-        "mode": "live" if is_live else "demo_tm1",
+        "is_connected": is_live and not is_expired,
+        "session_expired": is_expired,
+        "mode": "live_expired" if is_expired else ("live" if is_live else "demo_tm1"),
+        "status": "token_expired" if is_expired else ("connected" if is_live else "simulator"),
+        "alarm_message": "API DISCONNECTED: MANUAL ENTRY REQUIRED" if is_expired else "",
         "student_name": cfg.get("student_name", "Janek Smagieł" if not is_live else "Student"),
         "student_symbol": cfg.get("student_symbol", "Warszawa"),
         "last_synced_at": cfg.get("last_synced_at"),
         "has_token": bool(cfg.get("token")),
         "school_name": reg.get("school_name", "TM1 Mechatroniczne" if not is_live else ""),
+        "last_error": cfg.get("last_error", ""),
     }
 
 
@@ -472,6 +492,8 @@ def disconnect_vulcan() -> bool:
     cfg["demo_mode"] = True
     cfg["registered_device"] = None
     cfg["token"] = ""
+    cfg["session_expired"] = False
+    cfg["last_error"] = ""
     return save_vulcan_config(cfg)
 
 
@@ -746,16 +768,38 @@ def sync_vulcan_data(
         except Exception:
             payload = None
 
+    if is_live and (cfg.get("session_expired") or (isinstance(payload, dict) and payload.get("error") == "token_expired")):
+        cfg["session_expired"] = True
+        cfg["last_error"] = "API DISCONNECTED: MANUAL ENTRY REQUIRED"
+        save_vulcan_config(cfg)
+        return {
+            "status": "token_expired",
+            "message": "API DISCONNECTED: MANUAL ENTRY REQUIRED",
+            "error": "API DISCONNECTED: MANUAL ENTRY REQUIRED",
+            "alarm_message": "API DISCONNECTED: MANUAL ENTRY REQUIRED",
+            "exams_synced": 0,
+            "homework_synced": 0,
+            "grades_synced": 0,
+            "mode": "live_expired",
+            "timestamp": datetime.now().isoformat(),
+        }
+
     if is_live and payload is None:
         return {
             "status": "offline",
-            "message": "Live Vulcan fetch unreachable or timed out. Retaining existing cached school data.",
+            "message": "Live Vulcan fetch inactive or offline. Retaining existing cached school data.",
             "exams_synced": 0,
             "homework_synced": 0,
             "grades_synced": 0,
             "mode": "live_offline",
             "timestamp": datetime.now().isoformat(),
         }
+
+    if is_live and isinstance(payload, dict) and not payload.get("error"):
+        cfg["session_expired"] = False
+        cfg["last_error"] = ""
+        cfg["last_synced_at"] = datetime.now().isoformat()
+        save_vulcan_config(cfg)
 
     if payload is None:
         if not os.environ.get("PYTEST_CURRENT_TEST"):

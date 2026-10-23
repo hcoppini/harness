@@ -218,26 +218,36 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
     if close_conn:
         conn.close()
 
-    # Calculate Subject Grades for TUM Aptitude (Math 2x, CS 2x, Lang 1x)
-    def find_subj_grade(name_pattern: str, default_target: float = 5.5) -> float:
+    # Calculate Subject Grades for TUM Aptitude (Math 2x, CS 2x, Lang 1x) directly from live Vulcan ledger
+    def find_subj_grade(name_pattern: str, fallback_if_empty: float = 3.0) -> float:
         actuals = []
-        targets = []
+        has_negative_entries = False
+        has_any_entries = False
         for sem_grades in semesters.values():
             for g in sem_grades:
                 if name_pattern.lower() in g["subject"].lower():
                     if g["actual_grade"] is not None:
                         actuals.append(g["actual_grade"])
-                    if g["target_grade"] is not None:
-                        targets.append(g["target_grade"])
+                    entries = g.get("entries", [])
+                    if entries:
+                        has_any_entries = True
+                        for er in entries:
+                            raw = (er.get("raw_input") or "").lower()
+                            num = er.get("numeric_value")
+                            if "np" in raw or "nb" in raw or (num is not None and num <= 2.0):
+                                has_negative_entries = True
         if actuals:
             return round(sum(actuals) / len(actuals), 2)
-        if targets:
-            return round(sum(targets) / len(targets), 2)
-        return default_target
+        if has_negative_entries:
+            # When negative tripwires/grades (e.g. NP, nb, 1s) exist with zero passing grades, projected grade is 2.0 (Bavarian scale minimum)
+            return 2.0
+        if has_any_entries:
+            return 2.5
+        return fallback_if_empty
 
-    math_pl = find_subj_grade("matematyka", 5.5)
-    cs_pl = find_subj_grade("informatyka", 5.5)
-    lang_pl = find_subj_grade("angielski", 5.5)
+    math_pl = find_subj_grade("matematyka", 2.0)
+    cs_pl = find_subj_grade("informatyka", 3.0)
+    lang_pl = find_subj_grade("angielski", 5.0)
     calc_gpa = overall_gpa if overall_gpa > 0 else round((math_pl + cs_pl + lang_pl) / 3.0, 2)
 
     bavarian_eval = calculate_tum_aptitude_score(calc_gpa, math_pl, cs_pl, lang_pl)
