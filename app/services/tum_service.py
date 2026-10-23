@@ -1,3 +1,4 @@
+import os
 import json
 import sqlite3
 from datetime import datetime
@@ -87,6 +88,16 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
         close_conn = True
 
     seed_tum_data_if_empty(conn)
+
+    # In cloud / serverless environment (e.g. Vercel) or when online, pull latest grades from Supabase
+    if not os.environ.get("PYTEST_CURRENT_TEST") and (os.environ.get("VERCEL") or os.environ.get("AWS_LAMBDA_FUNCTION_NAME")):
+        try:
+            from app.services import sync_service
+            sync_service.sync_tum_grades(conn)
+            sync_service.sync_tum_grade_entries(conn)
+        except Exception as e:
+            print(f"[TUM Overview] Supabase grade sync notice: {e}")
+
     cursor = conn.cursor()
 
     # 1. Fetch grade entries and group by (subject, semester)

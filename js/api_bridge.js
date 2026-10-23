@@ -1875,34 +1875,81 @@
             };
           }
 
+          if (prop === "add_grade_entry") {
+            return async function (subject, semester, raw_input, weight = 1.0, category = "Grade", description = "", date_str = null) {
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("add_grade_entry", [subject, semester, raw_input, weight, category, description, date_str]);
+              } catch (e) {
+                console.warn("[Harness Bridge] add_grade_entry RPC notice:", e);
+              }
+
+              const dateVal = date_str || getLocalDateStr();
+              const newEntry = {
+                id: (serverRes && serverRes.id) ? serverRes.id : Date.now(),
+                subject,
+                semester: Number(semester) || 1,
+                raw_input,
+                numeric_value: serverRes && serverRes.numeric_value !== undefined ? serverRes.numeric_value : null,
+                weight: Number(weight) || 1.0,
+                category: category || "Grade",
+                description: description || "",
+                date: dateVal,
+                counts_in_average: serverRes && serverRes.counts_in_average !== undefined ? Boolean(serverRes.counts_in_average) : true,
+              };
+              supabaseRequest("tum_grade_entries", "POST", newEntry).catch(() => {});
+              return serverRes || newEntry;
+            };
+          }
+
+          if (prop === "delete_grade_entry") {
+            return async function (entryId) {
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("delete_grade_entry", [entryId]);
+              } catch (e) {
+                console.warn("[Harness Bridge] delete_grade_entry RPC notice:", e);
+              }
+              supabaseRequest(`tum_grade_entries?id=eq.${entryId}`, "DELETE").catch(() => {});
+              return serverRes !== null ? serverRes : true;
+            };
+          }
+
           if (prop === "get_tum_overview") {
             return async function () {
+              let serverRes = null;
               try {
-                const serverRes = await rpcCall("get_tum_overview", []);
-                if (serverRes) {
-                  if (serverRes.semesters) {
-                    for (const sem in serverRes.semesters) {
-                      serverRes.semesters[sem].forEach((sub) => {
-                        if (sub.entries) {
-                          sub.entries = sub.entries.filter((e) => {
-                            const desc = (e.description || "").toLowerCase();
-                            return !desc.includes("funkcje wymierne") && !desc.includes("algorytmu grafowego");
-                          });
-                        }
-                      });
-                    }
+                serverRes = await rpcCall("get_tum_overview", []);
+                if (serverRes && serverRes.semesters) {
+                  for (const sem in serverRes.semesters) {
+                    serverRes.semesters[sem].forEach((sub) => {
+                      if (sub.entries) {
+                        sub.entries = sub.entries.filter((e) => {
+                          const desc = (e.description || "").toLowerCase();
+                          return !desc.includes("funkcje wymierne") && !desc.includes("algorytmu grafowego");
+                        });
+                      }
+                    });
                   }
-                  return serverRes;
                 }
               } catch (e) {}
 
-              // Try Supabase live fetch if serverRes is not available
+              let serverCount = 0;
+              if (serverRes && serverRes.semesters) {
+                for (const s in serverRes.semesters) {
+                  (serverRes.semesters[s] || []).forEach((sub) => {
+                    serverCount += (sub.entries || []).length;
+                  });
+                }
+              }
+
+              // Try Supabase live fetch if serverRes is missing or Supabase has more entries
               try {
                 const [sbGrades, sbEntries] = await Promise.all([
                   supabaseRequest("tum_grades?select=*&order=semester.asc,id.asc"),
                   supabaseRequest("tum_grade_entries?select=*&order=date.asc,id.asc"),
                 ]);
-                if (Array.isArray(sbGrades) && sbGrades.length > 0) {
+                if (Array.isArray(sbGrades) && sbGrades.length > 0 && (!serverRes || (Array.isArray(sbEntries) && sbEntries.length > serverCount))) {
                   const normalizeSubj = (name) => {
                     const low = (name || "").toLowerCase();
                     if (low.includes("matem")) return "Matematyka";
@@ -2004,6 +2051,10 @@
                   };
                 }
               } catch (e) {}
+
+              if (serverRes) {
+                return serverRes;
+              }
 
               // Resilient offline fallback with clean real grades only
               return {

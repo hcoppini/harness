@@ -858,14 +858,14 @@ def sync_vulcan_data(
             SELECT id FROM tum_grade_entries 
             WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) 
               AND semester = ? 
+              AND date = ?
               AND (
                 (description != '' AND description = ?)
-                OR (date = ? AND raw_input = ?)
-                OR (description = ? AND date = ?)
+                OR raw_input = ?
               )
             ORDER BY id ASC
             """,
-            (subj, sem, desc, g_date, raw, desc, g_date),
+            (subj, sem, g_date, desc, raw),
         )
         existing_rows = cursor.fetchall()
         if existing_rows:
@@ -873,10 +873,10 @@ def sync_vulcan_data(
             cursor.execute(
                 """
                 UPDATE tum_grade_entries
-                SET subject = ?, raw_input = ?, numeric_value = ?, weight = ?, category = ?, description = ?, counts_in_average = ?
+                SET subject = ?, raw_input = ?, numeric_value = ?, weight = ?, category = ?, description = ?, date = ?, counts_in_average = ?
                 WHERE id = ?
                 """,
-                (subj, raw, num, weight, cat, desc, counts, primary_id),
+                (subj, raw, num, weight, cat, desc, g_date, counts, primary_id),
             )
             if len(existing_rows) > 1:
                 dup_ids = [r["id"] for r in existing_rows[1:]]

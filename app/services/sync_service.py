@@ -166,7 +166,7 @@ def delete_remote_item(table: str, id_column: str, id_value: Any, async_mode: bo
             print(f"[Supabase Sync] Remote delete failed for {table} {id_column}={id_value}: {e}")
             return False
 
-    if async_mode:
+    if async_mode and not os.environ.get("VERCEL") and not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
         import threading
         threading.Thread(target=_execute, daemon=True).start()
         return True
@@ -193,7 +193,7 @@ def upsert_remote_item(table: str, id_column: str, payload: Dict[str, Any], asyn
             print(f"[Supabase Sync] Remote upsert failed for {table}: {e}")
             return False
 
-    if async_mode:
+    if async_mode and not os.environ.get("VERCEL") and not os.environ.get("AWS_LAMBDA_FUNCTION_NAME"):
         import threading
         threading.Thread(target=_execute, daemon=True).start()
         return True
@@ -234,22 +234,29 @@ def test_supabase_connection(url: Optional[str] = None, key: Optional[str] = Non
     }
 
     try:
-        probe_url = f"{target_url}/rest/v1/"
+        probe_url = f"{target_url}/rest/v1/app_settings?select=*&limit=1"
         req = urllib.request.Request(probe_url, headers=req_headers, method="GET")
         with urllib.request.urlopen(req, timeout=5) as resp:
             pass
     except urllib.error.HTTPError as e:
         if e.code in [401, 403]:
-            return {
-                "success": False,
-                "status": "error",
-                "message": f"Authentication failed (HTTP {e.code}). Please check your Supabase anon/service key.",
-                "error": f"Authentication failed (HTTP {e.code})",
-                "tables_found": [],
-                "verified_tables": [],
-                "tables_missing": required_tables,
-            }
-        # Some Supabase instances return 404 for root /rest/v1/ - proceed to table check
+            try:
+                probe_url2 = f"{target_url}/rest/v1/tum_grades?select=*&limit=1"
+                req2 = urllib.request.Request(probe_url2, headers=req_headers, method="GET")
+                with urllib.request.urlopen(req2, timeout=5) as resp2:
+                    pass
+            except urllib.error.HTTPError as e2:
+                if e2.code in [401, 403]:
+                    return {
+                        "success": False,
+                        "status": "error",
+                        "message": f"Authentication failed (HTTP {e2.code}). Please check your Supabase anon/service key.",
+                        "error": f"Authentication failed (HTTP {e2.code})",
+                        "tables_found": [],
+                        "verified_tables": [],
+                        "tables_missing": required_tables,
+                    }
+        # Other HTTP errors (e.g. 404 table not found) proceed to schema table probe
     except Exception as e:
         return {
             "success": False,
