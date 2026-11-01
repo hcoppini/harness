@@ -149,13 +149,13 @@ const Tum = {
                 .map((e) => {
                   const chipClass = !e.counts_in_average || e.numeric_value === null || e.numeric_value === undefined
                     ? "chip-neutral"
-                    : e.numeric_value >= 5.0
+                    : e.numeric_value >= 4.75
                     ? "chip-green"
-                    : e.numeric_value >= 4.0
+                    : e.numeric_value >= 3.75
                     ? "chip-blue"
-                    : e.numeric_value >= 3.0
+                    : e.numeric_value >= 2.75
                     ? "chip-purple"
-                    : e.numeric_value >= 2.0
+                    : e.numeric_value >= 1.75
                     ? "chip-amber"
                     : "chip-red";
 

@@ -136,10 +136,14 @@ def mobile_static(filename):
 
 @app.route("/css/<path:filename>")
 def css_static(filename):
+    if (BASE_DIR / "css" / filename).exists():
+        return send_from_directory(BASE_DIR / "css", filename)
     return send_from_directory(UI_DIR / "css", filename)
 
 @app.route("/js/<path:filename>")
 def js_static(filename):
+    if (BASE_DIR / "js" / filename).exists():
+        return send_from_directory(BASE_DIR / "js", filename)
     return send_from_directory(UI_DIR / "js", filename)
 
 @app.route("/data/<path:filename>")

@@ -2085,13 +2085,38 @@
                     semester_gpas[s] = actuals.length > 0 ? Math.round((actuals.reduce((a, b) => a + b, 0) / actuals.length) * 100) / 100 : 0.0;
                   }
 
-                  const overall_gpa = totalGrades.length > 0 ? Math.round((totalGrades.reduce((a, b) => a + b, 0) / totalGrades.length) * 100) / 100 : 0.0;
+                  const findGrade = (pat, fallback = 3.0) => {
+                    for (const s in semesters) {
+                      for (const sub of (semesters[s] || [])) {
+                        if (sub.subject.toLowerCase().includes(pat.toLowerCase())) {
+                          if (sub.actual_grade !== null && sub.actual_grade !== undefined) return sub.actual_grade;
+                          if (sub.entries && sub.entries.length > 0) {
+                            const valid = sub.entries.filter(e => e.numeric_value !== null && e.numeric_value !== undefined);
+                            if (valid.length > 0) return valid[0].numeric_value;
+                          }
+                        }
+                      }
+                    }
+                    return fallback;
+                  };
+
+                  const mathPl = findGrade("matematyk", 2.0);
+                  const csPl = findGrade("informatyk", 3.0);
+                  const langPl = findGrade("angielsk", 5.0);
+                  const bavarianAssessment = serverRes?.bavarian_assessment || (window.Tum && typeof window.Tum.calculateAptitudeScore === "function"
+                    ? window.Tum.calculateAptitudeScore(overall_gpa || 3.0, mathPl, csPl, langPl)
+                    : null);
 
                   return {
                     gpa: overall_gpa,
                     overall_gpa: overall_gpa,
                     semesters: semesters,
                     semester_gpas: semester_gpas,
+                    bavarian_assessment: bavarianAssessment,
+                    matura: serverRes?.matura || [],
+                    language: serverRes?.language || [],
+                    target_program: serverRes?.target_program || "TUM Campus Heilbronn - Management & Data Science (B.Sc.)",
+                    key_requirements: serverRes?.key_requirements || [],
                   };
                 }
               } catch (e) {}
