@@ -709,13 +709,9 @@
             </h2>
           </div>
 
-          <div style="margin-bottom: 16px;">
-            <label class="form-label">STATION STATUS</label>
-            <select id="drawerStationStatus" class="form-input" style="width: 100%;">
-              <option value="upcoming">Upcoming</option>
-              <option value="active">Active Station</option>
-              <option value="completed">Completed / Reached</option>
-            </select>
+          <div id="drawerStationStatusContainer" style="margin-bottom: 14px;">
+            <!-- Rendered dynamically as a sleek read-only telemetry badge -->
+            <input type="hidden" id="drawerStationStatus" value="upcoming" />
           </div>
 
           <!-- Objective Box -->
@@ -1956,19 +1952,19 @@
   </nav>
 
   <!-- App Script Modules -->
-  <script src="js/api_bridge.js?v=5.2"></script>
-  <script src="js/metro.js?v=5.2"></script>
-  <script src="js/dashboard.js?v=5.2"></script>
-  <script src="js/study.js?v=5.2"></script>
-  <script src="js/today.js?v=5.2"></script>
-  <script src="js/tum.js?v=5.2"></script>
-  <script src="js/projects.js?v=5.2"></script>
-  <script src="js/body.js?v=5.2"></script>
-  <script src="js/knowledge.js?v=5.2"></script>
-  <script src="js/focus_timer.js?v=5.2"></script>
-  <script src="js/command_palette.js?v=5.2"></script>
-  <script src="js/kill_list.js?v=5.2"></script>
-  <script src="js/app.js?v=5.2"></script>
+  <script src="js/api_bridge.js?v=5.4"></script>
+  <script src="js/metro.js?v=5.4"></script>
+  <script src="js/dashboard.js?v=5.4"></script>
+  <script src="js/study.js?v=5.4"></script>
+  <script src="js/today.js?v=5.4"></script>
+  <script src="js/tum.js?v=5.4"></script>
+  <script src="js/projects.js?v=5.4"></script>
+  <script src="js/body.js?v=5.4"></script>
+  <script src="js/knowledge.js?v=5.4"></script>
+  <script src="js/focus_timer.js?v=5.4"></script>
+  <script src="js/command_palette.js?v=5.4"></script>
+  <script src="js/kill_list.js?v=5.4"></script>
+  <script src="js/app.js?v=5.4"></script>
   <script>
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
