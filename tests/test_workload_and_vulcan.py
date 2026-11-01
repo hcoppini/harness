@@ -437,4 +437,92 @@ def test_pure_cruise_3_pillar_pipeline(test_db):
     assert deep_block["net_minutes"] == 110
 
 
+def test_homework_service_positional_string_guard(test_db):
+    """Verifies that homework_service methods accept date strings or connection objects interchangeably without crashing."""
+    homework_service.add_homework("Fizyka", "Zadania 1-5", "2026-11-05", conn=test_db)
+    homework_service.add_exam("Matematyka", "Kartkówka", "2026-11-06", conn=test_db)
+
+    # Calling with test_db
+    hw = homework_service.get_upcoming_homework(test_db, today_str="2026-11-01")
+    assert len(hw) >= 1
+    assert any(h["subject"] == "Fizyka" for h in hw)
+
+    exams = homework_service.get_upcoming_exams(test_db, today_str="2026-11-01")
+    assert len(exams) >= 1
+    assert any(e["subject"] == "Matematyka" for e in exams)
+
+    # Prune expired passing Connection as first positional argument
+    pruned1 = homework_service.prune_expired_homework(test_db)
+    assert pruned1 == 0
+
+    # Prune expired passing date_str as first arg and conn as second
+    pruned2 = homework_service.prune_expired_homework("2026-11-10", test_db)
+    assert pruned2 >= 1
+
+
+def test_grade_replacement_and_deduplication(test_db):
+    """Verifies that updating absence 'nb' with a grade replaces rather than duplicates."""
+    cfg = {
+        "enabled": True,
+        "demo_mode": False,
+        "registered_device": {"device_id": "test"},
+    }
+
+    cursor = test_db.cursor()
+    cursor.execute(
+        """
+        INSERT INTO tum_grade_entries 
+        (subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average)
+        VALUES ('Biologia / Chemia', 1, 'nb', NULL, 0.0, 'Kartkówka', 'Genetyka molekularna', '2026-10-14', 0)
+        """
+    )
+    test_db.commit()
+
+    # Incoming live payload where absence became a real grade with comment
+    updated_payload = {
+        "exams": [],
+        "homework": [],
+        "grades": [
+            {
+                "subject": "Biologia",
+                "semester": 1,
+                "raw_input": "1 (33%)",
+                "numeric_value": 1.0,
+                "weight": 1.0,
+                "category": "Kartkówka",
+                "description": "Genetyka molekularna (33%)",
+                "date": "2026-10-14",
+            }
+        ],
+    }
+
+    import app.services.vulcan_service as vs
+    old_fetch = vs._fetch_live_vulcan_payload
+    old_cfg = vs.get_vulcan_config
+    vs.get_vulcan_config = lambda: cfg
+    vs._fetch_live_vulcan_payload = lambda c, d: updated_payload
+
+    try:
+        res = vs.sync_vulcan_data(client_date="2026-10-14", conn=test_db)
+        assert res["status"] == "synced"
+        assert res["total_grades_active"] >= 1
+
+        # Verify only 1 entry exists for 2026-10-14, updated with 1 (33%)
+        cursor.execute("SELECT * FROM tum_grade_entries WHERE date = '2026-10-14'")
+        entries = cursor.fetchall()
+        assert len(entries) == 1
+        assert entries[0]["raw_input"] == "1 (33%)"
+        assert entries[0]["numeric_value"] == 1.0
+
+        # Verify running average updated in tum_grades
+        cursor.execute("SELECT actual_grade FROM tum_grades WHERE subject = 'Biologia / Chemia' AND semester = 1")
+        row = cursor.fetchone()
+        assert row is not None
+        assert row["actual_grade"] == 1.0
+    finally:
+        vs._fetch_live_vulcan_payload = old_fetch
+        vs.get_vulcan_config = old_cfg
+
+
+
 

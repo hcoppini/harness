@@ -215,6 +215,11 @@ def get_tum_overview(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any
         for r in lang_rows
     ]
 
+    try:
+        conn.commit()
+    except Exception:
+        pass
+
     if close_conn:
         conn.close()
 

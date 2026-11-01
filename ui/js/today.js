@@ -1390,7 +1390,7 @@ const Today = {
       if (!window.pywebview || !window.pywebview.api) return;
       if (window.pywebview.api.auto_sync_vulcan) {
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Vulcan auto-sync timed out (10s)")), 10000)
+          setTimeout(() => reject(new Error("Vulcan auto-sync timeout (30s)")), 30000)
         );
         const res = await Promise.race([
           window.pywebview.api.auto_sync_vulcan(this.selectedDateStr),
@@ -1416,9 +1416,6 @@ const Today = {
       }
     } catch (err) {
       console.warn("Silent Vulcan auto-sync check:", err);
-      if (window.HarnessApp && window.HarnessApp.setVulcanAlarm) {
-        window.HarnessApp.setVulcanAlarm(true, "API DISCONNECTED: MANUAL ENTRY REQUIRED");
-      }
     }
   },
 
@@ -1799,9 +1796,9 @@ const Today = {
         if (window.HarnessApp && window.HarnessApp.showToast) {
           window.HarnessApp.showToast("Connecting to Vulcan / eduVULCAN...");
         }
-        // 10-second timeout guard to prevent infinite hang on expired token
+        // 30-second timeout guard for multi-endpoint HTTPS polling
         const timeoutPromise = new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("Vulcan API request timed out (10s)")), 10000)
+          setTimeout(() => reject(new Error("Vulcan API request timed out (30s)")), 30000)
         );
         const res = await Promise.race([
           window.pywebview.api.sync_vulcan_data(this.selectedDateStr, forceRefresh),
@@ -1836,18 +1833,21 @@ const Today = {
         const examsCount = res && res.exams_synced !== undefined ? res.exams_synced : 0;
         const hwCount = res && res.homework_synced !== undefined ? res.homework_synced : 0;
         const gradesCount = res && res.grades_synced !== undefined ? res.grades_synced : 0;
+        const totalExams = res && res.total_exams_active !== undefined ? res.total_exams_active : examsCount;
+        const totalHw = res && res.total_homework_active !== undefined ? res.total_homework_active : hwCount;
+        const totalGrades = res && res.total_grades_active !== undefined ? res.total_grades_active : gradesCount;
         const mode = res && res.mode === "live" ? "Live Account" : "TM1 Simulator";
+        const newDelta = examsCount + hwCount + gradesCount;
+        const deltaStr = newDelta > 0 ? ` (+${newDelta} new)` : "";
+
         if (window.HarnessApp && window.HarnessApp.showToast) {
-          window.HarnessApp.showToast(`Vulcan Synced [${mode}]: ${examsCount} exams, ${hwCount} homework, ${gradesCount} grades.`);
+          window.HarnessApp.showToast(`Vulcan Synced [${mode}]: ${totalExams} exams, ${totalHw} homework, ${totalGrades} grades active${deltaStr}`);
         }
       }
     } catch (err) {
       console.error("Error syncing Vulcan:", err);
-      if (window.HarnessApp && window.HarnessApp.setVulcanAlarm) {
-        window.HarnessApp.setVulcanAlarm(true, "API DISCONNECTED: MANUAL ENTRY REQUIRED");
-      }
       if (window.HarnessApp && window.HarnessApp.showToast) {
-        window.HarnessApp.showToast("API DISCONNECTED: MANUAL ENTRY REQUIRED");
+        window.HarnessApp.showToast("Vulcan sync timed out or connection slow. Retaining cached data.");
       }
     }
   },

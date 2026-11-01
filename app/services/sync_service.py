@@ -1178,6 +1178,10 @@ def sync_school_exams(conn: sqlite3.Connection) -> int:
                         method="POST",
                         payload={
                             "id": r_id,
+                            "subject": loc["subject"],
+                            "title": loc["title"],
+                            "exam_date": loc["exam_date"],
+                            "scope": loc["scope"],
                             "completed": True,
                             "result_percentage": loc["result_percentage"],
                         },
@@ -1194,7 +1198,15 @@ def sync_school_exams(conn: sqlite3.Connection) -> int:
                     _make_supabase_request(
                         "school_exams?on_conflict=id",
                         method="POST",
-                        payload={"id": r_id, "result_percentage": loc["result_percentage"]},
+                        payload={
+                            "id": r_id,
+                            "subject": loc["subject"],
+                            "title": loc["title"],
+                            "exam_date": loc["exam_date"],
+                            "scope": loc["scope"],
+                            "completed": bool(loc["completed"]),
+                            "result_percentage": loc["result_percentage"],
+                        },
                         headers_extra={"Prefer": "resolution=merge-duplicates"},
                     )
                     synced_count += 1
@@ -1259,7 +1271,16 @@ def sync_homework_items(conn: sqlite3.Connection) -> int:
                     _make_supabase_request(
                         "homework_items?on_conflict=id",
                         method="POST",
-                        payload={"id": r_id, "completed": True},
+                        payload={
+                            "id": r_id,
+                            "subject": loc["subject"],
+                            "title": loc["title"],
+                            "due_date": loc["due_date"],
+                            "completed": True,
+                            "source": loc["source"],
+                            "priority": loc["priority"],
+                            "notes": loc["notes"],
+                        },
                         headers_extra={"Prefer": "resolution=merge-duplicates"},
                     )
                     synced_count += 1
@@ -1319,12 +1340,33 @@ def sync_tum_grades(conn) -> int:
             synced_count += 1
         else:
             loc = local_items[r_id]
-            if loc["actual_grade"] != re.get("actual_grade") or loc["percentage"] != re.get("percentage") or loc["target_grade"] != re.get("target_grade"):
-                cursor.execute(
-                    "UPDATE tum_grades SET target_grade = ?, actual_grade = ?, percentage = ?, notes = ? WHERE id = ?",
-                    (re.get("target_grade"), re.get("actual_grade"), re.get("percentage"), re.get("notes"), r_id)
-                )
-                synced_count += 1
+            differs = (
+                loc["actual_grade"] != re.get("actual_grade")
+                or loc["percentage"] != re.get("percentage")
+                or loc["target_grade"] != re.get("target_grade")
+            )
+            if differs:
+                if loc.get("actual_grade") is not None:
+                    # Freshly calculated local running average takes precedence: push to remote
+                    _make_supabase_request(
+                        "tum_grades?on_conflict=id",
+                        method="POST",
+                        payload=loc,
+                        headers_extra={"Prefer": "resolution=merge-duplicates"},
+                    )
+                    synced_count += 1
+                elif re.get("actual_grade") is not None:
+                    cursor.execute(
+                        "UPDATE tum_grades SET target_grade = ?, actual_grade = ?, percentage = ?, notes = ? WHERE id = ?",
+                        (re.get("target_grade"), re.get("actual_grade"), re.get("percentage"), re.get("notes"), r_id)
+                    )
+                    synced_count += 1
+                else:
+                    cursor.execute(
+                        "UPDATE tum_grades SET target_grade = ?, actual_grade = ?, percentage = ?, notes = ? WHERE id = ?",
+                        (re.get("target_grade"), re.get("actual_grade"), re.get("percentage"), re.get("notes"), r_id)
+                    )
+                    synced_count += 1
 
     remote_ids = {re.get("id") for re in remote_items if re.get("id")}
     for l_id, loc in local_items.items():

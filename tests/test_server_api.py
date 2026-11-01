@@ -28,7 +28,10 @@ def client(tmp_path, monkeypatch):
     monkeypatch.setattr(sync_service, "CONFIG_FILE", test_data / "sync_config.json")
     import server
     monkeypatch.setattr(server, "DATA_DIR", test_data)
-    from app.services import vulcan_service
+    from app.services import vulcan_service, tum_service
+    from engine import kill_list_controller
+    monkeypatch.setattr(tum_service, "DATA_DIR", test_data)
+    monkeypatch.setattr(kill_list_controller, "DATA_DIR", test_data)
     test_vulcan_config = test_data / "vulcan_config.json"
     if test_vulcan_config.exists():
         test_vulcan_config.unlink()

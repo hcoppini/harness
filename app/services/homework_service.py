@@ -25,6 +25,13 @@ def prune_expired_homework(
     Deletes all homework items whose deadline has passed (due_date < today_str).
     Eliminates obsolete overdue homework automatically.
     """
+    if isinstance(today_str, sqlite3.Connection):
+        conn = today_str
+        today_str = None
+    elif isinstance(conn, str):
+        today_str = conn
+        conn = None
+
     close_conn = False
     if conn is None:
         conn = get_connection()
@@ -49,6 +56,10 @@ def get_upcoming_homework(
     auto_prune: bool = True,
 ) -> List[Dict[str, Any]]:
     """Returns pending/uncompleted homework items due today or in the future, automatically pruning expired items."""
+    if isinstance(conn, str):
+        today_str = conn
+        conn = None
+
     close_conn = False
     if conn is None:
         conn = get_connection()
@@ -237,6 +248,10 @@ def get_upcoming_exams(
     today_str: Optional[str] = None,
 ) -> List[Dict[str, Any]]:
     """Returns upcoming school exams, tests, and mock maturas."""
+    if isinstance(conn, str):
+        today_str = conn
+        conn = None
+
     close_conn = False
     if conn is None:
         conn = get_connection()

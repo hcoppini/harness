@@ -824,13 +824,23 @@ def sync_vulcan_data(
         title = e.get("title", "Exam").strip()
         exam_date = e.get("exam_date", target_date)
         scope = e.get("scope", "")
+        weight = int(e.get("weight", 2))
 
         cursor.execute(
-            "SELECT id FROM school_exams WHERE subject = ? AND title = ? AND exam_date = ?",
-            (subj, title, exam_date),
+            """
+            SELECT id FROM school_exams 
+            WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) 
+              AND (
+                LOWER(TRIM(title)) = LOWER(TRIM(?))
+                OR (scope != '' AND LOWER(TRIM(scope)) = LOWER(TRIM(?)))
+              )
+              AND exam_date = ?
+            ORDER BY id ASC
+            """,
+            (subj, title, scope, exam_date),
         )
-        existing = cursor.fetchone()
-        if not existing:
+        existing_exams = cursor.fetchall()
+        if not existing_exams:
             cursor.execute(
                 """
                 INSERT INTO school_exams (subject, title, exam_date, scope, completed)
@@ -839,6 +849,12 @@ def sync_vulcan_data(
                 (subj, title, exam_date, scope),
             )
             exams_synced += 1
+        else:
+            primary_id = existing_exams[0]["id"]
+            cursor.execute("UPDATE school_exams SET scope = ? WHERE id = ?", (scope, primary_id))
+            if len(existing_exams) > 1:
+                dup_ids = [r["id"] for r in existing_exams[1:]]
+                cursor.execute(f"DELETE FROM school_exams WHERE id IN ({','.join(['?']*len(dup_ids))})", dup_ids)
 
     # 2. Merge homework items (and auto-prune any whose deadline has passed)
     today_iso = target_date or datetime.now().strftime("%Y-%m-%d")
@@ -854,11 +870,17 @@ def sync_vulcan_data(
         notes = h.get("notes", "")
 
         cursor.execute(
-            "SELECT id FROM homework_items WHERE subject = ? AND title = ? AND due_date = ?",
+            """
+            SELECT id FROM homework_items 
+            WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) 
+              AND LOWER(TRIM(title)) = LOWER(TRIM(?)) 
+              AND due_date = ?
+            ORDER BY id ASC
+            """,
             (subj, title, due_date),
         )
-        existing = cursor.fetchone()
-        if not existing:
+        existing_hw = cursor.fetchall()
+        if not existing_hw:
             cursor.execute(
                 """
                 INSERT INTO homework_items (subject, title, due_date, completed, source, priority, notes)
@@ -867,6 +889,9 @@ def sync_vulcan_data(
                 (subj, title, due_date, prio, notes),
             )
             hw_synced += 1
+        elif len(existing_hw) > 1:
+            dup_ids = [r["id"] for r in existing_hw[1:]]
+            cursor.execute(f"DELETE FROM homework_items WHERE id IN ({','.join(['?']*len(dup_ids))})", dup_ids)
 
     # 3. Merge grades into Grade Ledger (tum_grade_entries & tum_grades)
     affected_subjects = set()
@@ -899,31 +924,60 @@ def sync_vulcan_data(
 
         cursor.execute(
             """
-            SELECT id FROM tum_grade_entries 
+            SELECT id, raw_input, category, description FROM tum_grade_entries 
             WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) 
               AND semester = ? 
               AND date = ?
-              AND (
-                (description != '' AND description = ?)
-                OR raw_input = ?
-              )
             ORDER BY id ASC
             """,
-            (subj, sem, g_date, desc, raw),
+            (subj, sem, g_date),
         )
-        existing_rows = cursor.fetchall()
-        if existing_rows:
-            primary_id = existing_rows[0]["id"]
+        candidates = [dict(r) for r in cursor.fetchall()]
+        matching_id = None
+        dup_ids = []
+
+        desc_clean = desc.lower().strip()
+        cat_clean = cat.lower().strip()
+        raw_clean = raw.lower().strip()
+
+        for cand in candidates:
+            c_desc = (cand.get("description") or "").lower().strip()
+            c_cat = (cand.get("category") or "").lower().strip()
+            c_raw = (cand.get("raw_input") or "").lower().strip()
+
+            is_match = False
+            # 1. Exact description match
+            if desc_clean and c_desc and desc_clean == c_desc:
+                is_match = True
+            # 2. Substring description match (e.g. "Genetyka molekularna." vs "Genetyka molekularna. (33%)")
+            elif desc_clean and c_desc and (desc_clean in c_desc or c_desc in desc_clean):
+                is_match = True
+            # 3. Both are Nieprzygotowanie
+            elif ("nieprzygotowan" in cat_clean or cat_clean == "np") and ("nieprzygotowan" in c_cat or c_cat == "np"):
+                is_match = True
+            # 4. Same raw input
+            elif raw_clean == c_raw:
+                is_match = True
+            # 5. Absence ('nb') replaced with real grade on same date and same category
+            elif c_raw == "nb" and (c_cat == cat_clean or (desc_clean and c_desc and desc_clean in c_desc)):
+                is_match = True
+
+            if is_match:
+                if matching_id is None:
+                    matching_id = cand["id"]
+                else:
+                    dup_ids.append(cand["id"])
+
+        if matching_id:
             cursor.execute(
                 """
                 UPDATE tum_grade_entries
                 SET subject = ?, raw_input = ?, numeric_value = ?, weight = ?, category = ?, description = ?, date = ?, counts_in_average = ?
                 WHERE id = ?
                 """,
-                (subj, raw, num, weight, cat, desc, g_date, counts, primary_id),
+                (subj, raw, num, weight, cat, desc, g_date, counts, matching_id),
             )
-            if len(existing_rows) > 1:
-                dup_ids = [r["id"] for r in existing_rows[1:]]
+            if dup_ids:
                 cursor.execute(
                     f"DELETE FROM tum_grade_entries WHERE id IN ({','.join(['?']*len(dup_ids))})",
                     dup_ids,
@@ -941,9 +995,12 @@ def sync_vulcan_data(
 
         affected_subjects.add((subj, sem))
 
-    # Recalculate running averages and update tum_grades for affected subjects
-    for subj, sem in affected_subjects:
-        norm_subj = normalize_subject_name(subj)
+    # Recalculate running averages and update tum_grades for ALL subjects in ledger
+    cursor.execute("SELECT DISTINCT subject, semester FROM tum_grade_entries")
+    all_ledger_subjects = {(normalize_subject_name(r["subject"]), r["semester"]) for r in cursor.fetchall()}
+    all_ledger_subjects.update(affected_subjects)
+
+    for norm_subj, sem in all_ledger_subjects:
         cursor.execute(
             "SELECT id FROM tum_grades WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) AND semester = ?",
             (norm_subj, sem),
@@ -991,6 +1048,14 @@ def sync_vulcan_data(
     cfg["last_synced_at"] = now_iso
     save_vulcan_config(cfg)
 
+    # Active totals in database
+    cursor.execute("SELECT COUNT(*) AS cnt FROM school_exams WHERE completed = 0")
+    total_active_exams = cursor.fetchone()["cnt"]
+    cursor.execute("SELECT COUNT(*) AS cnt FROM homework_items WHERE completed = 0")
+    total_active_hw = cursor.fetchone()["cnt"]
+    cursor.execute("SELECT COUNT(*) AS cnt FROM tum_grade_entries")
+    total_active_grades = cursor.fetchone()["cnt"]
+
     if close_conn:
         conn.close()
 
@@ -999,6 +1064,9 @@ def sync_vulcan_data(
         "exams_synced": exams_synced,
         "homework_synced": hw_synced,
         "grades_synced": grades_synced,
+        "total_exams_active": total_active_exams,
+        "total_homework_active": total_active_hw,
+        "total_grades_active": total_active_grades,
         "mode": "live" if is_live else "demo_tm1",
         "timestamp": now_iso,
     }
@@ -1093,6 +1161,19 @@ def setup_windows_scheduled_sync(target_time: str = "15:00") -> bool:
     ]
     try:
         res = subprocess.run(cmd, capture_output=True, text=True)
+        # Configure battery allowance, missed run catchup, and working directory
+        repo_dir = str(bat_path.parent.parent)
+        ps_cmd = (
+            f"$t = Get-ScheduledTask -TaskName 'HarnessDaily3pmVulcanSync' -ErrorAction SilentlyContinue; "
+            f"if ($t) {{ "
+            f"$t.Settings.DisallowStartIfOnBatteries = $false; "
+            f"$t.Settings.StopIfGoingOnBatteries = $false; "
+            f"$t.Settings.StartWhenAvailable = $true; "
+            f"if ($t.Actions -and $t.Actions.Count -gt 0) {{ $t.Actions[0].WorkingDirectory = '{repo_dir}' }}; "
+            f"Set-ScheduledTask -InputObject $t "
+            f"}}"
+        )
+        subprocess.run(["powershell", "-NoProfile", "-Command", ps_cmd], capture_output=True)
         return res.returncode == 0
     except Exception:
         return False
