@@ -182,17 +182,21 @@ window.Study = {
     const gpaEl = document.getElementById("studyCurrentGpaVal");
     if (!this.tumData) return;
 
-    if (gpaEl && this.tumData.current_gpa) {
-      gpaEl.textContent = Number(this.tumData.current_gpa).toFixed(2);
+    const gpa = this.tumData.overall_gpa || this.tumData.current_gpa || this.tumData.gpa;
+    if (gpaEl && gpa) {
+      gpaEl.textContent = Number(gpa).toFixed(2);
     }
 
     if (!container) return;
 
-    const grades = this.tumData.grades || [];
-    // Prioritize key STEM subjects for TUM
-    const priorityOrder = ["Matematyka", "Informatyka", "Język Angielski", "Fizyka", "Język Polski", "Historia", "Geografia"];
-    const sem1Grades = grades.filter((g) => g.semester === 1);
+    let grades = this.tumData.grades || [];
+    if (grades.length === 0 && this.tumData.semesters) {
+      grades = this.tumData.semesters[1] || [];
+    }
+    const sem1Grades = grades.filter((g) => g.semester === 1 || !g.semester);
 
+    // Prioritize key STEM subjects for TUM, while presenting all curricular subjects
+    const priorityOrder = ["Matematyka", "Informatyka", "Język Angielski", "Fizyka", "Język Polski", "Historia", "Geografia", "Biologia / Chemia", "Język Niemiecki"];
     sem1Grades.sort((a, b) => {
       const idxA = priorityOrder.indexOf(a.subject);
       const idxB = priorityOrder.indexOf(b.subject);

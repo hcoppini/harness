@@ -28,6 +28,11 @@ const Tum = {
         if (drawer) {
           drawer.style.display = this.showingGradesTable ? "block" : "none";
           btnToggle.textContent = this.showingGradesTable ? "Hide Grades Ledger" : "Grades Ledger";
+          if (this.showingGradesTable) {
+            setTimeout(() => {
+              drawer.scrollIntoView({ behavior: "smooth", block: "start" });
+            }, 60);
+          }
         }
       });
     }

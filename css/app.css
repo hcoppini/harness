@@ -545,11 +545,12 @@ body {
 
 #view-tum.active {
   max-width: 100%;
-  padding: 18px 28px;
+  padding: 18px 28px calc(80px + env(safe-area-inset-bottom, 0px));
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 80px);
-  overflow: hidden;
+  min-height: 100%;
+  height: auto;
+  overflow: visible;
 }
 
 @keyframes fadeIn {
@@ -1436,7 +1437,8 @@ body {
 .metro-viewport {
   position: relative;
   width: 100%;
-  flex: 1;
+  min-height: 480px;
+  height: 500px;
   background: var(--bg-card);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-md);
@@ -1444,6 +1446,7 @@ body {
   overflow-x: hidden;
   display: flex;
   flex-direction: column;
+  flex-shrink: 0;
 }
 
 .metro-toolbar {
@@ -3256,7 +3259,7 @@ input[type="range"]::-moz-range-thumb {
     height: auto !important;
     min-height: auto !important;
     overflow: visible !important;
-    padding: 6px 0 24px !important;
+    padding: 6px 0 calc(100px + env(safe-area-inset-bottom, 0px)) !important;
   }
 
   .metro-viewport {
