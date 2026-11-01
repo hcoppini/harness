@@ -709,13 +709,9 @@
             </h2>
           </div>
 
-          <div style="margin-bottom: 16px;">
-            <label class="form-label">STATION STATUS</label>
-            <select id="drawerStationStatus" class="form-input" style="width: 100%;">
-              <option value="upcoming">Upcoming</option>
-              <option value="active">Active Station</option>
-              <option value="completed">Completed / Reached</option>
-            </select>
+          <div id="drawerStationStatusContainer" style="margin-bottom: 14px;">
+            <!-- Rendered dynamically as a sleek read-only telemetry badge -->
+            <input type="hidden" id="drawerStationStatus" value="upcoming" />
           </div>
 
           <!-- Objective Box -->

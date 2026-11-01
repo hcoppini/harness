@@ -7,7 +7,11 @@ from engine import kill_list_controller
 
 
 @pytest.fixture
-def test_db(tmp_path):
+def test_db(tmp_path, monkeypatch):
+    import shutil
+    temp_metro = tmp_path / "metro_roadmap.json"
+    shutil.copy(kill_list_controller.DATA_DIR / "metro_roadmap.json", temp_metro)
+    monkeypatch.setattr(kill_list_controller, "DATA_DIR", tmp_path)
     db_file = tmp_path / "test_kill_list.db"
     init_db(db_file)
     conn = sqlite3.connect(str(db_file))
