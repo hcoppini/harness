@@ -2869,6 +2869,45 @@ input[type="range"]::-moz-range-thumb {
   transition: width 0.3s ease;
 }
 
+.metro-card-active-progress {
+  margin-top: 5px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.metro-card-active-progress .metro-progress-track {
+  height: 4px;
+  background: var(--border-subtle);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.metro-progress-fill.time-fill {
+  background: rgba(167, 139, 250, 0.45) !important;
+}
+
+.metro-progress-fill.goals-fill {
+  background: var(--accent-lavender) !important;
+}
+
+.deliverable-item.telemetry-deliverable-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.deliverable-item.telemetry-deliverable-card:hover {
+  border-color: rgba(196, 181, 253, 0.35);
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.deliverable-item.telemetry-deliverable-card.checked {
+  border-color: rgba(16, 185, 129, 0.25);
+}
+
 .telemetry-footer-notice {
   text-align: center;
   font-size: 9.5px;

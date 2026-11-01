@@ -858,13 +858,45 @@ const MetroMap = {
                 ${tagsHtml}
               </div>
 
-              <!-- Slim Progress Bar -->
-              <div class="metro-card-progress">
-                <div class="metro-progress-track">
-                  <div class="metro-progress-fill" style="width: ${progressPercent}%; ${isActive ? 'background: var(--accent-lavender);' : ''}"></div>
-                </div>
-                <span class="metro-progress-pct">${progressPercent}%</span>
-              </div>
+              <!-- Progress Bar (Dual for Active Station, Slim for Standard) -->
+              ${
+                isActive
+                  ? (() => {
+                      const now = new Date();
+                      const dayOfMonth = now.getDate();
+                      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+                      const timeElapsedPct = Math.min(100, Math.max(0, Math.round((dayOfMonth / daysInMonth) * 100)));
+                      const completedCount = completedList.length;
+                      return `
+                        <div class="metro-card-active-progress" title="Time Pace: Day ${dayOfMonth} of ${daysInMonth} (${timeElapsedPct}%) | Deliverables: ${completedCount}/${totalDelivs} (${progressPercent}%)">
+                          <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 8.5px;">
+                            <span style="color: var(--text-tertiary); font-weight: 600;">📅 TIME: Day ${dayOfMonth}/${daysInMonth}</span>
+                            <span style="color: rgba(167, 139, 250, 0.9); font-weight: 700;">${timeElapsedPct}%</span>
+                          </div>
+                          <div class="metro-progress-track">
+                            <div class="metro-progress-fill time-fill" style="width: ${timeElapsedPct}%;"></div>
+                          </div>
+
+                          <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 8.5px; margin-top: 2px;">
+                            <span style="color: var(--text-tertiary); font-weight: 600;">🎯 GOALS: ${completedCount}/${totalDelivs}</span>
+                            <span style="color: var(--accent-lavender); font-weight: 700;">${progressPercent}%</span>
+                          </div>
+                          <div class="metro-progress-track">
+                            <div class="metro-progress-fill goals-fill" style="width: ${progressPercent}%;"></div>
+                          </div>
+                        </div>
+                      `;
+                    })()
+                  : `
+                    <!-- Slim Progress Bar -->
+                    <div class="metro-card-progress">
+                      <div class="metro-progress-track">
+                        <div class="metro-progress-fill" style="width: ${progressPercent}%;"></div>
+                      </div>
+                      <span class="metro-progress-pct">${progressPercent}%</span>
+                    </div>
+                  `
+              }
             </div>
           `;
         })
@@ -1080,36 +1112,68 @@ const MetroMap = {
       }
     }
 
-    // Deliverables breakdown categorized by stream - PURE VIEW-ONLY TELEMETRY HUD
+    // Deliverables breakdown categorized by stream - Interactive HUD with dual-track progress
     const deliverablesList = document.getElementById("drawerDeliverablesList");
     if (deliverablesList && station.deliverables) {
+      const now = new Date();
+      const dayOfMonth = now.getDate();
+      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+      const timeElapsedPct = Math.min(100, Math.max(0, Math.round((dayOfMonth / daysInMonth) * 100)));
+
+      let velocity = this.paceVelocity;
+      if (!velocity || velocity.station_id !== station.id) {
+        const isBehind = progressPercent < timeElapsedPct;
+        velocity = {
+          station_id: station.id,
+          day_of_month: dayOfMonth,
+          total_days: daysInMonth,
+          elapsed_pct: timeElapsedPct,
+          is_behind: isBehind,
+          status_text: isBehind
+            ? `Pace Deficit: ${Math.round(timeElapsedPct - progressPercent)}% behind schedule`
+            : `Pace Velocity: Optimal (+${Math.max(0, Math.round(progressPercent - timeElapsedPct))}%)`,
+          badge_variant: isBehind ? "amber" : "optimal",
+        };
+      }
+
       let velocityHeader = "";
-      if (this.paceVelocity && station.status === "active") {
-        const isBehind = this.paceVelocity.is_behind;
+      if (statusVal === "active") {
+        const isBehind = velocity.is_behind;
         velocityHeader = `
           <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 11px; margin-bottom: 8px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 10px; ${isBehind ? "background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #f59e0b;" : "background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.25); color: var(--accent-lavender);"}">
             <div style="display: flex; align-items: center; gap: 6px;">
               <span class="beacon-dot ${isBehind ? "pulse" : "optimal"}" style="width: 6px; height: 6px;"></span>
-              <span style="font-weight: 700;">${this.paceVelocity.status_text}</span>
+              <span style="font-weight: 700;">${velocity.status_text}</span>
             </div>
-            <span style="opacity: 0.85;">Day ${this.paceVelocity.day_of_month}/${this.paceVelocity.total_days}</span>
+            <span style="opacity: 0.85;">Day ${velocity.day_of_month}/${velocity.total_days} (${velocity.elapsed_pct}%)</span>
           </div>
         `;
       }
 
       const progressHeader = `
         ${velocityHeader}
-        <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 9px 12px; margin-bottom: 10px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 5px; font-size: 10px; font-family: var(--font-mono);">
-            <span style="color: var(--text-tertiary); font-weight: 600;">STATION BENCHMARKS (${totalDelivs} TRACKED)</span>
-            <span style="color: ${isAudited ? '#f59e0b' : 'var(--accent-lavender)'}; font-weight: 700;">${isAudited ? "AUDITED" : `${progressPercent}% VERIFIED`}</span>
+        <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px;">
+          <!-- Track 1: Days Elapsed in Month (Increments daily as days pass) -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 10px; font-family: var(--font-mono);">
+            <span style="color: var(--text-tertiary); font-weight: 700;">📅 TIME ELAPSED (MONTH PACE)</span>
+            <span style="color: rgba(167, 139, 250, 0.9); font-weight: 700;">Day ${dayOfMonth} of ${daysInMonth} &bull; ${timeElapsedPct}%</span>
           </div>
-          <div class="progress-bar-track" style="margin: 0; height: 3px;">
-            <div class="progress-bar-fill" style="width: ${progressPercent}%; background: ${isAudited ? '#f59e0b' : 'var(--accent-lavender)'};"></div>
+          <div class="progress-bar-track" style="margin: 0 0 10px 0; height: 4px;" title="Month Days Elapsed: Day ${dayOfMonth} of ${daysInMonth} (${timeElapsedPct}%)">
+            <div class="progress-bar-fill time-fill" style="width: ${timeElapsedPct}%; background: rgba(167, 139, 250, 0.45);"></div>
+          </div>
+
+          <!-- Track 2: Goals Verified (Increments as deliverables are checked or stepped) -->
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 10px; font-family: var(--font-mono);">
+            <span style="color: var(--text-tertiary); font-weight: 700;">🎯 DELIVERABLES VERIFIED</span>
+            <span style="color: ${isAudited ? '#f59e0b' : 'var(--accent-lavender)'}; font-weight: 700;">${isAudited ? "AUDITED" : `${progressPercent}% (${completedList.length}/${totalDelivs} GOALS)`}</span>
+          </div>
+          <div class="progress-bar-track" style="margin: 0; height: 4px;" title="Deliverables: ${completedList.length}/${totalDelivs} (${progressPercent}%)">
+            <div class="progress-bar-fill goals-fill" style="width: ${progressPercent}%; background: ${isAudited ? '#f59e0b' : 'var(--accent-lavender)'};"></div>
           </div>
         </div>
       `;
 
+      const allEntries = delivEntries;
       const itemsHtml = allEntries
         .map(([key, val]) => {
           const streamMatch = this.streams.find((s) => s.name.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(s.id));
@@ -1130,8 +1194,9 @@ const MetroMap = {
           const totalReq = countObj.total;
           const unitLabel = countObj.unit;
           const itemPct = totalReq > 0 ? Math.min(100, Math.round((curCount / totalReq) * 100)) : 0;
+          const delivId = pMatch ? pMatch.deliverable_id : null;
 
-          // Status Pill: Informative, read-only
+          // Status Pill
           let statusPill = "";
           if (isAudited || isPassedOver) {
             statusPill = `<span class="telemetry-status-pill audited">REALLOCATED</span>`;
@@ -1143,38 +1208,99 @@ const MetroMap = {
             statusPill = `<span class="telemetry-status-pill upcoming">TARGET QUEUED</span>`;
           }
 
+          let quickStepBtn = "";
+          if (streamMatch?.id === "german" || key.toLowerCase().includes("german")) {
+            quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 7px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 20, ${delivId ? `'${delivId}'` : 'null'})">+20 Words</button>`;
+          } else if (streamMatch?.id === "code" || key.toLowerCase().includes("code")) {
+            quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 7px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 1, ${delivId ? `'${delivId}'` : 'null'})">+1 Prob</button>`;
+          } else if (streamMatch?.id === "academics" || key.toLowerCase().includes("math")) {
+            quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 7px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 5, ${delivId ? `'${delivId}'` : 'null'})">+5 Probs</button>`;
+          } else if (streamMatch?.id === "physical" || key.toLowerCase().includes("physical")) {
+            quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 7px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 1, ${delivId ? `'${delivId}'` : 'null'})">+1 Day</button>`;
+          }
+
           const counterPill = `<span class="telemetry-counter-pill">[${curCount} / ${totalReq} ${unitLabel}]</span>`;
 
           return `
-            <div class="telemetry-deliverable-card">
-              <div class="telemetry-card-header">
-                <div class="telemetry-card-title">
-                  <span class="telemetry-stream-name" style="color: ${lineBadgeColor};">
-                    ${key} STREAM
-                  </span>
-                  ${counterPill}
+            <div 
+              class="deliverable-item telemetry-deliverable-card ${isChecked ? "checked" : ""} ${isPassedOver ? "passed-over" : ""}" 
+              onclick="MetroMap.toggleDeliverable('${station.id}', '${this.escapeHtml(key)}')"
+              title="Click goal to toggle verified completion"
+              style="cursor: pointer;"
+            >
+              <div class="check-dot ${isChecked ? "checked" : ""}" style="margin-top: 3px; flex-shrink: 0;" onclick="event.stopPropagation(); MetroMap.toggleDeliverable('${station.id}', '${this.escapeHtml(key)}')"></div>
+              <div style="flex: 1; min-width: 0;">
+                <div class="telemetry-card-header" style="margin-bottom: 4px;">
+                  <div class="telemetry-card-title">
+                    <span class="telemetry-stream-name" style="color: ${lineBadgeColor};">
+                      ${key} STREAM
+                    </span>
+                    ${counterPill}
+                  </div>
+                  <div style="display: flex; align-items: center; gap: 6px;">
+                    ${statusPill}
+                    <button 
+                      type="button" 
+                      class="deliv-pass-btn ${isPassedOver ? 'passed-over' : ''}" 
+                      onclick="event.stopPropagation(); MetroMap.passOverDeliverable('${station.id}', '${this.escapeHtml(key)}')"
+                      title="Pass over or defer this deliverable"
+                    >
+                      ${isPassedOver ? 'PASSED' : 'PASS'}
+                    </button>
+                  </div>
                 </div>
-                ${statusPill}
-              </div>
-              <div class="telemetry-desc">
-                ${this.escapeHtml(val)}
-              </div>
-              <div class="telemetry-bar-track">
-                <div class="telemetry-bar-fill" style="width: ${itemPct}%; background: ${lineBadgeColor};"></div>
+
+                <div class="telemetry-desc" style="font-size: 11.5px; color: var(--text-primary); line-height: 1.45; margin-bottom: 6px; ${isPassedOver ? 'text-decoration: line-through; opacity: 0.65;' : ''}">
+                  ${this.escapeHtml(val)}
+                </div>
+
+                <!-- Stepper Controls & Quick Actions -->
+                <div class="deliv-stepper" onclick="event.stopPropagation();" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
+                  <div style="display: flex; align-items: center; gap: 4px;">
+                    <button type="button" class="deliv-stepper-btn" onclick="MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', -1, ${delivId ? `'${delivId}'` : 'null'})" title="Decrement">&minus;</button>
+                    <input 
+                      type="number" 
+                      class="deliv-input-count" 
+                      value="${curCount}" 
+                      min="0" 
+                      max="${totalReq}" 
+                      onchange="MetroMap.setDeliverableKeyProgress('${station.id}', '${this.escapeHtml(key)}', this.value, ${delivId ? `'${delivId}'` : 'null'})" 
+                      title="Direct count"
+                    />
+                    <button type="button" class="deliv-stepper-btn" onclick="MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 1, ${delivId ? `'${delivId}'` : 'null'})" title="Increment">+</button>
+                    ${quickStepBtn}
+                    <span style="color: var(--text-tertiary); font-size: 10px; font-family: var(--font-mono); margin-left: 2px;">/ ${totalReq} ${unitLabel}</span>
+                  </div>
+                  <span style="font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; color: ${lineBadgeColor};">${itemPct}%</span>
+                </div>
+
+                <!-- Mini Progress Bar -->
+                <div class="telemetry-bar-track" style="margin-top: 6px;">
+                  <div class="telemetry-bar-fill" style="width: ${itemPct}%; background: ${lineBadgeColor};"></div>
+                </div>
               </div>
             </div>
           `;
         })
         .join("");
 
-      const telemetryFooter = `
-        <div class="telemetry-footer-notice">
-          ⚡ <strong>VIEW-ONLY TELEMETRY HUD</strong><br/>
-          Metrics update automatically as you log daily study blocks, Kill List tasks, and school grades. The roadmap tracks where you stand without manual ticking.
+      const advanceFooter = `
+        <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-hairline);">
+          <button 
+            type="button" 
+            class="btn btn-secondary btn-advance-station" 
+            style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 12px; font-size: 11px; font-weight: 700; font-family: var(--font-mono); color: var(--accent-lavender); border-color: rgba(167, 139, 250, 0.3); background: rgba(167, 139, 250, 0.06); cursor: pointer;"
+            onclick="MetroMap.advanceStation('${station.id}')"
+          >
+            ADVANCE TO NEXT STATION &rarr;
+          </button>
+          <div style="text-align: center; font-size: 9px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 4px;">
+            Passes over any unfinished items and activates the next milestone.
+          </div>
         </div>
       `;
 
-      deliverablesList.innerHTML = progressHeader + itemsHtml + telemetryFooter;
+      deliverablesList.innerHTML = progressHeader + itemsHtml + advanceFooter;
     }
 
     drawer.classList.add("open");
