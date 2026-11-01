@@ -34,6 +34,13 @@ def test_grade_parser_standard_and_modifiers():
     # Comma decimal
     assert parse_polish_grade("4,5")["numeric_value"] == 4.5
 
+    # Badge colors for Polish grade tiers (specifically ensuring minus-grades belong to their base grade family)
+    assert parse_polish_grade("4-")["badge_color"] == "#0ea5e9"  # Sky Blue (Dobry family)
+    assert parse_polish_grade("5-")["badge_color"] == "#10b981"  # Emerald (Bardzo dobry family)
+    assert parse_polish_grade("3-")["badge_color"] == "#a855f7"  # Purple (Dostateczny family)
+    assert parse_polish_grade("2-")["badge_color"] == "#f59e0b"  # Amber (Dopuszczający family)
+    assert parse_polish_grade("1")["badge_color"] == "#ef4444"   # Red (Niedostateczny)
+
 
 def test_grade_parser_fractions_and_points():
     # 17/17 is 100% -> 6.0
