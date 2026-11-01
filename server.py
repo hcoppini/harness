@@ -881,6 +881,15 @@ def get_recommended_kill_items():
     date_str = request.args.get("date")
     return jsonify(api.get_recommended_kill_items(date_str))
 
+@app.route("/api/operating_mode", methods=["GET", "POST"])
+def operating_mode():
+    if request.method == "POST":
+        payload = request.get_json(silent=True) or {}
+        mode = payload.get("mode", "FORTRESS")
+        res = api.set_operating_mode(mode)
+        return jsonify(res)
+    return jsonify({"mode": api.get_operating_mode()})
+
 @app.route("/api/vulcan/sync", methods=["POST"])
 def sync_vulcan():
     payload = request.get_json(silent=True) or {}

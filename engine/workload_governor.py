@@ -7,6 +7,8 @@ Unifies school-first defense with long-term Matura Rozszerzona & TUM Heilbronn m
 
 import re
 import sqlite3
+import json
+from pathlib import Path
 from datetime import datetime, timedelta, date
 from typing import Dict, Any, List, Optional, Tuple
 
@@ -14,10 +16,46 @@ from app.db import get_connection
 from engine import kill_list_controller
 from engine import grade_parser
 
+DATA_DIR = Path(__file__).resolve().parent.parent / "data"
+OPERATING_MODE_FILE = DATA_DIR / "operating_mode.json"
+
 TIER_1_KEYWORDS = ["matematyka", "informatyka", "angielski", "math", "cs", "algorithm"]
 ESSAY_KEYWORDS = ["esej", "rozprawka", "wypracowanie", "tekst", "opowiadanie", "charakterystyka", "analiza literacka", "praca pisemna"]
 EXAM_MAJOR_KEYWORDS = ["sprawdzian", "praca klasowa", "test diagnostyczny", "arkusz", "matura", "egzamin"]
 QUIZ_KEYWORDS = ["kartkówka", "kartkowka", "odpowiedź", "odpowiedz ustna", "wejściówka"]
+
+
+def get_operating_mode() -> str:
+    """
+    Returns the current active system operating mode:
+    - 'FORTRESS' (Default): Standard Warsaw Liceum, SGH deep work, high problem quotas.
+    - 'FIELD': Travel / Away from workstation / Holiday. Suspends Warsaw schedules, reduces to unbreakable floor anchor.
+    - 'SURGE_RECOVERY': Life recovery / Illness / Family surge. Preserves biological baseline floor (protein, sleep, log).
+    """
+    if OPERATING_MODE_FILE.exists():
+        try:
+            with open(OPERATING_MODE_FILE, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+                mode = (cfg.get("mode") or "").strip().upper()
+                if mode in ("FORTRESS", "FIELD", "SURGE_RECOVERY"):
+                    return mode
+        except Exception:
+            pass
+    return "FORTRESS"
+
+
+def set_operating_mode(mode: str) -> Dict[str, Any]:
+    """
+    Sets the active system operating mode ('FORTRESS', 'FIELD', or 'SURGE_RECOVERY').
+    """
+    clean_mode = (mode or "").strip().upper()
+    if clean_mode not in ("FORTRESS", "FIELD", "SURGE_RECOVERY"):
+        return {"success": False, "error": f"Invalid mode: {mode}. Must be FORTRESS, FIELD, or SURGE_RECOVERY."}
+
+    DATA_DIR.mkdir(parents=True, exist_ok=True)
+    with open(OPERATING_MODE_FILE, "w", encoding="utf-8") as f:
+        json.dump({"mode": clean_mode, "updated_at": datetime.now().isoformat()}, f, indent=2)
+    return {"success": True, "mode": clean_mode}
 
 
 def is_us_travel_date(target_date: Optional[Any] = None) -> bool:
@@ -342,7 +380,9 @@ def get_workload_analysis(
     end_dt = target_dt + timedelta(days=10)
     hw_end_dt = target_dt + timedelta(days=7)
 
-    is_travel = is_us_travel_date(target_dt)
+    op_mode = get_operating_mode()
+    is_travel = is_us_travel_date(target_dt) or (op_mode == "FIELD")
+    is_recovery = (op_mode == "SURGE_RECOVERY")
     vulnerabilities = get_subject_vulnerabilities(conn=conn)
 
     cursor = conn.cursor()
@@ -377,8 +417,8 @@ def get_workload_analysis(
         e["is_vulnerable"] = subj_vuln.get("is_vulnerable", False)
         e["subject_gpa"] = subj_vuln.get("gpa", 4.0)
 
-        # US Travel protocol: exams occurring during trip are travel-excused post-trip defense
-        if is_travel or is_us_travel_date(ex_date):
+        # Travel or Recovery protocol: exams occurring during trip/recovery are excused post-event
+        if is_travel or is_recovery or is_us_travel_date(ex_date):
             e["is_travel_excused"] = True
 
         # Only future exams (days_left >= 1) require acute study preparation; exam day (days_left == 0) is already written
@@ -421,7 +461,7 @@ def get_workload_analysis(
         h["is_vulnerable"] = subj_vuln.get("is_vulnerable", False)
         h["subject_gpa"] = subj_vuln.get("gpa", 4.0)
 
-        if is_travel or is_us_travel_date(h_date):
+        if is_travel or is_recovery or is_us_travel_date(h_date):
             h["is_travel_excused"] = True
 
         if not h.get("is_travel_excused"):
@@ -518,9 +558,15 @@ def get_workload_analysis(
 
     if is_travel:
         mode = "TRAVEL"
-        mode_label = "Travel Mode • Minimal Maintenance"
+        mode_label = "Field Mode • Minimal Maintenance Floor"
         badge_class = "travel"
-        desc = "Travel Mode Active (Oct 4–18). Warsaw Liceum timetable suspended. School surge frozen. 60m minimal maintenance study hour to keep pace with zero guilt. Enjoy your trip."
+        desc = "Field / Travel Mode Active. Warsaw Liceum timetable suspended. School surge frozen. 60m minimal maintenance study hour to keep pace with zero guilt. Enjoy your trip."
+        score = 1.0
+    elif is_recovery:
+        mode = "SURGE_RECOVERY"
+        mode_label = "Surge Recovery • Biological Baseline Floor"
+        badge_class = "travel"
+        desc = "Life Recovery / Family Surge Mode Active. High-friction deadlines excused. Priority on biological baseline, sleep, protein, and micro-habits."
         score = 1.0
     elif score > 6.0:
         mode = "SURGE"
@@ -592,6 +638,8 @@ def get_workload_analysis(
         "cruise_unlocked": cruise_unlocked,
         "vulnerabilities": vulnerabilities,
         "is_us_travel_mode": is_travel,
+        "is_recovery_mode": is_recovery,
+        "operating_mode": op_mode,
     }
 
 
@@ -681,7 +729,63 @@ def synthesize_adaptive_schedule(
     is_weekend = weekday in (5, 6)
 
     # --------------------------------------------------------------------------
-    # 0. US TRAVEL PROTOCOL (Oct 4–18, 2026)
+    # 0A. SURGE RECOVERY PROTOCOL (Illness / Jet lag / Family Emergency)
+    # --------------------------------------------------------------------------
+    if analysis.get("is_recovery_mode") or analysis.get("mode") == "SURGE_RECOVERY":
+        recovery_blocks = [
+            {
+                "time": "08:30 – 09:30",
+                "focus": "Morning Fuel & Launch",
+                "activity": "Gentle wake up, hydration, high-protein breakfast. Nervous system recovery.",
+                "type": "routine",
+            },
+            {
+                "time": "10:00 – 10:45",
+                "focus": "Biological Floor • Micro-Habits (45m)",
+                "activity": "[Unbreakable Floor] 20m mobile German Anki vocabulary + 15m review/planning + 10m mental check-in. Momentum sustained; zero guilt.",
+                "type": "deep_work",
+                "is_tum_roadmap": True,
+                "is_school_dedicated": False,
+                "net_minutes": 45,
+            },
+            {
+                "time": "12:00 – 18:30",
+                "focus": "Rest, Family Duties & Life Recovery",
+                "activity": "Family obligations, restorative downtime, low cognitive load. Zero academic guilt.",
+                "type": "rest",
+            },
+            {
+                "time": "18:30 – 19:15",
+                "focus": "Light Mobility & Walk",
+                "activity": "45 min outdoor walk, fresh air, light mobility/stretching.",
+                "type": "training",
+            },
+            {
+                "time": "19:30 – 21:00",
+                "focus": "High-Protein Dinner & Daily Log",
+                "activity": "Nutritious dinner, protein target met, 60-second status check-in on Harness.",
+                "type": "nutrition",
+            },
+            {
+                "time": "21:00 – 22:30",
+                "focus": "Evening Wind Down & Read",
+                "activity": "Decompress, read, zero screen glare before bed.",
+                "type": "rest",
+            },
+            {
+                "time": "22:30 – 07:30",
+                "focus": "Restorative Sleep (9 hrs)",
+                "activity": "Deep cellular and nervous system recovery.",
+                "type": "sleep",
+            },
+        ]
+        schedule["blocks"] = recovery_blocks
+        schedule["name"] = f"Recovery Protocol ({target_dt.strftime('%A')})"
+        schedule["description"] = "Life Recovery / Family Surge Mode Active. High-friction commitments paused. Biological floor and streak preserved."
+        return schedule
+
+    # --------------------------------------------------------------------------
+    # 0B. FIELD / TRAVEL PROTOCOL (Away from Warsaw workstation)
     # --------------------------------------------------------------------------
     if analysis.get("is_us_travel_mode"):
         station_id = get_active_station_id(target_dt)

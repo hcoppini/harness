@@ -55,7 +55,15 @@
         "Physical": "Weight 68.5 kg, daily protein floor at 140g."
       },
       "next_action": "Solve LeetCode Problem #5 without AI and trace variables by hand.",
-      "completed_deliverables": []
+      "completed_deliverables": [
+        "Academics",
+        "SIGG",
+        "Physical",
+        "Code"
+      ],
+      "passed_over_deliverables": [
+        "German"
+      ]
     },
     {
       "id": "oct-2026",
@@ -64,7 +72,7 @@
       "name": "Gra Testowa & Moduły",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": false,
-      "status": "upcoming",
+      "status": "completed",
       "branches": [
         "academics",
         "code",
@@ -78,7 +86,14 @@
         "SIGG": "Dokończyć rejestrację zespołu (do 30.10). Gra testowa na platformie GPWtr@der (2–13.11). Zaliczyć moduły e-learningowe i testy wiedzy.",
         "German": "Finish A2.1 vocabulary deck."
       },
-      "next_action": "Sprawdzić rejestrację zespołu i przejść moduły edukacyjne na platformie GPWtr@der."
+      "next_action": "October audited and reallocated forward into Nov 2026 - Sep 2027 stations.",
+      "completed_deliverables": [],
+      "passed_over_deliverables": [
+        "Academics",
+        "Code",
+        "SIGG",
+        "German"
+      ]
     },
     {
       "id": "nov-2026",
@@ -87,21 +102,43 @@
       "name": "Etap Główny (20k PLN)",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": true,
-      "status": "upcoming",
+      "status": "active",
       "branches": [
         "academics",
         "code",
         "sigg",
         "physical"
       ],
-      "objective": "Launch 25. edycja SIGG Etap Główny (20 000 PLN capital) & CKE data parsing tasks.",
+      "objective": "Launch 25. edycja SIGG Etap Główny (20 000 PLN capital) & CKE data parsing tasks. [Includes +2 Math R & +2 Code catch-up].",
       "deliverables": {
-        "Academics": "Mid-semester review. All subjects > 4.0, Math and CS locked at 5.0+.",
-        "SIGG": "Start Etapu Głównego (16 listopada 2026 – 12 marca 2027). Kapitał 20 000 zł na akcje WIG20/mWIG40 i ETF-y. Złożyć obowiązkową pierwszą transakcję. Śledzić 4 premie lotne w trakcie etapu.",
-        "Code": "Transition to CKE Matura programming tasks in Python/C++ (file operations, data parsing).",
+        "Academics": "Mid-semester review. All subjects > 4.0, Math and CS locked at 5.0+. Target: 42 Math R problems (40 base + 2 Oct catch-up).",
+        "SIGG": "Start Etapu Głównego (16 listopada 2026 – 12 marca 2027). Kapitał 20 000 zł na akcje WIG20/mWIG40 i ETF-y. Złożyć obowiązkową pierwszą transakcję. Śledzić 4 premie lotne w trakcie etapu. (Gra Testowa na GPWtr@der 2-13.11).",
+        "Code": "Transition to CKE Matura programming tasks in Python/C++. Target: 17 exercises (15 base + 2 Oct catch-up).",
         "Physical": "Weight 69.5 kg; 5k run pace under 4:40."
       },
-      "next_action": "Złożyć pierwsze zlecenie w Etapie Głównym SIGG (WIG20/mWIG40/ETF) z kapitału 20 000 zł."
+      "next_action": "Gra Testowa na GPWtr@der (start 2.11) & pierwsze zadania Math R (42 zadania).",
+      "deliverable_counts": {
+        "Academics": {
+          "count": 0,
+          "total": 42,
+          "unit": "problems"
+        },
+        "Code": {
+          "count": 0,
+          "total": 17,
+          "unit": "exercises"
+        },
+        "SIGG": {
+          "count": 0,
+          "total": 5,
+          "unit": "modules"
+        },
+        "Physical": {
+          "count": 0,
+          "total": 30,
+          "unit": "days"
+        }
+      }
     },
     {
       "id": "dec-2026",
@@ -119,12 +156,34 @@
       ],
       "objective": "Lock in high grades on Sem 1 transcript & audit stock scanner.",
       "deliverables": {
-        "Academics": "Finalize Semester 1 proposed grades. No grade below 4; Math, CS, English at 5 or 6.",
+        "Academics": "Finalize Semester 1 proposed grades. No grade below 4; Math, CS, English at 5 or 6. Target: 42 Math R problems (40 base + 2 Oct catch-up).",
         "SIGG": "Etap Główny (20 000 zł): Przegląd portfela akcji/ETF przed przerwą świąteczną i okresem niskiej płynności. Polowanie na premię lotną.",
-        "German": "A2 certification test (self-assessment or mock). Begin transition to B1 materials.",
-        "Code": "Audit desktop/polish_stocks_day_trade-main and understand every function without AI explanation."
+        "German": "A2 certification test (self-assessment or mock). Begin transition to B1 materials. Target: 110 words in Anki (100 base + 10 Oct catch-up).",
+        "Code": "Audit desktop/polish_stocks_day_trade-main and understand every function without AI explanation. Target: 17 exercises (15 base + 2 Oct catch-up)."
       },
-      "next_action": "Review Semester 1 transcript and ensure all STEM subjects are 5.0+."
+      "next_action": "Review Semester 1 transcript and ensure all STEM subjects are 5.0+.",
+      "deliverable_counts": {
+        "Academics": {
+          "count": 0,
+          "total": 42,
+          "unit": "problems"
+        },
+        "SIGG": {
+          "count": 0,
+          "total": 5,
+          "unit": "modules"
+        },
+        "German": {
+          "count": 0,
+          "total": 110,
+          "unit": "words"
+        },
+        "Code": {
+          "count": 0,
+          "total": 17,
+          "unit": "exercises"
+        }
+      }
     },
     {
       "id": "jan-2027",
@@ -141,11 +200,28 @@
       ],
       "objective": "SIGG Etap Główny portfolio midpoint audit & dynamic programming drills.",
       "deliverables": {
-        "Academics": "Formal Semester 1 grades locked onto official transcript.",
+        "Academics": "Formal Semester 1 grades locked onto official transcript. Target: 42 Math R problems (40 base + 2 Oct catch-up).",
         "SIGG": "Półmetek Etapu Głównego (trwa do 12 marca). Audyt portfela akcji/ETF, kontrola obsunięcia kapitału (drawdown) i rywalizacja w modułach wiedzy.",
-        "Code": "Solve 10 dynamic programming and recursion problems from previous Matura sheets."
+        "Code": "Solve 17 dynamic programming and recursion problems from previous Matura sheets (15 base + 2 Oct catch-up)."
       },
-      "next_action": "Zoptymalizować pozycje w portfelu SIGG (akcje i ETF-y) pod kątem dynamiki sektorowej."
+      "next_action": "Zoptymalizować pozycje w portfelu SIGG (akcje i ETF-y) pod kątem dynamiki sektorowej.",
+      "deliverable_counts": {
+        "Academics": {
+          "count": 0,
+          "total": 42,
+          "unit": "problems"
+        },
+        "SIGG": {
+          "count": 0,
+          "total": 5,
+          "unit": "modules"
+        },
+        "Code": {
+          "count": 0,
+          "total": 17,
+          "unit": "exercises"
+        }
+      }
     },
     {
       "id": "feb-2027",
@@ -163,12 +239,34 @@
       ],
       "objective": "Winter break math acceleration & futures simulation.",
       "deliverables": {
-        "Academics": "Complete 5 full Math Rozszerzona past sheets (CKE 2020-2024).",
+        "Academics": "Complete 5 full Math Rozszerzona past sheets (CKE 2020-2024). Target: 42 Math R problems (40 base + 2 Oct catch-up).",
         "SIGG": "Etap Główny w fazie finałowej (do 12 marca). Przygotowanie do rozgrywki na kontraktach terminowych (start 15 marca): symulacja mechaniki dźwigni FW20 i pozycji krótkich.",
-        "German": "B1 grammar foundations (Subjunctive II, passive voice, subordinate clauses).",
+        "German": "B1 grammar foundations (Subjunctive II, passive voice, subordinate clauses). Target: 112 words (100 base + 12 Oct catch-up).",
         "Physical": "Weight 71.0 kg; bench/squat/deadlift baseline increase of 5%."
       },
-      "next_action": "Solve 5 complete Math R arkusze under timed conditions."
+      "next_action": "Solve 5 complete Math R arkusze under timed conditions.",
+      "deliverable_counts": {
+        "Academics": {
+          "count": 0,
+          "total": 42,
+          "unit": "problems"
+        },
+        "SIGG": {
+          "count": 0,
+          "total": 5,
+          "unit": "modules"
+        },
+        "German": {
+          "count": 0,
+          "total": 112,
+          "unit": "words"
+        },
+        "Physical": {
+          "count": 0,
+          "total": 30,
+          "unit": "days"
+        }
+      }
     },
     {
       "id": "mar-2027",
@@ -186,10 +284,27 @@
       "objective": "Finisz Etapu Głównego (12.03) i rozgrywka na kontraktach terminowych (15-26.03).",
       "deliverables": {
         "SIGG": "12 marca: Zakończenie Etapu Głównego. 15–26 marca: Dedykowana rozgrywka na kontraktach terminowych z osobną pulą 10 000 zł. Ścisły risk management i stop-loss na kontraktach FW20.",
-        "Academics": "Q3 school grades checkup. Ensure Polish, History, and Biology stay >= 4.0.",
-        "Code": "Master SQL databases and Access/Excel data processing modules required for Matura Informatyka."
+        "Academics": "Q3 school grades checkup. Ensure Polish, History, and Biology stay >= 4.0. Target: 42 Math R problems (40 base + 2 Oct catch-up).",
+        "Code": "Master SQL databases and Access/Excel data processing modules required for Matura Informatyka. Target: 16 exercises (15 base + 1 Oct catch-up)."
       },
-      "next_action": "Obrót kontraktami terminowymi FW20 w dedykowanym etapie (15–26 marca) z puli 10 000 zł."
+      "next_action": "Obrót kontraktami terminowymi FW20 w dedykowanym etapie (15–26 marca) z puli 10 000 zł.",
+      "deliverable_counts": {
+        "SIGG": {
+          "count": 0,
+          "total": 5,
+          "unit": "modules"
+        },
+        "Academics": {
+          "count": 0,
+          "total": 42,
+          "unit": "problems"
+        },
+        "Code": {
+          "count": 0,
+          "total": 16,
+          "unit": "exercises"
+        }
+      }
     },
     {
       "id": "apr-2027",
@@ -207,10 +322,27 @@
       "objective": "Oficjalny ranking (12.04) i Wielki Finał w Sali Notowań GPW w Warszawie (22.04).",
       "deliverables": {
         "SIGG": "12 kwietnia: Ogłoszenie rankingu oficjalnego. 22 kwietnia: Wielki Finał 25. edycji w Sali Notowań GPW w Warszawie dla 50 najlepszych zespołów w Polsce (pula nagród >200 tys. zł, laptopy MacBook).",
-        "Academics": "End-of-year sprint begins. Target 5.0+ in all core STEM subjects.",
-        "German": "B1 intermediate listening comprehension (DW Langsam gesprochene Nachrichten)."
+        "Academics": "End-of-year sprint begins. Target 5.0+ in all core STEM subjects. Target: 42 Math R problems (40 base + 2 Oct catch-up).",
+        "German": "B1 intermediate listening comprehension (DW Langsam gesprochene Nachrichten). Target: 113 words (100 base + 13 Oct catch-up)."
       },
-      "next_action": "Udział w Wielkim Finale 25. edycji SIGG w Sali Notowań GPW w Warszawie (22 kwietnia)."
+      "next_action": "Udział w Wielkim Finale 25. edycji SIGG w Sali Notowań GPW w Warszawie (22 kwietnia).",
+      "deliverable_counts": {
+        "SIGG": {
+          "count": 0,
+          "total": 5,
+          "unit": "modules"
+        },
+        "Academics": {
+          "count": 0,
+          "total": 42,
+          "unit": "problems"
+        },
+        "German": {
+          "count": 0,
+          "total": 113,
+          "unit": "words"
+        }
+      }
     },
     {
       "id": "may-2027",
@@ -226,10 +358,22 @@
       ],
       "objective": "Write official 2027 Matura 1 year early under timed exam conditions.",
       "deliverables": {
-        "Academics": "Sit down with 2027 official Matura papers written by 4th-graders. Score yourself under real exam timing (aim for >70% raw score on Math R 1 year early).",
+        "Academics": "Sit down with 2027 official Matura papers written by 4th-graders. Score yourself under real exam timing (aim for >70% raw score on Math R 1 year early). Target: 42 Math R problems (40 base + 2 Oct catch-up).",
         "Physical": "Body weight 72.5 kg at 14-15% body fat."
       },
-      "next_action": "Score 2027 official CKE Math sheet and identify gap topics."
+      "next_action": "Score 2027 official CKE Math sheet and identify gap topics.",
+      "deliverable_counts": {
+        "Academics": {
+          "count": 0,
+          "total": 42,
+          "unit": "problems"
+        },
+        "Physical": {
+          "count": 0,
+          "total": 30,
+          "unit": "days"
+        }
+      }
     },
     {
       "id": "jun-2027",
@@ -246,11 +390,28 @@
       ],
       "objective": "Milepost 1 for TUM: 3rd Class Liceum Final Transcript (GPA >= 4.8).",
       "deliverables": {
-        "Academics": "Milepost 1 for TUM: 3rd Class Liceum Final Transcript completed with GPA >= 4.8.",
-        "Code": "Complete a standalone, production-ready project for your portfolio without AI-generated scaffolding.",
+        "Academics": "Milepost 1 for TUM: 3rd Class Liceum Final Transcript completed with GPA >= 4.8. Target: 46 Math R problems (40 base + 6 summer catch-up).",
+        "Code": "Complete a standalone, production-ready project for your portfolio without AI-generated scaffolding. Target: 21 tasks (15 base + 6 summer catch-up).",
         "Harness": "Update portfolio database with SIGG credentials and year-end metrics."
       },
-      "next_action": "Verify final 3rd-year certificate grades with school administration."
+      "next_action": "Verify final 3rd-year certificate grades with school administration.",
+      "deliverable_counts": {
+        "Academics": {
+          "count": 0,
+          "total": 46,
+          "unit": "problems"
+        },
+        "Code": {
+          "count": 0,
+          "total": 21,
+          "unit": "exercises"
+        },
+        "Harness": {
+          "count": 0,
+          "total": 10,
+          "unit": "reps"
+        }
+      }
     },
     {
       "id": "jul-aug-2027",
@@ -267,11 +428,28 @@
       ],
       "objective": "Goethe B1 certification, Math Calculus sprint, and 74kg mass check.",
       "deliverables": {
-        "German": "Target Goethe-Zertifikat B1 exam or verify B1 competence. Start B2 reading.",
-        "Academics": "Math Rozszerzona topical review (Calculus, Stereometry, Combinatorics).",
+        "German": "Target Goethe-Zertifikat B1 exam or verify B1 competence. Start B2 reading. Target: 165 words in Anki (100 base + 65 summer catch-up).",
+        "Academics": "Math Rozszerzona topical review (Calculus, Stereometry, Combinatorics). Target: 54 Math R problems (40 base + 14 summer catch-up).",
         "Physical": "Peak summer check: 73.5-74 kg, 13-14% body fat, 5k run maintained at sub-4:40 pace."
       },
-      "next_action": "Register for Goethe B1 examination."
+      "next_action": "Register for Goethe B1 examination.",
+      "deliverable_counts": {
+        "German": {
+          "count": 0,
+          "total": 165,
+          "unit": "words"
+        },
+        "Academics": {
+          "count": 0,
+          "total": 54,
+          "unit": "problems"
+        },
+        "Physical": {
+          "count": 0,
+          "total": 30,
+          "unit": "days"
+        }
+      }
     },
     {
       "id": "sep-2027",
@@ -287,10 +465,22 @@
       ],
       "objective": "Official Matura declarations locked & daily timed algorithm speed drills.",
       "deliverables": {
-        "Academics": "Lock in official Matura declarations: Matematyka Podstawowa + Rozszerzona, Informatyka Rozszerzona, Język Angielski Dwujęzyczny / C1.",
-        "Code": "Daily timed Matura algorithm speed-drills (45 min/day)."
+        "Academics": "Lock in official Matura declarations: Matematyka Podstawowa + Rozszerzona, Informatyka Rozszerzona, Język Angielski Dwujęzyczny / C1. Target: 46 Math R problems (40 base + 6 summer catch-up).",
+        "Code": "Daily timed Matura algorithm speed-drills (45 min/day). Target: 22 tasks (15 base + 7 summer catch-up)."
       },
-      "next_action": "Submit official deklaracja maturalna to school director."
+      "next_action": "Submit official deklaracja maturalna to school director.",
+      "deliverable_counts": {
+        "Academics": {
+          "count": 0,
+          "total": 46,
+          "unit": "problems"
+        },
+        "Code": {
+          "count": 0,
+          "total": 22,
+          "unit": "exercises"
+        }
+      }
     },
     {
       "id": "oct-2027",

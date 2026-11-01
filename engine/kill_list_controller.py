@@ -618,6 +618,7 @@ def get_station_deliverables(
                 if matched_st:
                     delivs_dict = matched_st.get("deliverables", {})
                     clean_sid = matched_st["id"].replace("-", "")
+                    deliv_counts = matched_st.get("deliverable_counts", {})
                     seed_items = []
                     for key, desc in delivs_dict.items():
                         k_low = key.lower()
@@ -651,6 +652,11 @@ def get_station_deliverables(
                             unit = "tasks"
                             total = 10
                             title = f"{key}: {desc[:40]}"
+
+                        if key in deliv_counts and "total" in deliv_counts[key]:
+                            total = deliv_counts[key]["total"]
+                            if "unit" in deliv_counts[key]:
+                                unit = deliv_counts[key]["unit"]
 
                         d_id = f"{clean_sid}_{stream[:4]}"
                         seed_items.append((d_id, matched_st["id"], stream, title, total, 0, unit, 0))
@@ -852,9 +858,17 @@ def update_deliverable_progress(
                         comp_list.remove(matched_key)
 
                     target_station["completed_deliverables"] = comp_list
-                    if len(deliv_dict) > 0 and len(comp_list) >= len(deliv_dict) and all(k in comp_list for k in deliv_dict.keys()):
+                    passed_list = target_station.get("passed_over_deliverables", [])
+                    if is_done and matched_key in passed_list:
+                        passed_list.remove(matched_key)
+                        target_station["passed_over_deliverables"] = passed_list
+
+                    all_resolved = len(deliv_dict) > 0 and all(
+                        (k in comp_list or k in passed_list) for k in deliv_dict.keys()
+                    )
+                    if all_resolved:
                         target_station["status"] = "completed"
-                    elif target_station.get("status") == "completed" and not is_done:
+                    elif target_station.get("status") == "completed" and not is_done and matched_key not in passed_list:
                         target_station["status"] = "active"
 
                     with open(roadmap_file, "w", encoding="utf-8") as f:

@@ -832,6 +832,16 @@ class HarnessAPI:
         from engine import workload_governor
         return workload_governor.get_workload_analysis(target_date)
 
+    def get_operating_mode(self) -> str:
+        from engine import workload_governor
+        return workload_governor.get_operating_mode()
+
+    def set_operating_mode(self, mode: str) -> Dict[str, Any]:
+        from engine import workload_governor
+        res = workload_governor.set_operating_mode(mode)
+        self._trigger_auto_sync()
+        return res
+
     def get_recommended_kill_items(self, date_str: Optional[str] = None) -> List[Dict[str, Any]]:
         from engine import workload_governor
         return workload_governor.get_recommended_kill_items(date_str)
