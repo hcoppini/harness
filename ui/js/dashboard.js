@@ -639,12 +639,12 @@ window.Dashboard = {
             const isOverdue = h.days_left < 0;
 
             return `
-              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 6px 8px;">
-                <div style="display: flex; align-items: center; gap: 6px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 75%;">
-                  <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 600;">[${this.escapeHtml(h.subject)}]</span>
-                  <span style="font-size: 12px; color: var(--text-primary);">${this.escapeHtml(h.title)}</span>
+              <div class="radar-card-item" style="display: flex; justify-content: space-between; align-items: flex-start; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 7px 10px; gap: 8px;">
+                <div class="radar-card-content" style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0;">
+                  <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 700;">[${this.escapeHtml(h.subject)}]</span>
+                  <span class="radar-card-title" style="font-size: 12px; color: var(--text-primary); line-height: 1.35; word-break: break-word;">${this.escapeHtml(h.title)}</span>
                 </div>
-                <span class="key-pill" style="font-size: 9px; ${isOverdue ? "border-color: #ef4444; color: #ef4444;" : ""}">${dueBadge}</span>
+                <span class="key-pill radar-card-badge" style="font-size: 9px; flex-shrink: 0; margin-top: 1px; ${isOverdue ? "border-color: #ef4444; color: #ef4444;" : ""}">${dueBadge}</span>
               </div>
             `;
           })
@@ -663,12 +663,12 @@ window.Dashboard = {
             else if (e.days_left === 1) countdown = "TOMORROW";
 
             return `
-              <div style="display: flex; justify-content: space-between; align-items: center; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 6px 8px;">
-                <div style="overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 75%;">
-                  <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 600;">[${this.escapeHtml(e.subject)}]</span>
-                  <span style="font-size: 12px; color: var(--text-primary); margin-left: 4px;">${this.escapeHtml(e.title)}</span>
+              <div class="radar-card-item" style="display: flex; justify-content: space-between; align-items: flex-start; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 7px 10px; gap: 8px;">
+                <div class="radar-card-content" style="display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0;">
+                  <span style="font-size: 10px; font-family: var(--font-mono); color: var(--accent-purple-light); font-weight: 700;">[${this.escapeHtml(e.subject)}]</span>
+                  <span class="radar-card-title" style="font-size: 12px; color: var(--text-primary); line-height: 1.35; word-break: break-word;">${this.escapeHtml(e.title)}</span>
                 </div>
-                <span class="key-pill" style="font-size: 9px; color: var(--accent-purple-light);">${countdown}</span>
+                <span class="key-pill radar-card-badge" style="font-size: 9px; flex-shrink: 0; margin-top: 1px; color: var(--accent-purple-light);">${countdown}</span>
               </div>
             `;
           })

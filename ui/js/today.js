@@ -37,6 +37,12 @@ const Today = {
   async init() {
     this.bindEvents();
     this.renderMiniCalendar();
+    if (window.innerWidth <= 768) {
+      const qInput = document.getElementById("quickTaskInput");
+      if (qInput) qInput.placeholder = "Add task for today...";
+      const rInput = document.getElementById("reflectionWorked");
+      if (rInput) rInput.placeholder = "Record raw truth here or use AI Coach above...";
+    }
     await this.load(this.selectedDateStr);
     await this.loadSchoolPlan();
     await this.loadEasyLinks();
@@ -482,7 +488,7 @@ const Today = {
                 <span>${this.escapeHtml(block.focus)}</span>
                 ${badgesHtml}
               </div>
-              <div class="routine-activity" style="font-size: 11px; color: var(--text-tertiary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${compactActivity}</div>
+              <div class="routine-activity" style="font-size: 11px; color: var(--text-tertiary); line-height: 1.35;">${compactActivity}</div>
             </div>
             ${actionsHtml}
           </div>
