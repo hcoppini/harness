@@ -3076,7 +3076,177 @@ input[type="range"]::-moz-range-thumb {
 /* ==========================================================================
    Comprehensive Mobile Phone Layout (iOS / Android PWA <= 768px)
    ========================================================================== */
+
+/* Desktop defaults for Mobile-specific elements */
+.mobile-metro-hud,
+.today-mobile-segmented-bar {
+  display: none !important;
+}
+
 @media (max-width: 768px) {
+
+  /* ==========================================================================
+     MOBILE EXECUTIVE REDESIGN (v6.0 Monochrome Scroll-Free)
+     ========================================================================== */
+
+  /* 1. Cockpit Clutter Removal: Strip 365-day Heatmap and 7-day schedule reel */
+  .heatmap-card,
+  #dashForecastCard {
+    display: none !important;
+  }
+
+  /* 2. TUM Metro: HIDE 4,800px SVG Canvas Track and 22 Cards; SHOW Mobile Station HUD */
+  .metro-viewport,
+  .metro-cards-section,
+  .metro-toolbar {
+    display: none !important;
+  }
+
+  .mobile-metro-hud {
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 10px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin-top: 4px !important;
+  }
+
+  .mobile-hud-card {
+    padding: 12px 14px !important;
+    border-radius: 12px !important;
+    background: var(--bg-card) !important;
+    border: 1px solid var(--border-medium) !important;
+  }
+
+  .mobile-hud-deliv-item {
+    background: var(--bg-surface-elevated);
+    border: 1px solid var(--border-hairline);
+    border-radius: var(--radius-sm);
+    padding: 8px 10px;
+    transition: all 0.15s ease;
+  }
+
+  .mobile-hud-deliv-item.completed {
+    border-color: rgba(168, 85, 247, 0.25);
+    background: var(--accent-lavender-subtle);
+  }
+
+  .mobile-hud-deliv-item.passed-over {
+    opacity: 0.6;
+    background: var(--bg-surface);
+  }
+
+  .deliv-stepper-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border-hairline);
+    background: var(--bg-surface);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .deliv-stepper-btn:active {
+    background: var(--accent-lavender-subtle);
+    transform: scale(0.95);
+  }
+
+  .deliv-toggle-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    font-weight: 600;
+    border-radius: 6px;
+    border: 1px solid var(--border-hairline);
+    background: var(--bg-surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  .deliv-toggle-btn.completed {
+    background: var(--accent-lavender-subtle);
+    color: var(--accent-lavender);
+    border-color: var(--accent-lavender-border);
+    font-weight: 700;
+  }
+
+  /* 3. Daily Execution: Sticky Segmented Tab Switcher (Scroll-Free Mode) */
+  .today-mobile-segmented-bar {
+    display: flex !important;
+    gap: 4px !important;
+    padding: 4px !important;
+    background: var(--bg-surface-elevated) !important;
+    border: 1px solid var(--border-hairline) !important;
+    border-radius: 8px !important;
+    margin-bottom: 12px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    position: sticky !important;
+    top: 48px !important;
+    z-index: 50 !important;
+    backdrop-filter: blur(10px) !important;
+    -webkit-backdrop-filter: blur(10px) !important;
+  }
+
+  .today-segment-btn {
+    flex: 1 !important;
+    padding: 6px 4px !important;
+    font-size: 11px !important;
+    font-weight: 600 !important;
+    font-family: var(--font-sans) !important;
+    background: transparent !important;
+    border: none !important;
+    border-radius: 6px !important;
+    color: var(--text-tertiary) !important;
+    cursor: pointer !important;
+    text-align: center !important;
+    transition: all 0.15s ease !important;
+    white-space: nowrap !important;
+    -webkit-tap-highlight-color: transparent !important;
+  }
+
+  .today-segment-btn.active {
+    background: var(--bg-card) !important;
+    color: var(--text-primary) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
+    font-weight: 700 !important;
+  }
+
+  /* Filter cards based on active segment attribute */
+  .today-layout:not([data-active-segment]) [today-segment-target]:not([today-segment-target="routine"]),
+  .today-layout[data-active-segment="routine"] [today-segment-target]:not([today-segment-target="routine"]) {
+    display: none !important;
+  }
+
+  .today-layout[data-active-segment="timetable"] [today-segment-target]:not([today-segment-target="timetable"]) {
+    display: none !important;
+  }
+
+  .today-layout[data-active-segment="gym"] [today-segment-target]:not([today-segment-target="gym"]) {
+    display: none !important;
+  }
+
+  .today-layout[data-active-segment="diary"] [today-segment-target]:not([today-segment-target="diary"]) {
+    display: none !important;
+  }
+
+  /* Grades Ledger mobile responsiveness */
+  #gradesTableDrawer {
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch !important;
+  }
+
+  .grade-ledger-table {
+    min-width: 320px !important;
+    width: 100% !important;
+  }
   body {
     overflow-y: auto !important;
     overflow-x: hidden !important;

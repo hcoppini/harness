@@ -42,7 +42,6 @@ def test_mobile_bottom_nav_not_nested_in_modal():
 
         # Check closing tag of aiDiaryModal comes before bottom_nav
         slice_after_ai = content[ai_modal_idx:bottom_nav_idx]
-        # In this slice, there must be matching closing </div> tags for aiDiaryModal and its card
         assert slice_after_ai.count("</div>") >= 2
 
 def test_css_mobile_rules_and_calendar():
@@ -57,3 +56,77 @@ def test_css_mobile_rules_and_calendar():
 
         # Mobile bottom nav must have high z-index
         assert "z-index: 1000" in css
+
+def test_mobile_metro_hud_present_and_responsive():
+    """Verify that Mobile Metro HUD is present and replaces the 4,800px track on mobile."""
+    for filename in ["index.html", "ui/index.html"]:
+        path = Path(__file__).resolve().parent.parent / filename
+        with open(path, "r", encoding="utf-8") as f:
+            html = f.read()
+        assert 'id="mobileMetroHud"' in html
+        assert 'class="mobile-metro-hud"' in html
+
+    for filename in ["css/app.css", "ui/css/app.css"]:
+        path = Path(__file__).resolve().parent.parent / filename
+        with open(path, "r", encoding="utf-8") as f:
+            css = f.read()
+        # Desktop hides mobile HUD
+        assert ".mobile-metro-hud" in css
+        # Mobile hides viewport, cards section, and toolbar
+        assert ".metro-viewport,\n  .metro-cards-section,\n  .metro-toolbar" in css or ".metro-viewport" in css
+        assert "display: none !important;" in css
+
+def test_today_mobile_segmented_bar():
+    """Verify that Daily Execution has a Segmented Tab Switcher for scroll-free navigation."""
+    for filename in ["index.html", "ui/index.html"]:
+        path = Path(__file__).resolve().parent.parent / filename
+        with open(path, "r", encoding="utf-8") as f:
+            html = f.read()
+        assert 'id="todayMobileSegmentedBar"' in html
+        assert 'data-segment="routine"' in html
+        assert 'data-segment="timetable"' in html
+        assert 'data-segment="gym"' in html
+        assert 'data-segment="diary"' in html
+        assert 'today-segment-target="routine"' in html
+        assert 'today-segment-target="gym"' in html
+        assert 'today-segment-target="diary"' in html
+        assert 'today-segment-target="timetable"' in html
+
+    for filename in ["css/app.css", "ui/css/app.css"]:
+        path = Path(__file__).resolve().parent.parent / filename
+        with open(path, "r", encoding="utf-8") as f:
+            css = f.read()
+        assert ".today-mobile-segmented-bar" in css
+        assert '[today-segment-target="routine"]' in css
+        assert '[today-segment-target="timetable"]' in css
+
+def test_mobile_cockpit_clutter_free():
+    """Verify that the 365-day heatmap and 7-day schedule forecast are hidden on mobile."""
+    for filename in ["index.html", "ui/index.html"]:
+        path = Path(__file__).resolve().parent.parent / filename
+        with open(path, "r", encoding="utf-8") as f:
+            html = f.read()
+        assert 'id="dashForecastCard"' in html
+
+    for filename in ["css/app.css", "ui/css/app.css"]:
+        path = Path(__file__).resolve().parent.parent / filename
+        with open(path, "r", encoding="utf-8") as f:
+            css = f.read()
+        assert ".heatmap-card,\n  #dashForecastCard" in css or ".heatmap-card" in css
+
+def test_service_worker_v6_and_controllerchange():
+    """Verify Service Worker version v6.0 and controllerchange auto-reload."""
+    for filename in ["sw.js", "ui/sw.js"]:
+        path = Path(__file__).resolve().parent.parent / filename
+        with open(path, "r", encoding="utf-8") as f:
+            sw = f.read()
+        assert "harness-executive-v6.0" in sw
+        assert "?v=6.0" in sw
+
+    for filename in ["index.html", "ui/index.html"]:
+        path = Path(__file__).resolve().parent.parent / filename
+        with open(path, "r", encoding="utf-8") as f:
+            html = f.read()
+        assert "controllerchange" in html
+        assert "forceHardReload" in html
+        assert "v6.0" in html

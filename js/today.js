@@ -5,6 +5,19 @@
  */
 
 const Today = {
+  currentMobileSegment: "routine",
+
+  setMobileSegment(segment) {
+    this.currentMobileSegment = segment;
+    const layout = document.querySelector(".today-layout");
+    if (layout) {
+      layout.setAttribute("data-active-segment", segment);
+    }
+    const btns = document.querySelectorAll(".today-segment-btn");
+    btns.forEach((btn) => {
+      btn.classList.toggle("active", btn.getAttribute("data-segment") === segment);
+    });
+  },
   tasks: [],
   schedule: null,
   gymRoutine: null,
@@ -37,6 +50,7 @@ const Today = {
   async init() {
     this.bindEvents();
     this.renderMiniCalendar();
+    this.setMobileSegment(this.currentMobileSegment || 'routine');
     if (window.innerWidth <= 768) {
       const qInput = document.getElementById("quickTaskInput");
       if (qInput) qInput.placeholder = "Add task for today...";
@@ -150,6 +164,7 @@ const Today = {
           this.calDisplayYear--;
         }
         this.renderMiniCalendar();
+    this.setMobileSegment(this.currentMobileSegment || 'routine');
       });
     }
 
@@ -161,6 +176,7 @@ const Today = {
           this.calDisplayYear++;
         }
         this.renderMiniCalendar();
+    this.setMobileSegment(this.currentMobileSegment || 'routine');
       });
     }
 
@@ -213,6 +229,7 @@ const Today = {
   async selectDate(dateStr) {
     this.selectedDateStr = dateStr;
     this.renderMiniCalendar();
+    this.setMobileSegment(this.currentMobileSegment || 'routine');
     await this.load(dateStr);
     await this.loadSchoolPlan();
     await this.loadHomeworkAndExams();
@@ -1596,6 +1613,7 @@ const Today = {
     }
 
     this.renderMiniCalendar();
+    this.setMobileSegment(this.currentMobileSegment || 'routine');
   },
 
   async toggleHomeworkItem(id) {

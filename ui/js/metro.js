@@ -19,6 +19,7 @@
  */
 
 const MetroMap = {
+  mobileSelectedStationId: null,
   data: null,
   isDragging: false,
   startX: 0,
@@ -89,6 +90,175 @@ const MetroMap = {
     } catch (e) {
       console.warn("[MetroMap] saveState error:", e);
     }
+  },
+
+    selectMobileStation(stationId) {
+    this.mobileSelectedStationId = stationId;
+    this.renderMobileHud();
+  },
+
+  renderMobileHud() {
+    const container = document.getElementById("mobileMetroHud");
+    if (!container || !this.data || !this.data.stations) return;
+
+    const stations = this.data.stations;
+    let activeIndex = stations.findIndex((s) => s.status === "active");
+    if (activeIndex === -1) activeIndex = 0;
+
+    let currentStationId = this.mobileSelectedStationId || stations[activeIndex].id;
+    let station = stations.find((s) => s.id === currentStationId) || stations[activeIndex];
+    const stationIndex = stations.findIndex((s) => s.id === station.id);
+
+    const status = station.status || "upcoming";
+    const progressPercent = this.calculateStationProgress(station);
+    const delivEntries = Object.entries(station.deliverables || {});
+    const completedList = station.completed_deliverables || [];
+    const passedOverList = station.passed_over_deliverables || [];
+    const doneCount = completedList.length + passedOverList.length;
+    const totalCount = delivEntries.length;
+
+    // Build select dropdown options
+    const optionsHtml = stations
+      .map((s, idx) => {
+        const isCur = s.id === station.id;
+        const tag = s.status === "active" ? " • ACTIVE" : (s.status === "completed" ? " ✓" : "");
+        return `<option value="${s.id}" ${isCur ? "selected" : ""}>${String(idx + 1).padStart(2, "0")}: ${s.month_label} - ${this.escapeHtml(s.name)}${tag}</option>`;
+      })
+      .join("");
+
+    // Build deliverables HTML
+    let delivsHtml = "";
+    if (delivEntries.length === 0) {
+      delivsHtml = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 8px 0;">No active deliverables defined.</div>`;
+    } else {
+      delivsHtml = delivEntries
+        .map(([key, val]) => {
+          const isCompleted = completedList.includes(key);
+          const isPassedOver = passedOverList.includes(key);
+          const counter = this.getDeliverableCounter(station.id, key, val);
+          const isCounter = counter && counter.total > 1;
+
+          const progressObj = this.stationProgress?.find((p) => p.title === key || p.title === val);
+          const delivId = progressObj ? progressObj.id : null;
+
+          let controlHtml = "";
+          if (isCounter) {
+            controlHtml = `
+              <div style="display: flex; align-items: center; gap: 4px;">
+                <button type="button" class="deliv-stepper-btn" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', -1, ${delivId}); MetroMap.renderMobileHud();" title="Decrement">-</button>
+                <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--text-primary); min-width: 32px; text-align: center;">${counter.count}/${counter.total}</span>
+                <button type="button" class="deliv-stepper-btn" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 1, ${delivId}); MetroMap.renderMobileHud();" title="Increment (+1)">+1</button>
+              </div>
+            `;
+          } else {
+            controlHtml = `
+              <button type="button" class="deliv-toggle-btn ${isCompleted ? "completed" : ""}" onclick="event.stopPropagation(); MetroMap.toggleDeliverable('${station.id}', '${this.escapeHtml(key)}', ${isCompleted}, ${delivId}); MetroMap.renderMobileHud();">
+                ${isCompleted ? "✓ Done" : "Mark Done"}
+              </button>
+            `;
+          }
+
+          return `
+            <div class="mobile-hud-deliv-item ${isCompleted ? "completed" : ""} ${isPassedOver ? "passed-over" : ""}">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
+                <div style="flex: 1; min-width: 0;">
+                  <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); line-height: 1.35; ${isCompleted ? "text-decoration: line-through; opacity: 0.7;" : ""} ${isPassedOver ? "text-decoration: line-through; opacity: 0.5;" : ""}">
+                    ${this.escapeHtml(key)}
+                  </div>
+                  <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px; line-height: 1.35; ${isCompleted ? "opacity: 0.6;" : ""}">
+                    ${this.escapeHtml(val)}
+                  </div>
+                </div>
+                <div style="flex-shrink: 0; display: flex; align-items: center; gap: 4px;">
+                  ${controlHtml}
+                  <button type="button" class="deliv-pass-btn ${isPassedOver ? "passed-over" : ""}" onclick="event.stopPropagation(); MetroMap.passOverDeliverable('${station.id}', '${this.escapeHtml(key)}'); MetroMap.renderMobileHud();" title="Pass over">
+                    ${isPassedOver ? "PASSED" : "PASS"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          `;
+        })
+        .join("");
+    }
+
+    const prevDisabled = stationIndex === 0;
+    const nextDisabled = stationIndex >= stations.length - 1;
+
+    container.innerHTML = `
+      <div class="monotone-card mobile-hud-card">
+        <!-- Station Selector Row -->
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 10px;">
+          <button type="button" class="btn-ghost-icon" style="padding: 4px 8px; font-size: 11px;" ${prevDisabled ? 'disabled style="opacity: 0.3;"' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex - 1]?.id}')"`}>&larr; Prev</button>
+          
+          <select class="form-input" style="flex: 1; min-width: 0; padding: 4px 6px; font-size: 11px; font-weight: 600; font-family: var(--font-mono); text-align: center; border-radius: 6px;" onchange="MetroMap.selectMobileStation(this.value)">
+            ${optionsHtml}
+          </select>
+
+          <button type="button" class="btn-ghost-icon" style="padding: 4px 8px; font-size: 11px;" ${nextDisabled ? 'disabled style="opacity: 0.3;"' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex + 1]?.id}')"`}>Next &rarr;</button>
+        </div>
+
+        <!-- Station Headline & Status -->
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 6px;">
+              <span class="mono-chip lavender" style="font-size: 9px; padding: 2px 5px;">${station.month_label || "2026"}</span>
+              <span class="mono-chip ${status === "active" ? "lavender" : status === "completed" ? "green" : ""}" style="font-size: 9px; padding: 2px 5px; text-transform: uppercase;">${status}</span>
+            </div>
+            <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-top: 4px; letter-spacing: -0.01em;">
+              ${this.escapeHtml(station.name)}
+            </h2>
+          </div>
+          <div style="text-align: right; flex-shrink: 0;">
+            <div style="font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--text-primary);">
+              ${progressPercent}%
+            </div>
+            <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">
+              ${doneCount}/${totalCount} Done
+            </div>
+          </div>
+        </div>
+
+        <!-- Progress Bar -->
+        <div style="height: 5px; background: var(--border-hairline); border-radius: 3px; overflow: hidden; margin-bottom: 12px;">
+          <div style="width: ${progressPercent}%; height: 100%; background: var(--accent-lavender); transition: width 0.3s ease;"></div>
+        </div>
+
+        <!-- Core Objective Box -->
+        ${station.objective ? `
+          <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 10px;">
+            <div class="card-label" style="font-size: 9px; margin-bottom: 3px;">CORE OBJECTIVE</div>
+            <div style="font-size: 11.5px; color: var(--text-primary); line-height: 1.4;">${this.escapeHtml(station.objective)}</div>
+          </div>
+        ` : ""}
+
+        <!-- Deliverables Breakdown -->
+        <div style="margin-bottom: 10px;">
+          <div class="card-label" style="font-size: 9.5px; margin-bottom: 6px; letter-spacing: 0.05em;">DELIVERABLES CHECKLIST (${doneCount}/${totalCount})</div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            ${delivsHtml}
+          </div>
+        </div>
+
+        <!-- Immediate Next Action -->
+        ${station.next_action ? `
+          <div style="border-top: 1px solid var(--border-hairline); padding-top: 8px; margin-bottom: 10px;">
+            <div class="card-label" style="font-size: 9px; margin-bottom: 2px;">IMMEDIATE NEXT ACTION</div>
+            <div style="font-size: 11.5px; font-weight: 600; color: var(--accent-lavender); line-height: 1.35;">${this.escapeHtml(station.next_action)}</div>
+          </div>
+        ` : ""}
+
+        <!-- Bavarian GPA & Ledger Toggle -->
+        <div style="border-top: 1px solid var(--border-hairline); padding-top: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+          <div style="font-family: var(--font-mono); font-size: 10.5px; color: var(--text-secondary);">
+            Bavarian GPA: <span style="font-weight: 700; color: var(--text-primary);">3.06 DE</span> &bull; 29.1 pts
+          </div>
+          <button type="button" class="btn-ghost-icon" style="font-size: 10.5px; padding: 3px 8px;" onclick="document.getElementById('btnToggleGradesView')?.click()">
+            Ledger &rarr;
+          </button>
+        </div>
+      </div>
+    `;
   },
 
   calculateStationProgress(station) {

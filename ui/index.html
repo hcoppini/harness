@@ -17,7 +17,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,400&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="css/app.css?v=5.7">
+  <link rel="stylesheet" href="css/app.css?v=6.0">
 </head>
 <body>
 
@@ -28,6 +28,7 @@
       <span class="brand-title">HARNESS</span>
       <span class="brand-divider">/</span>
       <span class="brand-caption">Executive OS</span>
+      <span class="mono-chip lavender build-ver-chip" onclick="if(confirm('Force reload and clear cache?')) window.forceHardReload();" title="Build v6.0 Mobile Executive (Click to force purge cache)" style="cursor: pointer; font-size: 8.5px; padding: 1px 5px; margin-left: 2px;">v6.0</span>
     </div>
 
     <!-- Navigation Tabs -->
@@ -193,7 +194,7 @@
         </div>
 
         <!-- 3. UPCOMING 7-DAY FORECAST -->
-        <div class="monotone-card">
+        <div class="monotone-card" id="dashForecastCard">
           <div class="card-label-row">
             <div>
               <span class="card-label">7-Day Schedule Forecast</span>
@@ -266,11 +267,19 @@
         </div>
       </div>
 
+            <!-- Mobile Segmented View Switcher (Glanceable single-screen phone view) -->
+      <div id="todayMobileSegmentedBar" class="today-mobile-segmented-bar">
+        <button type="button" class="today-segment-btn active" data-segment="routine" onclick="window.Today.setMobileSegment('routine')">Routine</button>
+        <button type="button" class="today-segment-btn" data-segment="timetable" onclick="window.Today.setMobileSegment('timetable')">Timetable</button>
+        <button type="button" class="today-segment-btn" data-segment="gym" onclick="window.Today.setMobileSegment('gym')">Gym</button>
+        <button type="button" class="today-segment-btn" data-segment="diary" onclick="window.Today.setMobileSegment('diary')">Diary &amp; Book</button>
+      </div>
+
       <div class="today-layout">
         <!-- Left Column: Automated Routine & Tasks -->
         <div>
           <!-- Dynamic "Right Now" Execution Banner -->
-          <div id="dynamicNowBanner" class="now-banner" style="margin-bottom: 14px; background: var(--bg-surface-elevated); border: 1px solid var(--border-medium); border-radius: var(--radius-sm); padding: 12px 14px;">
+          <div id="dynamicNowBanner" class="now-banner" today-segment-target="routine" style="margin-bottom: 14px; background: var(--bg-surface-elevated); border: 1px solid var(--border-medium); border-radius: var(--radius-sm); padding: 12px 14px;">
             <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px;">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span class="now-pulse-dot"></span>
@@ -295,7 +304,7 @@
 
 
           <!-- Schedule Banner -->
-          <div class="schedule-banner" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div class="schedule-banner" today-segment-target="routine" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
             <div style="display: flex; align-items: center; gap: 8px;">
               <span id="scheduleBadge" class="mono-chip lavender">SCHEDULE --</span>
               <span id="scheduleDayName" style="font-size: 13px; font-weight: 600; color: var(--text-primary);">
@@ -311,7 +320,7 @@
           </div>
 
           <!-- Embedded SGH / Deep Work Kill List (Daily Execution Center) -->
-          <div id="todayInlineKillListCard" class="monotone-card" style="display: none; margin-bottom: 14px; border: 1px solid var(--accent-lavender-border); background: var(--bg-surface-elevated);">
+          <div id="todayInlineKillListCard" class="monotone-card" today-segment-target="routine" style="display: none; margin-bottom: 14px; border: 1px solid var(--accent-lavender-border); background: var(--bg-surface-elevated);">
             <div class="card-label-row" style="margin-bottom: 8px;">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span id="todayInlineKillListTitle" class="card-label" style="color: var(--accent-lavender); font-weight: 700; font-size: 11px; letter-spacing: 0.05em;">SGH LIBRARY KILL LIST</span>
@@ -325,12 +334,12 @@
           </div>
 
           <!-- Pre-loaded Day Routine Blocks -->
-          <div id="routineBlocksContainer" class="routine-timeline">
+          <div id="routineBlocksContainer" class="routine-timeline" today-segment-target="routine">
             <!-- Dynamic schedule time blocks -->
           </div>
 
           <!-- Tue/Thu Structured Gym Card -->
-          <div id="todayLiftCard" class="monotone-card" style="display: none; border-color: var(--accent-lavender-border);">
+          <div id="todayLiftCard" class="monotone-card" today-segment-target="gym" style="display: none; border-color: var(--accent-lavender-border);">
             <div class="card-label-row">
               <span id="todayLiftTitle" class="card-label" style="color: var(--accent-lavender);">Structured Gym Protocol</span>
               <span class="mono-chip">Hypertrophy</span>
@@ -341,7 +350,7 @@
           </div>
 
           <!-- Quick Task Bar -->
-          <form id="quickTaskForm" class="quick-task-bar">
+          <form id="quickTaskForm" class="quick-task-bar" today-segment-target="routine">
             <span style="color: var(--accent-lavender); font-weight: 600; padding: 0 4px; font-family: var(--font-mono); font-size: 11px;">+</span>
             <input 
               type="text" 
@@ -353,12 +362,12 @@
           </form>
 
           <!-- Custom Tasks Checklist -->
-          <div id="customTaskList">
+          <div id="customTaskList" today-segment-target="routine">
             <!-- Dynamic task items -->
           </div>
 
           <!-- Daily Book Reading Tracker Card (1 Book / Month) -->
-          <div class="monotone-card" id="todayBookCard" style="margin-top: 14px; border: 1px solid var(--accent-lavender-border); background: var(--bg-surface-elevated);">
+          <div class="monotone-card" id="todayBookCard" today-segment-target="diary" style="margin-top: 14px; border: 1px solid var(--accent-lavender-border); background: var(--bg-surface-elevated);">
             <div class="card-label-row" style="margin-bottom: 8px;">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span class="card-label" style="font-weight: 700; font-size: 11px; letter-spacing: 0.06em; color: var(--accent-lavender);">DAILY BOOK PROTOCOL</span>
@@ -413,7 +422,7 @@
           </div>
 
           <!-- Evening Honesty Diary Card with AI Coach Trigger -->
-          <div class="monotone-card" style="margin-top: 14px; border: 1px solid var(--border-medium);">
+          <div class="monotone-card" id="todayEveningDiaryCard" today-segment-target="diary" style="margin-top: 14px; border: 1px solid var(--border-medium);">
             <div class="card-label-row" style="margin-bottom: 8px;">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span class="card-label" style="font-weight: 700; font-size: 11px; letter-spacing: 0.06em; color: var(--text-primary);">EVENING HONESTY DIARY</span>
@@ -436,7 +445,7 @@
           </div>
 
           <!-- Scratchpad Card -->
-          <div class="monotone-card" style="margin-top: 14px;">
+          <div class="monotone-card" id="todayScratchpadCard" today-segment-target="diary" style="margin-top: 14px;">
             <div class="card-label-row">
               <span class="card-label">Scratchpad</span>
               <span id="scratchpadSavePill" class="mono-chip">Auto-saving</span>
@@ -451,7 +460,7 @@
           </div>
 
           <!-- Sleep & Wake Target -->
-          <div class="monotone-card">
+          <div class="monotone-card" id="todaySleepCard" today-segment-target="gym">
             <div class="card-label-row">
               <span class="card-label">Sleep Target</span>
               <span class="mono-chip">8h Floor</span>
@@ -472,7 +481,7 @@
         <!-- Right Column: Mini-Calendar, Timetable, Radar, Links -->
         <div style="display: flex; flex-direction: column; gap: 14px;">
           <!-- Mini-Calendar Date Navigator -->
-          <div class="monotone-card">
+          <div class="monotone-card" id="todayCalendarCard" today-segment-target="timetable">
             <div class="card-label-row">
               <span class="card-label">Calendar Navigator</span>
               <button id="btnTodayReset" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">Today</button>
@@ -490,7 +499,7 @@
           </div>
 
           <!-- School Timetable Widget (TM1 / Optivum 3lb) -->
-          <div class="monotone-card">
+          <div class="monotone-card" id="todayTimetableCard" today-segment-target="timetable">
             <div class="card-label-row">
               <span class="card-label">TM1 School Timetable</span>
               <div style="display: flex; gap: 4px;">
@@ -504,7 +513,7 @@
           </div>
 
           <!-- Academic Radar Link Card -->
-          <div class="monotone-card" onclick="window.HarnessApp.switchView('study')" style="cursor: pointer; border: 1px solid var(--border-medium);">
+          <div class="monotone-card" id="todayRadarLinkCard" today-segment-target="timetable" onclick="window.HarnessApp.switchView('study')" style="cursor: pointer; border: 1px solid var(--border-medium);">
             <div class="card-label-row" style="margin-bottom: 6px;">
               <div style="display: flex; align-items: center; gap: 8px;">
                 <span class="card-label" style="font-weight: 700; color: var(--text-primary);">ACADEMIC RADAR</span>
@@ -528,7 +537,7 @@
           </div>
 
           <!-- Quick Launch Links Card -->
-          <div class="monotone-card">
+          <div class="monotone-card" id="todayQuickLinksCard" today-segment-target="timetable">
             <div class="card-label-row">
               <span class="card-label">Quick Links Launchpad</span>
               <button id="btnAddNewLinkModal" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ Add Link</button>
@@ -654,6 +663,11 @@
           <button id="btnJumpCurrentStation" class="btn-ghost-icon">Jump to Active Station</button>
           <button id="btnToggleGradesView" class="btn-ghost-icon">Grades Ledger</button>
         </div>
+      </div>
+
+      <!-- Mobile Executive Station HUD (Shown on mobile only, replacing 4,800px track & 22 cards) -->
+      <div id="mobileMetroHud" class="mobile-metro-hud">
+        <!-- Rendered dynamically by MetroMap.renderMobileHud() -->
       </div>
 
       <!-- Metro Viewport -->
@@ -922,6 +936,14 @@
           <h1 class="section-headline">Machine Maintenance</h1>
           <p class="section-caption">Physical foundation: Hypertrophy progression to 80kg, Boxing sparring, and Recovery.</p>
         </div>
+      </div>
+
+            <!-- Mobile Segmented View Switcher (Glanceable single-screen phone view) -->
+      <div id="todayMobileSegmentedBar" class="today-mobile-segmented-bar">
+        <button type="button" class="today-segment-btn active" data-segment="routine" onclick="window.Today.setMobileSegment('routine')">Routine</button>
+        <button type="button" class="today-segment-btn" data-segment="timetable" onclick="window.Today.setMobileSegment('timetable')">Timetable</button>
+        <button type="button" class="today-segment-btn" data-segment="gym" onclick="window.Today.setMobileSegment('gym')">Gym</button>
+        <button type="button" class="today-segment-btn" data-segment="diary" onclick="window.Today.setMobileSegment('diary')">Diary &amp; Book</button>
       </div>
 
       <div class="today-layout">
@@ -1954,27 +1976,65 @@
   </nav>
 
   <!-- App Script Modules -->
-  <script src="js/api_bridge.js?v=5.7"></script>
-  <script src="js/metro.js?v=5.7"></script>
-  <script src="js/dashboard.js?v=5.7"></script>
-  <script src="js/study.js?v=5.7"></script>
-  <script src="js/today.js?v=5.7"></script>
-  <script src="js/tum.js?v=5.7"></script>
-  <script src="js/projects.js?v=5.7"></script>
-  <script src="js/body.js?v=5.7"></script>
-  <script src="js/knowledge.js?v=5.7"></script>
-  <script src="js/focus_timer.js?v=5.7"></script>
-  <script src="js/command_palette.js?v=5.7"></script>
-  <script src="js/kill_list.js?v=5.7"></script>
-  <script src="js/app.js?v=5.7"></script>
+  <script src="js/api_bridge.js?v=6.0"></script>
+  <script src="js/metro.js?v=6.0"></script>
+  <script src="js/dashboard.js?v=6.0"></script>
+  <script src="js/study.js?v=6.0"></script>
+  <script src="js/today.js?v=6.0"></script>
+  <script src="js/tum.js?v=6.0"></script>
+  <script src="js/projects.js?v=6.0"></script>
+  <script src="js/body.js?v=6.0"></script>
+  <script src="js/knowledge.js?v=6.0"></script>
+  <script src="js/focus_timer.js?v=6.0"></script>
+  <script src="js/command_palette.js?v=6.0"></script>
+  <script src="js/kill_list.js?v=6.0"></script>
+  <script src="js/app.js?v=6.0"></script>
   <script>
     if ('serviceWorker' in navigator) {
+      let refreshing = false;
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        if (!refreshing) {
+          refreshing = true;
+          window.location.reload();
+        }
+      });
+
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js').then((reg) => {
+        navigator.serviceWorker.register('/sw.js?v=6.0').then((reg) => {
           reg.update();
+          if (reg.waiting) {
+            reg.waiting.postMessage({ type: 'SKIP_WAITING' });
+          }
+          reg.addEventListener('updatefound', () => {
+            const newWorker = reg.installing;
+            if (newWorker) {
+              newWorker.addEventListener('statechange', () => {
+                if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                  newWorker.postMessage({ type: 'SKIP_WAITING' });
+                }
+              });
+            }
+          });
         }).catch((err) => console.log('SW Reg Notice:', err));
       });
     }
+
+    // Emergency hard cache bust utility
+    window.forceHardReload = async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          for (const reg of regs) await reg.unregister();
+        }
+        if ('caches' in window) {
+          const keys = await caches.keys();
+          for (const k of keys) await caches.delete(k);
+        }
+      } catch (e) {
+        console.warn('Cache purge error:', e);
+      }
+      window.location.href = window.location.pathname + '?nocache=' + Date.now();
+    };
   </script>
 </body>
 </html>

@@ -36,5 +36,7 @@ data/vulcan_config.json
 *.log
 data/*.log
 
+scratch/
+
 
 
