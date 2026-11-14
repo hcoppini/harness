@@ -96,12 +96,19 @@ const KillListDrawer = {
       this.items = (res && res.items) || [];
       this.isEveningLocked = Boolean(res && res.is_evening_locked);
 
-      // 2. Fetch Active Station Deliverables (Sep '26)
-      this.deliverables = (await window.pywebview.api.get_station_deliverables("sep-2026")) || [];
+      // 2. Fetch Active Station Deliverables
+      let activeStationId = null;
+      try {
+        const roadmap = (await window.pywebview.api.get_metro_roadmap()) || {};
+        const activeSt = (roadmap.stations || []).find((s) => s.status === "active");
+        if (activeSt) activeStationId = activeSt.id;
+      } catch (e) {}
+
+      this.deliverables = (await window.pywebview.api.get_station_deliverables(activeStationId || "nov-2026")) || [];
 
       // 3. Fetch Station Velocity Ghost Beacon
       try {
-        this.paceVelocity = await window.pywebview.api.get_station_pace_velocity("sep-2026", this.dateStr);
+        this.paceVelocity = await window.pywebview.api.get_station_pace_velocity(activeStationId, this.dateStr);
       } catch (e) {
         this.paceVelocity = null;
       }
@@ -136,11 +143,15 @@ const KillListDrawer = {
       const isBehind = this.paceVelocity.is_behind;
       let statusText = this.paceVelocity.status_text;
       if (isBehind && this.paceVelocity.deficit_item_title) {
-        statusText = `Pace Deficit: ${this.paceVelocity.deficit_item_title} (-${this.paceVelocity.max_deficit} ${this.paceVelocity.deficit_unit})`;
+        statusText = `Pace Deficit: ${this.paceVelocity.deficit_item_title} (${this.paceVelocity.max_deficit} ${this.paceVelocity.deficit_unit || 'units'} behind)`;
       }
       const badgeStyle = isBehind
         ? "background: var(--color-amber-subtle); border: 1px solid var(--color-amber-border); color: var(--color-amber);"
         : "background: var(--color-green-subtle); border: 1px solid var(--color-green-border); color: var(--color-green);";
+
+      const elapsedPct = this.paceVelocity.elapsed_pct !== undefined
+        ? this.paceVelocity.elapsed_pct
+        : Math.round(((this.paceVelocity.day_of_month || 1) / (this.paceVelocity.total_days || 30)) * 100);
 
       velocityContainer.innerHTML = `
         <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 10px; border-radius: 4px; font-family: var(--font-mono); font-size: 11px; ${badgeStyle}">
@@ -148,7 +159,7 @@ const KillListDrawer = {
             <span style="width: 7px; height: 7px; border-radius: 50%; background: ${isBehind ? "var(--color-amber)" : "var(--color-green)"}; display: inline-block;"></span>
             <span style="font-weight: 600;">${statusText}</span>
           </div>
-          <span style="font-size: 9px; opacity: 0.8;">Day ${this.paceVelocity.day_of_month || 1}/${this.paceVelocity.total_days || 30}</span>
+          <span style="font-size: 9px; opacity: 0.8;">Day ${this.paceVelocity.day_of_month || 1}/${this.paceVelocity.total_days || 30} (${elapsedPct}%)</span>
         </div>
       `;
     }

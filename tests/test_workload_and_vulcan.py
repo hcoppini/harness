@@ -439,8 +439,10 @@ def test_pure_cruise_3_pillar_pipeline(test_db):
 
 def test_homework_service_positional_string_guard(test_db):
     """Verifies that homework_service methods accept date strings or connection objects interchangeably without crashing."""
-    homework_service.add_homework("Fizyka", "Zadania 1-5", "2026-11-05", conn=test_db)
-    homework_service.add_exam("Matematyka", "Kartkówka", "2026-11-06", conn=test_db)
+    future_date = (datetime.now() + timedelta(days=10)).strftime("%Y-%m-%d")
+    far_future_date = (datetime.now() + timedelta(days=20)).strftime("%Y-%m-%d")
+    homework_service.add_homework("Fizyka", "Zadania 1-5", future_date, conn=test_db)
+    homework_service.add_exam("Matematyka", "Kartkówka", future_date, conn=test_db)
 
     # Calling with test_db
     hw = homework_service.get_upcoming_homework(test_db, today_str="2026-11-01")
@@ -456,7 +458,7 @@ def test_homework_service_positional_string_guard(test_db):
     assert pruned1 == 0
 
     # Prune expired passing date_str as first arg and conn as second
-    pruned2 = homework_service.prune_expired_homework("2026-11-10", test_db)
+    pruned2 = homework_service.prune_expired_homework(far_future_date, test_db)
     assert pruned2 >= 1
 
 

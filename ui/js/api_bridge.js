@@ -740,7 +740,12 @@
           }
 
           if (prop === "get_station_deliverables") {
-            return async function (stationId = "sep-2026") {
+            return async function (stationId = null) {
+              if (!stationId) {
+                const roadmap = await apiProxy.get_metro_roadmap().catch(() => ({}));
+                const activeSt = (roadmap?.stations || []).find((s) => s.status === "active");
+                stationId = activeSt ? activeSt.id : "nov-2026";
+              }
               const localMap = getStore(STORAGE_KEYS.DELIVERABLES, {});
               let serverRes = null;
               try {
@@ -826,7 +831,12 @@
           }
 
           if (prop === "get_station_pace_velocity") {
-            return async function (stationId = "sep-2026", dateStr = null) {
+            return async function (stationId = null, dateStr = null) {
+              if (!stationId) {
+                const roadmap = await apiProxy.get_metro_roadmap().catch(() => ({}));
+                const activeSt = (roadmap?.stations || []).find((s) => s.status === "active");
+                stationId = activeSt ? activeSt.id : "nov-2026";
+              }
               const todayDt = dateStr ? new Date(dateStr) : new Date();
               const dayOfMonth = todayDt.getDate();
               const year = todayDt.getFullYear();
@@ -873,7 +883,7 @@
               let statusText = "";
               let badgeVariant = "optimal";
               if (overallBehind && maxDeficit > 0) {
-                statusText = `Pace Deficit: -${maxDeficit} ${deficitUnit}`;
+                statusText = `Pace Deficit: ${maxDeficit} ${deficitUnit} behind`;
                 badgeVariant = "amber";
               } else {
                 const avgDelta = paceItems.reduce((acc, p) => acc + p.pace_delta, 0) / Math.max(1, paceItems.length);
@@ -881,11 +891,14 @@
                 badgeVariant = "optimal";
               }
 
+              const elapsedPct = totalDays > 0 ? Math.min(100, Math.max(0, Math.round((dayOfMonth / totalDays) * 100))) : 0;
+
               return {
                 station_id: stationId,
                 date: getLocalDateStr(todayDt),
                 day_of_month: dayOfMonth,
                 total_days: totalDays,
+                elapsed_pct: elapsedPct,
                 is_behind: overallBehind,
                 max_deficit: maxDeficit,
                 deficit_item_title: deficitItemTitle,

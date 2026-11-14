@@ -705,8 +705,41 @@ def get_station_deliverables(
     return results
 
 
+def get_active_station_id(conn: Optional[sqlite3.Connection] = None) -> str:
+    """Returns the currently active metro station id from metro_roadmap.json, defaulting to nov-2026."""
+    try:
+        roadmap_file = DATA_DIR / "metro_roadmap.json"
+        if roadmap_file.exists():
+            with open(roadmap_file, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            for s in data.get("stations", []):
+                if s.get("status") == "active":
+                    return s["id"]
+    except Exception:
+        pass
+    return "nov-2026"
+
+
+def get_station_id_for_date(date_str: Optional[str] = None) -> str:
+    """Returns the matching station id for a given date YYYY-MM-DD (e.g. nov-2026), or the active station."""
+    if date_str:
+        try:
+            dt = datetime.strptime(date_str, "%Y-%m-%d")
+            candidate = f"{dt.strftime('%b').lower()}-{dt.year}"
+            roadmap_file = DATA_DIR / "metro_roadmap.json"
+            if roadmap_file.exists():
+                with open(roadmap_file, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                for s in data.get("stations", []):
+                    if s.get("id") == candidate:
+                        return candidate
+        except Exception:
+            pass
+    return get_active_station_id()
+
+
 def get_station_pace_velocity(
-    station_id: str = "sep-2026",
+    station_id: Optional[str] = None,
     date_str: Optional[str] = None,
     conn: Optional[sqlite3.Connection] = None,
 ) -> Dict[str, Any]:
@@ -717,6 +750,9 @@ def get_station_pace_velocity(
       - If completed_count < Target Pace: Pace Deficit: -X units behind schedule
       - On pace / ahead: Pace Velocity: Optimal (+Y)
     """
+    if not station_id:
+        station_id = get_station_id_for_date(date_str)
+
     target_dt = datetime.strptime(date_str, "%Y-%m-%d") if date_str else datetime.now()
     day_of_month = target_dt.day
     _, total_days_in_month = calendar.monthrange(target_dt.year, target_dt.month)
@@ -759,7 +795,8 @@ def get_station_pace_velocity(
         })
 
     if overall_behind and max_deficit > 0:
-        status_text = f"Pace Deficit: -{max_deficit} {deficit_unit}"
+        unit = deficit_unit or "units"
+        status_text = f"Pace Deficit: {max_deficit} {unit} behind"
         badge_variant = "amber"
     else:
         # Calculate net positive pace delta
@@ -767,11 +804,14 @@ def get_station_pace_velocity(
         status_text = f"Pace Velocity: Optimal (+{abs(round(avg_delta, 1))})"
         badge_variant = "optimal"
 
+    elapsed_pct = min(100, max(0, round((day_of_month / total_days_in_month) * 100))) if total_days_in_month > 0 else 0
+
     return {
         "station_id": station_id,
         "date": target_dt.strftime("%Y-%m-%d"),
         "day_of_month": day_of_month,
         "total_days": total_days_in_month,
+        "elapsed_pct": elapsed_pct,
         "is_behind": overall_behind,
         "max_deficit": max_deficit,
         "deficit_item_title": deficit_item_title,
@@ -902,7 +942,7 @@ def log_study_reps(
 
 def auto_populate_kill_list(
     date_str: Optional[str] = None,
-    station_id: str = "sep-2026",
+    station_id: Optional[str] = None,
     conn: Optional[sqlite3.Connection] = None,
 ) -> Dict[str, Any]:
     """
@@ -913,6 +953,8 @@ def auto_populate_kill_list(
       Slot 3: German vocabulary (Anki / Nicos Weg A2) or secondary focus.
     """
     target_date = date_str or datetime.now().strftime("%Y-%m-%d")
+    if not station_id:
+        station_id = get_station_id_for_date(target_date)
     close_conn = False
     if conn is None:
         conn = get_connection()

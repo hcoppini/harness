@@ -811,6 +811,9 @@ const Today = {
           window.HarnessApp.showToast(`+${delta} progress logged`);
         }
         await this.load(this.selectedDateStr);
+        if (window.MetroMap && typeof window.MetroMap.load === "function") {
+          window.MetroMap.load();
+        }
         return res;
       } catch (err) {
         console.error("Error advancing deliverable:", err);
@@ -820,11 +823,13 @@ const Today = {
 
   async toggleRoutineBlock(idx) {
     const key = String(idx);
-    if (this.completedBlocks.has(key)) {
+    const wasChecked = this.completedBlocks.has(key);
+    if (wasChecked) {
       this.completedBlocks.delete(key);
     } else {
       this.completedBlocks.add(key);
     }
+    const isNowChecked = !wasChecked;
     this.renderSchedule();
 
     const strVal = Array.from(this.completedBlocks).join(",");
@@ -837,6 +842,16 @@ const Today = {
           strVal,
           null
         );
+
+        // Bi-directional link: checking off routine deep work directly advances TUM roadmap deliverable!
+        const block = (this.schedule && this.schedule.blocks && this.schedule.blocks[idx]);
+        if (block && block.deliverable && block.deliverable.deliverable_id && window.pywebview.api.update_deliverable_progress) {
+          const delta = isNowChecked ? (block.deliverable.quantity || 1) : -(block.deliverable.quantity || 1);
+          await window.pywebview.api.update_deliverable_progress(block.deliverable.deliverable_id, null, delta);
+          if (window.MetroMap && typeof window.MetroMap.load === "function") {
+            window.MetroMap.load();
+          }
+        }
       }
       if (window.Dashboard) window.Dashboard.load();
     } catch (err) {

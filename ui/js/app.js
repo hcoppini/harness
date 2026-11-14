@@ -48,7 +48,7 @@ window.HarnessApp = {
   },
 
   initTheme() {
-    const saved = localStorage.getItem("harness_theme") || "light";
+    const saved = localStorage.getItem("harness_theme") || "dark";
     this.applyTheme(saved);
 
     const btn = document.getElementById("btnToggleTheme");
@@ -69,7 +69,7 @@ window.HarnessApp = {
     // Dynamic mobile PWA status bar & theme-color sync for native iOS/Android look
     const themeColorMeta = document.querySelector('meta[name="theme-color"]');
     if (themeColorMeta) {
-      themeColorMeta.setAttribute("content", isDark ? "#08080A" : "#FFFFFF");
+      themeColorMeta.setAttribute("content", isDark ? "#000000" : "#FFFFFF");
     }
     const statusBarMeta = document.querySelector('meta[name="apple-mobile-web-app-status-bar-style"]');
     if (statusBarMeta) {

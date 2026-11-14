@@ -113,9 +113,36 @@ const MetroMap = {
     const progressPercent = this.calculateStationProgress(station);
     const delivEntries = Object.entries(station.deliverables || {});
     const completedList = station.completed_deliverables || [];
-    const passedOverList = station.passed_over_deliverables || [];
-    const doneCount = completedList.length + passedOverList.length;
-    const totalCount = delivEntries.length;
+
+    const now = new Date();
+    const dayOfMonth = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const timeElapsedPct = Math.min(100, Math.max(0, Math.round((dayOfMonth / daysInMonth) * 100)));
+
+    let velocity = this.paceVelocity;
+    if (!velocity || velocity.station_id !== station.id) {
+      const isBehind = progressPercent < timeElapsedPct;
+      velocity = {
+        station_id: station.id,
+        day_of_month: dayOfMonth,
+        total_days: daysInMonth,
+        elapsed_pct: timeElapsedPct,
+        is_behind: isBehind,
+        status_text: isBehind
+          ? `Pace Deficit: ${Math.round(timeElapsedPct - progressPercent)}% behind schedule`
+          : `Pace Velocity: Optimal (+${Math.max(0, Math.round(progressPercent - timeElapsedPct))}%)`,
+        badge_variant: isBehind ? "amber" : "optimal",
+      };
+    }
+
+    const validDayOfMonth = velocity?.day_of_month || dayOfMonth;
+    const validTotalDays = velocity?.total_days || daysInMonth;
+    const validElapsedPct = (velocity?.elapsed_pct !== undefined && !isNaN(velocity.elapsed_pct))
+      ? velocity.elapsed_pct
+      : (validTotalDays > 0 ? Math.min(100, Math.max(0, Math.round((validDayOfMonth / validTotalDays) * 100))) : timeElapsedPct);
+
+    let statusText = velocity?.status_text || (velocity?.is_behind ? "Pace Deficit: Behind schedule" : "Pace Velocity: Optimal");
+    statusText = statusText.replace(/Pace Deficit:\s*-\s*/i, "Pace Deficit: ").replace(/undefined/g, "").replace(/NaN/g, "0");
 
     // Build select dropdown options
     const optionsHtml = stations
@@ -126,56 +153,55 @@ const MetroMap = {
       })
       .join("");
 
-    // Build deliverables HTML
+    // Build deliverables HTML (Clean, informative, zero checkboxes)
     let delivsHtml = "";
     if (delivEntries.length === 0) {
       delivsHtml = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 8px 0;">No active deliverables defined.</div>`;
     } else {
       delivsHtml = delivEntries
         .map(([key, val]) => {
-          const isCompleted = completedList.includes(key);
-          const isPassedOver = passedOverList.includes(key);
-          const counter = this.getDeliverableCounter(station.id, key, val);
-          const isCounter = counter && counter.total > 1;
+          const streamMatch = this.streams.find((s) => s.name.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(s.id));
+          const lineBadgeColor = streamMatch ? streamMatch.color : "var(--accent-lavender)";
 
-          const progressObj = this.stationProgress?.find((p) => p.title === key || p.title === val);
-          const delivId = progressObj ? progressObj.id : null;
+          const pMatch = (this.stationProgress || []).find(
+            (p) => p.stream.toLowerCase() === key.toLowerCase() || (streamMatch && p.stream.toLowerCase() === streamMatch.id)
+          );
 
-          let controlHtml = "";
-          if (isCounter) {
-            controlHtml = `
-              <div style="display: flex; align-items: center; gap: 4px;">
-                <button type="button" class="deliv-stepper-btn" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', -1, ${delivId}); MetroMap.renderMobileHud();" title="Decrement">-</button>
-                <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--text-primary); min-width: 32px; text-align: center;">${counter.count}/${counter.total}</span>
-                <button type="button" class="deliv-stepper-btn" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 1, ${delivId}); MetroMap.renderMobileHud();" title="Increment (+1)">+1</button>
-              </div>
-            `;
-          } else {
-            controlHtml = `
-              <button type="button" class="deliv-toggle-btn ${isCompleted ? "completed" : ""}" onclick="event.stopPropagation(); MetroMap.toggleDeliverable('${station.id}', '${this.escapeHtml(key)}', ${isCompleted}, ${delivId}); MetroMap.renderMobileHud();">
-                ${isCompleted ? "✓ Done" : "Mark Done"}
-              </button>
-            `;
-          }
+          const isChecked = completedList.includes(key);
+          const countObj = (station.deliverable_counts && station.deliverable_counts[key])
+            || (pMatch ? { count: pMatch.completed_count, total: pMatch.total_required, unit: pMatch.unit_label } : null)
+            || this.getDeliverableCounter(station.id, key, val);
+
+          const curCount = isChecked ? countObj.total : (countObj.count || 0);
+          const totalReq = countObj.total;
+          const unitLabel = countObj.unit || "reps";
+          const itemPct = totalReq > 0 ? Math.min(100, Math.round((curCount / totalReq) * 100)) : 0;
+
+          const targetPace = Math.round(((validDayOfMonth / validTotalDays) * totalReq) * 10) / 10;
+          const deficit = Math.round((targetPace - curCount) * 10) / 10;
+          const isBehind = deficit > 0;
 
           return `
-            <div class="mobile-hud-deliv-item ${isCompleted ? "completed" : ""} ${isPassedOver ? "passed-over" : ""}">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px;">
-                <div style="flex: 1; min-width: 0;">
-                  <div style="font-size: 12px; font-weight: 600; color: var(--text-primary); line-height: 1.35; ${isCompleted ? "text-decoration: line-through; opacity: 0.7;" : ""} ${isPassedOver ? "text-decoration: line-through; opacity: 0.5;" : ""}">
-                    ${this.escapeHtml(key)}
-                  </div>
-                  <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px; line-height: 1.35; ${isCompleted ? "opacity: 0.6;" : ""}">
-                    ${this.escapeHtml(val)}
-                  </div>
-                </div>
-                <div style="flex-shrink: 0; display: flex; align-items: center; gap: 4px;">
-                  ${controlHtml}
-                  <button type="button" class="deliv-pass-btn ${isPassedOver ? "passed-over" : ""}" onclick="event.stopPropagation(); MetroMap.passOverDeliverable('${station.id}', '${this.escapeHtml(key)}'); MetroMap.renderMobileHud();" title="Pass over">
-                    ${isPassedOver ? "PASSED" : "PASS"}
-                  </button>
-                </div>
+            <div class="mobile-hud-deliv-item ${isChecked || curCount >= totalReq ? "completed" : ""}" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 6px;">
+              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px;">
+                <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: ${lineBadgeColor}; text-transform: uppercase; letter-spacing: 0.04em;">
+                  ${this.escapeHtml(key)} STREAM
+                </span>
+                <span style="font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; color: var(--text-primary);">
+                  ${curCount} / ${totalReq} ${this.escapeHtml(unitLabel)}
+                </span>
               </div>
+              <div style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 6px;">
+                ${this.escapeHtml(val)}
+              </div>
+              <div style="height: 4px; background: var(--border-hairline); border-radius: 2px; overflow: hidden; margin-bottom: 4px;">
+                <div style="width: ${itemPct}%; height: 100%; background: ${lineBadgeColor}; transition: width 0.3s ease;"></div>
+              </div>
+              ${status === "active" ? `
+                <div style="font-family: var(--font-mono); font-size: 9px; color: ${isBehind ? 'var(--color-amber-light)' : 'var(--text-tertiary)'};">
+                  ${isBehind ? `Pace Deficit: ${deficit} ${unitLabel} behind target` : `On pace (+${Math.abs(Math.round((curCount - targetPace) * 10) / 10)} ahead)`}
+                </div>
+              ` : ""}
             </div>
           `;
         })
@@ -186,72 +212,97 @@ const MetroMap = {
     const nextDisabled = stationIndex >= stations.length - 1;
 
     container.innerHTML = `
-      <div class="monotone-card mobile-hud-card">
+      <div class="monotone-card mobile-hud-card" style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: 12px; padding: 14px; margin-bottom: 12px;">
         <!-- Station Selector Row -->
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 10px;">
-          <button type="button" class="btn-ghost-icon" style="padding: 4px 8px; font-size: 11px;" ${prevDisabled ? 'disabled style="opacity: 0.3;"' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex - 1]?.id}')"`}>&larr; Prev</button>
+        <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 12px;">
+          <button type="button" class="btn-ghost-icon" style="padding: 4px 10px; font-size: 11px;" ${prevDisabled ? 'disabled style="opacity: 0.3;"' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex - 1]?.id}')"`}>&larr; Prev</button>
           
-          <select class="form-input" style="flex: 1; min-width: 0; padding: 4px 6px; font-size: 11px; font-weight: 600; font-family: var(--font-mono); text-align: center; border-radius: 6px;" onchange="MetroMap.selectMobileStation(this.value)">
+          <select class="form-input theme-select" style="flex: 1; min-width: 0; padding: 5px 8px; font-size: 11px; font-weight: 600; font-family: var(--font-mono); text-align: center; border-radius: 6px; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-subtle);" onchange="MetroMap.selectMobileStation(this.value)">
             ${optionsHtml}
           </select>
 
-          <button type="button" class="btn-ghost-icon" style="padding: 4px 8px; font-size: 11px;" ${nextDisabled ? 'disabled style="opacity: 0.3;"' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex + 1]?.id}')"`}>Next &rarr;</button>
+          <button type="button" class="btn-ghost-icon" style="padding: 4px 10px; font-size: 11px;" ${nextDisabled ? 'disabled style="opacity: 0.3;"' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex + 1]?.id}')"`}>Next &rarr;</button>
         </div>
 
         <!-- Station Headline & Status -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 8px;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px;">
           <div>
             <div style="display: flex; align-items: center; gap: 6px;">
-              <span class="mono-chip lavender" style="font-size: 9px; padding: 2px 5px;">${station.month_label || "2026"}</span>
-              <span class="mono-chip ${status === "active" ? "lavender" : status === "completed" ? "green" : ""}" style="font-size: 9px; padding: 2px 5px; text-transform: uppercase;">${status}</span>
+              <span class="mono-chip lavender" style="font-size: 9px; padding: 2px 6px;">${station.month_label || "2026"}</span>
+              <span class="mono-chip ${status === "active" ? "lavender" : status === "completed" ? "green" : ""}" style="font-size: 9px; padding: 2px 6px; text-transform: uppercase;">${status === "active" ? "ACTIVE MILESTONE" : status}</span>
             </div>
-            <h2 style="font-size: 16px; font-weight: 700; color: var(--text-primary); margin-top: 4px; letter-spacing: -0.01em;">
+            <h2 style="font-size: 17px; font-weight: 700; color: var(--text-primary); margin-top: 4px; letter-spacing: -0.01em;">
               ${this.escapeHtml(station.name)}
             </h2>
           </div>
           <div style="text-align: right; flex-shrink: 0;">
-            <div style="font-family: var(--font-mono); font-size: 14px; font-weight: 700; color: var(--text-primary);">
+            <div style="font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--text-primary);">
               ${progressPercent}%
             </div>
-            <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">
-              ${doneCount}/${totalCount} Done
+            <div style="font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary);">
+              COMPLETION
             </div>
           </div>
         </div>
 
-        <!-- Progress Bar -->
-        <div style="height: 5px; background: var(--border-hairline); border-radius: 3px; overflow: hidden; margin-bottom: 12px;">
-          <div style="width: ${progressPercent}%; height: 100%; background: var(--accent-lavender); transition: width 0.3s ease;"></div>
+        <!-- Dual Progress Indicators -->
+        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 10px;">
+          <div style="display: flex; justify-content: space-between; font-size: 9.5px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 3px;">
+            <span>MONTH PACE</span>
+            <span style="font-weight: 700; color: var(--text-primary);">Day ${validDayOfMonth}/${validTotalDays} (${validElapsedPct}%)</span>
+          </div>
+          <div style="height: 4px; background: var(--border-hairline); border-radius: 2px; overflow: hidden; margin-bottom: 8px;">
+            <div style="width: ${validElapsedPct}%; height: 100%; background: var(--border-medium);"></div>
+          </div>
+
+          <div style="display: flex; justify-content: space-between; font-size: 9.5px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 3px;">
+            <span>DELIVERABLES PACE</span>
+            <span style="font-weight: 700; color: var(--accent-lavender);">${progressPercent}%</span>
+          </div>
+          <div style="height: 4px; background: var(--border-hairline); border-radius: 2px; overflow: hidden;">
+            <div style="width: ${progressPercent}%; height: 100%; background: var(--accent-lavender);"></div>
+          </div>
         </div>
+
+        ${status === "active" ? `
+          <div style="font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 6px 10px; border-radius: 4px; margin-bottom: 10px; ${velocity?.is_behind ? "background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); color: #f59e0b;" : "background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-subtle); color: var(--text-primary);"}">
+            ${this.escapeHtml(statusText)}
+          </div>
+        ` : ""}
 
         <!-- Core Objective Box -->
         ${station.objective ? `
           <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 10px;">
-            <div class="card-label" style="font-size: 9px; margin-bottom: 3px;">CORE OBJECTIVE</div>
+            <div class="card-label" style="font-size: 8.5px; margin-bottom: 2px;">CORE OBJECTIVE</div>
             <div style="font-size: 11.5px; color: var(--text-primary); line-height: 1.4;">${this.escapeHtml(station.objective)}</div>
           </div>
         ` : ""}
 
         <!-- Deliverables Breakdown -->
         <div style="margin-bottom: 10px;">
-          <div class="card-label" style="font-size: 9.5px; margin-bottom: 6px; letter-spacing: 0.05em;">DELIVERABLES CHECKLIST (${doneCount}/${totalCount})</div>
+          <div class="card-label" style="font-size: 9px; margin-bottom: 6px; letter-spacing: 0.05em;">DELIVERABLES STATUS</div>
           <div style="display: flex; flex-direction: column; gap: 6px;">
             ${delivsHtml}
           </div>
+          <div style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); margin-top: 6px; padding: 6px 8px; background: var(--bg-surface); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm);">
+            💡 Check off tasks in the <strong>Daily</strong> tab to log progress.
+          </div>
         </div>
 
-        <!-- Immediate Next Action -->
-        ${station.next_action ? `
-          <div style="border-top: 1px solid var(--border-hairline); padding-top: 8px; margin-bottom: 10px;">
-            <div class="card-label" style="font-size: 9px; margin-bottom: 2px;">IMMEDIATE NEXT ACTION</div>
-            <div style="font-size: 11.5px; font-weight: 600; color: var(--accent-lavender); line-height: 1.35;">${this.escapeHtml(station.next_action)}</div>
-          </div>
-        ` : ""}
-
         <!-- Bavarian GPA & Ledger Toggle -->
-        <div style="border-top: 1px solid var(--border-hairline); padding-top: 8px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
+        <div style="border-top: 1px solid var(--border-hairline); padding-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
           <div style="font-family: var(--font-mono); font-size: 10.5px; color: var(--text-secondary);">
-            Bavarian GPA: <span style="font-weight: 700; color: var(--text-primary);">3.06 DE</span> &bull; 29.1 pts
+            Bavarian GPA: <span style="font-weight: 700; color: var(--text-primary);">${(() => {
+              const gpaEl = document.getElementById("tumGermanGpaVal");
+              const scoreEl = document.getElementById("tumTotalScoreVal");
+              if (gpaEl && gpaEl.textContent && gpaEl.textContent !== "--") {
+                return `${gpaEl.textContent} DE • ${scoreEl?.textContent || ""}`;
+              }
+              if (window.TumAptitude && window.TumAptitude.data && window.TumAptitude.data.bavarian_gpa) {
+                return `${window.TumAptitude.data.bavarian_gpa.toFixed(2)} DE • ${Math.round(window.TumAptitude.data.total_score || 0)} pts`;
+              }
+              return "3.06 DE • 29.1 pts";
+            })()}</span>
           </div>
           <button type="button" class="btn-ghost-icon" style="font-size: 10.5px; padding: 3px 8px;" onclick="document.getElementById('btnToggleGradesView')?.click()">
             Ledger &rarr;
@@ -698,45 +749,57 @@ const MetroMap = {
       }
     }
 
-    // Dynamic Multi-Tier Staggered School Exams on Track (Clean, Clutter-Free, Upcoming-Only)
+    // Dynamic School Exams on Track (Deduplicated, 55px non-overlapping clusters, alternating tiers)
     let examsSvgHtml = "";
     const showExamsOnTrack = this.activeStreamFilter === "all" || this.activeStreamFilter === "academics";
+    const clusters = [];
+
     if (showExamsOnTrack && this.upcomingExams && this.upcomingExams.length > 0) {
       const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-      const validExams = [];
+      // 1. Deduplicate exams by subject + date + title
+      const seenExams = new Set();
+      const uniqueExams = [];
       this.upcomingExams
         .filter((e) => !e.completed)
         .forEach((exam) => {
-          try {
-            const exDate = new Date(exam.exam_date + "T12:00:00");
-            const diffDays = Math.round((exDate.getTime() - todayMid) / (1000 * 60 * 60 * 24));
-            // Only upcoming exams (diffDays >= 0) within roadmap horizon
-            if (diffDays >= 0 && exDate >= startDate && exDate <= endDate) {
-              const elapsed = exDate.getTime() - startDate.getTime();
-              const totalMs = endDate.getTime() - startDate.getTime();
-              const ratio = elapsed / totalMs;
-              const testX = startX + ratio * totalTrackLength;
-              const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "1d" : `${diffDays}d`;
-              validExams.push({
-                ...exam,
-                exDate,
-                testX,
-                diffDays,
-                dueLabel,
-              });
-            }
-          } catch (e) {}
+          const key = `${(exam.subject || "").trim().toLowerCase()}|${(exam.exam_date || "").trim()}|${(exam.title || "").trim().toLowerCase()}`;
+          if (!seenExams.has(key)) {
+            seenExams.add(key);
+            uniqueExams.push(exam);
+          }
         });
+
+      const validExams = [];
+      uniqueExams.forEach((exam) => {
+        try {
+          const exDate = new Date(exam.exam_date + "T12:00:00");
+          const diffDays = Math.round((exDate.getTime() - todayMid) / (1000 * 60 * 60 * 24));
+          // Only upcoming exams (diffDays >= 0) within roadmap horizon
+          if (diffDays >= 0 && exDate >= startDate && exDate <= endDate) {
+            const elapsed = exDate.getTime() - startDate.getTime();
+            const totalMs = endDate.getTime() - startDate.getTime();
+            const ratio = elapsed / totalMs;
+            const testX = startX + ratio * totalTrackLength;
+            const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "1d" : `${diffDays}d`;
+            validExams.push({
+              ...exam,
+              exDate,
+              testX,
+              diffDays,
+              dueLabel,
+            });
+          }
+        } catch (e) {}
+      });
 
       // Sort by horizontal position / date
       validExams.sort((a, b) => a.testX - b.testX);
 
-      // Group nearby exams into non-overlapping clusters to prevent track clutter
-      const clusters = [];
+      // Group nearby exams into non-overlapping clusters (55px collision threshold)
       validExams.forEach((exam) => {
         const lastCluster = clusters[clusters.length - 1];
-        if (lastCluster && Math.abs(exam.testX - lastCluster.centerX) < 40) {
+        if (lastCluster && Math.abs(exam.testX - lastCluster.centerX) < 55) {
           lastCluster.exams.push(exam);
           if (exam.diffDays < lastCluster.diffDays) {
             lastCluster.diffDays = exam.diffDays;
@@ -752,55 +815,49 @@ const MetroMap = {
         }
       });
 
-      // Multi-tier heights to avoid collisions between adjacent clusters & Today beacon
-      const tierHeights = [36, 64, 92];
-      const assignedTiers = [];
-
+      // Assign non-colliding alternating vertical tiers:
+      // Upper tier: tickTopY = 38, pillY = 23 (h=15, from y=23 to 38)
+      // Lower tier: tickTopY = 72, pillY = 57 (h=15, from y=57 to 72)
+      // Active station radar ring sits at y=94..126, so 72 < 94 gives 22px of clear margin!
       clusters.forEach((cl, idx) => {
-        const collidingTiers = new Set();
-        // The Today indicator label sits between spineY - 42 and spineY - 58
-        const isNearToday = Math.abs(cl.centerX - currentX) < 70;
-        if (isNearToday) {
-          collidingTiers.add(1);
-        }
-        for (let j = 0; j < idx; j++) {
-          const prev = clusters[j];
-          if (Math.abs(cl.centerX - prev.centerX) < 90) {
-            collidingTiers.add(assignedTiers[j]);
-          }
-        }
-        let chosenTier = 0;
-        if (isNearToday && !collidingTiers.has(2)) {
-          chosenTier = 2; // Elevate above Today's indicator text
+        let labelText = "";
+        if (cl.exams.length === 1) {
+          const rawSubj = cl.exams[0].subject || "";
+          const shortSubj = rawSubj.length > 8 ? rawSubj.slice(0, 7) + "." : rawSubj;
+          labelText = `[${cl.dueLabel}] ${shortSubj}`;
+        } else if (cl.exams.length === 2) {
+          const s1 = (cl.exams[0].subject || "").slice(0, 4);
+          const s2 = (cl.exams[1].subject || "").slice(0, 4);
+          labelText = `[${cl.dueLabel}] ${s1}&${s2}`;
         } else {
-          while (collidingTiers.has(chosenTier) && chosenTier < tierHeights.length - 1) {
-            chosenTier++;
-          }
+          labelText = `[${cl.dueLabel}] ${cl.exams.length} Tests`;
         }
-        assignedTiers.push(chosenTier);
-        cl.tier = chosenTier;
-        cl.tickHeight = tierHeights[chosenTier];
+
+        const labelW = Math.max(54, labelText.length * 6.2 + 14);
+        cl.w = labelW;
+        cl.minX = cl.centerX - labelW / 2;
+        cl.maxX = cl.centerX + labelW / 2;
+        cl.labelText = labelText;
+
+        if (idx === 0) {
+          cl.tier = 1;
+        } else {
+          const prev = clusters[idx - 1];
+          cl.tier = prev.tier === 1 ? 0 : 1;
+        }
+
+        cl.tickTopY = cl.tier === 0 ? 38 : 72;
+        cl.pillY = cl.tier === 0 ? 23 : 57;
       });
 
       clusters.forEach((cl) => {
         const testX = cl.centerX;
-        const tickTopY = spineY - cl.tickHeight;
+        const tickTopY = cl.tickTopY;
         const isUrgent = cl.diffDays >= 0 && cl.diffDays <= 2;
-        const lineColor = isUrgent ? "#ef4444" : "var(--text-tertiary)";
+        const lineColor = isUrgent ? "#ef4444" : "var(--border-medium)";
         const textColor = isUrgent ? "#ef4444" : "var(--text-primary)";
-
-        let labelText = "";
-        if (cl.exams.length === 1) {
-          labelText = `[${cl.dueLabel}] ${cl.exams[0].subject}`;
-        } else if (cl.exams.length === 2) {
-          const s1 = cl.exams[0].subject;
-          const s2 = cl.exams[1].subject;
-          const short1 = s1.length > 8 ? s1.slice(0, 7) + "." : s1;
-          const short2 = s2.length > 8 ? s2.slice(0, 7) + "." : s2;
-          labelText = `[${cl.dueLabel}] ${short1} & ${short2}`;
-        } else {
-          labelText = `[${cl.dueLabel}] ${cl.exams.length} Tests`;
-        }
+        const pillY = cl.pillY;
+        const pillX = testX - cl.w / 2;
 
         const firstExam = cl.exams[0];
         const examsPayload = encodeURIComponent(
@@ -818,15 +875,17 @@ const MetroMap = {
 
         examsSvgHtml += `
           <g class="metro-test-tick" data-cluster="${examsPayload}" data-id="${firstExam.id}" data-subject="${this.escapeHtml(firstExam.subject)}" data-title="${this.escapeHtml(firstExam.title)}" data-date="${firstExam.exam_date}" data-due="${cl.dueLabel}" data-count="${cl.exams.length}" style="cursor: pointer; pointer-events: all;">
-            <!-- Pin dot on track -->
-            <circle cx="${testX}" cy="${spineY}" r="${cl.exams.length > 1 ? 4 : 3}" fill="${isUrgent ? '#ef4444' : 'var(--text-secondary)'}" stroke="var(--bg-card)" stroke-width="1.5" />
             <!-- Vertical leader line -->
-            <line x1="${testX}" y1="${spineY - 4}" x2="${testX}" y2="${tickTopY + 2}" stroke="${lineColor}" stroke-width="1.2" stroke-dasharray="${isUrgent ? 'none' : '2 2'}" opacity="0.8" />
+            <line x1="${testX}" y1="${spineY - 4}" x2="${testX}" y2="${tickTopY}" stroke="${lineColor}" stroke-width="1.2" stroke-dasharray="${isUrgent ? 'none' : '2 2'}" opacity="0.75" />
+            <!-- Pin dot on track -->
+            <circle cx="${testX}" cy="${spineY}" r="${cl.exams.length > 1 ? 3.5 : 2.5}" fill="${isUrgent ? '#ef4444' : 'var(--text-secondary)'}" stroke="var(--bg-canvas)" stroke-width="1.5" />
             <!-- Small top notch pip -->
-            <circle cx="${testX}" cy="${tickTopY + 2}" r="${cl.exams.length > 1 ? 2.5 : 1.5}" fill="${lineColor}" />
-            <!-- Clean minimalist text label -->
-            <text x="${testX}" y="${tickTopY - 3}" font-family="var(--font-mono)" font-size="9" font-weight="${isUrgent ? '700' : '600'}" text-anchor="middle" fill="${textColor}">
-              ${this.escapeHtml(labelText)}
+            <circle cx="${testX}" cy="${tickTopY}" r="${cl.exams.length > 1 ? 2 : 1.5}" fill="${lineColor}" />
+            <!-- Background pill: Prevents lines or dots from cutting through text -->
+            <rect x="${pillX}" y="${pillY}" width="${cl.w}" height="15" rx="3" fill="var(--bg-canvas)" stroke="${isUrgent ? 'rgba(239, 68, 68, 0.45)' : 'var(--border-subtle)'}" stroke-width="1" />
+            <!-- Clean monospace text label -->
+            <text x="${testX}" y="${pillY + 11}" font-family="var(--font-mono)" font-size="8.5" font-weight="${isUrgent ? '700' : '600'}" text-anchor="middle" fill="${textColor}" letter-spacing="0.02em">
+              ${this.escapeHtml(cl.labelText)}
             </text>
           </g>
         `;
@@ -847,14 +906,14 @@ const MetroMap = {
       let labelSubColor = "var(--text-tertiary)";
 
       if (isActive) {
-        labelSubText = "Active 'TUM' station";
+        labelSubText = "ACTIVE STATION";
         labelSubColor = "var(--accent-lavender)";
         nodeCircles = `
-          <!-- Concentric Blue Rings for Active TUM Station (Matching Mockup) -->
-          <circle cx="${posX}" cy="${spineY}" r="20" fill="none" stroke="var(--accent-lavender)" stroke-width="1.5" opacity="0.3" class="beacon-pulse" />
-          <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--accent-lavender)" data-orig-width="2.5" cx="${posX}" cy="${spineY}" r="13" fill="none" stroke="var(--accent-lavender)" stroke-width="2.5" />
-          <circle cx="${posX}" cy="${spineY}" r="9" fill="var(--bg-card)" />
-          <circle cx="${posX}" cy="${spineY}" r="5.5" fill="var(--accent-lavender)" />
+          <!-- Concentric Precision Radar Rings for Active Station -->
+          <circle cx="${posX}" cy="${spineY}" r="16" fill="none" stroke="var(--accent-lavender)" stroke-width="1" opacity="0.25" class="beacon-pulse" />
+          <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--accent-lavender)" data-orig-width="2" cx="${posX}" cy="${spineY}" r="11" fill="none" stroke="var(--accent-lavender)" stroke-width="2" />
+          <circle cx="${posX}" cy="${spineY}" r="7" fill="var(--bg-canvas)" />
+          <circle cx="${posX}" cy="${spineY}" r="4" fill="var(--accent-lavender)" />
         `;
       } else if (isCompleted) {
         const passedOverList = station.passed_over_deliverables || [];
@@ -863,21 +922,21 @@ const MetroMap = {
           labelSubText = "Audited";
           labelSubColor = "#f59e0b";
           nodeCircles = `
-            <!-- Audited / Reallocated Node (Amber Dashed Ring with Center Pip) -->
+            <!-- Audited / Reallocated Node -->
             <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="#f59e0b" data-orig-width="1.8" cx="${posX}" cy="${spineY}" r="8.5" fill="var(--bg-card)" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="3,2" />
             <circle cx="${posX}" cy="${spineY}" r="4" fill="#f59e0b" opacity="0.85" />
           `;
         } else {
           labelSubText = "Completed";
           nodeCircles = `
-            <!-- Solid Dark Circle with White Checkmark (Matching Mockup) -->
+            <!-- Solid Circle with Checkmark -->
             <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--bg-card)" data-orig-width="2" cx="${posX}" cy="${spineY}" r="8.5" fill="var(--text-primary)" stroke="var(--bg-card)" stroke-width="2" />
             <polyline points="${posX - 3},${spineY} ${posX - 1},${spineY + 2} ${posX + 3},${spineY - 2}" fill="none" stroke="var(--bg-card)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
           `;
         }
       } else {
         nodeCircles = `
-          <!-- Clean Hollow Circle for Future Stations (Matching Mockup) -->
+          <!-- Clean Hollow Circle for Future Stations -->
           <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--border-medium)" data-orig-width="2" cx="${posX}" cy="${spineY}" r="8.5" fill="var(--bg-card)" stroke="var(--border-medium)" stroke-width="2" />
         `;
       }
@@ -888,10 +947,10 @@ const MetroMap = {
       let pipsSvg = "";
       branches.forEach((b, pIdx) => {
         const c = this.getStreamColor(b);
-        pipsSvg += `<circle cx="${pipsStartX + pIdx * pipSpacing}" cy="${spineY + 44}" r="2" fill="${c}" />`;
+        pipsSvg += `<circle cx="${pipsStartX + pIdx * pipSpacing}" cy="${spineY + 42}" r="2" fill="${c}" />`;
       });
 
-      // Station Labels Below the Rail (Matching Mockup)
+      // Station Labels Below the Rail
       const labelNameColor = isActive ? "var(--accent-lavender)" : isCompleted ? "var(--text-secondary)" : "var(--text-tertiary)";
       const labelFontWeight = isActive ? "800" : "600";
 
@@ -902,11 +961,11 @@ const MetroMap = {
            onmouseleave="MetroMap.clearHighlightCardInGrid()">
           ${nodeCircles}
           <!-- Station Title Below Node -->
-          <text x="${posX}" y="${spineY + 20}" text-anchor="middle" font-size="10.5" font-weight="${labelFontWeight}" fill="${labelNameColor}">
+          <text x="${posX}" y="${spineY + 18}" text-anchor="middle" font-size="10.5" font-weight="${labelFontWeight}" fill="${labelNameColor}">
             ${this.escapeHtml(station.name)}
           </text>
           <!-- Status / Subtitle Below -->
-          <text x="${posX}" y="${spineY + 32}" text-anchor="middle" font-family="var(--font-mono)" font-size="8.5" font-weight="${isActive ? '700' : '500'}" fill="${labelSubColor}">
+          <text x="${posX}" y="${spineY + 30}" text-anchor="middle" font-family="var(--font-mono)" font-size="8.5" font-weight="${isActive ? '700' : '500'}" fill="${labelSubColor}">
             ${labelSubText}
           </text>
           <!-- Stream Pips -->
@@ -920,30 +979,45 @@ const MetroMap = {
     // TUM '28 Golden Terminal at the Horizon
     const terminalSvgHtml = `
       <g style="cursor: pointer; pointer-events: all;" onclick="HarnessApp.switchView('study')">
-        <circle cx="${terminusX}" cy="${spineY}" r="18" fill="none" stroke="#f59e0b" stroke-width="1.5" opacity="0.3" class="beacon-pulse" />
-        <circle cx="${terminusX}" cy="${spineY}" r="12" fill="var(--bg-card)" stroke="#f59e0b" stroke-width="2.5" />
-        <circle cx="${terminusX}" cy="${spineY}" r="5" fill="#f59e0b" />
-        <text x="${terminusX}" y="${spineY + 20}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#f59e0b">
+        <circle cx="${terminusX}" cy="${spineY}" r="16" fill="none" stroke="#f59e0b" stroke-width="1.2" opacity="0.3" class="beacon-pulse" />
+        <circle cx="${terminusX}" cy="${spineY}" r="11" fill="var(--bg-card)" stroke="#f59e0b" stroke-width="2" />
+        <circle cx="${terminusX}" cy="${spineY}" r="4" fill="#f59e0b" />
+        <text x="${terminusX}" y="${spineY + 18}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#f59e0b">
           TUM ’28
         </text>
-        <text x="${terminusX}" y="${spineY + 32}" text-anchor="middle" font-family="var(--font-mono)" font-size="8" font-weight="700" fill="#f59e0b">
+        <text x="${terminusX}" y="${spineY + 30}" text-anchor="middle" font-family="var(--font-mono)" font-size="8" font-weight="700" fill="#f59e0b">
           Campus Heilbronn
         </text>
       </g>
     `;
 
-    // Today Vertical Indicator (Matching Mockup with 2-line minimalist text)
+    // Today Vertical Indicator (Sharp Needle with Non-Colliding Monospace Telemetry Pill Badge)
+    const todayPillW = 146;
+    const todayPillH = 28;
+    const todayPillY = 20;
+
+    // Check if any upcoming exam cluster falls within 85px of Today to avoid collision
+    const nearExam = clusters.find((c) => c.centerX >= currentX && c.centerX < currentX + 85);
+    const shiftTodayLeft = Boolean(nearExam);
+    const todayPillX = shiftTodayLeft ? currentX - todayPillW - 4 : currentX - todayPillW / 2;
+
     const todayBeaconSvg = `
-      <g class="metro-today-beacon" style="pointer-events: none;">
-        <!-- Clean vertical indicator line rising from rail -->
-        <line x1="${currentX}" y1="${spineY - 10}" x2="${currentX}" y2="${spineY - 42}" stroke="var(--accent-lavender)" stroke-width="1.8" />
-        <circle cx="${currentX}" cy="${spineY - 10}" r="2" fill="var(--accent-lavender)" />
-        <!-- 2-line clean monospace date and progress text -->
-        <text x="${currentX}" y="${spineY - 54}" font-family="var(--font-mono)" font-size="9.5" font-weight="800" text-anchor="middle" fill="var(--text-primary)" letter-spacing="0.04em">
-          ${beaconSub.toUpperCase()}
+      <g class="metro-today-beacon" style="pointer-events: none; z-index: 25;">
+        <!-- Clean vertical needle rising from rail -->
+        <line x1="${currentX}" y1="${spineY - 4}" x2="${currentX}" y2="${todayPillY + todayPillH}" stroke="#ffffff" stroke-width="1.8" />
+        <circle cx="${currentX}" cy="${spineY - 4}" r="2.5" fill="#ffffff" />
+        ${shiftTodayLeft ? `
+          <!-- Hairline connector arm to left-anchored pill -->
+          <line x1="${currentX}" y1="${todayPillY + todayPillH / 2}" x2="${todayPillX + todayPillW}" y2="${todayPillY + todayPillH / 2}" stroke="rgba(255, 255, 255, 0.35)" stroke-width="1" stroke-dasharray="2 2" />
+        ` : ""}
+        
+        <!-- Floating Pill Badge with Pitch-Black Backdrop -->
+        <rect x="${todayPillX}" y="${todayPillY}" width="${todayPillW}" height="${todayPillH}" rx="4" fill="var(--bg-canvas)" stroke="rgba(255, 255, 255, 0.22)" stroke-width="1" />
+        <text x="${todayPillX + todayPillW / 2}" y="${todayPillY + 11}" font-family="var(--font-mono)" font-size="8.5" font-weight="800" text-anchor="middle" fill="#ffffff" letter-spacing="0.04em">
+          TODAY // ${now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).toUpperCase()}
         </text>
-        <text x="${currentX}" y="${spineY - 44}" font-family="var(--font-mono)" font-size="8.5" font-weight="700" text-anchor="middle" fill="var(--accent-lavender)">
-          ${beaconTitle} (${(progressRatio * 100).toFixed(1)}%)
+        <text x="${todayPillX + todayPillW / 2}" y="${todayPillY + 22}" font-family="var(--font-mono)" font-size="8" font-weight="700" text-anchor="middle" fill="var(--accent-lavender)" letter-spacing="0.02em">
+          DAY ${elapsedDays + 1} OF ${totalDays} • ${(progressRatio * 100).toFixed(1)}% OF '26–'28
         </text>
       </g>
     `;
@@ -1076,7 +1150,7 @@ const MetroMap = {
       gridCardsHtml += `
         <div 
           class="metro-grid-card" 
-          style="border: 1.5px solid rgba(245, 158, 11, 0.4); background: linear-gradient(135deg, rgba(245, 158, 11, 0.04), rgba(139, 92, 246, 0.04)); cursor: pointer;"
+          style="border: 1px solid rgba(245, 158, 11, 0.35); background: var(--bg-surface); cursor: pointer;"
           onclick="HarnessApp.switchView('study')"
           title="TUM Campus Heilbronn Destination"
         >
@@ -1255,7 +1329,7 @@ const MetroMap = {
         statusContainer.innerHTML = `
           <div class="station-status-badge active">
             <span class="beacon-dot optimal" style="width: 6px; height: 6px;"></span>
-            <span>ACTIVE STATION // TARGET RADAR LOCKED</span>
+            <span>ACTIVE MILESTONE // TUM HEILBRONN TRACK</span>
           </div>
         `;
       } else if (isAudited) {
@@ -1269,7 +1343,7 @@ const MetroMap = {
         statusContainer.innerHTML = `
           <div class="station-status-badge completed">
             <span>✓</span>
-            <span>COMPLETED // VERIFIED ON TIMELINE</span>
+            <span>COMPLETED MILESTONE</span>
           </div>
         `;
       } else {
@@ -1282,7 +1356,7 @@ const MetroMap = {
       }
     }
 
-    // Deliverables breakdown categorized by stream - Interactive HUD with dual-track progress
+    // Deliverables breakdown categorized by stream - Clean, Informative HUD
     const deliverablesList = document.getElementById("drawerDeliverablesList");
     if (deliverablesList && station.deliverables) {
       const now = new Date();
@@ -1306,39 +1380,48 @@ const MetroMap = {
         };
       }
 
+      const validDayOfMonth = velocity?.day_of_month || dayOfMonth;
+      const validTotalDays = velocity?.total_days || daysInMonth;
+      const validElapsedPct = (velocity?.elapsed_pct !== undefined && !isNaN(velocity.elapsed_pct))
+        ? velocity.elapsed_pct
+        : (validTotalDays > 0 ? Math.min(100, Math.max(0, Math.round((validDayOfMonth / validTotalDays) * 100))) : timeElapsedPct);
+
       let velocityHeader = "";
       if (statusVal === "active") {
-        const isBehind = velocity.is_behind;
+        const isBehind = Boolean(velocity?.is_behind);
+        let statusText = velocity?.status_text || (isBehind ? "Pace Deficit: Behind schedule" : "Pace Velocity: Optimal");
+        statusText = statusText.replace(/Pace Deficit:\s*-\s*/i, "Pace Deficit: ").replace(/undefined/g, "").replace(/NaN/g, "0");
+
         velocityHeader = `
-          <div style="display: flex; align-items: center; justify-content: space-between; padding: 7px 11px; margin-bottom: 8px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 10px; ${isBehind ? "background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.3); color: #f59e0b;" : "background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.25); color: var(--accent-lavender);"}">
+          <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; margin-bottom: 10px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 10px; ${isBehind ? "background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); color: #f59e0b;" : "background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-subtle); color: var(--text-primary);"}">
             <div style="display: flex; align-items: center; gap: 6px;">
               <span class="beacon-dot ${isBehind ? "pulse" : "optimal"}" style="width: 6px; height: 6px;"></span>
-              <span style="font-weight: 700;">${velocity.status_text}</span>
+              <span style="font-weight: 700;">${this.escapeHtml(statusText)}</span>
             </div>
-            <span style="opacity: 0.85;">Day ${velocity.day_of_month}/${velocity.total_days} (${velocity.elapsed_pct}%)</span>
+            <span style="opacity: 0.85;">Day ${validDayOfMonth}/${validTotalDays} (${validElapsedPct}%)</span>
           </div>
         `;
       }
 
       const progressHeader = `
         ${velocityHeader}
-        <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 12px;">
-          <!-- Track 1: Days Elapsed in Month (Increments daily as days pass) -->
+        <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 14px;">
+          <!-- Track 1: Days Elapsed in Month -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 10px; font-family: var(--font-mono);">
-            <span style="color: var(--text-tertiary); font-weight: 700;">📅 TIME ELAPSED (MONTH PACE)</span>
-            <span style="color: rgba(167, 139, 250, 0.9); font-weight: 700;">Day ${dayOfMonth} of ${daysInMonth} &bull; ${timeElapsedPct}%</span>
+            <span style="color: var(--text-tertiary); font-weight: 700;">TIME ELAPSED (MONTH PACE)</span>
+            <span style="color: var(--text-secondary); font-weight: 700;">Day ${validDayOfMonth} of ${validTotalDays} &bull; ${validElapsedPct}%</span>
           </div>
-          <div class="progress-bar-track" style="margin: 0 0 10px 0; height: 4px;" title="Month Days Elapsed: Day ${dayOfMonth} of ${daysInMonth} (${timeElapsedPct}%)">
-            <div class="progress-bar-fill time-fill" style="width: ${timeElapsedPct}%; background: rgba(167, 139, 250, 0.45);"></div>
+          <div class="progress-bar-track" style="margin: 0 0 10px 0; height: 4px;">
+            <div class="progress-bar-fill time-fill" style="width: ${validElapsedPct}%; background: var(--border-medium);"></div>
           </div>
 
-          <!-- Track 2: Goals Verified (Increments as deliverables are checked or stepped) -->
+          <!-- Track 2: Goals Verified -->
           <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 10px; font-family: var(--font-mono);">
-            <span style="color: var(--text-tertiary); font-weight: 700;">🎯 DELIVERABLES VERIFIED</span>
-            <span style="color: ${isAudited ? '#f59e0b' : 'var(--accent-lavender)'}; font-weight: 700;">${isAudited ? "AUDITED" : `${progressPercent}% (${completedList.length}/${totalDelivs} GOALS)`}</span>
+            <span style="color: var(--text-tertiary); font-weight: 700;">DELIVERABLES STATUS</span>
+            <span style="color: var(--accent-lavender); font-weight: 700;">${progressPercent}% (${completedList.length}/${totalDelivs} GOALS)</span>
           </div>
-          <div class="progress-bar-track" style="margin: 0; height: 4px;" title="Deliverables: ${completedList.length}/${totalDelivs} (${progressPercent}%)">
-            <div class="progress-bar-fill goals-fill" style="width: ${progressPercent}%; background: ${isAudited ? '#f59e0b' : 'var(--accent-lavender)'};"></div>
+          <div class="progress-bar-track" style="margin: 0; height: 4px;">
+            <div class="progress-bar-fill goals-fill" style="width: ${progressPercent}%; background: var(--accent-lavender);"></div>
           </div>
         </div>
       `;
@@ -1362,9 +1445,8 @@ const MetroMap = {
 
           const curCount = isChecked ? countObj.total : (countObj.count || 0);
           const totalReq = countObj.total;
-          const unitLabel = countObj.unit;
+          const unitLabel = countObj.unit || "reps";
           const itemPct = totalReq > 0 ? Math.min(100, Math.round((curCount / totalReq) * 100)) : 0;
-          const delivId = pMatch ? pMatch.deliverable_id : null;
 
           // Status Pill
           let statusPill = "";
@@ -1378,81 +1460,57 @@ const MetroMap = {
             statusPill = `<span class="telemetry-status-pill upcoming">TARGET QUEUED</span>`;
           }
 
-          let quickStepBtn = "";
-          if (streamMatch?.id === "german" || key.toLowerCase().includes("german")) {
-            quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 7px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 20, ${delivId ? `'${delivId}'` : 'null'})">+20 Words</button>`;
-          } else if (streamMatch?.id === "code" || key.toLowerCase().includes("code")) {
-            quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 7px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 1, ${delivId ? `'${delivId}'` : 'null'})">+1 Prob</button>`;
-          } else if (streamMatch?.id === "academics" || key.toLowerCase().includes("math")) {
-            quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 7px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 5, ${delivId ? `'${delivId}'` : 'null'})">+5 Probs</button>`;
-          } else if (streamMatch?.id === "physical" || key.toLowerCase().includes("physical")) {
-            quickStepBtn = `<button type="button" class="deliv-stepper-btn" style="width: auto; padding: 0 7px; font-size: 10px;" onclick="event.stopPropagation(); MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 1, ${delivId ? `'${delivId}'` : 'null'})">+1 Day</button>`;
-          }
-
-          const counterPill = `<span class="telemetry-counter-pill">[${curCount} / ${totalReq} ${unitLabel}]</span>`;
+          const targetPace = Math.round(((validDayOfMonth / validTotalDays) * totalReq) * 10) / 10;
+          const deficit = Math.round((targetPace - curCount) * 10) / 10;
+          const isBehind = deficit > 0;
+          const paceStatusText = isBehind
+            ? `Pace Deficit: ${deficit} ${unitLabel} behind target`
+            : `Optimal Pace (+${Math.abs(Math.round((curCount - targetPace) * 10) / 10)} ${unitLabel} ahead)`;
 
           return `
-            <div 
-              class="deliverable-item telemetry-deliverable-card ${isChecked ? "checked" : ""} ${isPassedOver ? "passed-over" : ""}" 
-              onclick="MetroMap.toggleDeliverable('${station.id}', '${this.escapeHtml(key)}')"
-              title="Click goal to toggle verified completion"
-              style="cursor: pointer;"
-            >
-              <div class="check-dot ${isChecked ? "checked" : ""}" style="margin-top: 3px; flex-shrink: 0;" onclick="event.stopPropagation(); MetroMap.toggleDeliverable('${station.id}', '${this.escapeHtml(key)}')"></div>
-              <div style="flex: 1; min-width: 0;">
-                <div class="telemetry-card-header" style="margin-bottom: 4px;">
-                  <div class="telemetry-card-title">
-                    <span class="telemetry-stream-name" style="color: ${lineBadgeColor};">
-                      ${key} STREAM
-                    </span>
-                    ${counterPill}
-                  </div>
-                  <div style="display: flex; align-items: center; gap: 6px;">
-                    ${statusPill}
-                    <button 
-                      type="button" 
-                      class="deliv-pass-btn ${isPassedOver ? 'passed-over' : ''}" 
-                      onclick="event.stopPropagation(); MetroMap.passOverDeliverable('${station.id}', '${this.escapeHtml(key)}')"
-                      title="Pass over or defer this deliverable"
-                    >
-                      ${isPassedOver ? 'PASSED' : 'PASS'}
-                    </button>
-                  </div>
+            <div class="deliverable-item telemetry-deliverable-card ${isChecked || curCount >= totalReq ? "completed-deliv" : ""}" style="cursor: default; padding: 12px; margin-bottom: 8px; border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); background: var(--bg-card);">
+              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
+                <div>
+                  <span class="telemetry-stream-name" style="color: ${lineBadgeColor}; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">
+                    ${this.escapeHtml(key)} STREAM
+                  </span>
+                  <span class="telemetry-counter-pill" style="font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary); margin-left: 6px;">[${curCount} / ${totalReq} ${this.escapeHtml(unitLabel)}]</span>
                 </div>
+                ${statusPill}
+              </div>
 
-                <div class="telemetry-desc" style="font-size: 11.5px; color: var(--text-primary); line-height: 1.45; margin-bottom: 6px; ${isPassedOver ? 'text-decoration: line-through; opacity: 0.65;' : ''}">
-                  ${this.escapeHtml(val)}
+              <div class="telemetry-desc" style="font-size: 11.5px; color: var(--text-primary); line-height: 1.45; margin-bottom: 8px;">
+                ${this.escapeHtml(val)}
+              </div>
+
+              <!-- Progress Bar -->
+              <div style="margin-bottom: 6px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); margin-bottom: 3px;">
+                  <span>PROGRESS</span>
+                  <span style="font-weight: 700; color: var(--text-primary);">${curCount} of ${totalReq} (${itemPct}%)</span>
                 </div>
-
-                <!-- Stepper Controls & Quick Actions -->
-                <div class="deliv-stepper" onclick="event.stopPropagation();" style="margin-top: 6px; padding-top: 6px; border-top: 1px dashed rgba(255, 255, 255, 0.08); display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 6px;">
-                  <div style="display: flex; align-items: center; gap: 4px;">
-                    <button type="button" class="deliv-stepper-btn" onclick="MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', -1, ${delivId ? `'${delivId}'` : 'null'})" title="Decrement">&minus;</button>
-                    <input 
-                      type="number" 
-                      class="deliv-input-count" 
-                      value="${curCount}" 
-                      min="0" 
-                      max="${totalReq}" 
-                      onchange="MetroMap.setDeliverableKeyProgress('${station.id}', '${this.escapeHtml(key)}', this.value, ${delivId ? `'${delivId}'` : 'null'})" 
-                      title="Direct count"
-                    />
-                    <button type="button" class="deliv-stepper-btn" onclick="MetroMap.stepDeliverableKey('${station.id}', '${this.escapeHtml(key)}', 1, ${delivId ? `'${delivId}'` : 'null'})" title="Increment">+</button>
-                    ${quickStepBtn}
-                    <span style="color: var(--text-tertiary); font-size: 10px; font-family: var(--font-mono); margin-left: 2px;">/ ${totalReq} ${unitLabel}</span>
-                  </div>
-                  <span style="font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; color: ${lineBadgeColor};">${itemPct}%</span>
-                </div>
-
-                <!-- Mini Progress Bar -->
-                <div class="telemetry-bar-track" style="margin-top: 6px;">
-                  <div class="telemetry-bar-fill" style="width: ${itemPct}%; background: ${lineBadgeColor};"></div>
+                <div class="progress-bar-track" style="margin: 0; height: 4px;">
+                  <div class="progress-bar-fill" style="width: ${itemPct}%; background: ${lineBadgeColor};"></div>
                 </div>
               </div>
+
+              <!-- Pace Diagnostic -->
+              ${statusVal === "active" ? `
+                <div style="font-family: var(--font-mono); font-size: 9px; color: ${isBehind ? 'var(--color-amber-light)' : 'var(--text-tertiary)'}; display: flex; align-items: center; gap: 4px;">
+                  <span>${isBehind ? '⚠' : '✓'}</span>
+                  <span>${paceStatusText}</span>
+                </div>
+              ` : ""}
             </div>
           `;
         })
         .join("");
+
+      const infoFooter = `
+        <div style="font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary); margin-top: 10px; padding: 8px 10px; background: var(--bg-surface); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); line-height: 1.4;">
+          💡 <strong>Execution Rule:</strong> Check off daily routine &amp; study blocks in the <strong>Daily</strong> tab to advance TUM milestone metrics.
+        </div>
+      `;
 
       const advanceFooter = `
         <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-hairline);">
@@ -1470,7 +1528,7 @@ const MetroMap = {
         </div>
       `;
 
-      deliverablesList.innerHTML = progressHeader + itemsHtml + advanceFooter;
+      deliverablesList.innerHTML = progressHeader + itemsHtml + infoFooter + advanceFooter;
     }
 
     drawer.classList.add("open");
