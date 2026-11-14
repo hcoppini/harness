@@ -526,5 +526,67 @@ def test_grade_replacement_and_deduplication(test_db):
         vs.get_vulcan_config = old_cfg
 
 
+def test_three_day_defense_threshold_and_weekend_tum_linkage(test_db):
+    """
+    Verifies the reality-grounded 3-day Defense threshold:
+    - Exams 4+ days out + daily homework + nb/historical low grades never lock DEFENSE.
+    - Exams <= 3 days out trigger DEFENSE/SURGE.
+    - Clean Horizon Saturdays inject TUM Deep Work with is_tum_roadmap=True + Physical linkage on training blocks.
+    """
+    from app.services import today_service
+
+    # Use a fixed Saturday Clean Horizon date: 2026-11-14
+    base_date = "2026-11-14"
+    exam_4d = "2026-11-18"
+    exam_3d = "2026-11-17"
+    hw_1d = "2026-11-15"
+
+    cursor = test_db.cursor()
+    # Seed historical 'nb' and low grade + normal homework (all should NOT lock DEFENSE)
+    cursor.execute(
+        """
+        INSERT INTO tum_grade_entries
+        (subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average)
+        VALUES ('Fizyka', 1, 'nb', NULL, 0.0, 'Sprawdzian', 'Kinematyka', '2026-10-10', 0)
+        """
+    )
+    cursor.execute(
+        """
+        INSERT INTO tum_grade_entries
+        (subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average)
+        VALUES ('Biologia', 1, '2.0', 2.0, 1.0, 'Kartkówka', 'Komórka', '2026-10-12', 1)
+        """
+    )
+    homework_service.add_homework("Angielski", "Short workbook exercises p. 14", hw_1d, conn=test_db)
+    homework_service.add_exam("Matematyka", "Wielomiany Sprawdzian", exam_4d, conn=test_db)
+    test_db.commit()
+
+    workload_4d = workload_governor.get_workload_analysis(target_date_str=base_date, conn=test_db)
+    assert workload_4d["mode"] in ("CRUISE", "BALANCED")
+    assert workload_4d["immediate_count"] == 0
+
+    # Verify Clean Horizon Saturday binds TUM Deep Work + Physical deliverable on training block
+    schedule_pack = today_service.get_schedule_for_date(base_date, conn=test_db)
+    blocks = schedule_pack["blocks"]
+    tum_blocks = [b for b in blocks if b.get("is_tum_roadmap")]
+    assert len(tum_blocks) >= 1
+    assert tum_blocks[0].get("deliverable") is not None
+    assert "TUM Deep Work" in tum_blocks[0].get("focus", "")
+    assert "TUM Roadmap" in tum_blocks[0].get("activity", "")
+
+    training_blocks = [b for b in blocks if b.get("type") == "training"]
+    assert len(training_blocks) >= 1
+    assert training_blocks[0].get("physical_deliverable") is not None
+
+    # Now add a test strictly 3 days away -> MUST trigger DEFENSE or SURGE
+    homework_service.add_exam("Informatyka", "Algorytmy Kartkówka", exam_3d, conn=test_db)
+    test_db.commit()
+
+    workload_3d = workload_governor.get_workload_analysis(target_date_str=base_date, conn=test_db)
+    assert workload_3d["mode"] in ("DEFENSE", "SURGE")
+    assert workload_3d["immediate_count"] == 1
+
+
+
 
 

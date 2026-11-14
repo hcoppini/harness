@@ -1091,6 +1091,145 @@ def log_workout():
     return jsonify(w)
 
 
+# ---------------------------------------------------------------------------
+# Google Calendar Bidirectional Sync & Live RFC 5545 .ics Feed Routes
+# ---------------------------------------------------------------------------
+
+@app.route("/api/calendar.ics", methods=["GET"])
+def gcalendar_ics_feed():
+    import hmac
+    from flask import Response
+    from app.services import gcalendar_service
+
+    cfg = gcalendar_service.get_gcalendar_config()
+    expected_tok = (cfg.get("ics_feed_token") or "").strip()
+    provided_tok = (request.args.get("token") or "").strip()
+    is_local = request.remote_addr in ("127.0.0.1", "::1", "localhost")
+    if expected_tok and not is_local:
+        if not provided_tok or not hmac.compare_digest(provided_tok, expected_tok):
+            return jsonify({"error": "Invalid or missing calendar feed token"}), 401
+
+    try:
+        days_ahead = max(1, min(60, int(request.args.get("days", cfg.get("sync_horizon_days", 14)))))
+    except Exception:
+        days_ahead = 14
+    start_date = request.args.get("start_date") or None
+    ics_body = api.export_gcalendar_ics(days_ahead=days_ahead, start_date=start_date)
+    headers = {"Cache-Control": "no-cache, max-age=0"}
+    if request.args.get("download") == "1":
+        headers["Content-Disposition"] = 'attachment; filename="harness_executive_os.ics"'
+    return Response(ics_body, mimetype="text/calendar; charset=utf-8", headers=headers)
+
+
+@app.route("/api/gcalendar/status", methods=["GET"])
+def gcalendar_status_route():
+    return jsonify(api.get_gcalendar_status())
+
+
+@app.route("/api/gcalendar/settings", methods=["POST"])
+def gcalendar_settings_route():
+    payload = request.get_json(silent=True) or {}
+    try:
+        return jsonify(api.save_gcalendar_settings(payload))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/gcalendar/credentials", methods=["POST"])
+def gcalendar_credentials_route():
+    payload = request.get_json(silent=True) or {}
+    raw_json = payload.get("credentials_json", "")
+    res = api.import_gcalendar_credentials(raw_json)
+    return jsonify(res), (200 if res.get("success") else 400)
+
+
+@app.route("/api/gcalendar/oauth/start", methods=["POST"])
+def gcalendar_oauth_start_route():
+    res = api.start_gcalendar_oauth()
+    return jsonify(res), (200 if res.get("started") else 400)
+
+
+@app.route("/api/gcalendar/oauth/url", methods=["GET"])
+def gcalendar_oauth_url_route():
+    redirect_uri = request.args.get("redirect_uri") or (request.url_root.rstrip("/") + "/api/gcalendar/oauth/callback")
+    try:
+        return jsonify(api.get_gcalendar_oauth_url(redirect_uri))
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/gcalendar/oauth/callback", methods=["GET"])
+def gcalendar_oauth_callback_route():
+    err = request.args.get("error")
+    if err:
+        return f"<html><body style='background:#0f1116;color:#f3f4f6;font-family:sans-serif;padding:40px;'><h2>OAuth Error</h2><p>{err}</p></body></html>", 400
+    code = request.args.get("code", "")
+    state = request.args.get("state", "")
+    if not code:
+        return jsonify({"error": "Missing OAuth authorization code"}), 400
+    try:
+        api.complete_gcalendar_oauth_web(code=code, redirect_uri=request.base_url, state=state)
+        return (
+            "<html><body style='background:#0f1116;color:#f3f4f6;font-family:sans-serif;padding:40px;'>"
+            "<h2 style='color:#10b981;'>Harness Connected to Google Calendar</h2>"
+            "<p>Redirecting back to Harness...</p>"
+            "<script>setTimeout(()=>window.location.href='/', 1200);</script></body></html>"
+        )
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 500
+
+
+@app.route("/api/gcalendar/oauth/exchange", methods=["POST"])
+def gcalendar_oauth_exchange_route():
+    payload = request.get_json(silent=True) or {}
+    code = (payload.get("code") or "").strip()
+    redirect_uri = (payload.get("redirect_uri") or (request.url_root.rstrip("/") + "/api/gcalendar/oauth/callback")).strip()
+    state = (payload.get("state") or "").strip()
+    if not code:
+        return jsonify({"error": "Authorization code is required"}), 400
+    try:
+        return jsonify(api.complete_gcalendar_oauth_web(code=code, redirect_uri=redirect_uri, state=state))
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/gcalendar/disconnect", methods=["POST"])
+def gcalendar_disconnect_route():
+    payload = request.get_json(silent=True) or {}
+    return jsonify(api.disconnect_gcalendar(clear_cache=bool(payload.get("clear_cache", False))))
+
+
+@app.route("/api/gcalendar/calendars", methods=["GET"])
+def gcalendar_calendars_route():
+    try:
+        return jsonify(api.list_gcalendar_calendars())
+    except Exception as exc:
+        return jsonify({"error": str(exc)}), 400
+
+
+@app.route("/api/gcalendar/sync", methods=["POST"])
+def gcalendar_sync_route():
+    payload = request.get_json(silent=True) or {}
+    try:
+        res = api.sync_gcalendar_now(
+            start_date=payload.get("start_date"),
+            force_push=bool(payload.get("force_push", False)),
+        )
+        return jsonify(res)
+    except Exception as exc:
+        return jsonify({"status": "error", "error": str(exc)}), 400
+
+
+@app.route("/api/gcalendar/events", methods=["GET"])
+def gcalendar_events_route():
+    return jsonify(
+        api.get_gcalendar_events(
+            start_date=request.args.get("start_date"),
+            end_date=request.args.get("end_date"),
+        )
+    )
+
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     host = os.environ.get("HOST", "0.0.0.0")

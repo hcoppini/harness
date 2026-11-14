@@ -739,6 +739,76 @@
             };
           }
 
+          const normalizeStreamKey = (key) => {
+            const k = String(key || "").toLowerCase();
+            if (k.includes("phys") || k.includes("protein")) return "physical";
+            if (k.includes("sigg") || k.includes("trad")) return "sigg";
+            if (k.includes("german") || k.includes("anki") || k.includes("lang")) return "german";
+            if (k.includes("code") || k.includes("syntax") || k.includes("leet") || k.startsWith("cs") || k.includes("cs_")) return "code";
+            return "academics";
+          };
+
+          const deriveStationDeliverables = (station) => {
+            if (!station || !station.deliverables) return [];
+            const cleanSid = String(station.id || "nov-2026").replace(/-/g, "");
+            const counts = station.deliverable_counts || {};
+            return Object.entries(station.deliverables).map(([key, desc]) => {
+              const stream = normalizeStreamKey(key);
+              const meta = counts[key] || {};
+              const unitDefault = stream === "physical" ? "days" : stream === "code" ? "exercises" : stream === "sigg" ? "modules" : stream === "german" ? "words" : "problems";
+              const totalDefault = stream === "physical" ? 30 : stream === "code" ? 15 : stream === "sigg" ? 5 : stream === "german" ? 100 : 40;
+              const total = Number(meta.total || totalDefault);
+              const count = Number(meta.count || 0);
+              return {
+                deliverable_id: meta.deliverable_id || `${cleanSid}_${stream.slice(0, 4)}`,
+                station_id: station.id,
+                stream,
+                title: `${stream.toUpperCase()}: ${String(desc || key).slice(0, 42)}`,
+                total_required: total,
+                completed_count: count,
+                unit_label: meta.unit || unitDefault,
+                is_completed: total > 0 && count >= total,
+              };
+            });
+          };
+
+          const overlayDeliverablesOntoStations = (stations, localDelivsMap) => {
+            if (!Array.isArray(stations) || !localDelivsMap) return;
+            const byStationStream = {};
+            Object.values(localDelivsMap).forEach((d) => {
+              if (!d || !d.station_id) return;
+              const sNorm = String(d.station_id).replace(/_/g, "-").toLowerCase();
+              const stStream = normalizeStreamKey(d.stream || d.deliverable_id);
+              byStationStream[sNorm] = byStationStream[sNorm] || {};
+              byStationStream[sNorm][stStream] = d;
+            });
+            stations.forEach((st) => {
+              const sNorm = String(st.id || "").replace(/_/g, "-").toLowerCase();
+              const mapForStation = byStationStream[sNorm];
+              if (!mapForStation) return;
+              st.deliverable_counts = st.deliverable_counts || {};
+              st.completed_deliverables = Array.isArray(st.completed_deliverables) ? [...st.completed_deliverables] : [];
+              Object.keys(st.deliverables || {}).forEach((key) => {
+                const stream = normalizeStreamKey(key);
+                const live = mapForStation[stream];
+                if (!live) return;
+                const existingCount = Number((st.deliverable_counts[key] && st.deliverable_counts[key].count) || 0);
+                const useCount = live._client_modified ? Number(live.completed_count || 0) : Math.max(existingCount, Number(live.completed_count || 0));
+                const useTotal = Number(live.total_required || (st.deliverable_counts[key] && st.deliverable_counts[key].total) || 1);
+                st.deliverable_counts[key] = {
+                  ...(st.deliverable_counts[key] || {}),
+                  count: useCount,
+                  total: useTotal,
+                  unit: live.unit_label || (st.deliverable_counts[key] && st.deliverable_counts[key].unit) || "units",
+                  deliverable_id: live.deliverable_id,
+                };
+                if (useTotal > 0 && useCount >= useTotal && !st.completed_deliverables.includes(key)) {
+                  st.completed_deliverables.push(key);
+                }
+              });
+            });
+          };
+
           if (prop === "get_station_deliverables") {
             return async function (stationId = null) {
               if (!stationId) {
@@ -753,68 +823,93 @@
               } catch (e) {}
 
               if (serverRes && Array.isArray(serverRes)) {
+                const now = Date.now();
                 const merged = serverRes.map((d) => {
                   const cached = localMap[d.deliverable_id];
-                  if (cached && cached.completed_count > d.completed_count) {
+                  if (cached && cached._client_modified && (now - cached._client_modified) < 15000) {
                     return { ...d, completed_count: cached.completed_count, is_completed: cached.completed_count >= d.total_required };
                   }
                   return d;
                 });
                 merged.forEach((d) => {
-                  localMap[d.deliverable_id] = d;
+                  localMap[d.deliverable_id] = { ...d, _client_modified: 0 };
                 });
                 setStore(STORAGE_KEYS.DELIVERABLES, localMap);
                 return merged;
               }
 
+              const normSid = String(stationId).replace(/_/g, "-").toLowerCase();
               const list = Object.values(localMap).filter(
-                (d) => d.station_id === stationId || d.station_id === stationId.replace("_", "-") || d.station_id === stationId.replace("-", "_")
+                (d) => String(d.station_id || "").replace(/_/g, "-").toLowerCase() === normSid
               );
               if (list.length > 0) return list;
 
-              return [
-                { deliverable_id: "sep26_math_diag", station_id: "sep-2026", stream: "Math R", title: "Diagnostic Exam 1-40", total_required: 40, completed_count: 0, unit_label: "problems", is_completed: false },
-                { deliverable_id: "sep26_leetcode_15", station_id: "sep-2026", stream: "Algorithms", title: "LeetCode Algorithm Drills (15 items)", total_required: 15, completed_count: 4, unit_label: "problems", is_completed: false },
-                { deliverable_id: "sep26_sigg_setup", station_id: "sep-2026", stream: "SIGG", title: "Registration & Platform Setup", total_required: 1, completed_count: 0, unit_label: "setup", is_completed: false },
-                { deliverable_id: "sep26_german_anki", station_id: "sep-2026", stream: "German", title: "Goethe A2 Core Vocabulary (400 Words)", total_required: 400, completed_count: 0, unit_label: "words", is_completed: false },
-                { deliverable_id: "sep26_phys_protein", station_id: "sep-2026", stream: "Physique", title: "Daily 140g+ Target Consistency (20/30 Days)", total_required: 20, completed_count: 0, unit_label: "days", is_completed: false },
-              ];
+              const roadmap = getStore(STORAGE_KEYS.METRO, null) || (await apiProxy.get_metro_roadmap().catch(() => ({})));
+              const matched = (roadmap?.stations || []).find((s) => String(s.id || "").toLowerCase() === normSid);
+              const derived = deriveStationDeliverables(matched);
+              if (derived.length > 0) {
+                derived.forEach((d) => { localMap[d.deliverable_id] = d; });
+                setStore(STORAGE_KEYS.DELIVERABLES, localMap);
+                return derived;
+              }
+              return [];
             };
           }
 
           if (prop === "update_deliverable_progress") {
             return async function (deliverableId, newCount = null, delta = null) {
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("update_deliverable_progress", [deliverableId, newCount, delta]);
+              } catch (e) {}
+
               const localMap = getStore(STORAGE_KEYS.DELIVERABLES, {});
-              const deliv = localMap[deliverableId] || {
+              const existing = localMap[deliverableId];
+              let deliv = existing ? { ...existing } : {
                 deliverable_id: deliverableId,
                 completed_count: 0,
-                total_required: 100,
+                total_required: 30,
                 unit_label: "units",
                 is_completed: false,
               };
 
-              let updatedCount = deliv.completed_count;
-              if (newCount !== null && newCount !== undefined) {
-                updatedCount = Math.max(0, parseInt(newCount, 10) || 0);
-              } else if (delta !== null && delta !== undefined) {
-                updatedCount = Math.max(0, updatedCount + (parseInt(delta, 10) || 0));
+              if (serverRes && serverRes.success) {
+                deliv.completed_count = Number(serverRes.completed_count ?? deliv.completed_count ?? 0);
+                deliv.total_required = Number(serverRes.total_required ?? deliv.total_required ?? 1);
+                deliv.is_completed = Boolean(serverRes.is_completed);
+                deliv.unit_label = serverRes.unit_label || deliv.unit_label;
+                if (serverRes.station_id) deliv.station_id = serverRes.station_id;
+              } else {
+                let updatedCount = Number(deliv.completed_count || 0);
+                if (newCount !== null && newCount !== undefined) {
+                  updatedCount = Math.max(0, parseInt(newCount, 10) || 0);
+                } else if (delta !== null && delta !== undefined) {
+                  updatedCount = Math.max(0, updatedCount + (parseInt(delta, 10) || 0));
+                }
+                deliv.completed_count = updatedCount;
+                deliv.is_completed = updatedCount >= (deliv.total_required || 1);
               }
-              deliv.completed_count = updatedCount;
-              deliv.is_completed = updatedCount >= (deliv.total_required || 1);
+              deliv._client_modified = Date.now();
               localMap[deliverableId] = deliv;
               setStore(STORAGE_KEYS.DELIVERABLES, localMap);
               syncCloudDocument("cloud_deliverables", localMap);
 
-              rpcCall("update_deliverable_progress", [deliverableId, newCount, delta]).catch(() => {});
+              // Also mirror live count into cached METRO roadmap immediately
+              const cachedMetro = getStore(STORAGE_KEYS.METRO, null);
+              if (cachedMetro && Array.isArray(cachedMetro.stations)) {
+                overlayDeliverablesOntoStations(cachedMetro.stations, localMap);
+                setStore(STORAGE_KEYS.METRO, cachedMetro);
+              }
+
               supabaseRequest(`station_deliverable_progress?deliverable_id=eq.${deliverableId}`, "PATCH", {
-                completed_count: updatedCount,
+                completed_count: deliv.completed_count,
                 is_completed: deliv.is_completed,
               });
 
               return {
                 success: true,
                 deliverable_id: deliverableId,
-                completed_count: updatedCount,
+                completed_count: deliv.completed_count,
                 total_required: deliv.total_required,
                 is_completed: deliv.is_completed,
                 unit_label: deliv.unit_label,
@@ -914,13 +1009,13 @@
           if (prop === "get_metro_roadmap") {
             return async function () {
               const localRoadmap = getStore(STORAGE_KEYS.METRO, null);
+              const localDelivs = getStore(STORAGE_KEYS.DELIVERABLES, {});
               let serverRes = null;
               try {
                 serverRes = await rpcCall("get_metro_roadmap", []);
               } catch (e) {}
 
               if (serverRes && serverRes.stations) {
-                // Merge server with any optimistic local completions and counts
                 if (localRoadmap && Array.isArray(localRoadmap.stations)) {
                   const localStationsMap = {};
                   localRoadmap.stations.forEach((ls) => { localStationsMap[ls.id] = ls; });
@@ -933,21 +1028,20 @@
                       if (Array.isArray(ls.passed_over_deliverables)) {
                         ss.passed_over_deliverables = ls.passed_over_deliverables;
                       }
-                      if (ls.deliverable_counts) {
-                        ss.deliverable_counts = { ...(ss.deliverable_counts || {}), ...ls.deliverable_counts };
-                      }
                       if (ls.status === "completed" && ss.status !== "completed") {
                         ss.status = "completed";
                       }
                     }
                   });
                 }
+                overlayDeliverablesOntoStations(serverRes.stations, localDelivs);
                 setStore(STORAGE_KEYS.METRO, serverRes);
                 syncCloudDocument("cloud_metro_roadmap", serverRes);
                 return serverRes;
               }
 
               if (localRoadmap && Array.isArray(localRoadmap.stations)) {
+                overlayDeliverablesOntoStations(localRoadmap.stations, localDelivs);
                 return localRoadmap;
               }
 
@@ -956,6 +1050,7 @@
                 const staticResp = await fetch("/data/metro_roadmap.json");
                 if (staticResp.ok) {
                   const staticData = await staticResp.json();
+                  overlayDeliverablesOntoStations(staticData.stations, localDelivs);
                   setStore(STORAGE_KEYS.METRO, staticData);
                   return staticData;
                 }
@@ -2229,6 +2324,50 @@
                 }
               } catch (e) {}
               return null;
+            };
+          }
+
+          if (prop === "get_operating_mode") {
+            return async function () {
+              try {
+                const serverMode = await rpcCall("get_operating_mode", []);
+                if (serverMode) {
+                  localStorage.setItem("harness_operating_mode", serverMode);
+                  return serverMode;
+                }
+              } catch (e) {}
+              return localStorage.getItem("harness_operating_mode") || "FORTRESS";
+            };
+          }
+
+          if (prop === "set_operating_mode") {
+            return async function (mode) {
+              localStorage.setItem("harness_operating_mode", mode);
+              try {
+                const serverRes = await rpcCall("set_operating_mode", [mode]);
+                if (serverRes) return serverRes;
+              } catch (e) {}
+              return { success: true, mode };
+            };
+          }
+
+          if (prop === "get_gcalendar_status") {
+            return async function () {
+              try {
+                const serverRes = await rpcCall("get_gcalendar_status", []);
+                if (serverRes) return serverRes;
+              } catch (e) {}
+              return { mode: "unconfigured", connected: false, cached_events_count: 0, mapped_events_count: 0, overrides_count: 0 };
+            };
+          }
+
+          if (prop === "get_gcalendar_events") {
+            return async function (startDate = null, endDate = null) {
+              try {
+                const serverRes = await rpcCall("get_gcalendar_events", [startDate, endDate]);
+                if (Array.isArray(serverRes)) return serverRes;
+              } catch (e) {}
+              return [];
             };
           }
 

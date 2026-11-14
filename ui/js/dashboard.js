@@ -97,11 +97,16 @@ window.Dashboard = {
     // 1. Today's Execution Velocity
     const todayPctVal = document.getElementById("dashTodayProgressVal");
     const todayBar = document.getElementById("dashTodayProgressBar");
+    const todayArc = document.getElementById("dashTodayRadialArc");
     const todayRoutineLabel = document.getElementById("dashTodayRoutineLabel");
 
-    const pct = velocity.percentage || 0;
+    const pct = Math.min(100, Math.max(0, Number(velocity.percentage || 0)));
     if (todayPctVal) todayPctVal.textContent = `${pct}%`;
     if (todayBar) todayBar.style.width = `${pct}%`;
+    if (todayArc) {
+      const circ = 2 * Math.PI * 20; // r=20 -> 125.66
+      todayArc.style.strokeDashoffset = (circ * (1 - pct / 100)).toFixed(2);
+    }
     if (todayRoutineLabel) {
       todayRoutineLabel.textContent = `${velocity.checked_boxes || 0}/${velocity.total_boxes || 0} boxes checked • ${velocity.schedule_name || "Daily routine"}`;
     }
@@ -113,9 +118,9 @@ window.Dashboard = {
     const workloadDescEl = document.getElementById("dashWorkloadDesc");
 
     if (modeBadge) {
-      const mode = acBalance.mode || "DEFENSE";
-      modeBadge.textContent = mode;
-      const badgeCls = mode === "DEFENSE" ? "rose" : (acBalance.badge_class || "");
+      const mode = acBalance.mode || "CRUISE";
+      modeBadge.textContent = mode === "SURGE_RECOVERY" ? "LOW ENERGY" : mode;
+      const badgeCls = (mode === "DEFENSE" || mode === "SURGE") ? "rose" : (acBalance.badge_class || "optimal");
       modeBadge.className = `mono-chip ${badgeCls}`;
     }
     if (nearestExamEl) {
@@ -134,7 +139,7 @@ window.Dashboard = {
       obligationsEl.textContent = `${examsCount} Tests • ${hwCount} Urgent HW`;
     }
     if (workloadDescEl) {
-      workloadDescEl.textContent = acBalance.description || "Academic pressure is calibrated. SGH blocks active.";
+      workloadDescEl.textContent = acBalance.description || "Clean 3-day horizon calibrated. Daily blocks feed TUM '28.";
     }
 
     // 3. TUM '28 Admissions Velocity
@@ -163,7 +168,7 @@ window.Dashboard = {
       if (isRejection) {
         stName.innerHTML = `<span style="color: var(--color-red); font-weight: 700;">⚠ REJECTION THRESHOLD BREACHED (&lt; 67.0)</span>`;
       } else {
-        stName.textContent = `Station: ${metrics.active_station?.name || "Pure Syntax"} (${metrics.active_station?.month || "SEP '26"})`;
+        stName.textContent = `Station: ${metrics.active_station?.name || "Etap Główny"} (${metrics.active_station?.month || "NOV '26"})`;
       }
     }
   },
@@ -296,7 +301,7 @@ window.Dashboard = {
             statusBadge = `<span style="color: var(--text-tertiary); font-size: 10px;">(Future Date)</span>`;
           }
         } else if (total > 0 && unchecked === 0) {
-          statusBadge = `<span style="color: var(--text-primary); font-weight: 700; font-size: 11px;">100% Done (0 unchecked • Deep Black)</span>`;
+          statusBadge = `<span style="color: var(--text-primary); font-weight: 700; font-size: 11px;">100% Done (0 unchecked)</span>`;
         } else if (total > 0) {
           statusBadge = `<span style="color: var(--text-secondary); font-size: 11px;">${count}/${total} checked (${unchecked} unchecked)</span>`;
         } else {
@@ -418,6 +423,9 @@ window.Dashboard = {
                 </span>
                 <div class="forecast-highlight-text">${this.escapeHtml(day.key_highlight)}</div>
                 ${day.cutoff_info ? `<div class="forecast-cutoff-text">${this.escapeHtml(day.cutoff_info)}</div>` : ""}
+                ${(day.calendar_events && day.calendar_events.length > 0) || (day.calendar_optimization && day.calendar_optimization.blocks_optimized > 0)
+                  ? `<div style="font-family: var(--font-mono); font-size: 9px; color: #34d399; margin-top: 3px;">GCal: ${(day.calendar_events || []).length} evt${day.calendar_optimization && day.calendar_optimization.blocks_optimized > 0 ? ` &bull; ${day.calendar_optimization.blocks_optimized} OPT` : ""}</div>`
+                  : ""}
                 ${actionsHtml}
                 ${gymSnippet}
               </div>
@@ -534,19 +542,32 @@ window.Dashboard = {
             ${blocks
               .map((b) => `
                 <div style="display: flex; align-items: baseline; justify-content: space-between; padding: 7px 10px; background: rgba(255,255,255,0.02); border: 1px solid var(--border-hairline); border-radius: 4px;">
-                  <div style="display: flex; align-items: baseline; gap: 10px;">
+                  <div style="display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap;">
                     <span style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-lavender); flex-shrink: 0; min-width: 85px;">
                       ${this.escapeHtml(b.time || "")}
                     </span>
                     <span style="font-size: 12px; font-weight: 500; color: var(--text-primary);">
                       ${this.escapeHtml(b.focus || "")}
                     </span>
+                    ${b.gcal_optimized ? `<span class="mono-chip" style="font-size: 8.5px; background: rgba(16, 185, 129, 0.14); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.35);">GCal OPT &bull; was ${this.escapeHtml(b.original_time || "")}</span>` : ""}
                   </div>
                   ${b.cutoff ? `<span style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary);">${this.escapeHtml(b.cutoff)}</span>` : ""}
                 </div>
               `)
               .join("")}
           </div>
+          ${day.calendar_events && day.calendar_events.length > 0 ? `
+            <div style="margin-top: 8px; padding: 8px 10px; background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.2); border-radius: 4px;">
+              <div style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; color: #34d399; margin-bottom: 4px;">EXTERNAL GOOGLE CALENDAR EVENTS (${day.calendar_events.length})</div>
+              <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+                ${day.calendar_events.map((ev) => `
+                  <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-primary); background: rgba(255,255,255,0.03); padding: 2px 6px; border-radius: 3px;">
+                    ${ev.is_all_day ? "All Day" : `${this.escapeHtml(ev.start_time || "")}-${this.escapeHtml(ev.end_time || "")}`} ${this.escapeHtml(ev.summary || "")}
+                  </span>
+                `).join("")}
+              </div>
+            </div>
+          ` : ""}
         </div>
       `;
     }

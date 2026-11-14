@@ -21,53 +21,55 @@
 const MetroMap = {
   mobileSelectedStationId: null,
   data: null,
+  tumOverview: null,
   isDragging: false,
   startX: 0,
   scrollLeft: 0,
   selectedStation: null,
   activeStreamFilter: "all",
+  activePhaseFilter: "all",
   focusedStationId: null,
   currentBeaconX: 0,
   stationProgress: [],
   paceVelocity: null,
   upcomingExams: [],
 
-  // Stream Definitions
+  // Stream Definitions (Compact schematic offsets tucked cleanly between exams and station labels)
   streams: [
+    {
+      id: "german",
+      name: "German Ladder",
+      code: "DE",
+      color: "#10b981",
+      yOffset: -22,
+    },
     {
       id: "academics",
       name: "Academics",
       code: "AC",
       color: "#a855f7",
-      yOffset: -28,
+      yOffset: -11,
     },
     {
       id: "code",
       name: "Code Sprint",
       code: "CD",
       color: "#38bdf8",
-      yOffset: -14,
+      yOffset: 11,
     },
     {
       id: "sigg",
       name: "SIGG GPW",
       code: "SG",
       color: "#f59e0b",
-      yOffset: 20,
-    },
-    {
-      id: "german",
-      name: "German Ladder",
-      code: "DE",
-      color: "#10b981",
-      yOffset: -40,
+      yOffset: 22,
     },
     {
       id: "physical",
       name: "Physical / Mass",
       code: "PH",
       color: "#f43f5e",
-      yOffset: 34,
+      yOffset: 32,
     },
   ],
 
@@ -83,6 +85,133 @@ const MetroMap = {
     }
   },
 
+  normalizeStreamKey(raw) {
+    const k = String(raw || "").trim().toLowerCase();
+    if (k.includes("phys") || k.includes("mass") || k.includes("gym") || k.includes("run") || k.includes("fit")) return "physical";
+    if (k.includes("sigg") || k.includes("gpw") || k.includes("invest")) return "sigg";
+    if (k.includes("germ") || k.includes("deutsch") || k.includes("anki") || k === "de") return "german";
+    if (k.includes("code") || k.includes("syntax") || k.includes("prog") || k.includes("alg")) return "code";
+    if (k.includes("acad") || k.includes("math") || k.includes("school") || k.includes("matura")) return "academics";
+    return k;
+  },
+
+  getStationPhaseKey(station, idx) {
+    const phaseLow = (station?.phase || "").toLowerCase();
+    const monthLow = (station?.month_label || "").toLowerCase();
+    const idLow = (station?.id || "").toLowerCase();
+    if (phaseLow.includes("summer") || idx === 11 || (monthLow.includes("jul") && monthLow.includes("27")) || idLow.includes("summer-2027")) {
+      return "phase2";
+    }
+    if (
+      idx >= 12 ||
+      phaseLow.includes("matura") ||
+      phaseLow.includes("cke") ||
+      phaseLow.includes("tum") ||
+      monthLow.includes("'28") ||
+      idLow.includes("2028")
+    ) {
+      return "phase3";
+    }
+    return "phase1";
+  },
+
+  setPhaseFilter(phase) {
+    this.activePhaseFilter = phase || "all";
+    document.querySelectorAll(".metro-phase-btn").forEach((btn) => {
+      btn.classList.toggle("active", (btn.getAttribute("data-phase") || "all") === this.activePhaseFilter);
+    });
+    if (this.data?.stations) {
+      const startDate = new Date(2026, 8, 1);
+      const endDate = new Date(2028, 6, 31);
+      const now = new Date();
+      let progressRatio = 0.044;
+      if (now >= startDate) {
+        const totalMs = endDate.getTime() - startDate.getTime();
+        const elapsedMs = Math.min(totalMs, Math.max(0, now.getTime() - startDate.getTime()));
+        progressRatio = elapsedMs / totalMs;
+      }
+      this.renderCardsGrid(this.data.stations, progressRatio);
+    }
+  },
+
+  getSafeVelocity(station, progressPercent) {
+    const now = new Date();
+    const dayFallback = now.getDate();
+    const daysInMonthFallback = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const fallbackPct = Math.min(100, Math.max(0, Math.round((dayFallback / daysInMonthFallback) * 100)));
+
+    const rawVel = (this.paceVelocity && this.paceVelocity.station_id === station?.id) ? this.paceVelocity : null;
+    const validDay = Number.isFinite(Number(rawVel?.day_of_month)) && Number(rawVel.day_of_month) > 0
+      ? Number(rawVel.day_of_month)
+      : dayFallback;
+    const validTotal = Number.isFinite(Number(rawVel?.total_days)) && Number(rawVel.total_days) > 0
+      ? Number(rawVel.total_days)
+      : daysInMonthFallback;
+    const validElapsedPct = Number.isFinite(Number(rawVel?.elapsed_pct))
+      ? Math.min(100, Math.max(0, Math.round(Number(rawVel.elapsed_pct))))
+      : (validTotal > 0 ? Math.min(100, Math.max(0, Math.round((validDay / validTotal) * 100))) : fallbackPct);
+
+    const safeProgress = Number.isFinite(Number(progressPercent)) ? Number(progressPercent) : 0;
+    const deltaPct = Math.round((safeProgress - validElapsedPct) * 10) / 10;
+    const isBehind = rawVel?.is_behind !== undefined ? Boolean(rawVel.is_behind) : deltaPct < 0;
+
+    let statusText = rawVel?.status_text ? String(rawVel.status_text) : "";
+    statusText = statusText
+      .replace(/undefined%?/gi, `${validElapsedPct}%`)
+      .replace(/NaN/gi, "0")
+      .replace(/Pace Deficit:\s*-\s*/i, "Pace Deficit: ")
+      .trim();
+
+    if (!statusText) {
+      statusText = isBehind
+        ? `Pace Deficit: ${Math.abs(deltaPct)}% behind month clock`
+        : `On Pace: ${deltaPct >= 0 ? `+${deltaPct}%` : "0%"} vs month clock`;
+    }
+
+    return {
+      day_of_month: validDay,
+      total_days: validTotal,
+      elapsed_pct: validElapsedPct,
+      delta_pct: deltaPct,
+      is_behind: isBehind,
+      status_text: statusText,
+    };
+  },
+
+  buildRadialRingHtml(pct, color = "var(--accent-lavender)", size = 84, subLabel = "OUTPUT") {
+    const safePct = Math.min(100, Math.max(0, Math.round(Number(pct) || 0)));
+    const strokeW = Math.max(5, Math.round(size * 0.085));
+    const r = (size - strokeW) / 2;
+    const circ = 2 * Math.PI * r;
+    const dashOffset = circ - (safePct / 100) * circ;
+    return `
+      <div class="tum-radial-wrap" style="width: ${size}px; height: ${size}px;">
+        <svg width="${size}" height="${size}" viewBox="0 0 ${size} ${size}" class="tum-radial-svg">
+          <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="rgba(255, 255, 255, 0.08)" stroke-width="${strokeW}" />
+          <circle cx="${size / 2}" cy="${size / 2}" r="${r}" fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round"
+                  stroke-dasharray="${circ.toFixed(2)}" stroke-dashoffset="${dashOffset.toFixed(2)}"
+                  transform="rotate(-90 ${size / 2} ${size / 2})" class="tum-radial-arc" />
+        </svg>
+        <div class="tum-radial-center">
+          <span class="tum-radial-pct">${safePct}%</span>
+          <span class="tum-radial-sub">${this.escapeHtml(subLabel)}</span>
+        </div>
+      </div>
+    `;
+  },
+
+  openGradesLedger() {
+    const drawer = document.getElementById("gradesTableDrawer");
+    const btn = document.getElementById("btnToggleGradesView");
+    if (drawer && (drawer.style.display === "none" || !drawer.style.display)) {
+      if (btn) btn.click();
+      else drawer.style.display = "block";
+    }
+    if (drawer) {
+      setTimeout(() => drawer.scrollIntoView({ behavior: "smooth", block: "start" }), 60);
+    }
+  },
+
   saveState() {
     if (!this.data) return;
     try {
@@ -92,7 +221,7 @@ const MetroMap = {
     }
   },
 
-    selectMobileStation(stationId) {
+  selectMobileStation(stationId) {
     this.mobileSelectedStationId = stationId;
     this.renderMobileHud();
   },
@@ -105,101 +234,61 @@ const MetroMap = {
     let activeIndex = stations.findIndex((s) => s.status === "active");
     if (activeIndex === -1) activeIndex = 0;
 
-    let currentStationId = this.mobileSelectedStationId || stations[activeIndex].id;
-    let station = stations.find((s) => s.id === currentStationId) || stations[activeIndex];
+    const currentStationId = this.mobileSelectedStationId || stations[activeIndex].id;
+    const station = stations.find((s) => s.id === currentStationId) || stations[activeIndex];
     const stationIndex = stations.findIndex((s) => s.id === station.id);
 
     const status = station.status || "upcoming";
     const progressPercent = this.calculateStationProgress(station);
     const delivEntries = Object.entries(station.deliverables || {});
     const completedList = station.completed_deliverables || [];
+    const velocity = this.getSafeVelocity(station, progressPercent);
+    const validDayOfMonth = velocity.day_of_month;
+    const validTotalDays = velocity.total_days;
+    const validElapsedPct = velocity.elapsed_pct;
 
-    const now = new Date();
-    const dayOfMonth = now.getDate();
-    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const timeElapsedPct = Math.min(100, Math.max(0, Math.round((dayOfMonth / daysInMonth) * 100)));
-
-    let velocity = this.paceVelocity;
-    if (!velocity || velocity.station_id !== station.id) {
-      const isBehind = progressPercent < timeElapsedPct;
-      velocity = {
-        station_id: station.id,
-        day_of_month: dayOfMonth,
-        total_days: daysInMonth,
-        elapsed_pct: timeElapsedPct,
-        is_behind: isBehind,
-        status_text: isBehind
-          ? `Pace Deficit: ${Math.round(timeElapsedPct - progressPercent)}% behind schedule`
-          : `Pace Velocity: Optimal (+${Math.max(0, Math.round(progressPercent - timeElapsedPct))}%)`,
-        badge_variant: isBehind ? "amber" : "optimal",
-      };
-    }
-
-    const validDayOfMonth = velocity?.day_of_month || dayOfMonth;
-    const validTotalDays = velocity?.total_days || daysInMonth;
-    const validElapsedPct = (velocity?.elapsed_pct !== undefined && !isNaN(velocity.elapsed_pct))
-      ? velocity.elapsed_pct
-      : (validTotalDays > 0 ? Math.min(100, Math.max(0, Math.round((validDayOfMonth / validTotalDays) * 100))) : timeElapsedPct);
-
-    let statusText = velocity?.status_text || (velocity?.is_behind ? "Pace Deficit: Behind schedule" : "Pace Velocity: Optimal");
-    statusText = statusText.replace(/Pace Deficit:\s*-\s*/i, "Pace Deficit: ").replace(/undefined/g, "").replace(/NaN/g, "0");
-
-    // Build select dropdown options
     const optionsHtml = stations
       .map((s, idx) => {
         const isCur = s.id === station.id;
         const tag = s.status === "active" ? " • ACTIVE" : (s.status === "completed" ? " ✓" : "");
-        return `<option value="${s.id}" ${isCur ? "selected" : ""}>${String(idx + 1).padStart(2, "0")}: ${s.month_label} - ${this.escapeHtml(s.name)}${tag}</option>`;
+        return `<option value="${s.id}" ${isCur ? "selected" : ""}>${String(idx + 1).padStart(2, "0")}: ${s.month_label} — ${this.escapeHtml(s.name)}${tag}</option>`;
       })
       .join("");
 
-    // Build deliverables HTML (Clean, informative, zero checkboxes)
     let delivsHtml = "";
     if (delivEntries.length === 0) {
       delivsHtml = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 8px 0;">No active deliverables defined.</div>`;
     } else {
       delivsHtml = delivEntries
         .map(([key, val]) => {
-          const streamMatch = this.streams.find((s) => s.name.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(s.id));
-          const lineBadgeColor = streamMatch ? streamMatch.color : "var(--accent-lavender)";
-
-          const pMatch = (this.stationProgress || []).find(
-            (p) => p.stream.toLowerCase() === key.toLowerCase() || (streamMatch && p.stream.toLowerCase() === streamMatch.id)
-          );
+          const normKey = this.normalizeStreamKey(key);
+          const streamMatch = this.streams.find((s) => s.id === normKey || s.name.toLowerCase().includes(key.toLowerCase()));
+          const lineBadgeColor = streamMatch ? this.getStreamColor(streamMatch.id) : "var(--accent-lavender)";
 
           const isChecked = completedList.includes(key);
-          const countObj = (station.deliverable_counts && station.deliverable_counts[key])
-            || (pMatch ? { count: pMatch.completed_count, total: pMatch.total_required, unit: pMatch.unit_label } : null)
-            || this.getDeliverableCounter(station.id, key, val);
-
+          const countObj = this.getDeliverableCounter(station.id, key, val);
           const curCount = isChecked ? countObj.total : (countObj.count || 0);
-          const totalReq = countObj.total;
+          const totalReq = Math.max(1, countObj.total || 10);
           const unitLabel = countObj.unit || "reps";
-          const itemPct = totalReq > 0 ? Math.min(100, Math.round((curCount / totalReq) * 100)) : 0;
+          const itemPct = Math.min(100, Math.round((curCount / totalReq) * 100));
 
           const targetPace = Math.round(((validDayOfMonth / validTotalDays) * totalReq) * 10) / 10;
           const deficit = Math.round((targetPace - curCount) * 10) / 10;
           const isBehind = deficit > 0;
 
           return `
-            <div class="mobile-hud-deliv-item ${isChecked || curCount >= totalReq ? "completed" : ""}" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 6px;">
-              <div style="display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 4px;">
-                <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: ${lineBadgeColor}; text-transform: uppercase; letter-spacing: 0.04em;">
-                  ${this.escapeHtml(key)} STREAM
-                </span>
-                <span style="font-family: var(--font-mono); font-size: 10.5px; font-weight: 700; color: var(--text-primary);">
-                  ${curCount} / ${totalReq} ${this.escapeHtml(unitLabel)}
-                </span>
+            <div class="mobile-hud-deliv-item ${isChecked || curCount >= totalReq ? "completed" : ""}" style="border-left: 2px solid ${lineBadgeColor};">
+              <div class="mobile-hud-deliv-top">
+                <span class="mobile-hud-stream" style="color: ${lineBadgeColor};">${this.escapeHtml(key)} STREAM</span>
+                <span class="mobile-hud-count">${curCount} / ${totalReq} ${this.escapeHtml(unitLabel)}</span>
               </div>
-              <div style="font-size: 11.5px; color: var(--text-secondary); line-height: 1.4; margin-bottom: 6px;">
-                ${this.escapeHtml(val)}
-              </div>
-              <div style="height: 4px; background: var(--border-hairline); border-radius: 2px; overflow: hidden; margin-bottom: 4px;">
-                <div style="width: ${itemPct}%; height: 100%; background: ${lineBadgeColor}; transition: width 0.3s ease;"></div>
+              <div class="mobile-hud-desc">${this.escapeHtml(val)}</div>
+              <div class="tum-mini-bar-track">
+                <div class="tum-mini-bar-fill" style="width: ${itemPct}%; background: ${lineBadgeColor};"></div>
               </div>
               ${status === "active" ? `
-                <div style="font-family: var(--font-mono); font-size: 9px; color: ${isBehind ? 'var(--color-amber-light)' : 'var(--text-tertiary)'};">
-                  ${isBehind ? `Pace Deficit: ${deficit} ${unitLabel} behind target` : `On pace (+${Math.abs(Math.round((curCount - targetPace) * 10) / 10)} ahead)`}
+                <div class="mobile-hud-pace ${isBehind ? "is-behind" : "is-optimal"}">
+                  ${isBehind ? `Target: ${targetPace} today (${deficit} ${this.escapeHtml(unitLabel)} behind)` : `On pace (+${Math.abs(Math.round((curCount - targetPace) * 10) / 10)} ahead)`}
                 </div>
               ` : ""}
             </div>
@@ -211,102 +300,91 @@ const MetroMap = {
     const prevDisabled = stationIndex === 0;
     const nextDisabled = stationIndex >= stations.length - 1;
 
+    // Live Bavarian Assessment Snapshot
+    const ov = window.Tum?.data || this.tumOverview || {};
+    const ba = ov.bavarian_assessment || {};
+    const bavGpa = Number.isFinite(Number(ba.bavarian_gpa)) ? Number(ba.bavarian_gpa).toFixed(2) : "--";
+    const totalScore = Number.isFinite(Number(ba.total_score)) ? Number(ba.total_score) : null;
+    const scorePct = totalScore !== null ? Math.min(100, Math.max(0, totalScore)) : 0;
+    const verdict = ba.admission_verdict || "Syncing Ledger...";
+
     container.innerHTML = `
-      <div class="monotone-card mobile-hud-card" style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: 12px; padding: 14px; margin-bottom: 12px;">
-        <!-- Station Selector Row -->
-        <div style="display: flex; justify-content: space-between; align-items: center; gap: 6px; margin-bottom: 12px;">
-          <button type="button" class="btn-ghost-icon" style="padding: 4px 10px; font-size: 11px;" ${prevDisabled ? 'disabled style="opacity: 0.3;"' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex - 1]?.id}')"`}>&larr; Prev</button>
-          
-          <select class="form-input theme-select" style="flex: 1; min-width: 0; padding: 5px 8px; font-size: 11px; font-weight: 600; font-family: var(--font-mono); text-align: center; border-radius: 6px; background: var(--bg-surface); color: var(--text-primary); border: 1px solid var(--border-subtle);" onchange="MetroMap.selectMobileStation(this.value)">
+      <div class="monotone-card mobile-hud-card">
+        <div class="mobile-hud-nav">
+          <button type="button" class="btn-ghost-icon mobile-hud-nav-btn" ${prevDisabled ? 'disabled' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex - 1]?.id}')"`}>&larr; Prev</button>
+          <select class="mobile-hud-select" onchange="MetroMap.selectMobileStation(this.value)">
             ${optionsHtml}
           </select>
-
-          <button type="button" class="btn-ghost-icon" style="padding: 4px 10px; font-size: 11px;" ${nextDisabled ? 'disabled style="opacity: 0.3;"' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex + 1]?.id}')"`}>Next &rarr;</button>
+          <button type="button" class="btn-ghost-icon mobile-hud-nav-btn" ${nextDisabled ? 'disabled' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex + 1]?.id}')"`}>Next &rarr;</button>
         </div>
 
-        <!-- Station Headline & Status -->
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 10px;">
-          <div>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span class="mono-chip lavender" style="font-size: 9px; padding: 2px 6px;">${station.month_label || "2026"}</span>
-              <span class="mono-chip ${status === "active" ? "lavender" : status === "completed" ? "green" : ""}" style="font-size: 9px; padding: 2px 6px; text-transform: uppercase;">${status === "active" ? "ACTIVE MILESTONE" : status}</span>
+        <div class="mobile-hud-hero-row">
+          ${this.buildRadialRingHtml(progressPercent, status === "completed" ? "var(--color-green-light)" : "var(--accent-lavender)", 76, "MILESTONE")}
+          <div class="mobile-hud-hero-meta">
+            <div class="mobile-hud-badges">
+              <span class="mono-chip lavender">${station.month_label || "2026"}</span>
+              <span class="mono-chip ${status === "active" ? "lavender" : status === "completed" ? "green" : ""}">${status === "active" ? "ACTIVE" : status.toUpperCase()}</span>
             </div>
-            <h2 style="font-size: 17px; font-weight: 700; color: var(--text-primary); margin-top: 4px; letter-spacing: -0.01em;">
-              ${this.escapeHtml(station.name)}
-            </h2>
-          </div>
-          <div style="text-align: right; flex-shrink: 0;">
-            <div style="font-family: var(--font-mono); font-size: 16px; font-weight: 800; color: var(--text-primary);">
-              ${progressPercent}%
-            </div>
-            <div style="font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary);">
-              COMPLETION
+            <h2 class="mobile-hud-title">${this.escapeHtml(station.name)}</h2>
+            <div class="mobile-hud-delta-tag ${velocity.is_behind ? "is-behind" : "is-optimal"}">
+              ${this.escapeHtml(velocity.status_text)}
             </div>
           </div>
         </div>
 
-        <!-- Dual Progress Indicators -->
-        <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 10px;">
-          <div style="display: flex; justify-content: space-between; font-size: 9.5px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 3px;">
-            <span>MONTH PACE</span>
-            <span style="font-weight: 700; color: var(--text-primary);">Day ${validDayOfMonth}/${validTotalDays} (${validElapsedPct}%)</span>
+        <div class="mobile-hud-pace-box">
+          <div class="tum-pace-row">
+            <span>SHOULD BE (DAY ${validDayOfMonth}/${validTotalDays})</span>
+            <strong>${validElapsedPct}%</strong>
           </div>
-          <div style="height: 4px; background: var(--border-hairline); border-radius: 2px; overflow: hidden; margin-bottom: 8px;">
-            <div style="width: ${validElapsedPct}%; height: 100%; background: var(--border-medium);"></div>
+          <div class="tum-mini-bar-track" style="margin-bottom: 8px;">
+            <div class="tum-mini-bar-fill" style="width: ${validElapsedPct}%; background: rgba(255, 255, 255, 0.35);"></div>
           </div>
-
-          <div style="display: flex; justify-content: space-between; font-size: 9.5px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 3px;">
-            <span>DELIVERABLES PACE</span>
-            <span style="font-weight: 700; color: var(--accent-lavender);">${progressPercent}%</span>
+          <div class="tum-pace-row">
+            <span>ACTUAL OUTPUT LOGGED</span>
+            <strong style="color: var(--accent-lavender);">${progressPercent}%</strong>
           </div>
-          <div style="height: 4px; background: var(--border-hairline); border-radius: 2px; overflow: hidden;">
-            <div style="width: ${progressPercent}%; height: 100%; background: var(--accent-lavender);"></div>
+          <div class="tum-mini-bar-track">
+            <div class="tum-mini-bar-fill" style="width: ${progressPercent}%; background: var(--accent-lavender);"></div>
           </div>
         </div>
 
-        ${status === "active" ? `
-          <div style="font-family: var(--font-mono); font-size: 10px; font-weight: 600; padding: 6px 10px; border-radius: 4px; margin-bottom: 10px; ${velocity?.is_behind ? "background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); color: #f59e0b;" : "background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-subtle); color: var(--text-primary);"}">
-            ${this.escapeHtml(statusText)}
-          </div>
-        ` : ""}
-
-        <!-- Core Objective Box -->
         ${station.objective ? `
-          <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 8px 10px; margin-bottom: 10px;">
-            <div class="card-label" style="font-size: 8.5px; margin-bottom: 2px;">CORE OBJECTIVE</div>
-            <div style="font-size: 11.5px; color: var(--text-primary); line-height: 1.4;">${this.escapeHtml(station.objective)}</div>
+          <div class="mobile-hud-objective">
+            <div class="card-label" style="margin-bottom: 3px;">CORE OBJECTIVE</div>
+            <div>${this.escapeHtml(station.objective)}</div>
           </div>
         ` : ""}
 
-        <!-- Deliverables Breakdown -->
-        <div style="margin-bottom: 10px;">
-          <div class="card-label" style="font-size: 9px; margin-bottom: 6px; letter-spacing: 0.05em;">DELIVERABLES STATUS</div>
+        <div style="margin-bottom: 12px;">
+          <div class="card-label" style="margin-bottom: 6px;">LIVE STREAM PROGRESS (AUTO FROM DAILY)</div>
           <div style="display: flex; flex-direction: column; gap: 6px;">
             ${delivsHtml}
           </div>
-          <div style="font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); margin-top: 6px; padding: 6px 8px; background: var(--bg-surface); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm);">
-            💡 Check off tasks in the <strong>Daily</strong> tab to log progress.
-          </div>
         </div>
 
-        <!-- Bavarian GPA & Ledger Toggle -->
-        <div style="border-top: 1px solid var(--border-hairline); padding-top: 10px; display: flex; justify-content: space-between; align-items: center; gap: 8px;">
-          <div style="font-family: var(--font-mono); font-size: 10.5px; color: var(--text-secondary);">
-            Bavarian GPA: <span style="font-weight: 700; color: var(--text-primary);">${(() => {
-              const gpaEl = document.getElementById("tumGermanGpaVal");
-              const scoreEl = document.getElementById("tumTotalScoreVal");
-              if (gpaEl && gpaEl.textContent && gpaEl.textContent !== "--") {
-                return `${gpaEl.textContent} DE • ${scoreEl?.textContent || ""}`;
-              }
-              if (window.TumAptitude && window.TumAptitude.data && window.TumAptitude.data.bavarian_gpa) {
-                return `${window.TumAptitude.data.bavarian_gpa.toFixed(2)} DE • ${Math.round(window.TumAptitude.data.total_score || 0)} pts`;
-              }
-              return "3.06 DE • 29.1 pts";
-            })()}</span>
+        <div class="mobile-hud-admissions">
+          <div class="mobile-hud-adm-top">
+            <div>
+              <div class="card-label" style="margin-bottom: 2px;">TUM STAGE 1 ADMISSIONS</div>
+              <div class="mobile-hud-adm-score">
+                <span>${bavGpa} DE</span>
+                <span class="adm-sep">/</span>
+                <span class="adm-pts">${totalScore !== null ? totalScore.toFixed(1) : "--"} pts</span>
+              </div>
+            </div>
+            <button type="button" class="btn-ghost-icon" style="font-size: 10px; padding: 4px 10px;" onclick="MetroMap.openGradesLedger()">
+              Ledger &rarr;
+            </button>
           </div>
-          <button type="button" class="btn-ghost-icon" style="font-size: 10.5px; padding: 3px 8px;" onclick="document.getElementById('btnToggleGradesView')?.click()">
-            Ledger &rarr;
-          </button>
+          <div class="tum-threshold-track">
+            <div class="tum-threshold-fill" style="width: ${scorePct}%;"></div>
+            <div class="tum-threshold-pin" style="left: 88%;" title="88.0 pts Direct Admit Cutoff"></div>
+          </div>
+          <div class="mobile-hud-adm-sub">
+            <span>${this.escapeHtml(verdict)}</span>
+            <span>Direct Admit &ge; 88.0</span>
+          </div>
         </div>
       </div>
     `;
@@ -320,18 +398,15 @@ const MetroMap = {
 
     const completedList = station.completed_deliverables || [];
     const passedOverList = station.passed_over_deliverables || [];
-    const countsMap = station.deliverable_counts || {};
 
     let totalScore = 0;
     entries.forEach(([key, val]) => {
-      if (completedList.includes(key)) {
-        totalScore += 1.0;
-      } else if (passedOverList.includes(key)) {
+      if (completedList.includes(key) || passedOverList.includes(key)) {
         totalScore += 1.0;
       } else {
-        const countObj = countsMap[key] || this.getDeliverableCounter(station.id, key, val);
+        const countObj = this.getDeliverableCounter(station.id, key, val);
         if (countObj && countObj.total > 0) {
-          const frac = Math.min(1.0, Math.max(0, countObj.count / countObj.total));
+          const frac = Math.min(1.0, Math.max(0, (countObj.count || 0) / countObj.total));
           totalScore += frac;
         }
       }
@@ -342,6 +417,25 @@ const MetroMap = {
 
   getDeliverableCounter(stationId, key, val) {
     const st = this.data?.stations?.find((s) => s.id === stationId);
+    const normKey = this.normalizeStreamKey(key);
+    const liveList = (this.stationProgressById && this.stationProgressById[stationId]) || this.stationProgress || [];
+    const pMatch = liveList.find((p) => {
+      if (p.station_id && p.station_id !== stationId) return false;
+      const pNorm = this.normalizeStreamKey(p.stream);
+      const pLow = (p.stream || "").toLowerCase();
+      const kLow = (key || "").toLowerCase();
+      return pNorm === normKey || pLow === kLow || pLow.includes(kLow) || kLow.includes(pLow);
+    });
+    if (pMatch) {
+      return {
+        count: Number(pMatch.completed_count || 0),
+        total: Math.max(1, Number(pMatch.total_required || 10)),
+        unit: pMatch.unit_label || "reps",
+        deliverable_id: pMatch.deliverable_id || null,
+        fromSqlite: true,
+      };
+    }
+
     if (st?.deliverable_counts?.[key]) {
       return st.deliverable_counts[key];
     }
@@ -508,15 +602,19 @@ const MetroMap = {
           this.data = apiRoadmap;
           this.saveState();
         }
+        const activeStation = this.data?.stations?.find((s) => s.status === "active") || this.data?.stations?.[0];
+        const targetStId = this.selectedStation?.id || (activeStation ? activeStation.id : "sep-2026");
+
         if (window.pywebview.api.get_station_deliverables) {
-          const activeStation = this.data?.stations?.find((s) => s.status === "active") || this.data?.stations?.[0];
-          const stId = activeStation ? activeStation.id : "sep-2026";
-          this.stationProgress = (await window.pywebview.api.get_station_deliverables(stId)) || [];
+          this.stationProgress = (await window.pywebview.api.get_station_deliverables(targetStId)) || [];
         }
         if (window.pywebview.api.get_station_pace_velocity) {
-          const activeStation = this.data?.stations?.find((s) => s.status === "active") || this.data?.stations?.[0];
-          const stId = activeStation ? activeStation.id : "sep-2026";
-          this.paceVelocity = (await window.pywebview.api.get_station_pace_velocity(stId)) || null;
+          this.paceVelocity = (await window.pywebview.api.get_station_pace_velocity(activeStation ? activeStation.id : targetStId)) || null;
+        }
+        if (window.Tum?.data) {
+          this.tumOverview = window.Tum.data;
+        } else if (window.pywebview.api.get_tum_overview) {
+          this.tumOverview = await window.pywebview.api.get_tum_overview();
         }
         if (window.pywebview.api.get_upcoming_exams) {
           const rawExams = await window.pywebview.api.get_upcoming_exams();
@@ -554,6 +652,10 @@ const MetroMap = {
       if (!this.upcomingExams) this.upcomingExams = [];
 
       this.render();
+      if (this.selectedStation) {
+        const refreshed = this.data?.stations?.find((s) => s.id === this.selectedStation.id);
+        if (refreshed) this.renderInspector(refreshed, true);
+      }
       setTimeout(() => this.scrollToBeacon(), 200);
     } catch (err) {
       console.error("Error loading Metro Roadmap:", err);
@@ -595,23 +697,178 @@ const MetroMap = {
     });
   },
 
+  renderComparisonHero() {
+    const heroEl = document.getElementById("tumComparisonHero");
+    if (!heroEl || !this.data || !this.data.stations) return;
+
+    const stations = this.data.stations;
+    const station = stations.find((s) => s.status === "active") || stations[0];
+    if (!station) return;
+
+    const progressPercent = this.calculateStationProgress(station);
+    const vel = this.getSafeVelocity(station, progressPercent);
+    const completedList = station.completed_deliverables || [];
+    const delivEntries = Object.entries(station.deliverables || {});
+
+    const streamsHtml = delivEntries
+      .map(([key, val]) => {
+        const normKey = this.normalizeStreamKey(key);
+        const color = this.getStreamColor(normKey);
+        const countObj = this.getDeliverableCounter(station.id, key, val);
+        const curCount = completedList.includes(key) ? countObj.total : (countObj.count || 0);
+        const totalReq = Math.max(1, countObj.total || 10);
+        const itemPct = Math.min(100, Math.round((curCount / totalReq) * 100));
+        return `
+          <div class="tum-hero-stream-row" title="${this.escapeHtml(val)}">
+            <div class="tum-hero-stream-label">
+              <span class="tum-stream-dot" style="background: ${color};"></span>
+              <span>${this.escapeHtml(key)}</span>
+            </div>
+            <div class="tum-mini-bar-track" style="flex: 1;">
+              <div class="tum-mini-bar-fill" style="width: ${itemPct}%; background: ${color};"></div>
+            </div>
+            <div class="tum-hero-stream-val">${curCount}/${totalReq} <span class="unit">${this.escapeHtml(countObj.unit || "")}</span></div>
+          </div>
+        `;
+      })
+      .join("");
+
+    // TUM Admissions Assessment snapshot
+    const ov = window.Tum?.data || this.tumOverview || {};
+    const ba = ov.bavarian_assessment || {};
+    const hasAssessment = ba && ba.total_score !== undefined && ba.total_score !== null;
+    const bavGpa = Number.isFinite(Number(ba.bavarian_gpa)) ? Number(ba.bavarian_gpa).toFixed(2) : "--";
+    const polishGpa = Number.isFinite(Number(ov.overall_gpa)) ? Number(ov.overall_gpa).toFixed(2) : "--";
+    const totalScore = hasAssessment ? Number(ba.total_score) : null;
+    const curricularScore = Number.isFinite(Number(ba.curricular_score)) ? Number(ba.curricular_score).toFixed(1) : "--";
+    const dist88 = totalScore !== null ? Math.round((88.0 - totalScore) * 10) / 10 : null;
+    const verdict = ba.admission_verdict || (hasAssessment ? "Evaluated" : "Syncing Ledger...");
+    const isDirect = totalScore !== null && totalScore >= 88.0;
+    const isInterview = totalScore !== null && totalScore >= 72.0 && totalScore < 88.0;
+    const verdictClass = isDirect ? "optimal" : isInterview ? "lavender" : "amber";
+    const barPct = totalScore !== null ? Math.min(100, Math.max(0, totalScore)) : 0;
+
+    const deltaSign = vel.delta_pct >= 0 ? "+" : "";
+    const paceChipClass = vel.is_behind ? "amber" : "optimal";
+
+    heroEl.innerHTML = `
+      <div class="tum-hero-card">
+        <div class="tum-hero-card-top">
+          <div>
+            <div class="tum-hero-eyebrow">WHERE I AM VS. WHERE I SHOULD BE // ${this.escapeHtml(station.month_label || "ACTIVE")}</div>
+            <h2 class="tum-hero-title">${this.escapeHtml(station.name)}</h2>
+          </div>
+          <span class="tum-pace-pill ${paceChipClass}">
+            ${vel.is_behind ? `BEHIND ${Math.abs(vel.delta_pct)}%` : `AHEAD ${deltaSign}${vel.delta_pct}%`}
+          </span>
+        </div>
+
+        <div class="tum-hero-pace-body">
+          ${this.buildRadialRingHtml(progressPercent, vel.is_behind ? "#f59e0b" : "var(--accent-lavender)", 86, "EXECUTED")}
+          <div class="tum-hero-bars">
+            <div class="tum-pace-row">
+              <span>SHOULD BE &bull; MONTH CLOCK (DAY ${vel.day_of_month}/${vel.total_days})</span>
+              <strong>${vel.elapsed_pct}%</strong>
+            </div>
+            <div class="tum-mini-bar-track" style="height: 5px; margin-bottom: 10px;">
+              <div class="tum-mini-bar-fill" style="width: ${vel.elapsed_pct}%; background: rgba(255, 255, 255, 0.35);"></div>
+            </div>
+
+            <div class="tum-pace-row">
+              <span>ACTUAL DELIVERABLES (${completedList.length}/${delivEntries.length} COMPLETE)</span>
+              <strong style="color: var(--accent-lavender);">${progressPercent}%</strong>
+            </div>
+            <div class="tum-mini-bar-track" style="height: 5px; margin-bottom: 8px;">
+              <div class="tum-mini-bar-fill" style="width: ${progressPercent}%; background: var(--accent-lavender);"></div>
+            </div>
+
+            <div class="tum-hero-delta-line ${vel.is_behind ? "is-behind" : "is-optimal"}">
+              ${this.escapeHtml(vel.status_text)} &bull; Checkboxes live in <strong>Daily</strong>
+            </div>
+          </div>
+        </div>
+
+        <div class="tum-hero-streams-list">
+          ${streamsHtml || `<div style="font-size: 11px; color: var(--text-tertiary);">No stream deliverables bound.</div>`}
+        </div>
+      </div>
+
+      <div class="tum-hero-card">
+        <div class="tum-hero-card-top">
+          <div>
+            <div class="tum-hero-eyebrow">TUM HEILBRONN STAGE 1 ADMISSIONS // BAVARIAN SCALE</div>
+            <h2 class="tum-hero-title">Direct Admit Standing (&ge; 88.0 pts)</h2>
+          </div>
+          <span class="tum-pace-pill ${verdictClass}">${this.escapeHtml(verdict)}</span>
+        </div>
+
+        <div class="tum-adm-kpi-row">
+          <div class="tum-adm-kpi">
+            <span class="kpi-lbl">BAVARIAN GPA</span>
+            <span class="kpi-num">${bavGpa} <small>DE</small></span>
+            <span class="kpi-sub">Polish Avg: ${polishGpa}</span>
+          </div>
+          <div class="tum-adm-kpi">
+            <span class="kpi-lbl">PROJECTED STAGE 1</span>
+            <span class="kpi-num accent">${totalScore !== null ? totalScore.toFixed(1) : "--"} <small>/ 100</small></span>
+            <span class="kpi-sub">Curricular: ${curricularScore} pts</span>
+          </div>
+          <div class="tum-adm-kpi">
+            <span class="kpi-lbl">DISTANCE TO 88.0</span>
+            <span class="kpi-num ${isDirect ? "green" : ""}">${dist88 !== null ? (dist88 <= 0 ? `+${Math.abs(dist88).toFixed(1)}` : `-${dist88.toFixed(1)}`) : "--"} <small>pts</small></span>
+            <span class="kpi-sub">${isDirect ? "Direct Admit Zone" : "Target Cutoff Gap"}</span>
+          </div>
+        </div>
+
+        <div class="tum-threshold-block">
+          <div class="tum-pace-row" style="margin-bottom: 6px;">
+            <span>STAGE 1 SCORE GAUGE (0 &rarr; 100 PTS)</span>
+            <strong style="color: ${isDirect ? "var(--color-green-light)" : "var(--text-primary)"};">CUTOFF 88.0 PTS</strong>
+          </div>
+          <div class="tum-threshold-track lg">
+            <div class="tum-threshold-fill ${isDirect ? "is-direct" : ""}" style="width: ${barPct}%;"></div>
+            <div class="tum-threshold-pin" style="left: 72%;" title="72.0 pts Stage 2 Interview Threshold"></div>
+            <div class="tum-threshold-pin target" style="left: 88%;" title="88.0 pts Direct Admit Cutoff"></div>
+          </div>
+          <div class="tum-threshold-scale">
+            <span>0</span>
+            <span style="left: 72%;">72 Interview</span>
+            <span style="left: 88%; color: var(--accent-lavender);">88 Direct</span>
+            <span>100</span>
+          </div>
+        </div>
+
+        <div class="tum-hero-adm-footer">
+          <div class="tum-hero-adm-note">
+            ${isDirect
+              ? "Standing exceeds Direct Admission cutoff. Maintain Math R (2&times;) &amp; CS (2&times;)."
+              : "Boost weighted Math R (2&times;) &amp; Informatics (2&times;) averages in Study to close gap."}
+          </div>
+          <button type="button" class="btn-ghost-icon tum-ledger-cta" onclick="MetroMap.openGradesLedger()">
+            Grades Ledger &amp; Simulator &rarr;
+          </button>
+        </div>
+      </div>
+    `;
+  },
+
   render() {
     if (!this.data || !this.data.stations) return;
 
     const canvasWrap = document.getElementById("metroCanvasWrap");
-    const cardsGrid = document.getElementById("metroCardsGrid");
     if (!canvasWrap) return;
 
     const stations = this.data.stations;
     const spacing = 220;
     const startX = 120;
-    const spineY = 110;
+    const spineY = 148;
+    const svgHeight = 246;
     const totalTrackLength = (stations.length - 1) * spacing;
     const terminusX = startX + totalTrackLength + 120;
     const totalWidth = terminusX + 160;
 
     canvasWrap.style.minWidth = `${totalWidth}px`;
-    canvasWrap.style.height = "210px";
+    canvasWrap.style.height = `${svgHeight}px`;
 
     // Date calculations
     const startDate = new Date(2026, 8, 1);
@@ -619,36 +876,28 @@ const MetroMap = {
     const now = new Date();
 
     let currentX = startX;
-    let beaconTitle = "";
-    let beaconSub = "";
-    let isPreLaunch = false;
     let totalDays = 699;
     let elapsedDays = 31;
     let progressRatio = 0.044;
 
     if (now < startDate) {
-      isPreLaunch = true;
-      const msDiff = startDate.getTime() - now.getTime();
-      const daysUntil = Math.max(1, Math.ceil(msDiff / (1000 * 60 * 60 * 24)));
       currentX = startX - 35;
-      beaconTitle = "LAUNCH GATE";
-      beaconSub = `${daysUntil}d to kickoff`;
     } else {
       const totalMs = endDate.getTime() - startDate.getTime();
       const elapsedMs = Math.min(totalMs, Math.max(0, now.getTime() - startDate.getTime()));
       progressRatio = elapsedMs / totalMs;
       totalDays = Math.round(totalMs / (1000 * 60 * 60 * 24));
       elapsedDays = Math.min(totalDays, Math.round(elapsedMs / (1000 * 60 * 60 * 24)));
-
       currentX = startX + progressRatio * totalTrackLength;
-      const dateStr = now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-      beaconTitle = `DAY ${elapsedDays + 1}/${totalDays}`;
-      beaconSub = dateStr;
     }
 
     this.currentBeaconX = currentX;
 
-    // Phase Milestones Headers (Top Zone, Y=14)
+    // Update Band 1 & Mobile HUD alongside Track
+    this.renderComparisonHero();
+    this.renderMobileHud();
+
+    // Phase Headers Ribbon (Top Zone Y=10)
     const phases = [
       { name: "Phase 1: Year 3 Liceum", startIdx: 0, endIdx: 6 },
       { name: "Phase 2: SIGG Finals & Year 3 Lock", startIdx: 7, endIdx: 10 },
@@ -657,15 +906,15 @@ const MetroMap = {
       { name: "Phase 5: Official CKE & TUM", startIdx: 20, endIdx: 21 },
     ];
 
-    let phaseHeadersHtml = phases
+    const phaseHeadersHtml = phases
       .map((p) => {
         const x1 = startX + p.startIdx * spacing - 30;
         const x2 = startX + p.endIdx * spacing + 80;
         const width = Math.max(120, x2 - x1);
         return `
-          <div style="position: absolute; top: 12px; left: ${x1}px; width: ${width}px; pointer-events: none; z-index: 5;">
+          <div style="position: absolute; top: 10px; left: ${x1}px; width: ${width}px; pointer-events: none; z-index: 5;">
             <div style="display: flex; align-items: center; gap: 8px;">
-              <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: 0.05em; white-space: nowrap;">
+              <span style="font-family: var(--font-mono); font-size: 9px; font-weight: 700; text-transform: uppercase; color: var(--text-tertiary); letter-spacing: 0.06em; white-space: nowrap;">
                 ${p.name}
               </span>
               <div style="flex: 1; height: 1px; background: var(--border-hairline);"></div>
@@ -675,81 +924,117 @@ const MetroMap = {
       })
       .join("");
 
-    // Single Main Track (Elapsed solid black/dark, Future light subtle grey)
+    // Sleek Architectural Multi-Stream Harmonic Rails (Rendered subtly in 'All', spotlighted on filter)
+    let streamRailsHtml = "";
+    const filterStream = this.activeStreamFilter || "all";
+    this.streams.forEach((stream) => {
+      const isFocused = filterStream === stream.id;
+      const isAll = filterStream === "all";
+      const railOpacity = isFocused ? "0.92" : isAll ? "0.3" : "0.08";
+      const strokeW = isFocused ? "2.6" : "1.5";
+      const color = this.getStreamColor(stream.id);
+      const yOffset = stream.yOffset;
+      const branchY = spineY + yOffset;
+      const rampLen = Math.min(34, Math.abs(yOffset) * 1.35 + 10);
+
+      const indices = [];
+      stations.forEach((st, idx) => {
+        const branches = st.branches || [];
+        if (branches.includes(stream.id) || branches.some((b) => this.normalizeStreamKey(b) === stream.id)) {
+          indices.push(idx);
+        }
+      });
+
+      if (indices.length === 0) return;
+
+      const segments = [];
+      let curSeg = [indices[0]];
+      for (let i = 1; i < indices.length; i++) {
+        if (indices[i] === indices[i - 1] + 1) {
+          curSeg.push(indices[i]);
+        } else {
+          segments.push(curSeg);
+          curSeg = [indices[i]];
+        }
+      }
+      segments.push(curSeg);
+
+      segments.forEach((seg) => {
+        const firstIdx = seg[0];
+        const lastIdx = seg[seg.length - 1];
+        const segStartX = startX + firstIdx * spacing;
+        const segEndX = startX + lastIdx * spacing;
+        const ingressX = segStartX - rampLen;
+        const egressX = segEndX + rampLen;
+        const midIn = (ingressX + segStartX) / 2;
+        const midOut = (segEndX + egressX) / 2;
+
+        const pathD = `M ${ingressX} ${spineY} C ${midIn} ${spineY}, ${midIn} ${branchY}, ${segStartX} ${branchY} L ${segEndX} ${branchY} C ${midOut} ${branchY}, ${midOut} ${spineY}, ${egressX} ${spineY}`;
+        const approxLen = Math.round((egressX - ingressX) + Math.abs(yOffset) * 2 + 40);
+
+        streamRailsHtml += `
+          <g class="stream-tributary-branch ${isFocused ? "is-focused" : ""}" style="opacity: ${railOpacity}; transition: opacity 0.3s ease;">
+            <path d="${pathD}" class="metro-rail-draw"
+                  style="--rail-len: ${approxLen}; stroke-dasharray: ${approxLen}; stroke-dashoffset: 0;"
+                  fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"
+                  ${isFocused ? `filter="url(#metroGlow)"` : ""} />
+            ${
+              isFocused || isAll
+                ? seg
+                    .map((idx) => {
+                      const px = startX + idx * spacing;
+                      return `<circle cx="${px}" cy="${branchY}" r="${isFocused ? 3.2 : 2}" fill="${color}" stroke="var(--bg-canvas)" stroke-width="1" />`;
+                    })
+                    .join("")
+                : ""
+            }
+          </g>
+        `;
+      });
+    });
+
+    // Main Spine Track
+    const activeEndX = Math.min(terminusX, currentX);
+    const activeSpineLen = Math.max(0, Math.round(activeEndX - (startX - 20)));
     const trunkHtml = `
-      <!-- Future Track -->
-      <line x1="${startX - 20}" y1="${spineY}" x2="${terminusX}" y2="${spineY}" 
-            stroke="var(--border-subtle)" stroke-width="4" stroke-linecap="round" />
-      
-      <!-- Completed / Active Track up to Today -->
+      <line x1="${startX - 20}" y1="${spineY}" x2="${terminusX}" y2="${spineY}"
+            stroke="rgba(255, 255, 255, 0.14)" stroke-width="3.5" stroke-linecap="round" />
       ${
         currentX > startX - 20
-          ? `<line x1="${startX - 20}" y1="${spineY}" x2="${Math.min(terminusX, currentX)}" y2="${spineY}" 
-                  stroke="var(--text-primary)" stroke-width="4" stroke-linecap="round" />`
+          ? `<line x1="${startX - 20}" y1="${spineY}" x2="${activeEndX}" y2="${spineY}"
+                   class="metro-spine-progress"
+                   style="--spine-len: ${activeSpineLen}; stroke-dasharray: ${activeSpineLen};"
+                   stroke="url(#metroProgressGrad)" stroke-width="4" stroke-linecap="round" />`
           : ""
       }
     `;
 
-    // Dynamic 45° Tributary Rails (On demand when a stream filter is selected)
-    let tributaryPathsHtml = "";
-    if (this.activeStreamFilter !== "all") {
-      const stream = this.streams.find((s) => s.id === this.activeStreamFilter);
-      if (stream) {
-        const color = this.getStreamColor(stream.id);
-        const yOffset = stream.yOffset;
-        const branchY = spineY + yOffset;
-        const ramp = Math.abs(yOffset);
+    // Today Pill geometry computed FIRST so exam solver reserves its bounding box & needle corridor
+    const todayPillW = 152;
+    const todayPillH = 30;
+    const todayPillY = 26;
+    const todayPillX = Math.max(14, currentX - todayPillW / 2);
 
-        const indices = [];
-        stations.forEach((st, idx) => {
-          if ((st.branches || []).includes(stream.id)) {
-            indices.push(idx);
-          }
-        });
+    const occupiedBoxes = [
+      // Today Pill Bounding Box
+      {
+        x1: todayPillX - 8,
+        x2: todayPillX + todayPillW + 8,
+        y1: todayPillY - 4,
+        y2: todayPillY + todayPillH + 6,
+      },
+      // Vertical Today Needle Corridor (guarantees NO exam pill cuts across Today's needle!)
+      {
+        x1: currentX - 18,
+        x2: currentX + 18,
+        y1: todayPillY + todayPillH,
+        y2: spineY - 8,
+      },
+    ];
 
-        if (indices.length > 0) {
-          const segments = [];
-          let cur = [indices[0]];
-          for (let i = 1; i < indices.length; i++) {
-            if (indices[i] === indices[i - 1] + 1) {
-              cur.push(indices[i]);
-            } else {
-              segments.push(cur);
-              cur = [indices[i]];
-            }
-          }
-          segments.push(cur);
+    const boxesOverlap = (a, b) => !(a.x2 <= b.x1 || a.x1 >= b.x2 || a.y2 <= b.y1 || a.y1 >= b.y2);
 
-          segments.forEach((seg) => {
-            const firstIdx = seg[0];
-            const lastIdx = seg[seg.length - 1];
-            const segStartX = startX + firstIdx * spacing;
-            const segEndX = startX + lastIdx * spacing;
-            const ingressX = segStartX - ramp;
-            const egressX = segEndX + ramp;
-
-            const pathD = `M ${ingressX} ${spineY} L ${segStartX} ${branchY} L ${segEndX} ${branchY} L ${egressX} ${spineY}`;
-
-            tributaryPathsHtml += `
-              <g class="stream-tributary-branch">
-                <path d="${pathD}" fill="none" stroke="${color}" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.85" />
-            `;
-
-            seg.forEach((idx) => {
-              const px = startX + idx * spacing;
-              tributaryPathsHtml += `
-                <line x1="${px}" y1="${branchY}" x2="${px}" y2="${spineY}" stroke="${color}" stroke-width="1" stroke-dasharray="2 2" opacity="0.5" />
-                <circle cx="${px}" cy="${branchY}" r="3" fill="${color}" stroke="var(--bg-canvas)" stroke-width="1.2" />
-              `;
-            });
-
-            tributaryPathsHtml += `</g>`;
-          });
-        }
-      }
-    }
-
-    // Dynamic School Exams on Track (Deduplicated, 55px non-overlapping clusters, alternating tiers)
+    // Dynamic School Exams on Track (Deduplicated, 2D Collision-Solved, Orthogonal Elbow Routing)
     let examsSvgHtml = "";
     const showExamsOnTrack = this.activeStreamFilter === "all" || this.activeStreamFilter === "academics";
     const clusters = [];
@@ -757,7 +1042,6 @@ const MetroMap = {
     if (showExamsOnTrack && this.upcomingExams && this.upcomingExams.length > 0) {
       const todayMid = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 
-      // 1. Deduplicate exams by subject + date + title
       const seenExams = new Set();
       const uniqueExams = [];
       this.upcomingExams
@@ -775,28 +1059,19 @@ const MetroMap = {
         try {
           const exDate = new Date(exam.exam_date + "T12:00:00");
           const diffDays = Math.round((exDate.getTime() - todayMid) / (1000 * 60 * 60 * 24));
-          // Only upcoming exams (diffDays >= 0) within roadmap horizon
           if (diffDays >= 0 && exDate >= startDate && exDate <= endDate) {
             const elapsed = exDate.getTime() - startDate.getTime();
             const totalMs = endDate.getTime() - startDate.getTime();
             const ratio = elapsed / totalMs;
             const testX = startX + ratio * totalTrackLength;
             const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "1d" : `${diffDays}d`;
-            validExams.push({
-              ...exam,
-              exDate,
-              testX,
-              diffDays,
-              dueLabel,
-            });
+            validExams.push({ ...exam, exDate, testX, diffDays, dueLabel });
           }
         } catch (e) {}
       });
 
-      // Sort by horizontal position / date
       validExams.sort((a, b) => a.testX - b.testX);
 
-      // Group nearby exams into non-overlapping clusters (55px collision threshold)
       validExams.forEach((exam) => {
         const lastCluster = clusters[clusters.length - 1];
         if (lastCluster && Math.abs(exam.testX - lastCluster.centerX) < 55) {
@@ -815,49 +1090,91 @@ const MetroMap = {
         }
       });
 
-      // Assign non-colliding alternating vertical tiers:
-      // Upper tier: tickTopY = 38, pillY = 23 (h=15, from y=23 to 38)
-      // Lower tier: tickTopY = 72, pillY = 57 (h=15, from y=57 to 72)
-      // Active station radar ring sits at y=94..126, so 72 < 94 gives 22px of clear margin!
+      const tierPillYs = [82, 58, 34]; // Tiers from bottom-most clear band upward (82..98 leaves 28px above highest rail)
+      const pillH = 16;
+
       clusters.forEach((cl, idx) => {
         let labelText = "";
         if (cl.exams.length === 1) {
-          const rawSubj = cl.exams[0].subject || "";
-          const shortSubj = rawSubj.length > 8 ? rawSubj.slice(0, 7) + "." : rawSubj;
+          const rawSubj = (cl.exams[0].subject || "").trim();
+          const shortSubj = rawSubj.length > 9 ? rawSubj.slice(0, 8) + "." : rawSubj;
           labelText = `[${cl.dueLabel}] ${shortSubj}`;
         } else if (cl.exams.length === 2) {
-          const s1 = (cl.exams[0].subject || "").slice(0, 4);
-          const s2 = (cl.exams[1].subject || "").slice(0, 4);
-          labelText = `[${cl.dueLabel}] ${s1}&${s2}`;
+          const raw1 = (cl.exams[0].subject || "").trim();
+          const raw2 = (cl.exams[1].subject || "").trim();
+          if (raw1.toLowerCase() === raw2.toLowerCase() && raw1) {
+            const shortSubj = raw1.length > 9 ? raw1.slice(0, 8) + "." : raw1;
+            labelText = `[${cl.dueLabel}] 2\u00d7 ${shortSubj}`;
+          } else {
+            labelText = `[${cl.dueLabel}] ${raw1.slice(0, 4)} \u2022 ${raw2.slice(0, 4)}`;
+          }
         } else {
           labelText = `[${cl.dueLabel}] ${cl.exams.length} Tests`;
         }
 
-        const labelW = Math.max(54, labelText.length * 6.2 + 14);
+        const labelW = Math.max(60, Math.round(labelText.length * 6.3 + 16));
         cl.w = labelW;
-        cl.minX = cl.centerX - labelW / 2;
-        cl.maxX = cl.centerX + labelW / 2;
         cl.labelText = labelText;
 
-        if (idx === 0) {
-          cl.tier = 1;
-        } else {
-          const prev = clusters[idx - 1];
-          cl.tier = prev.tier === 1 ? 0 : 1;
+        const anchorX = cl.centerX;
+        const candidateXs = [
+          anchorX - labelW / 2,
+          anchorX + 18,
+          anchorX - labelW - 18,
+          anchorX + 48,
+          anchorX - labelW - 48,
+          anchorX + 86,
+          anchorX - labelW - 86,
+          anchorX + 124,
+          anchorX - labelW - 124,
+        ];
+
+        const preferredTierOrder = idx % 2 === 0 ? [0, 1, 2] : [1, 0, 2];
+        let chosenX = candidateXs[0];
+        let chosenY = tierPillYs[preferredTierOrder[0]];
+        let placed = false;
+
+        for (const cx of candidateXs) {
+          if (cx < 12) continue;
+          for (const tIdx of preferredTierOrder) {
+            const cy = tierPillYs[tIdx];
+            const testBox = { x1: cx - 5, x2: cx + labelW + 5, y1: cy - 3, y2: cy + pillH + 3 };
+            if (!occupiedBoxes.some((b) => boxesOverlap(testBox, b))) {
+              chosenX = cx;
+              chosenY = cy;
+              occupiedBoxes.push(testBox);
+              placed = true;
+              break;
+            }
+          }
+          if (placed) break;
         }
 
-        cl.tickTopY = cl.tier === 0 ? 38 : 72;
-        cl.pillY = cl.tier === 0 ? 23 : 57;
+        if (!placed) {
+          occupiedBoxes.push({ x1: chosenX - 5, x2: chosenX + labelW + 5, y1: chosenY - 3, y2: chosenY + pillH + 3 });
+        }
+
+        cl.pillX = chosenX;
+        cl.pillY = chosenY;
       });
 
       clusters.forEach((cl) => {
         const testX = cl.centerX;
-        const tickTopY = cl.tickTopY;
-        const isUrgent = cl.diffDays >= 0 && cl.diffDays <= 2;
-        const lineColor = isUrgent ? "#ef4444" : "var(--border-medium)";
-        const textColor = isUrgent ? "#ef4444" : "var(--text-primary)";
+        const pillX = cl.pillX;
         const pillY = cl.pillY;
-        const pillX = testX - cl.w / 2;
+        const pillCenterX = pillX + cl.w / 2;
+        const pillBottomY = pillY + 16;
+        const isUrgent = cl.diffDays >= 0 && cl.diffDays <= 3; // Aligned with 3-day reality rule
+        const lineColor = isUrgent ? "#ef4444" : "rgba(255, 255, 255, 0.25)";
+        const textColor = isUrgent ? "#fca5a5" : "var(--text-primary)";
+
+        // Route cleanly via orthogonal elbow if offset away from anchor
+        const dx = Math.abs(pillCenterX - testX);
+        const kneeY = Math.min(spineY - 30, pillBottomY + 6);
+        const leaderPath =
+          dx <= 3
+            ? `M ${testX} ${spineY - 4} L ${testX} ${pillBottomY}`
+            : `M ${testX} ${spineY - 4} L ${testX} ${kneeY} L ${pillCenterX} ${kneeY} L ${pillCenterX} ${pillBottomY}`;
 
         const firstExam = cl.exams[0];
         const examsPayload = encodeURIComponent(
@@ -875,16 +1192,11 @@ const MetroMap = {
 
         examsSvgHtml += `
           <g class="metro-test-tick" data-cluster="${examsPayload}" data-id="${firstExam.id}" data-subject="${this.escapeHtml(firstExam.subject)}" data-title="${this.escapeHtml(firstExam.title)}" data-date="${firstExam.exam_date}" data-due="${cl.dueLabel}" data-count="${cl.exams.length}" style="cursor: pointer; pointer-events: all;">
-            <!-- Vertical leader line -->
-            <line x1="${testX}" y1="${spineY - 4}" x2="${testX}" y2="${tickTopY}" stroke="${lineColor}" stroke-width="1.2" stroke-dasharray="${isUrgent ? 'none' : '2 2'}" opacity="0.75" />
-            <!-- Pin dot on track -->
-            <circle cx="${testX}" cy="${spineY}" r="${cl.exams.length > 1 ? 3.5 : 2.5}" fill="${isUrgent ? '#ef4444' : 'var(--text-secondary)'}" stroke="var(--bg-canvas)" stroke-width="1.5" />
-            <!-- Small top notch pip -->
-            <circle cx="${testX}" cy="${tickTopY}" r="${cl.exams.length > 1 ? 2 : 1.5}" fill="${lineColor}" />
-            <!-- Background pill: Prevents lines or dots from cutting through text -->
-            <rect x="${pillX}" y="${pillY}" width="${cl.w}" height="15" rx="3" fill="var(--bg-canvas)" stroke="${isUrgent ? 'rgba(239, 68, 68, 0.45)' : 'var(--border-subtle)'}" stroke-width="1" />
-            <!-- Clean monospace text label -->
-            <text x="${testX}" y="${pillY + 11}" font-family="var(--font-mono)" font-size="8.5" font-weight="${isUrgent ? '700' : '600'}" text-anchor="middle" fill="${textColor}" letter-spacing="0.02em">
+            <path d="${leaderPath}" fill="none" stroke="${lineColor}" stroke-width="1.2" ${isUrgent ? "" : 'stroke-dasharray="2.5 2.5"'} opacity="0.85" />
+            <circle cx="${testX}" cy="${spineY}" r="${cl.exams.length > 1 ? 3.5 : 2.5}" fill="${isUrgent ? "#ef4444" : "var(--text-secondary)"}" stroke="var(--bg-canvas)" stroke-width="1.5" />
+            <circle cx="${pillCenterX}" cy="${pillBottomY}" r="1.6" fill="${isUrgent ? "#ef4444" : "rgba(255, 255, 255, 0.45)"}" />
+            <rect x="${pillX}" y="${pillY}" width="${cl.w}" height="16" rx="4" fill="var(--bg-canvas)" stroke="${isUrgent ? "rgba(239, 68, 68, 0.55)" : "var(--border-subtle)"}" stroke-width="1" />
+            <text x="${pillCenterX}" y="${pillY + 11.2}" font-family="var(--font-mono)" font-size="8.5" font-weight="${isUrgent ? "700" : "600"}" text-anchor="middle" fill="${textColor}" letter-spacing="0.02em">
               ${this.escapeHtml(cl.labelText)}
             </text>
           </g>
@@ -892,13 +1204,14 @@ const MetroMap = {
       });
     }
 
-    // Station Nodes along Track
+    // Station Nodes along Track (Labels safely pushed below lower stream rails at spineY + 46)
     let stationsSvgHtml = "";
     stations.forEach((station, idx) => {
       const posX = startX + idx * spacing;
       const status = station.status || "upcoming";
       const isActive = status === "active";
       const isCompleted = status === "completed";
+      const isSelected = this.selectedStation?.id === station.id;
       const branches = station.branches || [];
 
       let nodeCircles = "";
@@ -909,11 +1222,10 @@ const MetroMap = {
         labelSubText = "ACTIVE STATION";
         labelSubColor = "var(--accent-lavender)";
         nodeCircles = `
-          <!-- Concentric Precision Radar Rings for Active Station -->
-          <circle cx="${posX}" cy="${spineY}" r="16" fill="none" stroke="var(--accent-lavender)" stroke-width="1" opacity="0.25" class="beacon-pulse" />
-          <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--accent-lavender)" data-orig-width="2" cx="${posX}" cy="${spineY}" r="11" fill="none" stroke="var(--accent-lavender)" stroke-width="2" />
+          <circle cx="${posX}" cy="${spineY}" r="16" fill="none" stroke="var(--accent-lavender)" stroke-width="1" opacity="0.3" class="beacon-pulse" />
+          <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--accent-lavender)" data-orig-width="${isSelected ? "3" : "2"}" cx="${posX}" cy="${spineY}" r="11" fill="none" stroke="var(--accent-lavender)" stroke-width="${isSelected ? "3" : "2"}" />
           <circle cx="${posX}" cy="${spineY}" r="7" fill="var(--bg-canvas)" />
-          <circle cx="${posX}" cy="${spineY}" r="4" fill="var(--accent-lavender)" />
+          <circle cx="${posX}" cy="${spineY}" r="4.2" fill="var(--accent-lavender)" />
         `;
       } else if (isCompleted) {
         const passedOverList = station.passed_over_deliverables || [];
@@ -922,35 +1234,28 @@ const MetroMap = {
           labelSubText = "Audited";
           labelSubColor = "#f59e0b";
           nodeCircles = `
-            <!-- Audited / Reallocated Node -->
-            <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="#f59e0b" data-orig-width="1.8" cx="${posX}" cy="${spineY}" r="8.5" fill="var(--bg-card)" stroke="#f59e0b" stroke-width="1.8" stroke-dasharray="3,2" />
+            <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="#f59e0b" data-orig-width="${isSelected ? "3" : "1.8"}" cx="${posX}" cy="${spineY}" r="8.5" fill="var(--bg-card)" stroke="#f59e0b" stroke-width="${isSelected ? "3" : "1.8"}" stroke-dasharray="3,2" />
             <circle cx="${posX}" cy="${spineY}" r="4" fill="#f59e0b" opacity="0.85" />
           `;
         } else {
           labelSubText = "Completed";
           nodeCircles = `
-            <!-- Solid Circle with Checkmark -->
-            <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--bg-card)" data-orig-width="2" cx="${posX}" cy="${spineY}" r="8.5" fill="var(--text-primary)" stroke="var(--bg-card)" stroke-width="2" />
+            <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--bg-card)" data-orig-width="2" cx="${posX}" cy="${spineY}" r="8.5" fill="var(--text-primary)" stroke="${isSelected ? "var(--accent-lavender)" : "var(--bg-card)"}" stroke-width="${isSelected ? "2.5" : "2"}" />
             <polyline points="${posX - 3},${spineY} ${posX - 1},${spineY + 2} ${posX + 3},${spineY - 2}" fill="none" stroke="var(--bg-card)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
           `;
         }
       } else {
         nodeCircles = `
-          <!-- Clean Hollow Circle for Future Stations -->
-          <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--border-medium)" data-orig-width="2" cx="${posX}" cy="${spineY}" r="8.5" fill="var(--bg-card)" stroke="var(--border-medium)" stroke-width="2" />
+          <circle id="rail-ring-${station.id}" class="station-rail-node-ring" data-orig-stroke="var(--border-medium)" data-orig-width="2" cx="${posX}" cy="${spineY}" r="8.5" fill="var(--bg-card)" stroke="${isSelected ? "var(--accent-lavender)" : "var(--border-medium)"}" stroke-width="${isSelected ? "2.5" : "2"}" />
         `;
       }
 
-      // Stream Micro-Pips beneath station
-      const pipSpacing = 6;
+      const pipSpacing = 6.5;
       const pipsStartX = posX - ((branches.length - 1) * pipSpacing) / 2;
-      let pipsSvg = "";
-      branches.forEach((b, pIdx) => {
-        const c = this.getStreamColor(b);
-        pipsSvg += `<circle cx="${pipsStartX + pIdx * pipSpacing}" cy="${spineY + 42}" r="2" fill="${c}" />`;
-      });
+      const pipsSvg = branches
+        .map((b, pIdx) => `<circle cx="${pipsStartX + pIdx * pipSpacing}" cy="${spineY + 70}" r="2" fill="${this.getStreamColor(this.normalizeStreamKey(b))}" />`)
+        .join("");
 
-      // Station Labels Below the Rail
       const labelNameColor = isActive ? "var(--accent-lavender)" : isCompleted ? "var(--text-secondary)" : "var(--text-tertiary)";
       const labelFontWeight = isActive ? "800" : "600";
 
@@ -960,74 +1265,66 @@ const MetroMap = {
            onmouseenter="MetroMap.highlightCardInGrid('${station.id}')"
            onmouseleave="MetroMap.clearHighlightCardInGrid()">
           ${nodeCircles}
-          <!-- Station Title Below Node -->
-          <text x="${posX}" y="${spineY + 18}" text-anchor="middle" font-size="10.5" font-weight="${labelFontWeight}" fill="${labelNameColor}">
+          <text x="${posX}" y="${spineY + 46}" text-anchor="middle" font-size="10.5" font-weight="${labelFontWeight}" fill="${labelNameColor}">
             ${this.escapeHtml(station.name)}
           </text>
-          <!-- Status / Subtitle Below -->
-          <text x="${posX}" y="${spineY + 30}" text-anchor="middle" font-family="var(--font-mono)" font-size="8.5" font-weight="${isActive ? '700' : '500'}" fill="${labelSubColor}">
+          <text x="${posX}" y="${spineY + 59}" text-anchor="middle" font-family="var(--font-mono)" font-size="8.5" font-weight="${isActive ? "700" : "500"}" fill="${labelSubColor}">
             ${labelSubText}
           </text>
-          <!-- Stream Pips -->
           ${pipsSvg}
-          <!-- Transparent Hit Target -->
-          <circle cx="${posX}" cy="${spineY}" r="20" fill="transparent" />
+          <circle cx="${posX}" cy="${spineY}" r="22" fill="transparent" />
         </g>
       `;
     });
 
-    // TUM '28 Golden Terminal at the Horizon
+    // TUM '28 Golden Terminal
     const terminalSvgHtml = `
-      <g style="cursor: pointer; pointer-events: all;" onclick="HarnessApp.switchView('study')">
+      <g style="cursor: pointer; pointer-events: all;" onclick="MetroMap.openGradesLedger()">
         <circle cx="${terminusX}" cy="${spineY}" r="16" fill="none" stroke="#f59e0b" stroke-width="1.2" opacity="0.3" class="beacon-pulse" />
         <circle cx="${terminusX}" cy="${spineY}" r="11" fill="var(--bg-card)" stroke="#f59e0b" stroke-width="2" />
         <circle cx="${terminusX}" cy="${spineY}" r="4" fill="#f59e0b" />
-        <text x="${terminusX}" y="${spineY + 18}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#f59e0b">
-          TUM ’28
+        <text x="${terminusX}" y="${spineY + 46}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#f59e0b">
+          TUM \u201928
         </text>
-        <text x="${terminusX}" y="${spineY + 30}" text-anchor="middle" font-family="var(--font-mono)" font-size="8" font-weight="700" fill="#f59e0b">
+        <text x="${terminusX}" y="${spineY + 59}" text-anchor="middle" font-family="var(--font-mono)" font-size="8" font-weight="700" fill="#f59e0b">
           Campus Heilbronn
         </text>
       </g>
     `;
 
-    // Today Vertical Indicator (Sharp Needle with Non-Colliding Monospace Telemetry Pill Badge)
-    const todayPillW = 146;
-    const todayPillH = 28;
-    const todayPillY = 20;
-
-    // Check if any upcoming exam cluster falls within 85px of Today to avoid collision
-    const nearExam = clusters.find((c) => c.centerX >= currentX && c.centerX < currentX + 85);
-    const shiftTodayLeft = Boolean(nearExam);
-    const todayPillX = shiftTodayLeft ? currentX - todayPillW - 4 : currentX - todayPillW / 2;
-
+    // Today Needle & Pill (guaranteed collision-free in reserved corridor)
     const todayBeaconSvg = `
       <g class="metro-today-beacon" style="pointer-events: none; z-index: 25;">
-        <!-- Clean vertical needle rising from rail -->
-        <line x1="${currentX}" y1="${spineY - 4}" x2="${currentX}" y2="${todayPillY + todayPillH}" stroke="#ffffff" stroke-width="1.8" />
-        <circle cx="${currentX}" cy="${spineY - 4}" r="2.5" fill="#ffffff" />
-        ${shiftTodayLeft ? `
-          <!-- Hairline connector arm to left-anchored pill -->
-          <line x1="${currentX}" y1="${todayPillY + todayPillH / 2}" x2="${todayPillX + todayPillW}" y2="${todayPillY + todayPillH / 2}" stroke="rgba(255, 255, 255, 0.35)" stroke-width="1" stroke-dasharray="2 2" />
-        ` : ""}
-        
-        <!-- Floating Pill Badge with Pitch-Black Backdrop -->
-        <rect x="${todayPillX}" y="${todayPillY}" width="${todayPillW}" height="${todayPillH}" rx="4" fill="var(--bg-canvas)" stroke="rgba(255, 255, 255, 0.22)" stroke-width="1" />
-        <text x="${todayPillX + todayPillW / 2}" y="${todayPillY + 11}" font-family="var(--font-mono)" font-size="8.5" font-weight="800" text-anchor="middle" fill="#ffffff" letter-spacing="0.04em">
+        <line x1="${currentX}" y1="${spineY - 4}" x2="${currentX}" y2="${todayPillY + todayPillH}" stroke="#ffffff" stroke-width="1.8" stroke-opacity="0.9" />
+        <circle cx="${currentX}" cy="${spineY - 4}" r="2.8" fill="#ffffff" />
+        <rect x="${todayPillX}" y="${todayPillY}" width="${todayPillW}" height="${todayPillH}" rx="5" fill="var(--bg-canvas)" stroke="rgba(255, 255, 255, 0.28)" stroke-width="1" />
+        <text x="${todayPillX + todayPillW / 2}" y="${todayPillY + 12}" font-family="var(--font-mono)" font-size="8.5" font-weight="800" text-anchor="middle" fill="#ffffff" letter-spacing="0.05em">
           TODAY // ${now.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }).toUpperCase()}
         </text>
-        <text x="${todayPillX + todayPillW / 2}" y="${todayPillY + 22}" font-family="var(--font-mono)" font-size="8" font-weight="700" text-anchor="middle" fill="var(--accent-lavender)" letter-spacing="0.02em">
-          DAY ${elapsedDays + 1} OF ${totalDays} • ${(progressRatio * 100).toFixed(1)}% OF '26–'28
+        <text x="${todayPillX + todayPillW / 2}" y="${todayPillY + 23}" font-family="var(--font-mono)" font-size="8" font-weight="700" text-anchor="middle" fill="var(--accent-lavender)" letter-spacing="0.02em">
+          DAY ${elapsedDays + 1}/${totalDays} \u2022 ${(progressRatio * 100).toFixed(1)}% OF \u201926\u2013\u201928
         </text>
       </g>
     `;
 
-    // Assemble Track SVG
     canvasWrap.innerHTML = `
       ${phaseHeadersHtml}
-      <svg width="${totalWidth}" height="210" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 20;">
+      <svg width="${totalWidth}" height="${svgHeight}" style="position: absolute; top: 0; left: 0; pointer-events: none; z-index: 20;">
+        <defs>
+          <linearGradient id="metroProgressGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+            <stop offset="0%" stop-color="rgba(255, 255, 255, 0.65)" />
+            <stop offset="100%" stop-color="#a78bfa" />
+          </linearGradient>
+          <filter id="metroGlow" x="-10%" y="-40%" width="120%" height="180%">
+            <feGaussianBlur stdDeviation="2.5" result="blur" />
+            <feMerge>
+              <feMergeNode in="blur" />
+              <feMergeNode in="SourceGraphic" />
+            </feMerge>
+          </filter>
+        </defs>
+        ${streamRailsHtml}
         ${trunkHtml}
-        ${tributaryPathsHtml}
         ${examsSvgHtml}
         ${stationsSvgHtml}
         ${terminalSvgHtml}
@@ -1035,123 +1332,127 @@ const MetroMap = {
       </svg>
     `;
 
-    // Render Tier 2: Responsive Milestone Cards Grid (Matching User Mockup)
-    if (cardsGrid) {
-      let gridCardsHtml = stations
-        .map((station) => {
-          const status = station.status || "upcoming";
-          const isActive = status === "active";
-          const isCompleted = status === "completed";
-          const branches = station.branches || [];
+    // Sync 'All (N)' button label and render Phase-Filtered Cards Grid
+    const allPhaseBtn = document.querySelector('.metro-phase-btn[data-phase="all"]');
+    if (allPhaseBtn) {
+      allPhaseBtn.textContent = `All (${stations.length})`;
+    }
+    this.renderCardsGrid(stations, progressRatio);
+    this.attachTestDotEvents();
+  },
 
-          const isFilteredMatch = this.activeStreamFilter === "all" || branches.includes(this.activeStreamFilter);
-          const filterStyle = isFilteredMatch ? "" : "opacity: 0.28; filter: grayscale(0.5);";
+  renderCardsGrid(stations, progressRatio = 0.044) {
+    const cardsGrid = document.getElementById("metroCardsGrid");
+    if (!cardsGrid || !stations) return;
 
-          const delivEntries = Object.entries(station.deliverables || {});
-          const completedList = station.completed_deliverables || [];
-          const totalDelivs = delivEntries.length;
-          const progressPercent = this.calculateStationProgress(station);
+    const phaseFilter = this.activePhaseFilter || "all";
+    const visibleStations = stations
+      .map((st, idx) => ({ st, idx }))
+      .filter(({ st, idx }) => phaseFilter === "all" || this.getStationPhaseKey(st, idx) === phaseFilter);
 
-          const passedOverList = station.passed_over_deliverables || [];
-          const isAudited = isCompleted && passedOverList.length > 0 && (completedList.length === 0 || passedOverList.length >= totalDelivs);
+    let gridCardsHtml = visibleStations
+      .map(({ st: station }) => {
+        const status = station.status || "upcoming";
+        const isActive = status === "active";
+        const isCompleted = status === "completed";
+        const isSelected = this.selectedStation?.id === station.id;
+        const branches = station.branches || [];
 
-          // Header Chip
-          let chipHtml = "";
-          if (isActive) {
-            chipHtml = `<span class="metro-card-chip active">ACTIVE (${progressPercent}%)</span>`;
-          } else if (isAudited) {
-            chipHtml = `<span class="metro-card-chip" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35);">AUDITED</span>`;
-          } else if (isCompleted) {
-            chipHtml = `<span class="metro-card-chip done">✓ DONE</span>`;
-          } else {
-            chipHtml = `<span class="metro-card-chip">${progressPercent}%</span>`;
-          }
+        const isFilteredMatch =
+          this.activeStreamFilter === "all" ||
+          branches.includes(this.activeStreamFilter) ||
+          branches.some((b) => this.normalizeStreamKey(b) === this.activeStreamFilter);
+        const filterStyle = isFilteredMatch ? "" : "opacity: 0.25; filter: grayscale(0.5);";
 
-          // Micro-Tags
-          const tagsHtml = branches
-            .map((b) => {
-              const c = this.getStreamColor(b);
-              const streamObj = this.streams.find((s) => s.id === b);
-              const sName = streamObj ? streamObj.name : b.toUpperCase();
-              return `<span class="metro-micro-tag" style="background: ${c}15; color: ${c}; border: 1px solid ${c}35;">${sName}</span>`;
-            })
-            .join("");
+        const delivEntries = Object.entries(station.deliverables || {});
+        const completedList = station.completed_deliverables || [];
+        const totalDelivs = delivEntries.length;
+        const progressPercent = this.calculateStationProgress(station);
 
-          return `
-            <div 
-              class="metro-grid-card ${isActive ? 'active-card' : ''} ${isCompleted ? 'completed-card' : ''}"
-              data-station-id="${station.id}"
-              style="${filterStyle}"
-              onclick="MetroMap.selectStation('${station.id}')"
-              onmouseenter="MetroMap.highlightStationOnRail('${station.id}')"
-              onmouseleave="MetroMap.clearHighlightStationOnRail()"
-            >
-              <!-- Card Header -->
-              <div class="metro-card-header">
-                <span class="metro-card-month">${station.month_label}:</span>
-                ${chipHtml}
-              </div>
+        const passedOverList = station.passed_over_deliverables || [];
+        const isAudited = isCompleted && passedOverList.length > 0 && (completedList.length === 0 || passedOverList.length >= totalDelivs);
 
-              <!-- Milestone Title -->
-              <div class="metro-card-title" title="${this.escapeHtml(station.name)}">
-                ${this.escapeHtml(station.name.toUpperCase())}
-              </div>
+        let chipHtml = "";
+        if (isActive) {
+          chipHtml = `<span class="metro-card-chip active">ACTIVE (${progressPercent}%)</span>`;
+        } else if (isAudited) {
+          chipHtml = `<span class="metro-card-chip" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35);">AUDITED</span>`;
+        } else if (isCompleted) {
+          chipHtml = `<span class="metro-card-chip done">\u2713 DONE</span>`;
+        } else {
+          chipHtml = `<span class="metro-card-chip">${progressPercent}%</span>`;
+        }
 
-              <!-- Micro-Tags Row -->
-              <div class="metro-micro-tags">
-                ${tagsHtml}
-              </div>
+        const tagsHtml = branches
+          .map((b) => {
+            const c = this.getStreamColor(this.normalizeStreamKey(b));
+            const streamObj = this.streams.find((s) => s.id === b || s.id === this.normalizeStreamKey(b));
+            const sName = streamObj ? streamObj.name : b.toUpperCase();
+            return `<span class="metro-micro-tag" style="background: ${c}15; color: ${c}; border: 1px solid ${c}35;">${sName}</span>`;
+          })
+          .join("");
 
-              <!-- Progress Bar (Dual for Active Station, Slim for Standard) -->
-              ${
-                isActive
-                  ? (() => {
-                      const now = new Date();
-                      const dayOfMonth = now.getDate();
-                      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-                      const timeElapsedPct = Math.min(100, Math.max(0, Math.round((dayOfMonth / daysInMonth) * 100)));
-                      const completedCount = completedList.length;
-                      return `
-                        <div class="metro-card-active-progress" title="Time Pace: Day ${dayOfMonth} of ${daysInMonth} (${timeElapsedPct}%) | Deliverables: ${completedCount}/${totalDelivs} (${progressPercent}%)">
-                          <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 8.5px;">
-                            <span style="color: var(--text-tertiary); font-weight: 600;">📅 TIME: Day ${dayOfMonth}/${daysInMonth}</span>
-                            <span style="color: rgba(167, 139, 250, 0.9); font-weight: 700;">${timeElapsedPct}%</span>
-                          </div>
-                          <div class="metro-progress-track">
-                            <div class="metro-progress-fill time-fill" style="width: ${timeElapsedPct}%;"></div>
-                          </div>
+        const vel = isActive ? this.getSafeVelocity(station, progressPercent) : null;
 
-                          <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 8.5px; margin-top: 2px;">
-                            <span style="color: var(--text-tertiary); font-weight: 600;">🎯 GOALS: ${completedCount}/${totalDelivs}</span>
-                            <span style="color: var(--accent-lavender); font-weight: 700;">${progressPercent}%</span>
-                          </div>
-                          <div class="metro-progress-track">
-                            <div class="metro-progress-fill goals-fill" style="width: ${progressPercent}%;"></div>
-                          </div>
-                        </div>
-                      `;
-                    })()
-                  : `
-                    <!-- Slim Progress Bar -->
-                    <div class="metro-card-progress">
-                      <div class="metro-progress-track">
-                        <div class="metro-progress-fill" style="width: ${progressPercent}%;"></div>
-                      </div>
-                      <span class="metro-progress-pct">${progressPercent}%</span>
-                    </div>
-                  `
-              }
+        return `
+          <div
+            class="metro-grid-card ${isActive ? "active-card" : ""} ${isCompleted ? "completed-card" : ""} ${isSelected ? "selected-card" : ""}"
+            data-station-id="${station.id}"
+            style="${filterStyle}"
+            onclick="MetroMap.selectStation('${station.id}')"
+            onmouseenter="MetroMap.highlightStationOnRail('${station.id}')"
+            onmouseleave="MetroMap.clearHighlightStationOnRail()"
+          >
+            <div class="metro-card-header">
+              <span class="metro-card-month">${station.month_label}:</span>
+              ${chipHtml}
             </div>
-          `;
-        })
-        .join("");
+            <div class="metro-card-title" title="${this.escapeHtml(station.name)}">
+              ${this.escapeHtml(station.name.toUpperCase())}
+            </div>
+            <div class="metro-micro-tags">
+              ${tagsHtml}
+            </div>
+            ${
+              isActive && vel
+                ? `
+                  <div class="metro-card-active-progress">
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 8.5px;">
+                      <span style="color: var(--text-tertiary); font-weight: 600;">CLOCK: Day ${vel.day_of_month}/${vel.total_days}</span>
+                      <span style="color: rgba(255, 255, 255, 0.72); font-weight: 700;">${vel.elapsed_pct}%</span>
+                    </div>
+                    <div class="metro-progress-track">
+                      <div class="metro-progress-fill time-fill" style="width: ${vel.elapsed_pct}%;"></div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 8.5px; margin-top: 2px;">
+                      <span style="color: var(--text-tertiary); font-weight: 600;">OUTPUT: ${completedList.length}/${totalDelivs}</span>
+                      <span style="color: var(--accent-lavender); font-weight: 700;">${progressPercent}%</span>
+                    </div>
+                    <div class="metro-progress-track">
+                      <div class="metro-progress-fill goals-fill" style="width: ${progressPercent}%;"></div>
+                    </div>
+                  </div>
+                `
+                : `
+                  <div class="metro-card-progress">
+                    <div class="metro-progress-track">
+                      <div class="metro-progress-fill" style="width: ${progressPercent}%;"></div>
+                    </div>
+                    <span class="metro-progress-pct">${progressPercent}%</span>
+                  </div>
+                `
+            }
+          </div>
+        `;
+      })
+      .join("");
 
-      // Destination Milestone Card at the end of grid
+    if (phaseFilter === "all" || phaseFilter === "phase3") {
       gridCardsHtml += `
-        <div 
-          class="metro-grid-card" 
+        <div
+          class="metro-grid-card"
           style="border: 1px solid rgba(245, 158, 11, 0.35); background: var(--bg-surface); cursor: pointer;"
-          onclick="HarnessApp.switchView('study')"
+          onclick="MetroMap.openGradesLedger()"
           title="TUM Campus Heilbronn Destination"
         >
           <div class="metro-card-header">
@@ -1159,7 +1460,7 @@ const MetroMap = {
             <span class="metro-card-chip" style="background: rgba(245, 158, 11, 0.12); color: #f59e0b; border-color: rgba(245, 158, 11, 0.3);">TARGET</span>
           </div>
           <div class="metro-card-title" style="color: #f59e0b;">
-            TUM ’28 HEILBRONN
+            TUM \u201928 HEILBRONN
           </div>
           <div class="metro-micro-tags">
             <span class="metro-micro-tag" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b; border: 1px solid rgba(245, 158, 11, 0.35);">B.Sc. MDS</span>
@@ -1173,11 +1474,9 @@ const MetroMap = {
           </div>
         </div>
       `;
-
-      cardsGrid.innerHTML = gridCardsHtml;
     }
 
-    this.attachTestDotEvents();
+    cardsGrid.innerHTML = gridCardsHtml;
   },
 
   attachTestDotEvents() {
@@ -1285,253 +1584,213 @@ const MetroMap = {
   },
 
   selectStation(stationId) {
-    const station = this.data.stations.find((s) => s.id === stationId);
+    if (this.selectedStation && this.selectedStation.id === stationId) {
+      const panel = document.getElementById("stationInspectorPanel");
+      if (panel && panel.style.display === "block") {
+        this.closeInspector();
+        return;
+      }
+    }
+    const station = this.data?.stations?.find((s) => s.id === stationId);
     if (!station) return;
 
     this.selectedStation = station;
-    this.openDrawer(station);
+    this.renderInspector(station);
+  },
+
+  closeInspector() {
+    const panel = document.getElementById("stationInspectorPanel");
+    if (panel) {
+      panel.style.display = "none";
+      panel.innerHTML = "";
+    }
+    this.selectedStation = null;
+    document.querySelectorAll(".metro-grid-card.selected-card").forEach((el) => el.classList.remove("selected-card"));
   },
 
   async openDrawer(station) {
-    const drawer = document.getElementById("stationDrawer");
-    if (!drawer) return;
+    return this.renderInspector(station, false);
+  },
 
-    // Refresh deliverables and pace velocity for THIS station
+  async renderInspector(station, skipScroll = false) {
+    const panel = document.getElementById("stationInspectorPanel");
+    const legacyDrawer = document.getElementById("stationDrawer");
+    if (legacyDrawer) legacyDrawer.classList.remove("open");
+    if (!panel || !station) return;
+
+    if (!this.stationProgressById) this.stationProgressById = {};
+
+    let inspectedProgress = null;
     if (window.pywebview && window.pywebview.api) {
       if (window.pywebview.api.get_station_deliverables) {
-        this.stationProgress = (await window.pywebview.api.get_station_deliverables(station.id)) || [];
+        inspectedProgress = (await window.pywebview.api.get_station_deliverables(station.id)) || [];
+        this.stationProgressById[station.id] = inspectedProgress;
+        if (station.status === "active") {
+          this.stationProgress = inspectedProgress;
+        }
       }
-      if (window.pywebview.api.get_station_pace_velocity) {
+      if (station.status === "active" && window.pywebview.api.get_station_pace_velocity) {
         this.paceVelocity = (await window.pywebview.api.get_station_pace_velocity(station.id)) || null;
       }
     }
 
-    document.getElementById("drawerStationTitle").textContent = station.name;
-    document.getElementById("drawerStationMonth").textContent = `${station.month_label} // ${station.phase}`;
-    document.getElementById("drawerStationObjective").textContent = station.objective || "No objective stated.";
-    document.getElementById("drawerStationNextAction").textContent = station.next_action || "--";
-
     const statusVal = station.status || "upcoming";
-    const statusInput = document.getElementById("drawerStationStatus");
-    if (statusInput) statusInput.value = statusVal;
-
     const delivEntries = Object.entries(station.deliverables || {});
     const totalDelivs = delivEntries.length;
     const completedList = station.completed_deliverables || [];
     const passedOverList = station.passed_over_deliverables || [];
-    const isAudited = (statusVal === "completed" && passedOverList.length > 0 && (completedList.length === 0 || passedOverList.length >= totalDelivs));
-    const progressPercent = this.calculateStationProgress(station);
+    const isAudited = statusVal === "completed" && passedOverList.length > 0 && (completedList.length === 0 || passedOverList.length >= totalDelivs);
 
-    // Read-only Status Badge
-    const statusContainer = document.getElementById("drawerStationStatusContainer");
-    if (statusContainer) {
-      if (statusVal === "active") {
-        statusContainer.innerHTML = `
-          <div class="station-status-badge active">
-            <span class="beacon-dot optimal" style="width: 6px; height: 6px;"></span>
-            <span>ACTIVE MILESTONE // TUM HEILBRONN TRACK</span>
-          </div>
-        `;
-      } else if (isAudited) {
-        statusContainer.innerHTML = `
-          <div class="station-status-badge audited">
-            <span class="beacon-dot" style="width: 6px; height: 6px; background: #f59e0b;"></span>
-            <span>AUDITED // REALLOCATED TO SUMMER RUNWAY</span>
-          </div>
-        `;
-      } else if (statusVal === "completed") {
-        statusContainer.innerHTML = `
-          <div class="station-status-badge completed">
-            <span>✓</span>
-            <span>COMPLETED MILESTONE</span>
-          </div>
-        `;
-      } else {
-        statusContainer.innerHTML = `
-          <div class="station-status-badge upcoming">
-            <span>○</span>
-            <span>UPCOMING MILESTONE</span>
-          </div>
-        `;
-      }
-    }
-
-    // Deliverables breakdown categorized by stream - Clean, Informative HUD
-    const deliverablesList = document.getElementById("drawerDeliverablesList");
-    if (deliverablesList && station.deliverables) {
-      const now = new Date();
-      const dayOfMonth = now.getDate();
-      const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-      const timeElapsedPct = Math.min(100, Math.max(0, Math.round((dayOfMonth / daysInMonth) * 100)));
-
-      let velocity = this.paceVelocity;
-      if (!velocity || velocity.station_id !== station.id) {
-        const isBehind = progressPercent < timeElapsedPct;
-        velocity = {
-          station_id: station.id,
-          day_of_month: dayOfMonth,
-          total_days: daysInMonth,
-          elapsed_pct: timeElapsedPct,
-          is_behind: isBehind,
-          status_text: isBehind
-            ? `Pace Deficit: ${Math.round(timeElapsedPct - progressPercent)}% behind schedule`
-            : `Pace Velocity: Optimal (+${Math.max(0, Math.round(progressPercent - timeElapsedPct))}%)`,
-          badge_variant: isBehind ? "amber" : "optimal",
+    const resolveCounter = (key, val) => {
+      const normKey = this.normalizeStreamKey(key);
+      const list = inspectedProgress || this.stationProgressById[station.id] || [];
+      const pMatch = list.find((p) => {
+        if (p.station_id && p.station_id !== station.id) return false;
+        const pNorm = this.normalizeStreamKey(p.stream);
+        const pLow = (p.stream || "").toLowerCase();
+        const kLow = (key || "").toLowerCase();
+        return pNorm === normKey || pLow === kLow || pLow.includes(kLow) || kLow.includes(pLow);
+      });
+      if (pMatch) {
+        return {
+          count: Number(pMatch.completed_count || 0),
+          total: Math.max(1, Number(pMatch.total_required || 10)),
+          unit: pMatch.unit_label || "reps",
         };
       }
+      return this.getDeliverableCounter(station.id, key, val);
+    };
 
-      const validDayOfMonth = velocity?.day_of_month || dayOfMonth;
-      const validTotalDays = velocity?.total_days || daysInMonth;
-      const validElapsedPct = (velocity?.elapsed_pct !== undefined && !isNaN(velocity.elapsed_pct))
-        ? velocity.elapsed_pct
-        : (validTotalDays > 0 ? Math.min(100, Math.max(0, Math.round((validDayOfMonth / validTotalDays) * 100))) : timeElapsedPct);
-
-      let velocityHeader = "";
-      if (statusVal === "active") {
-        const isBehind = Boolean(velocity?.is_behind);
-        let statusText = velocity?.status_text || (isBehind ? "Pace Deficit: Behind schedule" : "Pace Velocity: Optimal");
-        statusText = statusText.replace(/Pace Deficit:\s*-\s*/i, "Pace Deficit: ").replace(/undefined/g, "").replace(/NaN/g, "0");
-
-        velocityHeader = `
-          <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; margin-bottom: 10px; border-radius: var(--radius-sm); font-family: var(--font-mono); font-size: 10px; ${isBehind ? "background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); color: #f59e0b;" : "background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-subtle); color: var(--text-primary);"}">
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <span class="beacon-dot ${isBehind ? "pulse" : "optimal"}" style="width: 6px; height: 6px;"></span>
-              <span style="font-weight: 700;">${this.escapeHtml(statusText)}</span>
-            </div>
-            <span style="opacity: 0.85;">Day ${validDayOfMonth}/${validTotalDays} (${validElapsedPct}%)</span>
-          </div>
-        `;
-      }
-
-      const progressHeader = `
-        ${velocityHeader}
-        <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 14px;">
-          <!-- Track 1: Days Elapsed in Month -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 10px; font-family: var(--font-mono);">
-            <span style="color: var(--text-tertiary); font-weight: 700;">TIME ELAPSED (MONTH PACE)</span>
-            <span style="color: var(--text-secondary); font-weight: 700;">Day ${validDayOfMonth} of ${validTotalDays} &bull; ${validElapsedPct}%</span>
-          </div>
-          <div class="progress-bar-track" style="margin: 0 0 10px 0; height: 4px;">
-            <div class="progress-bar-fill time-fill" style="width: ${validElapsedPct}%; background: var(--border-medium);"></div>
-          </div>
-
-          <!-- Track 2: Goals Verified -->
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; font-size: 10px; font-family: var(--font-mono);">
-            <span style="color: var(--text-tertiary); font-weight: 700;">DELIVERABLES STATUS</span>
-            <span style="color: var(--accent-lavender); font-weight: 700;">${progressPercent}% (${completedList.length}/${totalDelivs} GOALS)</span>
-          </div>
-          <div class="progress-bar-track" style="margin: 0; height: 4px;">
-            <div class="progress-bar-fill goals-fill" style="width: ${progressPercent}%; background: var(--accent-lavender);"></div>
-          </div>
-        </div>
-      `;
-
-      const allEntries = delivEntries;
-      const itemsHtml = allEntries
-        .map(([key, val]) => {
-          const streamMatch = this.streams.find((s) => s.name.toLowerCase().includes(key.toLowerCase()) || key.toLowerCase().includes(s.id));
-          const lineBadgeColor = streamMatch ? streamMatch.color : "var(--accent-lavender)";
-
-          const pMatch = (this.stationProgress || []).find(
-            (p) => p.stream.toLowerCase() === key.toLowerCase() || (streamMatch && p.stream.toLowerCase() === streamMatch.id)
-          );
-
-          const isChecked = completedList.includes(key);
-          const isPassedOver = passedOverList.includes(key);
-
-          const countObj = (station.deliverable_counts && station.deliverable_counts[key])
-            || (pMatch ? { count: pMatch.completed_count, total: pMatch.total_required, unit: pMatch.unit_label } : null)
-            || this.getDeliverableCounter(station.id, key, val);
-
-          const curCount = isChecked ? countObj.total : (countObj.count || 0);
-          const totalReq = countObj.total;
-          const unitLabel = countObj.unit || "reps";
-          const itemPct = totalReq > 0 ? Math.min(100, Math.round((curCount / totalReq) * 100)) : 0;
-
-          // Status Pill
-          let statusPill = "";
-          if (isAudited || isPassedOver) {
-            statusPill = `<span class="telemetry-status-pill audited">REALLOCATED</span>`;
-          } else if (isChecked || curCount >= totalReq) {
-            statusPill = `<span class="telemetry-status-pill done">VERIFIED ✓</span>`;
-          } else if (statusVal === "active") {
-            statusPill = `<span class="telemetry-status-pill active">${itemPct}% LOGGED</span>`;
-          } else {
-            statusPill = `<span class="telemetry-status-pill upcoming">TARGET QUEUED</span>`;
-          }
-
-          const targetPace = Math.round(((validDayOfMonth / validTotalDays) * totalReq) * 10) / 10;
-          const deficit = Math.round((targetPace - curCount) * 10) / 10;
-          const isBehind = deficit > 0;
-          const paceStatusText = isBehind
-            ? `Pace Deficit: ${deficit} ${unitLabel} behind target`
-            : `Optimal Pace (+${Math.abs(Math.round((curCount - targetPace) * 10) / 10)} ${unitLabel} ahead)`;
-
-          return `
-            <div class="deliverable-item telemetry-deliverable-card ${isChecked || curCount >= totalReq ? "completed-deliv" : ""}" style="cursor: default; padding: 12px; margin-bottom: 8px; border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); background: var(--bg-card);">
-              <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; margin-bottom: 6px;">
-                <div>
-                  <span class="telemetry-stream-name" style="color: ${lineBadgeColor}; font-family: var(--font-mono); font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;">
-                    ${this.escapeHtml(key)} STREAM
-                  </span>
-                  <span class="telemetry-counter-pill" style="font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary); margin-left: 6px;">[${curCount} / ${totalReq} ${this.escapeHtml(unitLabel)}]</span>
-                </div>
-                ${statusPill}
-              </div>
-
-              <div class="telemetry-desc" style="font-size: 11.5px; color: var(--text-primary); line-height: 1.45; margin-bottom: 8px;">
-                ${this.escapeHtml(val)}
-              </div>
-
-              <!-- Progress Bar -->
-              <div style="margin-bottom: 6px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 9px; color: var(--text-tertiary); margin-bottom: 3px;">
-                  <span>PROGRESS</span>
-                  <span style="font-weight: 700; color: var(--text-primary);">${curCount} of ${totalReq} (${itemPct}%)</span>
-                </div>
-                <div class="progress-bar-track" style="margin: 0; height: 4px;">
-                  <div class="progress-bar-fill" style="width: ${itemPct}%; background: ${lineBadgeColor};"></div>
-                </div>
-              </div>
-
-              <!-- Pace Diagnostic -->
-              ${statusVal === "active" ? `
-                <div style="font-family: var(--font-mono); font-size: 9px; color: ${isBehind ? 'var(--color-amber-light)' : 'var(--text-tertiary)'}; display: flex; align-items: center; gap: 4px;">
-                  <span>${isBehind ? '⚠' : '✓'}</span>
-                  <span>${paceStatusText}</span>
-                </div>
-              ` : ""}
-            </div>
-          `;
-        })
-        .join("");
-
-      const infoFooter = `
-        <div style="font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary); margin-top: 10px; padding: 8px 10px; background: var(--bg-surface); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); line-height: 1.4;">
-          💡 <strong>Execution Rule:</strong> Check off daily routine &amp; study blocks in the <strong>Daily</strong> tab to advance TUM milestone metrics.
-        </div>
-      `;
-
-      const advanceFooter = `
-        <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--border-hairline);">
-          <button 
-            type="button" 
-            class="btn btn-secondary btn-advance-station" 
-            style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 9px 12px; font-size: 11px; font-weight: 700; font-family: var(--font-mono); color: var(--accent-lavender); border-color: rgba(167, 139, 250, 0.3); background: rgba(167, 139, 250, 0.06); cursor: pointer;"
-            onclick="MetroMap.advanceStation('${station.id}')"
-          >
-            ADVANCE TO NEXT STATION &rarr;
-          </button>
-          <div style="text-align: center; font-size: 9px; color: var(--text-tertiary); font-family: var(--font-mono); margin-top: 4px;">
-            Passes over any unfinished items and activates the next milestone.
-          </div>
-        </div>
-      `;
-
-      deliverablesList.innerHTML = progressHeader + itemsHtml + infoFooter + advanceFooter;
+    let progressPercent = this.calculateStationProgress(station);
+    if (inspectedProgress && statusVal !== "completed" && delivEntries.length > 0) {
+      let score = 0;
+      delivEntries.forEach(([k, v]) => {
+        if (completedList.includes(k) || passedOverList.includes(k)) {
+          score += 1.0;
+        } else {
+          const cObj = resolveCounter(k, v);
+          if (cObj.total > 0) score += Math.min(1.0, Math.max(0, (cObj.count || 0) / cObj.total));
+        }
+      });
+      progressPercent = Math.min(100, Math.round((score / delivEntries.length) * 100));
     }
 
-    drawer.classList.add("open");
+    const vel = this.getSafeVelocity(station, progressPercent);
+
+    let statusBadgeHtml = "";
+    if (statusVal === "active") {
+      statusBadgeHtml = `<span class="tum-pace-pill ${vel.is_behind ? "amber" : "lavender"}">ACTIVE MILESTONE</span>`;
+    } else if (isAudited) {
+      statusBadgeHtml = `<span class="tum-pace-pill amber">AUDITED // REALLOCATED</span>`;
+    } else if (statusVal === "completed") {
+      statusBadgeHtml = `<span class="tum-pace-pill optimal">\u2713 COMPLETED</span>`;
+    } else {
+      statusBadgeHtml = `<span class="tum-pace-pill">UPCOMING TARGET</span>`;
+    }
+
+    const itemsHtml = delivEntries
+      .map(([key, val]) => {
+        const normKey = this.normalizeStreamKey(key);
+        const lineBadgeColor = this.getStreamColor(normKey);
+        const isChecked = completedList.includes(key);
+        const isPassedOver = passedOverList.includes(key);
+        const countObj = resolveCounter(key, val);
+        const curCount = isChecked ? countObj.total : (countObj.count || 0);
+        const totalReq = Math.max(1, countObj.total || 10);
+        const unitLabel = countObj.unit || "reps";
+        const itemPct = Math.min(100, Math.round((curCount / totalReq) * 100));
+
+        const targetPace = Math.round(((vel.day_of_month / vel.total_days) * totalReq) * 10) / 10;
+        const deficit = Math.round((targetPace - curCount) * 10) / 10;
+        const isBehind = deficit > 0;
+
+        let statusPill = "";
+        if (isAudited || isPassedOver) {
+          statusPill = `<span class="telemetry-status-pill audited">REALLOCATED</span>`;
+        } else if (isChecked || curCount >= totalReq) {
+          statusPill = `<span class="telemetry-status-pill done">VERIFIED \u2713</span>`;
+        } else if (statusVal === "active") {
+          statusPill = `<span class="telemetry-status-pill active">${itemPct}% LOGGED</span>`;
+        } else {
+          statusPill = `<span class="telemetry-status-pill upcoming">QUEUED</span>`;
+        }
+
+        return `
+          <div class="inspector-deliv-card ${isChecked || curCount >= totalReq ? "completed-deliv" : ""}" style="border-top: 2px solid ${lineBadgeColor};">
+            <div class="inspector-deliv-top">
+              <div>
+                <span class="telemetry-stream-name" style="color: ${lineBadgeColor};">${this.escapeHtml(key)}</span>
+                <span class="telemetry-counter-pill">${curCount} / ${totalReq} ${this.escapeHtml(unitLabel)}</span>
+              </div>
+              ${statusPill}
+            </div>
+            <div class="telemetry-desc">${this.escapeHtml(val)}</div>
+            <div class="tum-mini-bar-track" style="margin: 8px 0 6px;">
+              <div class="tum-mini-bar-fill" style="width: ${itemPct}%; background: ${lineBadgeColor};"></div>
+            </div>
+            ${statusVal === "active" ? `
+              <div class="inspector-pace-line ${isBehind ? "is-behind" : "is-optimal"}">
+                ${isBehind ? `Pace Deficit: ${deficit} ${this.escapeHtml(unitLabel)} behind today's target (${targetPace})` : `On Pace (+${Math.abs(Math.round((curCount - targetPace) * 10) / 10)} ${this.escapeHtml(unitLabel)} buffer)`}
+              </div>
+            ` : ""}
+          </div>
+        `;
+      })
+      .join("");
+
+    panel.innerHTML = `
+      <div class="inspector-header">
+        <div>
+          <div class="inspector-eyebrow">${this.escapeHtml(station.month_label || "")} // ${this.escapeHtml(station.phase || "ROADMAP STATION")}</div>
+          <div class="inspector-title-row">
+            <h3 class="inspector-title">${this.escapeHtml(station.name)}</h3>
+            ${statusBadgeHtml}
+          </div>
+        </div>
+        <div class="inspector-actions">
+          ${statusVal === "active" ? `
+            <button type="button" class="btn-ghost-icon" style="color: var(--accent-lavender); border-color: rgba(167, 139, 250, 0.35);" onclick="MetroMap.advanceStation('${station.id}')">
+              Advance Station &rarr;
+            </button>
+          ` : ""}
+          <button type="button" class="btn-ghost-icon" onclick="MetroMap.closeInspector()" title="Close Inspector">&times; Close</button>
+        </div>
+      </div>
+
+      <div class="inspector-meta-grid">
+        <div class="inspector-meta-box">
+          <div class="card-label" style="margin-bottom: 4px;">CORE OBJECTIVE</div>
+          <div class="inspector-meta-text">${this.escapeHtml(station.objective || "No objective stated.")}</div>
+        </div>
+        <div class="inspector-meta-box">
+          <div class="card-label" style="margin-bottom: 4px;">NEXT EXECUTION STEP</div>
+          <div class="inspector-meta-text">${this.escapeHtml(station.next_action || "--")}</div>
+        </div>
+        <div class="inspector-meta-box">
+          <div class="card-label" style="margin-bottom: 4px;">CLOCK VS. OUTPUT</div>
+          <div class="inspector-clock-compare">
+            <span>Month Clock: <strong>Day ${vel.day_of_month}/${vel.total_days} (${vel.elapsed_pct}%)</strong></span>
+            <span>Deliverables: <strong style="color: var(--accent-lavender);">${progressPercent}%</strong></span>
+          </div>
+        </div>
+      </div>
+
+      <div class="inspector-delivs-grid">
+        ${itemsHtml || `<div style="font-size: 11px; color: var(--text-tertiary);">No deliverables defined for this milestone.</div>`}
+      </div>
+
+      <div class="inspector-rule-footer">
+        Check off workout &amp; TUM Deep Work blocks in <strong>Daily</strong> to increment live stream metrics here automatically.
+      </div>
+    `;
+
+    panel.style.display = "block";
+    document.querySelectorAll(".metro-grid-card").forEach((card) => {
+      card.classList.toggle("selected-card", card.getAttribute("data-station-id") === station.id);
+    });
+    if (!skipScroll) {
+      setTimeout(() => panel.scrollIntoView({ behavior: "smooth", block: "nearest" }), 40);
+    }
   },
 
   async stepDeliverableKey(stationId, key, delta, deliverableId = null) {
@@ -1686,11 +1945,11 @@ const MetroMap = {
   },
 
   closeDrawer() {
+    this.closeInspector();
     const drawer = document.getElementById("stationDrawer");
     if (!drawer) return;
 
     drawer.classList.remove("open");
-    this.selectedStation = null;
   },
 
   async toggleDeliverable(stationId, deliverableKey) {

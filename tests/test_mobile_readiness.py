@@ -130,3 +130,46 @@ def test_service_worker_v6_and_controllerchange():
         assert "controllerchange" in html
         assert "forceHardReload" in html
         assert "v6.0" in html
+
+
+def test_daily_exclusive_checkboxes_and_obsidian_ui_parity():
+    """Verify checkboxes live exclusively in Daily, no duplicate mobile segmented bar, and root == ui parity."""
+    root = Path(__file__).resolve().parent.parent
+
+    for filename in ["index.html", "ui/index.html"]:
+        html = (root / filename).read_text(encoding="utf-8")
+        assert html.count('id="todayMobileSegmentedBar"') == 1
+        assert 'id="tumComparisonHero"' in html
+        assert 'id="stationInspectorPanel"' in html
+        assert 'id="metroPhaseFilters"' in html
+        assert 'id="btnHeaderSettings"' in html
+        assert 'id="headerSettingsPopover"' in html
+
+        # Extract #view-tum section and ensure zero checkboxes appear inside TUM '28 view
+        tum_start = html.index('id="view-tum"')
+        tum_end = html.index('id="view-projects"')
+        tum_slice = html[tum_start:tum_end]
+        assert 'type="checkbox"' not in tum_slice
+        assert 'check-dot' not in tum_slice
+
+    for filename in ["js/study.js", "ui/js/study.js"]:
+        study_js = (root / filename).read_text(encoding="utf-8")
+        assert "Clear" in study_js and "Reopen" in study_js
+        assert "check-dot" not in study_js
+
+    mirrored_paths = [
+        "index.html",
+        "css/app.css",
+        "js/api_bridge.js",
+        "js/app.js",
+        "js/command_palette.js",
+        "js/dashboard.js",
+        "js/focus_timer.js",
+        "js/metro.js",
+        "js/study.js",
+        "js/today.js",
+        "js/tum.js",
+    ]
+    for rel in mirrored_paths:
+        assert (root / rel).read_bytes() == (root / "ui" / rel).read_bytes(), f"Mismatch between {rel} and ui/{rel}"
+

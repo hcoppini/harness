@@ -95,39 +95,33 @@ const CommandPalette = {
     const defaultActions = [
       {
         category: "Navigation",
-        title: "Go to Dashboard",
+        title: "Go to Cockpit",
         shortcut: "0",
         action: () => window.HarnessApp.switchView("dashboard"),
       },
       {
         category: "Navigation",
-        title: "Go to Today Execution",
+        title: "Go to Daily Execution",
         shortcut: "1",
         action: () => window.HarnessApp.switchView("today"),
       },
       {
         category: "Navigation",
-        title: "Go to TUM Metro Roadmap",
+        title: "Go to Study & Exams",
         shortcut: "2",
+        action: () => window.HarnessApp.switchView("study"),
+      },
+      {
+        category: "Navigation",
+        title: "Go to TUM '28 Roadmap",
+        shortcut: "3",
         action: () => window.HarnessApp.switchView("tum"),
       },
       {
-        category: "Navigation",
-        title: "Go to Projects",
-        shortcut: "3",
-        action: () => window.HarnessApp.switchView("projects"),
-      },
-      {
-        category: "Navigation",
-        title: "Go to Body Maintenance",
-        shortcut: "4",
-        action: () => window.HarnessApp.switchView("body"),
-      },
-      {
-        category: "Navigation",
-        title: "Go to Knowledge Base",
-        shortcut: "5",
-        action: () => window.HarnessApp.switchView("knowledge"),
+        category: "Actions",
+        title: "Open Focus Timer",
+        shortcut: "T",
+        action: () => window.FocusTimer && window.FocusTimer.openSetup(),
       },
       {
         category: "Actions",
@@ -145,54 +139,39 @@ const CommandPalette = {
           if (window.Today) window.Today.refreshSchoolPlan();
         },
       },
-    ];
-
-    // Project launcher entries
-    const projectActions = [];
-    if (window.Projects && window.Projects.list) {
-      window.Projects.list.forEach((p) => {
-        if (p.local_path) {
-          projectActions.push({
-            category: "Workspaces",
-            title: `VS Code: ${p.name}`,
-            detail: p.local_path,
-            action: () => window.Projects.openVsCode(p.local_path),
-          });
-          projectActions.push({
-            category: "Workspaces",
-            title: `Terminal: ${p.name}`,
-            detail: p.local_path,
-            action: () => window.Projects.openTerminal(p.local_path),
-          });
-        }
-      });
-    }
-
-    // Portals
-    const portalActions = [
       {
-        category: "Portals",
-        title: "Open Vulcan UONET+ E-Dziennik",
-        action: () => window.pywebview.api.open_external_url("https://uonetplus.vulcan.net.pl/"),
-      },
-      {
-        category: "Portals",
-        title: "Open TM1 Staffa Timetable",
-        action: () => window.pywebview.api.open_external_url("http://tm1.edu.pl/plan/"),
-      },
-      {
-        category: "Portals",
-        title: "Open SIGG GPW Contest Platform",
-        action: () => window.pywebview.api.open_external_url("https://sigg.gpw.pl/"),
-      },
-      {
-        category: "Portals",
-        title: "Open TUM Heilbronn Portal",
-        action: () => window.pywebview.api.open_external_url("https://www.tum.de/en/campus-heilbronn/"),
+        category: "Actions",
+        title: "Add Quick Bookmark",
+        action: () => {
+          if (window.Today && window.Today.openAddLinkModal) window.Today.openAddLinkModal();
+        },
       },
     ];
 
-    this.allItems = [...defaultActions, ...projectActions, ...portalActions];
+    // Dynamic Quick Links from Today / EasyLinks
+    const portalActions = [];
+    const easyLinks = (window.Today && Array.isArray(window.Today.easyLinks) && window.Today.easyLinks.length > 0)
+      ? window.Today.easyLinks
+      : [
+          { name: "TM1 Official Portal", url: "https://tm1.edu.pl/", desc: "School homepage" },
+          { name: "TM1 Live Plan (Optivum)", url: "https://tm1.edu.pl/plan/", desc: "Class schedule" },
+          { name: "Vulcan UONET+ E-Dziennik", url: "https://uonetplus.vulcan.net.pl/", desc: "Grades & exams" },
+          { name: "SIGG Platform (GPW)", url: "https://sigg.gpw.pl/", desc: "Trading challenge" },
+          { name: "TUM Heilbronn Portal", url: "https://www.tum.de/en/campus-heilbronn/", desc: "Admissions & info" },
+          { name: "CKE Matura Portal", url: "https://cke.gov.pl/", desc: "Past papers & keys" },
+        ];
+    easyLinks.forEach((link) => {
+      if (link && link.url) {
+        portalActions.push({
+          category: "Portals",
+          title: link.name,
+          detail: link.desc || link.url,
+          action: () => window.pywebview && window.pywebview.api && window.pywebview.api.open_external_url(link.url),
+        });
+      }
+    });
+
+    this.allItems = [...defaultActions, ...portalActions];
     this.filteredItems = [...this.allItems];
   },
 

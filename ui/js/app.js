@@ -10,6 +10,7 @@ window.HarnessApp = {
 
   init() {
     this.initTheme();
+    this.initSettingsPopover();
     this.bindNavigation();
     this.bindKeybindings();
     this.bindModals();
@@ -47,6 +48,31 @@ window.HarnessApp = {
     }, 100);
   },
 
+  initSettingsPopover() {
+    const btn = document.getElementById("btnHeaderSettings");
+    const menu = document.getElementById("headerSettingsPopover");
+    if (!btn || !menu) return;
+
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      menu.classList.toggle("open");
+    });
+
+    document.addEventListener("click", (e) => {
+      if (menu.classList.contains("open") && !menu.contains(e.target) && e.target !== btn) {
+        menu.classList.remove("open");
+      }
+    });
+
+    menu.querySelectorAll(".settings-menu-item").forEach((item) => {
+      item.addEventListener("click", () => {
+        if (item.id !== "btnToggleTheme") {
+          menu.classList.remove("open");
+        }
+      });
+    });
+  },
+
   initTheme() {
     const saved = localStorage.getItem("harness_theme") || "dark";
     this.applyTheme(saved);
@@ -80,8 +106,8 @@ window.HarnessApp = {
     if (btn) {
       const icon = btn.querySelector("#themeToggleIcon");
       const text = btn.querySelector("#themeToggleText");
-      if (icon) icon.textContent = isDark ? "☀️" : "🌙";
-      if (text) text.textContent = isDark ? "LIGHT" : "DARK";
+      if (icon) icon.textContent = isDark ? "☀" : "☾";
+      if (text) text.textContent = isDark ? "Light Theme" : "Dark Theme";
     }
   },
 

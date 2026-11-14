@@ -43,6 +43,7 @@ class HarnessAPI:
                 pass
 
         threading.Thread(target=_worker, daemon=True).start()
+        self._trigger_auto_gcalendar_sync()
 
     # --- Layer 0: DASHBOARD ---
     def get_dashboard(self, client_date: Optional[str] = None) -> Dict[str, Any]:
@@ -1002,6 +1003,96 @@ class HarnessAPI:
         )
         self._trigger_auto_sync()
         return res
+
+    # --- Google Calendar Bidirectional Sync & Conflict Optimization ---
+
+    _gcal_debounce_timer = None
+
+    def _trigger_auto_gcalendar_sync(self) -> None:
+        """Non-blocking debounced Google Calendar push when OAuth sync is active."""
+        import os
+        import threading
+        if os.environ.get("PYTEST_CURRENT_TEST"):
+            return
+        try:
+            from app.services import gcalendar_service
+            cfg = gcalendar_service.get_gcalendar_config()
+            if cfg.get("mode") != "oauth" or not (cfg.get("refresh_token") or cfg.get("access_token")):
+                return
+
+            if getattr(self, "_gcal_debounce_timer", None):
+                try:
+                    self._gcal_debounce_timer.cancel()
+                except Exception:
+                    pass
+
+            def _run() -> None:
+                try:
+                    gcalendar_service.sync_all_gcalendar()
+                except Exception as exc:
+                    print(f"[GCAL] Background sync skipped: {exc}")
+
+            timer = threading.Timer(1.5, _run)
+            timer.daemon = True
+            self._gcal_debounce_timer = timer
+            timer.start()
+        except Exception:
+            pass
+
+    def get_gcalendar_status(self) -> Dict[str, Any]:
+        """Returns sanitized Google Calendar connection status & sync metrics."""
+        from app.services import gcalendar_service
+        return gcalendar_service.get_gcalendar_status()
+
+    def save_gcalendar_settings(self, settings: Dict[str, Any]) -> Dict[str, Any]:
+        """Updates Google Calendar sync scope, optimization toggles & iCal feeds."""
+        from app.services import gcalendar_service
+        return gcalendar_service.save_gcalendar_settings(settings)
+
+    def import_gcalendar_credentials(self, raw_json: str) -> Dict[str, Any]:
+        """Imports Google Cloud OAuth 2.0 client JSON safely."""
+        from app.services import gcalendar_service
+        return gcalendar_service.import_oauth_credentials(raw_json)
+
+    def start_gcalendar_oauth(self) -> Dict[str, Any]:
+        """Launches Desktop PKCE loopback OAuth flow in system browser."""
+        from app.services import gcalendar_service
+        return gcalendar_service.start_desktop_oauth_flow()
+
+    def get_gcalendar_oauth_url(self, redirect_uri: str) -> Dict[str, Any]:
+        """Builds Web OAuth authorization URL with PKCE for hosted deployments."""
+        from app.services import gcalendar_service
+        return gcalendar_service.build_oauth_authorize_url(redirect_uri=redirect_uri)
+
+    def complete_gcalendar_oauth_web(self, code: str, redirect_uri: str, state: str = "") -> Dict[str, Any]:
+        """Exchanges OAuth authorization code for tokens."""
+        from app.services import gcalendar_service
+        return gcalendar_service.exchange_oauth_code(code=code, redirect_uri=redirect_uri, state=state)
+
+    def disconnect_gcalendar(self, clear_cache: bool = False) -> Dict[str, Any]:
+        """Disconnects OAuth credentials and optionally clears cached GCal events."""
+        from app.services import gcalendar_service
+        return gcalendar_service.disconnect_gcalendar(clear_cache=clear_cache)
+
+    def list_gcalendar_calendars(self) -> List[Dict[str, Any]]:
+        """Lists available Google Calendars from the authenticated account."""
+        from app.services import gcalendar_service
+        return gcalendar_service.list_calendars()
+
+    def sync_gcalendar_now(self, start_date: Optional[str] = None, force_push: bool = False) -> Dict[str, Any]:
+        """Runs full bidirectional Google Calendar cross-sync immediately."""
+        from app.services import gcalendar_service
+        return gcalendar_service.sync_all_gcalendar(start_date=start_date, force_push=force_push)
+
+    def get_gcalendar_events(self, start_date: Optional[str] = None, end_date: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Returns cached external Google Calendar / iCal events."""
+        from app.services import gcalendar_service
+        return gcalendar_service.get_cached_events(start_date=start_date, end_date=end_date)
+
+    def export_gcalendar_ics(self, days_ahead: int = 14, start_date: Optional[str] = None) -> str:
+        """Exports Harness tests, school lessons, homework, and daily plans as RFC 5545 .ics."""
+        from app.services import gcalendar_service
+        return gcalendar_service.generate_ics_feed(days_ahead=days_ahead, start_date=start_date)
 
 
 

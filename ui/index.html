@@ -28,7 +28,6 @@
       <span class="brand-title">HARNESS</span>
       <span class="brand-divider">/</span>
       <span class="brand-caption">Executive OS</span>
-      <span class="mono-chip lavender build-ver-chip" onclick="if(confirm('Force reload and clear cache?')) window.forceHardReload();" title="Build v6.0 Mobile Executive (Click to force purge cache)" style="cursor: pointer; font-size: 8.5px; padding: 1px 5px; margin-left: 2px;">v6.0</span>
     </div>
 
     <!-- Navigation Tabs -->
@@ -51,29 +50,62 @@
       </button>
     </nav>
 
-    <!-- Header Right Controls -->
+    <!-- Header Right Controls (Minimal Executive Chrome) -->
     <div class="header-right">
-      <button id="btnToggleTheme" class="btn-ghost-icon theme-toggle-btn" title="Toggle Light/Dark Monochrome">
-        <span id="themeToggleIcon">🌙</span>
-        <span id="themeToggleText">DARK</span>
-      </button>
       <button id="vulcanAlarmBadge" class="vulcan-alarm-badge" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--color-red); color: var(--color-red); border-radius: 6px; padding: 4px 8px; font-size: 10px; font-weight: 700; font-family: var(--font-mono); cursor: pointer; align-items: center; gap: 6px;" title="Vulcan Session Expired. Click to re-authenticate or log tests manually." onclick="window.Today && window.Today.openVulcanConfig ? window.Today.openVulcanConfig() : window.HarnessApp.openQuickTestModal();">
         <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-red); animation: pulse 1.5s infinite;"></span>
-        <span>API DISCONNECTED: MANUAL ENTRY REQUIRED</span>
+        <span>API DISCONNECTED</span>
       </button>
-      <button id="btnOpenQuickTest" class="btn-ghost-icon" onclick="window.HarnessApp.openQuickTestModal()" title="Quick Log Verbal Test / Obligation (Hotkeys: N or +)" style="font-weight: 700; color: var(--accent-lavender); border: 1px solid var(--border-medium); padding: 4px 8px; font-size: 11px;">
-        <span>+ Test (N)</span>
+      <button id="btnOpenQuickTest" class="btn-ghost-icon" onclick="window.HarnessApp.openQuickTestModal()" title="Quick Log Test / Obligation (Hotkeys: N or +)" style="font-weight: 700; color: var(--accent-lavender); border: 1px solid var(--border-medium); padding: 4px 9px; font-size: 11px;">
+        <span>+ Test</span>
       </button>
-      <button id="syncStatusBadge" class="sync-badge" title="Click to sync Laptop and PC">
+      <button id="syncStatusBadge" class="sync-badge" title="Cloud & Cross-Device Sync">
         <span class="sync-dot" id="syncDot"></span>
         <span class="sync-text" id="syncStatusText">Synced</span>
       </button>
-      <button id="btnOpenJsonModal" class="btn-ghost-icon" title="Standardized JSON Configuration">
-        <span>JSON Hub</span>
+      <button id="gcalSyncBadge" class="sync-badge" onclick="window.Today && window.Today.openGCalendarModal ? window.Today.openGCalendarModal() : null;" title="Google Calendar Bidirectional Cross-Sync & Optimizer">
+        <span class="sync-dot" id="gcalSyncDot" style="background: var(--text-tertiary);"></span>
+        <span class="sync-text" id="gcalSyncText">GCal</span>
       </button>
       <div class="header-clock" style="display: flex; align-items: baseline; gap: 8px; font-family: var(--font-mono); font-size: 11px;">
         <span id="currentDatePill" style="color: var(--text-tertiary);">--</span>
         <span id="currentTimePill" style="color: var(--text-primary); font-weight: 600;">--:--</span>
+      </div>
+      <div class="header-settings-wrap">
+        <button id="btnHeaderSettings" class="btn-ghost-icon" title="Tools & Settings" aria-label="Tools and Settings" style="padding: 5px 7px;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </button>
+        <div id="headerSettingsPopover" class="header-settings-popover">
+          <div class="settings-popover-label">SYSTEM &amp; TOOLS</div>
+          <button type="button" id="btnToggleTheme" class="settings-menu-item">
+            <span id="themeToggleIcon">☀</span>
+            <span id="themeToggleText">Light Theme</span>
+          </button>
+          <button type="button" class="settings-menu-item" onclick="window.FocusTimer && window.FocusTimer.openSetup ? window.FocusTimer.openSetup() : null;">
+            <span>⏱</span>
+            <span>Focus Timer</span>
+            <span class="key-pill">T</span>
+          </button>
+          <button type="button" id="btnOpenJsonModal" class="settings-menu-item">
+            <span>{}</span>
+            <span>JSON Config Hub</span>
+          </button>
+          <button type="button" class="settings-menu-item" onclick="window.Today && window.Today.openVulcanConfig ? window.Today.openVulcanConfig() : null;">
+            <span>◈</span>
+            <span>Vulcan UONET+ Setup</span>
+          </button>
+          <button type="button" class="settings-menu-item" onclick="window.Today && window.Today.openGCalendarModal ? window.Today.openGCalendarModal() : null;">
+            <span>📅</span>
+            <span>Google Calendar Sync</span>
+          </button>
+          <button type="button" class="settings-menu-item" onclick="if(confirm('Force reload and clear cache (v6.0)?')) window.forceHardReload();" title="Build v6.0 • Purge local SW cache">
+            <span>↻</span>
+            <span>Reload Cache (v6.0)</span>
+          </button>
+        </div>
       </div>
     </div>
   </header>
@@ -113,10 +145,18 @@
               <span class="cockpit-title">Today's Velocity</span>
               <span class="mono-chip" id="dashTodayRoutineTag">Schedule</span>
             </div>
-            <div>
-              <div class="cockpit-value" id="dashTodayProgressVal">0%</div>
-              <div class="progress-bar-track">
-                <div class="progress-bar-fill" id="dashTodayProgressBar" style="width: 0%;"></div>
+            <div style="display: flex; align-items: center; gap: 14px; margin: 4px 0;">
+              <div style="position: relative; width: 48px; height: 48px; flex-shrink: 0;">
+                <svg width="48" height="48" viewBox="0 0 48 48" style="transform: rotate(-90deg);">
+                  <circle cx="24" cy="24" r="20" fill="none" stroke="var(--border-hairline)" stroke-width="4" />
+                  <circle id="dashTodayRadialArc" cx="24" cy="24" r="20" fill="none" stroke="var(--accent-lavender)" stroke-width="4" stroke-linecap="round" stroke-dasharray="125.66" stroke-dashoffset="125.66" style="transition: stroke-dashoffset 0.7s cubic-bezier(0.16, 1, 0.3, 1);" />
+                </svg>
+              </div>
+              <div style="flex: 1; min-width: 0;">
+                <div class="cockpit-value" id="dashTodayProgressVal" style="margin-bottom: 6px;">0%</div>
+                <div class="progress-bar-track" style="margin: 0;">
+                  <div class="progress-bar-fill" id="dashTodayProgressBar" style="width: 0%;"></div>
+                </div>
               </div>
             </div>
             <div class="cockpit-subtitle" id="dashTodayRoutineLabel">
@@ -137,11 +177,11 @@
               </div>
               <div style="text-align: right;">
                 <div class="card-label">OBLIGATIONS</div>
-                <div class="cockpit-value" id="dashSchoolObligationsVal" style="font-size: 18px; margin-top: 2px;">0 Tests • 0 HW</div>
+                <div class="cockpit-value" id="dashSchoolObligationsVal" style="font-size: 18px; margin-top: 2px;">0 Tests &bull; 0 HW</div>
               </div>
             </div>
             <div class="cockpit-subtitle" id="dashWorkloadDesc">
-              Academic pressure calibrated. SGH blocks active.
+              Clean horizon calibrated. Daily blocks feed TUM '28.
             </div>
           </div>
 
@@ -158,30 +198,30 @@
               </div>
               <div style="text-align: right;">
                 <div class="card-label">PROJECTED TUM SCORE</div>
-                <div class="cockpit-value" id="dashTumScoreVal" style="font-size: 18px; margin-top: 2px;">90 pts</div>
+                <div class="cockpit-value" id="dashTumScoreVal" style="font-size: 18px; margin-top: 2px;">-- pts</div>
               </div>
             </div>
             <div class="cockpit-subtitle" id="dashActiveStationName">
-              Station: Pure Syntax (SEP '26)
+              Station: Syncing active milestone...
             </div>
           </div>
         </div>
 
-        <!-- 2. DAILY EXECUTION HEATMAP (Forward Sep 1 -> Horizon, Inverted Monochrome) -->
+        <!-- 2. DAILY EXECUTION HEATMAP (Forward Sep 1 -> Horizon) -->
         <div class="monotone-card heatmap-card">
           <div class="heatmap-header-row">
             <div>
               <span class="heatmap-title" id="heatmapContributionsCount">Forward Execution Horizon</span>
-              <div class="heatmap-subtitle">Forward execution horizon (from Sep 1, 2026). Pitch black indicates 100% completed days.</div>
+              <div class="heatmap-subtitle">Daily routine completion velocity (Sep 1, 2026 &rarr; July 2028). Higher contrast indicates full daily execution.</div>
             </div>
             <div class="heatmap-legend">
-              <span>0% (White)</span>
-              <div class="legend-square lvl-0" title="0% / White"></div>
+              <span>0%</span>
+              <div class="legend-square lvl-0" title="0% Idle"></div>
               <div class="legend-square lvl-1" title="Low completion"></div>
               <div class="legend-square lvl-2" title="Medium completion"></div>
               <div class="legend-square lvl-3" title="High completion"></div>
-              <div class="legend-square lvl-4" title="100% Pitch Black"></div>
-              <span>100% (Pitch Black)</span>
+              <div class="legend-square lvl-4" title="100% Complete"></div>
+              <span>100%</span>
             </div>
           </div>
 
@@ -253,7 +293,7 @@
       <div class="section-header">
         <div>
           <h1 class="section-headline">Daily Execution</h1>
-          <p class="section-caption">Routines are pre-calibrated. Zero input fatigue. Check the boxes.</p>
+          <p class="section-caption">Single source of action: checking Deep Work &amp; Training blocks advances TUM '28 automatically.</p>
         </div>
         <div style="display: flex; gap: 8px;">
           <button id="btnOpenKillList" class="btn-ghost-icon" title="Open Kill List Drawer (SGH Library Deep Work)" style="display: none;">
@@ -267,7 +307,7 @@
         </div>
       </div>
 
-            <!-- Mobile Segmented View Switcher (Glanceable single-screen phone view) -->
+      <!-- Mobile Segmented View Switcher (Glanceable single-screen phone view) -->
       <div id="todayMobileSegmentedBar" class="today-mobile-segmented-bar">
         <button type="button" class="today-segment-btn active" data-segment="routine" onclick="window.Today.setMobileSegment('routine')">Routine</button>
         <button type="button" class="today-segment-btn" data-segment="timetable" onclick="window.Today.setMobileSegment('timetable')">Timetable</button>
@@ -302,20 +342,21 @@
             </div>
           </div>
 
-
-          <!-- Schedule Banner -->
+          <!-- Schedule Banner + Reality Day Mode Switch -->
           <div class="schedule-banner" today-segment-target="routine" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
               <span id="scheduleBadge" class="mono-chip lavender">SCHEDULE --</span>
               <span id="scheduleDayName" style="font-size: 13px; font-weight: 600; color: var(--text-primary);">
                 Loading routine...
               </span>
               <span id="workloadBadge" class="mono-chip" style="display: none; cursor: pointer; font-size: 10px;" title="Workload Governor">CRUISE</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 6px;">
-              <button type="button" class="btn-ghost-icon" onclick="Today.syncVulcan()" style="font-size: 10px; padding: 2px 7px; color: var(--accent-lavender); border-color: rgba(196, 181, 253, 0.3);" title="Sync upcoming tests & homework from Vulcan UONET+">Sync Vulcan</button>
-              <button type="button" class="btn-ghost-icon" onclick="Today.openVulcanConfig()" style="font-size: 10px; padding: 2px 6px; color: var(--text-tertiary);" title="Configure Vulcan / eduVULCAN Integration & Manual Exams">Config</button>
-              <span id="scheduleDescription" style="font-size: 11px; color: var(--text-tertiary);"></span>
+            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+              <div id="dayModeSwitchContainer"></div>
+              <button type="button" class="btn-ghost-icon" onclick="Today.syncVulcan()" style="font-size: 10px; padding: 3px 8px; color: var(--accent-lavender); border-color: rgba(196, 181, 253, 0.25);" title="Sync Vulcan tests & homework">Sync</button>
+              <button type="button" class="btn-ghost-icon" onclick="Today.syncGCalendarNow()" style="font-size: 10px; padding: 3px 8px; color: #34d399; border-color: rgba(52, 211, 153, 0.3);" title="Cross-sync tests, lessons & plan with Google Calendar">GCal</button>
+              <button type="button" class="btn-ghost-icon" onclick="Today.openGCalendarModal()" style="font-size: 10px; padding: 3px 6px; color: var(--text-tertiary);" title="Configure Google Calendar OAuth / iCal Feed & Auto-Optimizer">Cal Setup</button>
+              <span id="scheduleDescription" style="display: none;"></span>
             </div>
           </div>
 
@@ -443,42 +484,9 @@
               style="width: 100%; height: 95px; font-family: var(--font-sans); font-size: 12px; line-height: 1.5; resize: vertical;"
             ></textarea>
           </div>
-
-          <!-- Scratchpad Card -->
-          <div class="monotone-card" id="todayScratchpadCard" today-segment-target="diary" style="margin-top: 14px;">
-            <div class="card-label-row">
-              <span class="card-label">Scratchpad</span>
-              <span id="scratchpadSavePill" class="mono-chip">Auto-saving</span>
-            </div>
-            <textarea 
-              id="scratchpadTextarea" 
-              class="form-textarea" 
-              placeholder="Transient thoughts, code logic, or quick math scratchpad..."
-              spellcheck="false"
-              style="width: 100%; height: 80px;"
-            ></textarea>
-          </div>
-
-          <!-- Sleep & Wake Target -->
-          <div class="monotone-card" id="todaySleepCard" today-segment-target="gym">
-            <div class="card-label-row">
-              <span class="card-label">Sleep Target</span>
-              <span class="mono-chip">8h Floor</span>
-            </div>
-            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
-              <div>
-                <label class="form-label">WAKE TIME</label>
-                <input type="text" id="wakeTimeInput" class="form-input" style="width: 100%; font-family: var(--font-mono);" placeholder="06:45" />
-              </div>
-              <div>
-                <label class="form-label">BEDTIME</label>
-                <input type="text" id="sleepTimeInput" class="form-input" style="width: 100%; font-family: var(--font-mono);" placeholder="22:45" />
-              </div>
-            </div>
-          </div>
         </div>
 
-        <!-- Right Column: Mini-Calendar, Timetable, Radar, Links -->
+        <!-- Right Column: Mini-Calendar & School Timetable -->
         <div style="display: flex; flex-direction: column; gap: 14px;">
           <!-- Mini-Calendar Date Navigator -->
           <div class="monotone-card" id="todayCalendarCard" today-segment-target="timetable">
@@ -509,41 +517,6 @@
             </div>
             <div id="schoolLessonsList" style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
               <!-- Lessons rendered dynamically -->
-            </div>
-          </div>
-
-          <!-- Academic Radar Link Card -->
-          <div class="monotone-card" id="todayRadarLinkCard" today-segment-target="timetable" onclick="window.HarnessApp.switchView('study')" style="cursor: pointer; border: 1px solid var(--border-medium);">
-            <div class="card-label-row" style="margin-bottom: 6px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="card-label" style="font-weight: 700; color: var(--text-primary);">ACADEMIC RADAR</span>
-                <span id="homeworkTotalCountBadge" class="mono-chip" style="font-size: 9px;">Vulcan</span>
-              </div>
-              <span style="font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono);">Open Study &rarr;</span>
-            </div>
-            <p style="font-size: 11px; color: var(--text-tertiary); line-height: 1.4; margin-bottom: 8px;">
-              Sprawdziany, kartkówki &amp; daily homework tracked with automated Vulcan sync.
-            </p>
-            <div style="display: flex; gap: 6px;">
-              <button type="button" class="btn-ghost-icon" onclick="event.stopPropagation(); Today.openAddExamModal();" style="font-size: 10px; padding: 2px 7px;">+ Exam</button>
-              <button type="button" class="btn-ghost-icon" onclick="event.stopPropagation(); Today.openAddHomeworkModal();" style="font-size: 10px; padding: 2px 7px;">+ HW</button>
-            </div>
-            <!-- Retain hidden containers so background today.js calls don't error -->
-            <div id="homeworkItemsList" style="display: none;"></div>
-            <div id="upcomingExamsList" style="display: none;"></div>
-            <span id="examsTotalCountBadge" style="display: none;">0</span>
-            <button id="btnAddHomeworkBtn" style="display: none;"></button>
-            <button id="btnAddExamBtn" style="display: none;"></button>
-          </div>
-
-          <!-- Quick Launch Links Card -->
-          <div class="monotone-card" id="todayQuickLinksCard" today-segment-target="timetable">
-            <div class="card-label-row">
-              <span class="card-label">Quick Links Launchpad</span>
-              <button id="btnAddNewLinkModal" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">+ Add Link</button>
-            </div>
-            <div id="easyLinksContainer" class="easy-links-grid">
-              <!-- Easy links rendered dynamically -->
             </div>
           </div>
         </div>
@@ -656,27 +629,31 @@
     <section id="view-tum" class="view-section">
       <div class="section-header" style="margin-bottom: 12px; padding-bottom: 10px;">
         <div>
-          <h1 class="section-headline">TUM Metro Roadmap (2026 – 2028)</h1>
-          <p class="section-caption">Core milestone timeline anchored on the main track, with stream highlighter lines tracing connected goals.</p>
+          <h1 class="section-headline">TUM Heilbronn &lsquo;28 Trajectory</h1>
+          <p class="section-caption">Clear view of where you stand vs. pace &amp; admissions threshold. Checkboxes live only in Daily.</p>
         </div>
-        <div style="display: flex; gap: 8px;">
-          <button id="btnJumpCurrentStation" class="btn-ghost-icon">Jump to Active Station</button>
+        <div style="display: flex; gap: 8px; align-items: center;">
+          <button id="btnJumpCurrentStation" class="btn-ghost-icon">Active Station</button>
           <button id="btnToggleGradesView" class="btn-ghost-icon">Grades Ledger</button>
         </div>
       </div>
 
-      <!-- Mobile Executive Station HUD (Shown on mobile only, replacing 4,800px track & 22 cards) -->
+      <!-- Mobile Executive Station HUD (Phone Viewport) -->
       <div id="mobileMetroHud" class="mobile-metro-hud">
         <!-- Rendered dynamically by MetroMap.renderMobileHud() -->
       </div>
 
-      <!-- Metro Viewport -->
+      <!-- Band 1: Always-Visible Desktop/Tablet "Where I Am vs. Where I Should Be" Hero Panel -->
+      <div id="tumComparisonHero" class="tum-hero-grid">
+        <!-- Populated dynamically by MetroMap.renderComparisonHero() -->
+      </div>
+
+      <!-- Band 2: Animated Multi-Stream Trajectory Roadmap -->
       <div class="metro-viewport">
-        <!-- Metro Toolbar & Stream Filters -->
         <div class="metro-toolbar">
           <div class="metro-filters">
-            <span class="card-label" style="margin-right: 4px;">Highlight:</span>
-            <button class="metro-filter-btn active" data-stream="all">All Lines</button>
+            <span class="card-label" style="margin-right: 4px;">Track:</span>
+            <button class="metro-filter-btn active" data-stream="all">All Streams</button>
             <button class="metro-filter-btn" data-stream="academics">Academics</button>
             <button class="metro-filter-btn" data-stream="code">Code</button>
             <button class="metro-filter-btn" data-stream="sigg">SIGG GPW</button>
@@ -684,7 +661,7 @@
             <button class="metro-filter-btn" data-stream="physical">Physical</button>
           </div>
           <div style="font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono);">
-            Scroll or drag track • Real-time timeline beacon
+            Click any milestone node to inspect deliverables below
           </div>
         </div>
 
@@ -695,14 +672,25 @@
           </div>
         </div>
 
-        <!-- Milestone Cards Grid Section (Tier 2) -->
+        <!-- Inline Selected Station Inspector (Zero Drawer Overlap, Zero Checkboxes) -->
+        <div id="stationInspectorPanel" class="station-inspector-panel" style="display: none;">
+          <!-- Rendered dynamically by MetroMap.renderInspector(station) -->
+        </div>
+
+        <!-- Band 3: Phase-Filtered Milestone Strip -->
         <div class="metro-cards-section">
-          <div class="metro-cards-header">
+          <div class="metro-cards-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <div>
-              <span class="card-label">Milestone Stations &amp; Deliverables</span>
+              <span class="card-label">Milestones &amp; Deliverables</span>
               <span style="font-size: 11px; color: var(--text-tertiary); margin-left: 8px;">
-                Click any milestone to open full deliverables and exam targets
+                Progress updates automatically from Daily check-offs
               </span>
+            </div>
+            <div class="metro-phase-filters" id="metroPhaseFilters">
+              <button type="button" class="metro-phase-btn active" data-phase="all" onclick="MetroMap.setPhaseFilter('all')">All (22)</button>
+              <button type="button" class="metro-phase-btn" data-phase="phase1" onclick="MetroMap.setPhaseFilter('phase1')">Year 3</button>
+              <button type="button" class="metro-phase-btn" data-phase="phase2" onclick="MetroMap.setPhaseFilter('phase2')">Summer &lsquo;27</button>
+              <button type="button" class="metro-phase-btn" data-phase="phase3" onclick="MetroMap.setPhaseFilter('phase3')">Year 4 &amp; TUM</button>
             </div>
           </div>
           <div id="metroCardsGrid" class="metro-cards-grid">
@@ -710,46 +698,27 @@
           </div>
         </div>
 
-        <!-- Station Details Slide-Over Drawer -->
+        <!-- Legacy Station Drawer DOM preserved hidden/clean for graceful fallback -->
         <div id="stationDrawer" class="station-drawer">
           <button id="closeStationDrawerBtn" class="drawer-close-btn">&times;</button>
-          
           <div style="margin-top: 8px; margin-bottom: 16px;">
-            <div id="drawerStationMonth" style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-lavender); font-weight: 600;">
-              SEP '26 // PHASE 1
-            </div>
-            <h2 id="drawerStationTitle" style="font-size: 17px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">
-              Pure Syntax
-            </h2>
+            <div id="drawerStationMonth" style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-lavender); font-weight: 600;">--</div>
+            <h2 id="drawerStationTitle" style="font-size: 17px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">--</h2>
           </div>
-
           <div id="drawerStationStatusContainer" style="margin-bottom: 14px;">
-            <!-- Rendered dynamically as a sleek read-only telemetry badge -->
             <input type="hidden" id="drawerStationStatus" value="upcoming" />
           </div>
-
-          <!-- Objective Box -->
           <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 16px;">
             <div class="card-label" style="margin-bottom: 4px;">CORE OBJECTIVE</div>
-            <div id="drawerStationObjective" style="font-size: 12px; color: var(--text-primary); line-height: 1.5;">
-              --
-            </div>
+            <div id="drawerStationObjective" style="font-size: 12px; color: var(--text-primary); line-height: 1.5;">--</div>
           </div>
-
-          <!-- Deliverables Checklist -->
           <div style="margin-bottom: 16px;">
             <div class="card-label" style="margin-bottom: 8px;">DELIVERABLES BREAKDOWN</div>
-            <div id="drawerDeliverablesList">
-              <!-- Rendered dynamically -->
-            </div>
+            <div id="drawerDeliverablesList"></div>
           </div>
-
-          <!-- Next Action Box -->
           <div style="border-top: 1px solid var(--border-hairline); padding-top: 14px;">
             <div class="card-label" style="margin-bottom: 4px;">IMMEDIATE NEXT ACTION</div>
-            <div id="drawerStationNextAction" style="font-size: 12px; font-weight: 600; color: var(--text-primary); line-height: 1.4;">
-              --
-            </div>
+            <div id="drawerStationNextAction" style="font-size: 12px; font-weight: 600; color: var(--text-primary); line-height: 1.4;">--</div>
           </div>
         </div>
       </div>
@@ -936,14 +905,6 @@
           <h1 class="section-headline">Machine Maintenance</h1>
           <p class="section-caption">Physical foundation: Hypertrophy progression to 80kg, Boxing sparring, and Recovery.</p>
         </div>
-      </div>
-
-            <!-- Mobile Segmented View Switcher (Glanceable single-screen phone view) -->
-      <div id="todayMobileSegmentedBar" class="today-mobile-segmented-bar">
-        <button type="button" class="today-segment-btn active" data-segment="routine" onclick="window.Today.setMobileSegment('routine')">Routine</button>
-        <button type="button" class="today-segment-btn" data-segment="timetable" onclick="window.Today.setMobileSegment('timetable')">Timetable</button>
-        <button type="button" class="today-segment-btn" data-segment="gym" onclick="window.Today.setMobileSegment('gym')">Gym</button>
-        <button type="button" class="today-segment-btn" data-segment="diary" onclick="window.Today.setMobileSegment('diary')">Diary &amp; Book</button>
       </div>
 
       <div class="today-layout">
@@ -1920,22 +1881,6 @@
     </div>
   </div>
 
-  <!-- Bottom App Status Bar -->
-  <footer class="app-footer">
-    <div style="display: flex; align-items: center; gap: 8px;">
-      <span style="font-weight: 600; color: var(--text-primary);">HARNESS OS</span>
-      <span>&bull;</span>
-      <span>SQLite WAL Storage</span>
-    </div>
-    <div style="display: flex; align-items: center; gap: 12px;">
-      <span>[0-5] Layers</span>
-      <span>[Ctrl+K] Palette</span>
-      <span>[T] Timer</span>
-      <span>[N] New Task</span>
-      <span>[R] Rollover</span>
-    </div>
-  </footer>
-
   <!-- Notification Toast Container -->
   <div id="toastContainer" class="toast-container"></div>
 
@@ -1974,6 +1919,97 @@
       <span class="mobile-tab-label">Roadmap</span>
     </button>
   </nav>
+
+  <!-- Google Calendar Bidirectional Sync & Optimizer Modal -->
+  <div id="gcalendarModal" class="modal-backdrop">
+    <div class="modal-dialog" style="max-width: 660px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <div>
+          <span class="modal-title">Google Calendar Cross-Sync &amp; Optimizer</span>
+          <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">
+            2-Way OAuth API + RFC 5545 Live Feed &bull; Auto-Shifts Plan Around Real Events
+          </div>
+        </div>
+        <button class="modal-close" onclick="Today.closeGCalendarModal()">&times;</button>
+      </div>
+      <div class="modal-body" style="overflow-y: auto; display: flex; flex-direction: column; gap: 14px;">
+        <!-- Live Connection & Stats Banner -->
+        <div id="gcalModalStatusBanner" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span id="gcalModalModeChip" class="mono-chip" style="font-size: 10px;">Not Configured</span>
+              <span id="gcalModalEmail" style="font-size: 12px; font-weight: 600; color: var(--text-primary);">No account linked</span>
+            </div>
+            <div id="gcalModalMetaText" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); margin-top: 4px;">
+              Cached external events: 0 &bull; Active overrides: 0
+            </div>
+          </div>
+          <div style="display: flex; gap: 6px; align-items: center;">
+            <button type="button" id="btnGcalSyncNow" class="btn-primary" onclick="Today.syncGCalendarNow()" style="font-size: 11px; padding: 5px 12px;">Sync Both Ways</button>
+            <button type="button" id="btnGcalDisconnect" class="btn-ghost-icon" onclick="Today.disconnectGCalendar()" style="font-size: 10px; padding: 5px 9px; color: var(--color-rose); border-color: rgba(244, 63, 94, 0.3);">Disconnect</button>
+          </div>
+        </div>
+
+        <!-- Option A: Full 2-Way OAuth 2.0 -->
+        <div style="border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 12px; background: rgba(255,255,255,0.015);">
+          <div class="card-label" style="margin-bottom: 6px; color: var(--accent-lavender);">1. Full 2-Way Google OAuth 2.0 (Push &amp; Pull + Auto Cleanup)</div>
+          <p style="font-size: 11px; color: var(--text-secondary); margin-bottom: 8px; line-height: 1.45;">
+            Paste your Google Cloud OAuth <strong>Desktop App</strong> (<code>installed</code>) or <strong>Web</strong> credentials JSON below (enable <em>Google Calendar API</em> in Cloud Console), then connect your Google account.
+          </p>
+          <textarea id="gcalCredentialsJsonInput" class="form-input" rows="3" placeholder='Paste Google OAuth credentials JSON here ({"installed": {"client_id": ..., "client_secret": ...}}) — stored encrypted/local outside Git' style="width: 100%; font-family: var(--font-mono); font-size: 10.5px; margin-bottom: 8px;"></textarea>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <button type="button" class="btn-subtle" onclick="Today.importGCalCredentials()" style="font-size: 11px; padding: 5px 10px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer;">Import Client JSON</button>
+            <button type="button" id="btnGcalConnectOAuth" class="btn-primary" onclick="Today.startGCalendarOAuth()" style="font-size: 11px; padding: 5px 12px; background: #10b981; border-color: #10b981;">Connect Google Account &nearr;</button>
+            <span id="gcalCredStateLabel" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);"></span>
+          </div>
+          <div id="gcalManualCodeBox" style="display: none; margin-top: 10px; padding-top: 8px; border-top: 1px dashed var(--border-hairline);">
+            <div style="font-size: 10.5px; color: var(--text-secondary); margin-bottom: 4px;">If your browser didn't auto-redirect, paste authorization code here:</div>
+            <div style="display: flex; gap: 6px;">
+              <input type="text" id="gcalManualCodeInput" class="form-input" placeholder="Authorization code..." style="flex: 1; font-size: 11px;" />
+              <button type="button" class="btn-primary" onclick="Today.submitManualGCalCode()" style="font-size: 11px; padding: 4px 10px;">Complete Login</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Option B: Zero-Config iCal Feed & Private URL Pull -->
+        <div style="border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 12px; background: rgba(255,255,255,0.015);">
+          <div class="card-label" style="margin-bottom: 6px; color: #34d399;">2. Live .ics Subscription Feed &amp; Private iCal URL Pull</div>
+          <div style="display: flex; gap: 6px; align-items: center; margin-bottom: 10px;">
+            <input type="text" id="gcalIcsSubscribeUrl" class="form-input" readonly style="flex: 1; font-family: var(--font-mono); font-size: 10.5px; opacity: 0.9;" />
+            <button type="button" class="btn-subtle" onclick="Today.copyGCalendarIcsUrl()" style="font-size: 10.5px; padding: 5px 9px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer;">Copy Feed</button>
+            <button type="button" class="btn-subtle" onclick="Today.downloadGCalendarIcs()" style="font-size: 10.5px; padding: 5px 9px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer;">Download .ics</button>
+          </div>
+          <label style="display: block; font-size: 11px; color: var(--text-secondary); margin-bottom: 4px;">
+            Pull External Google Calendars via Private Secret iCal Address(es) (<code>https://calendar.google.com/.../basic.ics</code>, 1 per line):
+          </label>
+          <div id="gcalPrivateIcalPreview" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); margin-bottom: 4px;"></div>
+          <textarea id="gcalPrivateIcalInput" class="form-input" rows="2" placeholder="Paste replacement HTTPS .ics URL(s) to add/replace (leave blank to keep existing saved URLs)" style="width: 100%; font-family: var(--font-mono); font-size: 10.5px;"></textarea>
+        </div>
+
+        <!-- Option C: Cross-Sync Scope & Conflict Optimizer Preferences -->
+        <div style="border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 12px;">
+          <div class="card-label" style="margin-bottom: 8px;">3. Cross-Sync Scope &amp; Plan Optimization</div>
+          <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 8px; font-size: 11.5px; color: var(--text-primary);">
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" id="chkGcalSyncExams" checked /> Exams &amp; Tests (matched to bell schedule)</label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" id="chkGcalSyncHomework" checked /> Homework Deadlines</label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" id="chkGcalSyncPlan" checked /> Adaptive Plan (Deep Work, Gym, Study)</label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" id="chkGcalSyncSchool" checked /> TM1 School Timetable Lessons</label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" id="chkGcalIncludeSleep" /> Include Sleep &amp; Free Time Blocks</label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" id="chkGcalImportTests" checked /> Import <code>[Test]</code>/<code>Sprawdzian</code> GCal &rarr; Exams</label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" id="chkGcalAutoOptimize" checked /> Auto-Shift Plan Around GCal Conflicts</label>
+            <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;"><input type="checkbox" id="chkGcalDedicatedCal" checked /> Dedicated "Harness Executive OS" Cal</label>
+          </div>
+          <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border-hairline); flex-wrap: wrap; gap: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-secondary);">
+              <span>Horizon (days):</span>
+              <input type="number" id="gcalHorizonDays" min="1" max="60" value="14" class="form-input" style="width: 64px; padding: 3px 6px; font-size: 11px;" />
+            </div>
+            <button type="button" class="btn-primary" onclick="Today.saveGCalendarSettings()" style="font-size: 11px; padding: 5px 14px;">Save Settings</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
 
   <!-- App Script Modules -->
   <script src="js/api_bridge.js?v=6.0"></script>

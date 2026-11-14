@@ -421,9 +421,9 @@ def get_workload_analysis(
         if is_travel or is_recovery or is_us_travel_date(ex_date):
             e["is_travel_excused"] = True
 
-        # Only future exams (days_left >= 1) require acute study preparation; exam day (days_left == 0) is already written
+        # 3-day test factor ONLY: exams within 1 to 3 days trigger Defense readiness (T-0 exam day is already written)
         if days_left >= 1 and not e.get("is_travel_excused"):
-            if 1 <= days_left <= 2:
+            if 1 <= days_left <= 3:
                 immediate_exams.append(e)
             if 1 <= days_left <= 5:
                 week_exams.append(e)
@@ -521,23 +521,23 @@ def get_workload_analysis(
     ]
 
     # --------------------------------------------------------------------------
-    # STATE MACHINE INVERSION: DEFENSE PROTOCOL IS THE PERSISTENT DEFAULT STATE.
-    # CRUISE PROTOCOL only unlocks if and only if ALL THREE conditions pass:
-    # 1. Active Homework Deliverables with due date <= 24h == 0.
-    # 2. Zero unexcused nb marks open on the current semester ledger.
-    # 3. No pending retakes (poprawy) scheduled for marks <= 3 (and zero open np tripwires).
+    # REALITY-GROUNDED WORKLOAD STATE MACHINE:
+    # School Defense locks ONLY on upcoming tests within the 3-day horizon
+    # (1 <= days_left <= 3) or acute writing essays (<= 2 days).
+    # Regular ~30m daily homework and historical nb/np/low marks remain tracked
+    # as triage advisories without blocking daily TUM execution on Clean Horizons.
     # --------------------------------------------------------------------------
     has_active_hw_le_24h = len(urgent_homework) > 0
     has_open_nb = len(open_nb_marks) > 0
     has_pending_retakes_or_tripwires = (len(scheduled_poprawy) > 0 or len(failing_marks) > 0 or len(open_np_marks) > 0)
+    acute_essays_list = [
+        h for h in (urgent_homework + active_homework)
+        if h.get("is_essay") and 1 <= h.get("days_left", 99) <= 2 and not h.get("is_travel_excused")
+    ]
     has_acute_exams = len(immediate_exams) > 0
+    has_acute_essays = len(acute_essays_list) > 0
 
-    cruise_unlocked = (
-        not has_active_hw_le_24h
-        and not has_open_nb
-        and not has_pending_retakes_or_tripwires
-        and not has_acute_exams
-    )
+    cruise_unlocked = not has_acute_exams and not has_acute_essays
 
     # Composite Workload score calculation:
     score = (len(tier_1_exams) * 2.5) + (len(tier_2_exams) * 1.0)
@@ -548,13 +548,13 @@ def get_workload_analysis(
             score += 1.5
     if len(week_exams) > 1:
         score += (len(week_exams) - 1) * 1.5
-    score += (len(urgent_homework) * 2.0)
+    score += (len(urgent_homework) * 0.75)
     for h in homework:
         if h.get("is_essay") and h.get("days_left", 99) <= 2 and not h.get("is_travel_excused"):
             score += 2.5
         elif h.get("is_vulnerable") and h.get("days_left", 99) <= 2 and not h.get("is_travel_excused"):
-            score += 1.5
-    score += (len(active_homework) * 0.5)
+            score += 1.0
+    score += (len(active_homework) * 0.25)
 
     if is_travel:
         mode = "TRAVEL"
@@ -568,41 +568,32 @@ def get_workload_analysis(
         badge_class = "travel"
         desc = "Life Recovery / Family Surge Mode Active. High-friction deadlines excused. Priority on biological baseline, sleep, protein, and micro-habits."
         score = 1.0
-    elif score > 6.0:
+    elif score > 6.0 and has_acute_exams:
         mode = "SURGE"
         mode_label = "Surge Protocol • High Academic Density"
         badge_class = "amber"
-        hw_info = f", {len(urgent_homework)} urgent homework" if urgent_homework else ""
-        desc = f"High academic load ({len(tier_1_exams) + len(tier_2_exams)} upcoming test(s){hw_info}). SGH deep work blocks dynamically re-routed to phased exam defense and submission clearance."
+        desc = f"High acute test density ({len(immediate_exams)} test(s) ≤3d, {len(tier_1_exams) + len(tier_2_exams)} total upcoming). Deep work prioritizes nearest test prep."
     elif not cruise_unlocked:
         mode = "DEFENSE"
-        mode_label = "Defense Protocol • School Triage"
+        mode_label = "Defense Protocol • Test Within 3 Days"
         badge_class = "surge"
         triage_reasons = []
-        if has_active_hw_le_24h:
-            triage_reasons.append(f"{len(urgent_homework)} homework deliverable(s) due ≤24h")
-        if has_open_nb:
-            triage_reasons.append(f"{len(open_nb_marks)} unexcused nb mark(s)")
-        if scheduled_poprawy:
-            triage_reasons.append(f"{len(scheduled_poprawy)} scheduled retake(s)")
-        if failing_marks:
-            triage_reasons.append(f"{len(failing_marks)} failing mark(s) ≤2.5")
-        if open_np_marks:
-            triage_reasons.append(f"{len(open_np_marks)} open np tripwire(s)")
         if has_acute_exams:
-            triage_reasons.append(f"{len(immediate_exams)} acute exam(s) in ≤2d")
-        reason_str = ", ".join(triage_reasons) if triage_reasons else "Active school defense commitments"
-        desc = f"DEFENSE PROTOCOL LOCKED: {reason_str}. Long-term aspirational work suspended until school triage is cleared."
+            triage_reasons.append(f"{len(immediate_exams)} test(s) ≤3d")
+        if has_acute_essays:
+            triage_reasons.append(f"{len(acute_essays_list)} essay draft(s) ≤2d")
+        reason_str = ", ".join(triage_reasons) if triage_reasons else "Acute 3-day test defense"
+        desc = f"DEFENSE PROTOCOL ACTIVE: {reason_str}. Deep work shifted to acute test preparation."
     elif score > 2.5:
         mode = "BALANCED"
-        mode_label = "Balanced Mode • Dual Track Focus"
+        mode_label = "Balanced Horizon • Clean TUM + Early Test Prep"
         badge_class = "lavender"
-        desc = "Moderate academic load. All acute defense conditions cleared; balanced SGH deep work."
+        desc = "Clean 3-day horizon: no tests within 3 days. Deep work advances TUM Roadmap deliverables alongside light early review."
     else:
         mode = "CRUISE"
         mode_label = "Cruise Mode • TUM Acceleration"
         badge_class = "optimal"
-        desc = "CRUISE PROTOCOL UNLOCKED: 0 acute homework ≤24h, 0 open nb marks, 0 pending retakes. 100% capacity focused on TUM roadmap & Matura R."
+        desc = "CRUISE PROTOCOL UNLOCKED: No tests within 3 days. 100% Deep Work & Training capacity advances TUM '28 Roadmap."
 
     if close_conn:
         conn.close()
@@ -706,6 +697,79 @@ def compute_phase_durations(total_net_min: int, scenario_type: str) -> Tuple[int
         return p1, p2, p3
 
 
+def _is_physical_deliverable(d: Dict[str, Any]) -> bool:
+    """Returns True if a deliverable belongs to the Physical training stream."""
+    did = str(d.get("deliverable_id") or "").lower()
+    stream = str(d.get("stream") or d.get("category") or "").lower()
+    return "_phys" in did or stream == "physical" or "physical" in stream
+
+
+def _build_deliverable_payload(d: Dict[str, Any], active_station_id: str) -> Dict[str, Any]:
+    """Builds standardized deliverable metadata attached to scheduled blocks."""
+    spec = d.get("next_spec") or {}
+    stream = str(d.get("stream") or spec.get("category") or "roadmap").lower()
+    return {
+        "deliverable_id": d["deliverable_id"],
+        "station_id": active_station_id,
+        "stream": stream,
+        "title": spec.get("title") or d.get("title") or "TUM Deliverable",
+        "category": spec.get("category") or d.get("category") or (stream.capitalize() if stream else "Roadmap"),
+        "target_spec": spec.get("target_spec") or d.get("title") or "",
+        "action_type": spec.get("action_type") or "url",
+        "target_path": spec.get("target_path") or "",
+        "quantity": spec.get("quantity") or 1,
+        "completed_count": d.get("completed_count", 0),
+        "total_required": d.get("total_required", 1),
+        "unit_label": d.get("unit_label") or "units",
+    }
+
+
+def _select_station_deliverables_for_schedule(
+    active_station_id: str, conn: Optional[sqlite3.Connection] = None
+) -> tuple:
+    """
+    Separates intellectual deliverables (Academics, Code, SIGG, German) from Physical.
+    Picks the intellectual deliverable with lowest completion ratio for Deep Work,
+    and binds the active Physical deliverable to Training/Gym/Running blocks.
+    """
+    station_delivs = kill_list_controller.get_station_deliverables(active_station_id, conn=conn)
+    intellectual = [d for d in station_delivs if not _is_physical_deliverable(d)]
+    physical_list = [d for d in station_delivs if _is_physical_deliverable(d)]
+
+    incomplete_intel = [d for d in intellectual if not d.get("is_completed")]
+    pool = incomplete_intel if incomplete_intel else intellectual
+    top_intel = None
+    if pool:
+        top_intel = min(
+            pool,
+            key=lambda d: (d.get("completed_count", 0) / max(d.get("total_required", 1), 1)),
+        )
+
+    phys_deliv = next((d for d in physical_list if not d.get("is_completed")), (physical_list[0] if physical_list else None))
+
+    deliv_dict = _build_deliverable_payload(top_intel, active_station_id) if top_intel else None
+    deliv_spec = (top_intel.get("next_spec") if top_intel else None) or {
+        "title": "LeetCode Unassisted & Math R",
+        "target_spec": "Solve 1 problem without AI & review Math R",
+        "action_type": "url",
+        "target_path": "https://leetcode.com/problemset/all/",
+        "category": "Algorithms",
+        "quantity": 1,
+    }
+    phys_dict = _build_deliverable_payload(phys_deliv, active_station_id) if phys_deliv else None
+    candidates = [_build_deliverable_payload(d, active_station_id) for d in intellectual]
+    return deliv_dict, deliv_spec, phys_dict, candidates
+
+
+def _attach_physical_to_training_blocks(blocks: List[Dict[str, Any]], phys_dict: Optional[Dict[str, Any]]) -> None:
+    """Attaches active Physical TUM deliverable metadata onto training/workout blocks."""
+    if not phys_dict:
+        return
+    for b in blocks:
+        if b.get("type") == "training":
+            b["physical_deliverable"] = dict(phys_dict)
+
+
 def synthesize_adaptive_schedule(
     base_schedule: Dict[str, Any],
     date_str: Optional[str] = None,
@@ -713,10 +777,9 @@ def synthesize_adaptive_schedule(
 ) -> Dict[str, Any]:
     """
     Takes the static base routine and dynamically shapes the daily plan and study blocks
-    depending on upcoming tests, essays, homework deadlines, live subject grades, and travel protocols.
-    - US Travel Mode (Oct 4–18): Suspends Warsaw timetable and schedules hotel deep work.
-    - Exam Day (T-0): Written test is excluded from afternoon study blocks.
-    - Non-Defense Days: SGH Library block embeds active station TUM Roadmap deliverable.
+    depending on upcoming tests (3-day threshold), acute essays, and reality modes.
+    - Clean Horizon (>3d until next exam): Deep work embeds TUM Roadmap deliverables.
+    - Every training/gym/run block binds the active month's Physical deliverable.
     """
     schedule = dict(base_schedule)
     blocks = [dict(b) for b in schedule.get("blocks", [])]
@@ -728,8 +791,13 @@ def synthesize_adaptive_schedule(
     weekday = target_dt.weekday()  # Monday=0, ... Saturday=5, Sunday=6
     is_weekend = weekday in (5, 6)
 
+    active_station_id = get_active_station_id(target_dt)
+    deliv_dict, deliv_spec, phys_dict, candidate_deliverables = _select_station_deliverables_for_schedule(
+        active_station_id, conn=conn
+    )
+
     # --------------------------------------------------------------------------
-    # 0A. SURGE RECOVERY PROTOCOL (Illness / Jet lag / Family Emergency)
+    # 0A. SURGE RECOVERY PROTOCOL (Low Energy / Illness / Family Surge)
     # --------------------------------------------------------------------------
     if analysis.get("is_recovery_mode") or analysis.get("mode") == "SURGE_RECOVERY":
         recovery_blocks = [
@@ -747,6 +815,8 @@ def synthesize_adaptive_schedule(
                 "is_tum_roadmap": True,
                 "is_school_dedicated": False,
                 "net_minutes": 45,
+                "deliverable": deliv_dict,
+                "candidate_deliverables": candidate_deliverables,
             },
             {
                 "time": "12:00 – 18:30",
@@ -779,6 +849,7 @@ def synthesize_adaptive_schedule(
                 "type": "sleep",
             },
         ]
+        _attach_physical_to_training_blocks(recovery_blocks, phys_dict)
         schedule["blocks"] = recovery_blocks
         schedule["name"] = f"Recovery Protocol ({target_dt.strftime('%A')})"
         schedule["description"] = "Life Recovery / Family Surge Mode Active. High-friction commitments paused. Biological floor and streak preserved."
@@ -788,17 +859,9 @@ def synthesize_adaptive_schedule(
     # 0B. FIELD / TRAVEL PROTOCOL (Away from Warsaw workstation)
     # --------------------------------------------------------------------------
     if analysis.get("is_us_travel_mode"):
-        station_id = get_active_station_id(target_dt)
-        delivs = kill_list_controller.get_station_deliverables(station_id, conn=conn)
-        chosen_deliv = next((d for d in delivs if not d.get("is_completed")), (delivs[0] if delivs else None))
-        spec = (chosen_deliv.get("next_spec") if chosen_deliv else None) or {
-            "title": "LeetCode Unassisted & Math R",
-            "target_spec": "Solve 1 problem without AI & review Math R",
-            "action_type": "url",
-            "target_path": "https://leetcode.com/problemset/all/",
-            "category": "Algorithms",
-            "quantity": 1,
-        }
+        station_id = active_station_id
+        chosen_payload = deliv_dict
+        spec = deliv_spec
         net_min, cutoff_str = parse_block_net_minutes("09:30 – 10:30", default_minutes=60)
         p1, p2, p3 = compute_phase_durations(net_min, "us_travel")
         travel_blocks = [
@@ -850,19 +913,8 @@ def synthesize_adaptive_schedule(
                         "color": "#10b981",
                     },
                 ],
-                "deliverable": {
-                    "deliverable_id": chosen_deliv["deliverable_id"] if chosen_deliv else "us_hotel_sprint",
-                    "station_id": station_id,
-                    "title": spec["title"],
-                    "category": spec["category"],
-                    "target_spec": spec["target_spec"],
-                    "action_type": spec["action_type"],
-                    "target_path": spec["target_path"],
-                    "quantity": spec["quantity"],
-                    "completed_count": chosen_deliv["completed_count"] if chosen_deliv else 0,
-                    "total_required": chosen_deliv["total_required"] if chosen_deliv else 15,
-                    "unit_label": chosen_deliv["unit_label"] if chosen_deliv else "exercises",
-                } if chosen_deliv else None,
+                "deliverable": chosen_payload,
+                "candidate_deliverables": candidate_deliverables,
             },
             {
                 "time": "10:30 – 18:30",
@@ -895,6 +947,7 @@ def synthesize_adaptive_schedule(
                 "type": "sleep",
             },
         ]
+        _attach_physical_to_training_blocks(travel_blocks, phys_dict)
         schedule["blocks"] = travel_blocks
         schedule["name"] = f"US Travel Protocol ({target_dt.strftime('%A')})"
         schedule["description"] = "Travel Mode Active (Oct 4–18). Warsaw schedule suspended. 60m minimal maintenance anchor to keep pace with zero guilt. Enjoy your trip."
@@ -903,33 +956,18 @@ def synthesize_adaptive_schedule(
     exams = analysis.get("upcoming_exams", [])
     homework = analysis.get("urgent_homework", []) + analysis.get("active_homework", [])
 
-    # Identify acute writing tasks (essays due in 1 to 2 days)
+    # 3-day test factor ONLY: exams due in 1 to 3 days + acute essays due in 1 to 2 days
     acute_essays = [h for h in homework if h.get("is_essay") and 1 <= h.get("days_left", 99) <= 2]
-    # Identify acute exams (exams due in 1 to 2 days - NEVER days_left == 0)
-    acute_exams = [e for e in exams if 1 <= e.get("days_left", 99) <= 2]
-
-    # Active station deliverable lookup for non-defense TUM embedding
-    active_station_id = get_active_station_id(target_dt)
-    station_delivs = kill_list_controller.get_station_deliverables(active_station_id, conn=conn)
-    top_deliv = next((d for d in station_delivs if not d.get("is_completed")), (station_delivs[0] if station_delivs else None))
-    deliv_spec = top_deliv.get("next_spec") if top_deliv else {
-        "title": "LeetCode Unassisted & Math R",
-        "target_spec": "Solve 1 problem without AI & review Math R",
-        "action_type": "url",
-        "target_path": "https://leetcode.com/problemset/all/",
-        "category": "Algorithms",
-        "quantity": 1,
-    }
+    acute_exams = [e for e in exams if 1 <= e.get("days_left", 99) <= 3]
 
     # --------------------------------------------------------------------------
-    # 1. WEEKEND ADAPTATION: Inject structured study blocks if heavy load looms
+    # 1. WEEKEND ADAPTATION: Inject extra study block ONLY when <=3d tests or acute essays loom
+    #    Keep Clean Horizon weekends free to advance TUM Deep Work + Running/Physical!
     # --------------------------------------------------------------------------
     if is_weekend:
-        impending_obligations = [e for e in exams if e.get("days_left", 99) <= 5] + [
-            h for h in homework if h.get("days_left", 99) <= 5 and (h.get("is_essay") or h.get("is_vulnerable"))
-        ]
+        impending_obligations = [e for e in exams if 1 <= e.get("days_left", 99) <= 3] + acute_essays
 
-        if impending_obligations or analysis["mode"] in ("BALANCED", "SURGE"):
+        if impending_obligations or analysis["mode"] in ("DEFENSE", "SURGE"):
             primary_ob = impending_obligations[0] if impending_obligations else (exams[0] if exams else (homework[0] if homework else None))
             if primary_ob:
                 phased = generate_phased_study_action(
@@ -994,30 +1032,12 @@ def synthesize_adaptive_schedule(
                 if not inserted:
                     blocks.append(weekend_block)
 
-        schedule["blocks"] = blocks
-        return schedule
-
     # --------------------------------------------------------------------------
-    # 2. WEEKDAY SGH DEEP WORK SHAPING
+    # 2. PHYSICAL BINDING & DEEP WORK SHAPING (BOTH WEEKDAYS AND WEEKENDS)
     # --------------------------------------------------------------------------
-    acute_essays = [h for h in homework if h.get("is_essay") and 1 <= h.get("days_left", 99) <= 2]
-    acute_exams = [e for e in exams if 1 <= e.get("days_left", 99) <= 2]
+    _attach_physical_to_training_blocks(blocks, phys_dict)
     today_exams = analysis.get("today_exams", [])
     urgent_hw = analysis.get("urgent_homework", [])
-
-    deliv_dict = {
-        "deliverable_id": top_deliv["deliverable_id"] if top_deliv else "sgh_tum_roadmap",
-        "station_id": active_station_id,
-        "title": deliv_spec["title"],
-        "category": deliv_spec["category"],
-        "target_spec": deliv_spec["target_spec"],
-        "action_type": deliv_spec["action_type"],
-        "target_path": deliv_spec["target_path"],
-        "quantity": deliv_spec["quantity"],
-        "completed_count": top_deliv["completed_count"] if top_deliv else 0,
-        "total_required": top_deliv["total_required"] if top_deliv else 15,
-        "unit_label": top_deliv["unit_label"] if top_deliv else "exercises",
-    } if top_deliv else None
 
     for b in blocks:
         is_deep_work = b.get("type") == "deep_work" or "SGH Library" in b.get("focus", "")
@@ -1025,6 +1045,7 @@ def synthesize_adaptive_schedule(
             continue
 
         b["is_surge"] = (analysis["mode"] == "SURGE")
+        b["candidate_deliverables"] = candidate_deliverables
         time_slot = b.get("time", "14:30 – 16:30")
         net_min, cutoff_str = parse_block_net_minutes(time_slot, default_minutes=110)
         b["net_minutes"] = net_min
@@ -1081,7 +1102,7 @@ def synthesize_adaptive_schedule(
                 },
             ]
 
-        # Scenario B: Single Nearest Exam Dominance (1 to 2 days out)
+        # Scenario B: Single Nearest Exam Dominance (1 to 3 days out)
         elif acute_exams:
             top_exam = acute_exams[0]
             p1, p2, p3 = compute_phase_durations(net_min, "acute_school_defense")
@@ -1133,8 +1154,8 @@ def synthesize_adaptive_schedule(
                 },
             ]
 
-        # Scenario C: Defense Protocol Active OR Urgent Homework Due <= 24h
-        elif analysis.get("mode") == "DEFENSE" or urgent_hw:
+        # Scenario C: Defense Protocol Active (only when 3-day test defense is unlocked/locked)
+        elif analysis.get("mode") == "DEFENSE":
             p1, p2, p3 = compute_phase_durations(net_min, "urgent_hw")
             primary_hw = urgent_hw[0] if urgent_hw else None
             second_hw = urgent_hw[1] if len(urgent_hw) > 1 else None
@@ -1228,7 +1249,8 @@ def synthesize_adaptive_schedule(
         # Scenario D: Exam Written Today (T-0) -> Morning cleared, 100% TUM Metro Pipeline
         elif today_exams:
             p1, p2, p3 = compute_phase_durations(net_min, "pure_tum")
-            b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']}"
+            focus_prefix = "TUM Deep Work" if is_weekend else "SGH Library • TUM Deep Work"
+            b["focus"] = f"{focus_prefix}: {deliv_spec['title']}"
             b["activity"] = (
                 f"[TUM Victory Sprint // {active_station_id}] Morning examination cleared. "
                 f"1 TUM Milestone Rep + 4 CKE Matura R Tasks + 20 German A2 Vocab Units."
@@ -1275,12 +1297,13 @@ def synthesize_adaptive_schedule(
                 },
             ]
 
-        # Scenario E: Medium-Horizon Exam (3 to 5 days out) -> 50/50 Balanced Foundation
+        # Scenario E: Clean Horizon with Upcoming Exam (4 to 5 days out) -> Balanced TUM + Foundation
         elif exams and exams[0].get("days_left", 99) <= 5:
             e = exams[0]
             p1, p2, p3 = compute_phase_durations(net_min, "medium_horizon")
             scope_info = f" ({e['scope'][:40]})" if e.get("scope") else ""
-            b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']} & {e['subject']} Foundation"
+            focus_prefix = "TUM Deep Work" if is_weekend else "SGH Library • TUM Deep Work"
+            b["focus"] = f"{focus_prefix}: {deliv_spec['title']} & {e['subject']} Foundation"
             b["activity"] = (
                 f"[TUM Roadmap & Foundation // {active_station_id}] 1 Formula Sheet + "
                 f"4 Theorem Proofs + {deliv_spec['target_spec']}."
@@ -1330,7 +1353,8 @@ def synthesize_adaptive_schedule(
         # Scenario F: Pure Cruise Mode / Clear Academic Horizon -> 100% TUM Metro Pipeline
         else:
             p1, p2, p3 = compute_phase_durations(net_min, "pure_tum")
-            b["focus"] = f"SGH Library • TUM Deep Work: {deliv_spec['title']}"
+            focus_prefix = "TUM Deep Work" if is_weekend else "SGH Library • TUM Deep Work"
+            b["focus"] = f"{focus_prefix}: {deliv_spec['title']}"
             b["activity"] = (
                 f"[TUM Metro Pipeline // {active_station_id}] 1 Milestone Rep + "
                 f"4 CKE Tasks (2023 May) + 20 German A2 Vocab Units."
@@ -1378,7 +1402,319 @@ def synthesize_adaptive_schedule(
             ]
 
     schedule["blocks"] = blocks
-    return schedule
+    resolved_date = (date_str or (target_dt.isoformat() if "target_dt" in locals() and target_dt else "")) or dt.date.today().isoformat()
+    return optimize_schedule_with_calendar_events(schedule, date_str=resolved_date, conn=conn)
+
+
+def _scale_plan_phases(
+    phases: List[Dict[str, Any]],
+    net_minutes: int,
+    scenario_type: str,
+) -> List[Dict[str, Any]]:
+    """Recalculates phase durations so `sum(duration_min) == net_minutes` without mutating inputs."""
+    if not phases:
+        return []
+    copied = [dict(p) for p in phases]
+    if len(copied) == 3:
+        d1, d2, d3 = compute_phase_durations(net_minutes, scenario_type or "medium_horizon")
+        # Guarantee exact integer sum
+        d3 = max(1, net_minutes - d1 - d2) if net_minutes >= 3 else max(0, net_minutes - d1 - d2)
+        for p, dur in zip(copied, (d1, d2, d3)):
+            p["duration_min"] = int(dur)
+        return copied
+
+    old_total = sum(max(1, int(p.get("duration_min", 0))) for p in copied) or len(copied)
+    allocated = 0
+    for idx, p in enumerate(copied):
+        if idx == len(copied) - 1:
+            p["duration_min"] = max(0, int(net_minutes) - allocated)
+        else:
+            part = max(1, round((max(1, int(p.get("duration_min", 0))) / old_total) * net_minutes))
+            part = min(part, max(0, int(net_minutes) - allocated))
+            p["duration_min"] = int(part)
+            allocated += part
+    return copied
+
+
+def _free_intervals_from_busy(
+    busy: List[Tuple[int, int]],
+    day_start: int,
+    day_end: int,
+    buffer_min: int = 0,
+) -> List[Tuple[int, int]]:
+    """Computes sorted merged free windows inside [day_start, day_end] outside `busy` intervals."""
+    expanded: List[Tuple[int, int]] = []
+    for s, e in busy:
+        if e <= day_start or s >= day_end:
+            continue
+        expanded.append((max(day_start, s - buffer_min), min(day_end, e + buffer_min)))
+    expanded.sort()
+
+    merged: List[Tuple[int, int]] = []
+    for s, e in expanded:
+        if not merged or s > merged[-1][1]:
+            merged.append((s, e))
+        else:
+            merged[-1] = (merged[-1][0], max(merged[-1][1], e))
+
+    free: List[Tuple[int, int]] = []
+    cursor = day_start
+    for s, e in merged:
+        if s > cursor:
+            free.append((cursor, s))
+        cursor = max(cursor, e)
+    if cursor < day_end:
+        free.append((cursor, day_end))
+    return free
+
+
+def _pick_best_reschedule_slot(
+    orig_start: int,
+    orig_dur: int,
+    busy: List[Tuple[int, int]],
+    min_slot_min: int = 45,
+) -> Optional[Tuple[int, int]]:
+    """Finds the best conflict-free slot for a shifted/compressed block."""
+    day_start = 7 * 60
+    day_end = 22 * 60 + 30
+
+    for buf in (5, 0):
+        free = _free_intervals_from_busy(busy, day_start, day_end, buffer_min=buf)
+        if not free:
+            continue
+
+        # 1. Full duration before 21:30 preferred
+        full_daytime: List[Tuple[int, int]] = []
+        for fs, fe in free:
+            if fe - fs < orig_dur:
+                continue
+            cand_s = max(fs, min(orig_start, fe - orig_dur))
+            cand_e = cand_s + orig_dur
+            if cand_e <= 21 * 60 + 30:
+                full_daytime.append((cand_s, cand_e))
+            elif fs + orig_dur <= 21 * 60 + 30:
+                full_daytime.append((fs, fs + orig_dur))
+        if full_daytime:
+            return min(full_daytime, key=lambda win: (abs(win[0] - orig_start), win[0]))
+
+        # 2. Ergonomic daytime compressed slot (>= 75 min before 21:00)
+        daytime_substantial = [
+            (fs, min(fe, fs + orig_dur))
+            for fs, fe in free
+            if min(fe, 21 * 60) - fs >= min(75, orig_dur)
+        ]
+        if daytime_substantial:
+            best = max(daytime_substantial, key=lambda win: (win[1] - win[0], -abs(win[0] - orig_start)))
+            return (best[0], min(best[1], best[0] + orig_dur))
+
+        # 3. Full duration up to 22:30
+        full_any = [(fs, fs + orig_dur) for fs, fe in free if fe - fs >= orig_dur]
+        if full_any:
+            return min(full_any, key=lambda win: (abs(win[0] - orig_start), win[0]))
+
+        # 4. Largest available slot >= min_slot_min
+        viable = [(fs, min(fe, fs + orig_dur)) for fs, fe in free if fe - fs >= min(min_slot_min, orig_dur)]
+        if viable:
+            return max(viable, key=lambda win: (win[1] - win[0], -abs(win[0] - orig_start)))
+
+    return None
+
+
+def optimize_schedule_with_calendar_events(
+    schedule: Dict[str, Any],
+    date_str: str,
+    conn: Optional[sqlite3.Connection] = None,
+) -> Dict[str, Any]:
+    """
+    Applies Google Calendar user overrides (`gcal_sync_map`) and shifts/resizes conflicted
+    movable blocks around external `gcal_events`, preserving array indices for completion parity.
+    """
+    from app.db import get_connection
+    from app.services import gcalendar_service
+
+    sched_copy = dict(schedule)
+    blocks = [dict(b) for b in (schedule.get("blocks") or [])]
+
+    own_conn = conn is None
+    if own_conn:
+        conn = get_connection()
+
+    ext_events: List[Dict[str, Any]] = []
+    override_by_idx: Dict[int, Dict[str, Any]] = {}
+    try:
+        rows = conn.execute(
+            """
+            SELECT event_id, calendar_id, summary, description, location,
+                   date, start_time, end_time, start_iso, end_iso, is_all_day, status, source
+            FROM gcal_events
+            WHERE date = ? AND status != 'cancelled' AND is_harness_managed = 0
+            ORDER BY is_all_day DESC, start_time ASC
+            """,
+            (date_str,),
+        ).fetchall()
+        ext_events = [dict(r) for r in rows]
+
+        ov_rows = conn.execute(
+            """
+            SELECT harness_key, override_date, override_start, override_end, user_deleted
+            FROM gcal_sync_map
+            WHERE harness_kind = 'plan_block' AND harness_key LIKE ?
+            """,
+            (f"plan:{date_str}:%",),
+        ).fetchall()
+        for r in ov_rows:
+            try:
+                idx = int(str(r["harness_key"]).rsplit(":", 1)[-1])
+                override_by_idx[idx] = dict(r)
+            except Exception:
+                continue
+    except sqlite3.OperationalError:
+        ext_events = []
+        override_by_idx = {}
+    finally:
+        if own_conn and conn is not None:
+            conn.close()
+
+    # Step A: Apply explicit user edits / deletions from Google Calendar UI
+    for idx, blk in enumerate(blocks):
+        ov = override_by_idx.get(idx)
+        if not ov:
+            continue
+        if ov.get("user_deleted"):
+            blk["gcal_user_deleted"] = True
+            blk["gcal_adjustment_reason"] = "Removed by user in Google Calendar"
+            continue
+        ov_date = ov.get("override_date") or date_str
+        ov_start = (ov.get("override_start") or "").strip()
+        ov_end = (ov.get("override_end") or "").strip()
+        if ov_date == date_str and ov_start and ov_end:
+            new_win = gcalendar_service.parse_time_window(f"{ov_start} – {ov_end}")
+            if new_win:
+                blk["original_time"] = blk.get("time", "")
+                blk["time"] = gcalendar_service.format_time_window(new_win[0], new_win[1])
+                blk["gcal_user_override"] = True
+                blk["gcal_adjustment_reason"] = "Adjusted by user in Google Calendar"
+                net_min, _ = parse_block_net_minutes(blk["time"], default_minutes=new_win[1] - new_win[0])
+                blk["net_minutes"] = net_min
+                if blk.get("plan_phases"):
+                    blk["plan_phases"] = _scale_plan_phases(
+                        blk["plan_phases"], net_min, blk.get("scenario_type") or "medium_horizon"
+                    )
+
+    # Step B: Conflict-aware optimization around external timed Google Calendar events
+    cfg = gcalendar_service.get_gcalendar_config()
+    auto_opt = bool(cfg.get("auto_optimize_schedule", True))
+    ext_intervals: List[Tuple[int, int, str]] = []
+    for ev in ext_events:
+        if ev.get("is_all_day"):
+            continue
+        win = gcalendar_service.parse_time_window(f"{ev.get('start_time', '')} – {ev.get('end_time', '')}")
+        if win:
+            ext_intervals.append((win[0], win[1], ev.get("summary") or "Calendar Event"))
+
+    conflicts_detected = 0
+    blocks_optimized = 0
+    opt_notes: List[str] = []
+
+    if auto_opt and ext_intervals:
+        def _is_movable(b: Dict[str, Any]) -> bool:
+            if b.get("gcal_user_override") or b.get("gcal_user_deleted"):
+                return False
+            btype = b.get("type", "")
+            if btype in ("deep_work", "study_block"):
+                return True
+            if btype == "training":
+                lbl = (b.get("focus") or b.get("label") or "").lower()
+                return "box" not in lbl
+            return False
+
+        # Soft 'rest' (Free Time) is absorbable by optimizer; 'chore'/'nutrition' preserved in Tier 1
+        fixed_strict: List[Tuple[int, int]] = [(s, e) for s, e, _ in ext_intervals]
+        fixed_relaxed: List[Tuple[int, int]] = [(s, e) for s, e, _ in ext_intervals]
+        block_windows: Dict[int, Tuple[int, int]] = {}
+        for idx, blk in enumerate(blocks):
+            if blk.get("gcal_user_deleted"):
+                continue
+            btype = blk.get("type", "")
+            win = gcalendar_service.parse_time_window(blk.get("time", ""))
+            if not win:
+                continue
+            block_windows[idx] = win
+            if btype == "rest":
+                continue
+            if not _is_movable(blk):
+                fixed_strict.append(win)
+                if btype not in ("chore",):
+                    fixed_relaxed.append(win)
+
+        # Keep track of each movable block's current slot so unmoved ones act as barriers
+        placed_movable: Dict[int, Tuple[int, int]] = {
+            idx: win for idx, win in block_windows.items() if _is_movable(blocks[idx])
+        }
+
+        for idx, blk in enumerate(blocks):
+            if idx not in block_windows:
+                continue
+            b_start, b_end = block_windows[idx]
+            overlapping_names = [
+                name for es, ee, name in ext_intervals
+                if b_start < ee and es < b_end
+            ]
+            if not overlapping_names:
+                continue
+
+            if not _is_movable(blk):
+                conflicts_detected += 1
+                opt_notes.append(
+                    f"{blk.get('focus') or blk.get('label') or 'Block'} ({blk.get('time', '')}) overlaps GCal: {', '.join(overlapping_names)}"
+                )
+                continue
+
+            conflicts_detected += 1
+            other_movable = [w for j, w in placed_movable.items() if j != idx]
+            orig_dur = max(15, b_end - b_start)
+            new_slot = _pick_best_reschedule_slot(
+                b_start, orig_dur, fixed_strict + other_movable, min_slot_min=45
+            )
+            if not new_slot:
+                new_slot = _pick_best_reschedule_slot(
+                    b_start, orig_dur, fixed_relaxed + other_movable, min_slot_min=45
+                )
+
+            if not new_slot:
+                blk["gcal_conflict_warning"] = True
+                opt_notes.append(
+                    f"Could not relocate {blk.get('focus') or blk.get('label') or 'Block'} cleanly around {', '.join(overlapping_names)}"
+                )
+                continue
+
+            ns, ne = new_slot
+            orig_time = blk.get("time", "")
+            blk["original_time"] = orig_time
+            blk["time"] = gcalendar_service.format_time_window(ns, ne)
+            blk["gcal_optimized"] = True
+            blk["gcal_compressed"] = (ne - ns) < orig_dur
+            blk["gcal_adjustment_reason"] = f"Shifted around GCal: {', '.join(overlapping_names)}"
+            net_min, _ = parse_block_net_minutes(blk["time"], default_minutes=ne - ns)
+            blk["net_minutes"] = net_min
+            if blk.get("plan_phases"):
+                blk["plan_phases"] = _scale_plan_phases(
+                    blk["plan_phases"], net_min, blk.get("scenario_type") or "medium_horizon"
+                )
+            placed_movable[idx] = (ns, ne)
+            blocks_optimized += 1
+            opt_notes.append(
+                f"{blk.get('focus') or blk.get('label') or 'Block'}: {orig_time} -> {blk['time']} (around {', '.join(overlapping_names)})"
+            )
+
+    sched_copy["blocks"] = blocks
+    sched_copy["calendar_events"] = ext_events
+    sched_copy["calendar_optimization"] = {
+        "conflicts_detected": conflicts_detected,
+        "blocks_optimized": blocks_optimized,
+        "notes": opt_notes,
+    }
+    return sched_copy
 
 
 def get_recommended_kill_items(

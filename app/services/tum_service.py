@@ -592,17 +592,88 @@ def update_language_status(
     return updated
 
 
-def get_metro_roadmap() -> Dict[str, Any]:
-    """Returns the complete 2-year metro roadmap dataset from data/metro_roadmap.json."""
+def _normalize_stream_key(key: str) -> str:
+    """Maps a roadmap deliverable key (e.g. cs_syntax, academics) to canonical stream name."""
+    k = str(key or "").lower()
+    if "phys" in k or "protein" in k:
+        return "physical"
+    if "sigg" in k or "trad" in k:
+        return "sigg"
+    if "german" in k or "anki" in k or "lang" in k:
+        return "german"
+    if "code" in k or "syntax" in k or "leet" in k or k.startswith("cs") or "cs_" in k:
+        return "code"
+    return "academics"
+
+
+def get_metro_roadmap(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
+    """Returns the complete 2-year metro roadmap overlaid with live SQLite deliverable progress."""
     roadmap_file = DATA_DIR / "metro_roadmap.json"
     if not roadmap_file.exists():
         return {"title": "TUM Roadmap", "stations": []}
 
     try:
         with open(roadmap_file, "r", encoding="utf-8") as f:
-            return json.load(f)
+            data = json.load(f)
     except Exception as e:
         return {"title": "TUM Roadmap", "stations": [], "error": str(e)}
+
+    close_conn = False
+    try:
+        if conn is None:
+            conn = get_connection()
+            close_conn = True
+
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            SELECT deliverable_id, station_id, stream, title, total_required, completed_count, unit_label, is_completed
+            FROM station_deliverable_progress
+            """
+        )
+        rows = cursor.fetchall()
+        progress_by_station: Dict[str, Dict[str, Dict[str, Any]]] = {}
+        for r in rows:
+            sid_norm = str(r["station_id"] or "").replace("_", "-").lower()
+            stream_norm = str(r["stream"] or "").lower()
+            progress_by_station.setdefault(sid_norm, {})[stream_norm] = {
+                "deliverable_id": r["deliverable_id"],
+                "stream": stream_norm,
+                "title": r["title"],
+                "count": int(r["completed_count"] or 0),
+                "total": int(r["total_required"] or 1),
+                "unit": r["unit_label"] or "units",
+                "is_completed": bool(r["is_completed"]),
+            }
+
+        for st in data.get("stations", []):
+            sid_norm = str(st.get("id") or "").replace("_", "-").lower()
+            live_map = progress_by_station.get(sid_norm)
+            if not live_map:
+                continue
+            counts = st.setdefault("deliverable_counts", {})
+            completed_keys = list(st.get("completed_deliverables") or [])
+            for key in st.get("deliverables", {}).keys():
+                stream = _normalize_stream_key(key)
+                live = live_map.get(stream)
+                if not live:
+                    continue
+                counts[key] = {
+                    "count": live["count"],
+                    "total": live["total"],
+                    "unit": live["unit"],
+                    "deliverable_id": live["deliverable_id"],
+                }
+                if live["is_completed"] and key not in completed_keys:
+                    completed_keys.append(key)
+            st["completed_deliverables"] = completed_keys
+    except Exception:
+        pass
+    finally:
+        if close_conn and conn is not None:
+            conn.close()
+
+    return data
 
 
 def update_station_status(station_id: str, status: str) -> bool:

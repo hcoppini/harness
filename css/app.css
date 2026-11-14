@@ -1437,13 +1437,12 @@ body {
 .metro-viewport {
   position: relative;
   width: 100%;
-  min-height: 480px;
-  height: 500px;
+  min-height: 440px;
+  height: auto;
   background: var(--bg-card);
   border: 1px solid var(--border-hairline);
   border-radius: var(--radius-md);
-  overflow-y: auto;
-  overflow-x: hidden;
+  overflow: visible;
   display: flex;
   flex-direction: column;
   flex-shrink: 0;
@@ -1492,8 +1491,8 @@ body {
 }
 
 .metro-scroll-container {
-  height: 220px;
-  min-height: 220px;
+  height: 248px;
+  min-height: 248px;
   flex-shrink: 0;
   overflow-x: auto;
   overflow-y: hidden;
@@ -1511,7 +1510,7 @@ body {
 .metro-canvas-wrap {
   position: relative;
   min-width: 3200px;
-  height: 220px;
+  height: 248px;
   padding: 0;
 }
 
@@ -3093,7 +3092,8 @@ input[type="range"]::-moz-range-thumb {
     display: none !important;
   }
 
-  /* 2. TUM Metro: HIDE 4,800px SVG Canvas Track and 22 Cards; SHOW Mobile Station HUD */
+  /* 2. TUM Metro: HIDE 4,800px SVG Canvas Track, Band 1 Hero, and 22 Cards; SHOW Mobile Station HUD */
+  .tum-hero-grid,
   .metro-viewport,
   .metro-cards-section,
   .metro-toolbar {
@@ -4372,6 +4372,894 @@ input[type="range"]::-moz-range-thumb {
 .plan-phase-card.phase-winddown {
   border-left: 3.5px solid #d97706;
 }
+
+/* ==========================================================================
+   HARNESS 6.2 // SWISS-PRECISION OBSIDIAN VISUAL ASCENSION
+   ========================================================================== */
+
+/* Header Settings Gear & Popover */
+.header-settings-wrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.header-settings-popover {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 228px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-dropdown);
+  padding: 6px;
+  z-index: 200;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+  animation: popoverSlideIn 0.16s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.header-settings-popover.open {
+  display: flex;
+}
+
+@keyframes popoverSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.settings-popover-label {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding: 6px 8px 4px;
+}
+
+.settings-menu-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 9px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  font-size: 11.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.settings-menu-item:hover {
+  background: var(--bg-surface-elevated);
+  border-color: var(--border-hairline);
+  color: var(--text-primary);
+}
+
+.settings-menu-item .key-pill {
+  margin-left: auto;
+}
+
+/* Reality Day Mode Segmented Pill Switch */
+.day-mode-segmented {
+  display: inline-flex;
+  align-items: center;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-hairline);
+  border-radius: 6px;
+  padding: 2px;
+  gap: 2px;
+}
+
+.day-mode-btn {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  padding: 3px 8px;
+  cursor: pointer;
+  transition: all 0.14s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
+}
+
+.day-mode-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.day-mode-btn.active {
+  background: var(--accent-lavender-subtle);
+  color: var(--accent-lavender-light);
+  box-shadow: inset 0 0 0 1px var(--accent-lavender-border);
+  font-weight: 700;
+}
+
+.clickable-chip {
+  transition: transform 0.12s ease, border-color 0.12s ease, background 0.12s ease;
+}
+
+.clickable-chip:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent-lavender) !important;
+  background: rgba(129, 140, 248, 0.18) !important;
+}
+
+/* TUM '28 Band 1: "Where I Am vs. Where I Should Be" Executive Hero */
+.tum-hero-grid {
+  display: grid;
+  grid-template-columns: 1.15fr 1fr;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+@media (max-width: 1024px) {
+  .tum-hero-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.tum-hero-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  transition: border-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tum-hero-card:hover {
+  border-color: var(--border-subtle);
+}
+
+.tum-hero-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.tum-hero-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 3px;
+}
+
+.tum-hero-title {
+  font-size: 16px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.tum-pace-pill {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface-elevated);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.tum-pace-pill.optimal {
+  background: var(--color-green-subtle);
+  border-color: var(--color-green-border);
+  color: var(--color-green-light);
+}
+
+.tum-pace-pill.amber {
+  background: var(--color-amber-subtle);
+  border-color: var(--color-amber-border);
+  color: var(--color-amber-light);
+}
+
+.tum-pace-pill.lavender {
+  background: var(--accent-lavender-subtle);
+  border-color: var(--accent-lavender-border);
+  color: var(--accent-lavender-light);
+}
+
+.tum-hero-pace-body {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.tum-radial-wrap {
+  position: relative;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.tum-radial-arc {
+  transition: stroke-dashoffset 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tum-radial-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.tum-radial-pct {
+  font-family: var(--font-mono);
+  font-size: 16px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.tum-radial-sub {
+  font-family: var(--font-mono);
+  font-size: 7.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  margin-top: 3px;
+}
+
+.tum-hero-bars {
+  flex: 1;
+  min-width: 0;
+}
+
+.tum-pace-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.tum-pace-row strong {
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.tum-mini-bar-track {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.tum-mini-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tum-hero-delta-line {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.tum-hero-delta-line.is-behind {
+  color: var(--color-amber-light);
+}
+
+.tum-hero-streams-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+  gap: 8px 14px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-hairline);
+}
+
+.tum-hero-stream-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tum-hero-stream-label {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  min-width: 72px;
+  text-transform: capitalize;
+}
+
+.tum-stream-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.tum-hero-stream-val {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.tum-hero-stream-val .unit {
+  color: var(--text-tertiary);
+  font-weight: 500;
+  font-size: 9px;
+}
+
+/* Admissions KPI & Threshold Gauge */
+.tum-adm-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.tum-adm-kpi {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.tum-adm-kpi .kpi-lbl {
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  color: var(--text-tertiary);
+}
+
+.tum-adm-kpi .kpi-num {
+  font-family: var(--font-mono);
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+  line-height: 1.15;
+}
+
+.tum-adm-kpi .kpi-num small {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.tum-adm-kpi .kpi-num.accent {
+  color: var(--accent-lavender-light);
+}
+
+.tum-adm-kpi .kpi-num.green {
+  color: var(--color-green-light);
+}
+
+.tum-adm-kpi .kpi-sub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-secondary);
+}
+
+.tum-threshold-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.tum-threshold-track {
+  position: relative;
+  height: 7px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: visible;
+}
+
+.tum-threshold-track.lg {
+  height: 8px;
+}
+
+.tum-threshold-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(129, 140, 248, 0.55), var(--accent-lavender));
+  transition: width 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.tum-threshold-fill.is-direct {
+  background: linear-gradient(90deg, rgba(74, 222, 128, 0.6), var(--color-green));
+}
+
+.tum-threshold-pin {
+  position: absolute;
+  top: -3px;
+  bottom: -3px;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.45);
+  border-radius: 1px;
+}
+
+.tum-threshold-pin.target {
+  background: var(--accent-lavender-light);
+  box-shadow: 0 0 8px rgba(129, 140, 248, 0.7);
+}
+
+.tum-threshold-scale {
+  position: relative;
+  height: 14px;
+  font-family: var(--font-mono);
+  font-size: 8.5px;
+  color: var(--text-tertiary);
+  display: flex;
+  justify-content: space-between;
+}
+
+.tum-threshold-scale span[style*="left"] {
+  position: absolute;
+  transform: translateX(-50%);
+}
+
+.tum-hero-adm-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-hairline);
+}
+
+.tum-hero-adm-note {
+  font-size: 11px;
+  color: var(--text-secondary);
+  line-height: 1.35;
+}
+
+.tum-ledger-cta {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  padding: 5px 10px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* Metro SVG Stroke-Draw Animations */
+@keyframes metroDraw {
+  from {
+    stroke-dashoffset: var(--rail-len, 600);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+.metro-rail-draw {
+  animation: metroDraw 0.9s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+.metro-spine-progress {
+  animation: metroSpineDraw 1s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@keyframes metroSpineDraw {
+  from {
+    stroke-dashoffset: var(--spine-len, 600);
+  }
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+/* Inline Station Inspector Panel (Zero Drawer Overlap) */
+.station-inspector-panel {
+  border-bottom: 1px solid var(--border-hairline);
+  background: var(--bg-surface);
+  padding: 16px 18px;
+  animation: inspectorReveal 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes inspectorReveal {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.inspector-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.inspector-eyebrow {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--accent-lavender);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 3px;
+}
+
+.inspector-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.inspector-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.inspector-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.inspector-meta-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 960px) {
+  .inspector-meta-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.inspector-meta-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: 10px 12px;
+}
+
+.inspector-meta-text {
+  font-size: 11.5px;
+  color: var(--text-primary);
+  line-height: 1.45;
+}
+
+.inspector-clock-compare {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.inspector-clock-compare strong {
+  color: var(--text-primary);
+}
+
+.inspector-delivs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.inspector-deliv-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: 11px 12px;
+  transition: border-color 0.15s ease;
+}
+
+.inspector-deliv-card:hover {
+  border-color: var(--border-subtle);
+}
+
+.inspector-deliv-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.inspector-pace-line {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-tertiary);
+}
+
+.inspector-pace-line.is-behind {
+  color: var(--color-amber-light);
+}
+
+.inspector-rule-footer {
+  margin-top: 12px;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-tertiary);
+  padding: 7px 10px;
+  border: 1px solid var(--border-hairline);
+  background: var(--bg-card);
+  border-radius: var(--radius-sm);
+}
+
+/* Band 3 Phase Filters & Selected Card Highlight */
+.metro-phase-filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-canvas);
+  border: 1px solid var(--border-hairline);
+  border-radius: 6px;
+  padding: 2px;
+}
+
+.metro-phase-btn {
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  font-weight: 600;
+  padding: 3px 9px;
+  cursor: pointer;
+  transition: all 0.14s ease;
+}
+
+.metro-phase-btn:hover {
+  color: var(--text-primary);
+}
+
+.metro-phase-btn.active {
+  background: var(--accent-lavender-subtle);
+  color: var(--accent-lavender-light);
+  font-weight: 700;
+}
+
+.metro-grid-card.selected-card {
+  border-color: var(--accent-lavender) !important;
+  box-shadow: 0 0 0 1px rgba(129, 140, 248, 0.35);
+}
+
+/* Mobile TUM Executive HUD Styles */
+.mobile-hud-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.mobile-hud-nav-btn {
+  padding: 5px 10px;
+  font-size: 11px;
+  font-family: var(--font-mono);
+}
+
+.mobile-hud-nav-btn:disabled {
+  opacity: 0.3;
+}
+
+.mobile-hud-select {
+  flex: 1;
+  min-width: 0;
+  padding: 6px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  font-family: var(--font-mono);
+  text-align: center;
+  border-radius: 6px;
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  border: 1px solid var(--border-subtle);
+}
+
+.mobile-hud-hero-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.mobile-hud-hero-meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.mobile-hud-badges {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+.mobile-hud-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 4px 0;
+  letter-spacing: -0.015em;
+}
+
+.mobile-hud-delta-tag {
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  color: var(--text-secondary);
+}
+
+.mobile-hud-delta-tag.is-behind {
+  color: var(--color-amber-light);
+}
+
+.mobile-hud-pace-box {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: 10px 11px;
+  margin-bottom: 10px;
+}
+
+.mobile-hud-objective {
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-hairline);
+  border-radius: var(--radius-sm);
+  padding: 9px 11px;
+  font-size: 11.5px;
+  color: var(--text-primary);
+  line-height: 1.45;
+  margin-bottom: 12px;
+}
+
+.mobile-hud-deliv-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.mobile-hud-stream {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.mobile-hud-count {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mobile-hud-desc {
+  font-size: 11.5px;
+  color: var(--text-secondary);
+  line-height: 1.4;
+  margin-bottom: 6px;
+}
+
+.mobile-hud-pace {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-tertiary);
+  margin-top: 4px;
+}
+
+.mobile-hud-pace.is-behind {
+  color: var(--color-amber-light);
+}
+
+.mobile-hud-admissions {
+  border-top: 1px solid var(--border-hairline);
+  padding-top: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.mobile-hud-adm-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobile-hud-adm-score {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.mobile-hud-adm-score .adm-sep {
+  color: var(--text-tertiary);
+  margin: 0 4px;
+}
+
+.mobile-hud-adm-score .adm-pts {
+  color: var(--accent-lavender-light);
+}
+
+.mobile-hud-adm-sub {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-tertiary);
+}
+
+@media (max-width: 768px) {
+  .day-mode-segmented {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .day-mode-btn {
+    flex: 1;
+    text-align: center;
+    padding: 5px 4px;
+  }
+
+  .header-settings-popover {
+    right: -4px;
+    min-width: 210px;
+  }
+}
+
 
 
 

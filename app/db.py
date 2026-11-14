@@ -432,6 +432,13 @@ def init_db(db_path: Optional[Path] = None) -> None:
     except Exception as e:
         print(f"Warning: diary tables init notice: {e}")
 
+    # 10. Google Calendar Bidirectional Sync & Conflict Map
+    try:
+        from app.services.gcalendar_service import ensure_gcal_tables
+        ensure_gcal_tables(conn)
+    except Exception as e:
+        print(f"Warning: gcalendar tables init notice: {e}")
+
     conn.commit()
     conn.close()
 

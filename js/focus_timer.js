@@ -34,12 +34,18 @@ const FocusTimer = {
     timerPill.className = "mono-chip lavender";
     timerPill.style.cursor = "pointer";
     timerPill.style.padding = "4px 8px";
+    timerPill.style.display = "none";
     timerPill.title = "Focus Deep Work Timer (Click to open controls, Space to start/pause)";
     timerPill.innerHTML = `
       <span id="focusTimeDisplay" style="font-family: var(--font-mono); font-weight: 700; color: var(--accent-lavender);">60:00</span>
       <span id="focusPresetLabel" style="font-size: 8px; color: var(--text-tertiary); text-transform: uppercase;">Math R</span>
     `;
     headerRight.insertBefore(timerPill, headerRight.firstChild);
+
+    this.openSetup = () => {
+      const m = document.getElementById("focusTimerModal");
+      if (m) m.style.display = "flex";
+    };
 
 
     timerPill.addEventListener("click", () => this.toggleDrawer());
@@ -209,6 +215,12 @@ const FocusTimer = {
     const secs = this.remainingSeconds % 60;
     const formatted = `${String(mins).padStart(2, "0")}:${String(secs).padStart(2, "0")}`;
 
+    const pillEl = document.getElementById("focusTimerPill");
+    if (pillEl) {
+      const activeOrPausedMidSprint = this.isRunning || this.remainingSeconds < this.durationSeconds;
+      pillEl.style.display = activeOrPausedMidSprint ? "inline-flex" : "none";
+    }
+
     const pillDisplay = document.getElementById("focusTimeDisplay");
     const modalDisplay = document.getElementById("focusModalBigTime");
     const presetLabel = document.getElementById("focusPresetLabel");
@@ -226,6 +238,7 @@ const FocusTimer = {
       btn.textContent = this.isRunning ? "Pause Focus" : "Start Focus";
       btn.style.borderColor = this.isRunning ? "var(--text-primary)" : "var(--accent-purple)";
     }
+    this.updateDisplay();
   },
 
   playTone() {

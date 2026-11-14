@@ -383,7 +383,7 @@ def get_upcoming_days(
         day_name = target_dt.strftime("%A")
 
         # Resolve pre-calibrated schedule
-        sched = today_service.get_schedule_for_date(date_str)
+        sched = today_service.get_schedule_for_date(date_str, conn=conn)
         sched_name = sched.get("name", f"{day_name} Routine")
         sched_key = sched.get("key", "").replace("C_", "")
         sched_desc = sched.get("description", "")
@@ -447,6 +447,8 @@ def get_upcoming_days(
             "task_count": len(scheduled_tasks),
             "tasks": scheduled_tasks,
             "kill_list_items": kl_items,
+            "calendar_events": sched.get("calendar_events", []),
+            "calendar_optimization": sched.get("calendar_optimization", {"conflicts_detected": 0, "blocks_optimized": 0, "notes": []}),
         })
 
     if close_conn:
@@ -476,7 +478,7 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None, client_date
 
     # Today's execution metrics
     today_tasks = today_service.get_today_tasks(today_str, conn=conn)
-    today_sched = today_service.get_schedule_for_date(today_str)
+    today_sched = today_service.get_schedule_for_date(today_str, conn=conn)
     today_log = today_service.get_daily_log(today_str, conn=conn)
     today_gym = today_service.get_gym_routine_for_date(today_str)
     kl_info = kill_list_controller.get_kill_list(today_str, conn=conn)

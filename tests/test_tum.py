@@ -125,3 +125,24 @@ def test_metro_roadmap():
     finally:
         with open(orig_file, "w", encoding="utf-8") as f:
             f.write(orig_content)
+
+
+def test_metro_roadmap_sqlite_deliverable_overlay(test_db):
+    """Verify get_metro_roadmap overlays live SQLite deliverable progress without auto-seeding unvisited stations."""
+    cursor = test_db.cursor()
+    cursor.execute(
+        """
+        INSERT INTO station_deliverable_progress
+        (station_id, stream, title, total_required, completed_count, unit_label, is_completed)
+        VALUES ('nov-2026', 'Physical', 'Consistency streak', 30, 7, 'days', 0)
+        """
+    )
+    test_db.commit()
+
+    roadmap = tum_service.get_metro_roadmap(conn=test_db)
+    nov_station = next(s for s in roadmap["stations"] if s["id"] == "nov-2026")
+    phys_counts = nov_station.get("deliverable_counts", {}).get("Physical")
+    assert phys_counts is not None
+    assert phys_counts["count"] == 7
+    assert phys_counts["total"] == 30
+

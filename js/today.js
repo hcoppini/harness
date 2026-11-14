@@ -365,6 +365,78 @@ const Today = {
     }
   },
 
+  getActiveBlockDeliverable(block, idx) {
+    if (!block) return null;
+    if (block.is_tum_roadmap && Array.isArray(block.candidate_deliverables) && block.candidate_deliverables.length > 0) {
+      try {
+        const savedId = localStorage.getItem(`harness_dw_stream_${this.selectedDateStr}_${idx}`);
+        if (savedId) {
+          const found = block.candidate_deliverables.find((c) => c.deliverable_id === savedId);
+          if (found) return found;
+        }
+      } catch (_) {}
+    }
+    return block.deliverable || null;
+  },
+
+  cycleDeepWorkStream(idx) {
+    const block = this.schedule && this.schedule.blocks && this.schedule.blocks[idx];
+    if (!block || !Array.isArray(block.candidate_deliverables) || block.candidate_deliverables.length < 2) return;
+    const current = this.getActiveBlockDeliverable(block, idx);
+    const curIdx = current ? block.candidate_deliverables.findIndex((c) => c.deliverable_id === current.deliverable_id) : 0;
+    const next = block.candidate_deliverables[(curIdx + 1) % block.candidate_deliverables.length];
+    if (!next) return;
+    try {
+      localStorage.setItem(`harness_dw_stream_${this.selectedDateStr}_${idx}`, next.deliverable_id);
+    } catch (_) {}
+    this.renderSchedule();
+    if (window.HarnessApp && window.HarnessApp.showToast) {
+      window.HarnessApp.showToast(`Deep Work feeds ${next.category || next.stream || "TUM"}`);
+    }
+  },
+
+  async setDayMode(mode) {
+    if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.set_operating_mode) return;
+    try {
+      await window.pywebview.api.set_operating_mode(mode);
+      const label = mode === "SURGE_RECOVERY" ? "Low Energy" : mode === "FIELD" ? "Travel" : "Standard";
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast(`Day Mode -> ${label}`);
+      }
+      await this.load(this.selectedDateStr);
+      if (window.Dashboard && typeof window.Dashboard.load === "function") {
+        window.Dashboard.load();
+      }
+    } catch (err) {
+      console.error("Failed to switch day mode:", err);
+    }
+  },
+
+  renderDayModeSwitch() {
+    const host = document.getElementById("dayModeSwitchContainer");
+    if (!host) return;
+    const opMode = (this.schedule && this.schedule.workload && this.schedule.workload.operating_mode)
+      || localStorage.getItem("harness_operating_mode")
+      || "FORTRESS";
+    const modes = [
+      { key: "FORTRESS", label: "Standard" },
+      { key: "SURGE_RECOVERY", label: "Low Energy" },
+      { key: "FIELD", label: "Travel" },
+    ];
+    host.innerHTML = `
+      <div class="day-mode-segmented" role="group" aria-label="Reality Day Mode">
+        ${modes.map((m) => `
+          <button
+            type="button"
+            class="day-mode-btn ${opMode === m.key ? "active" : ""}"
+            onclick="Today.setDayMode('${m.key}')"
+            title="Switch daily protocol to ${m.label}"
+          >${m.label}</button>
+        `).join("")}
+      </div>
+    `;
+  },
+
   renderSchedule() {
     const badgeEl = document.getElementById("scheduleBadge");
     const dayNameEl = document.getElementById("scheduleDayName");
@@ -372,38 +444,44 @@ const Today = {
     const blocksContainer = document.getElementById("routineBlocksContainer");
     const wlBadge = document.getElementById("workloadBadge");
     const inlineKillCard = document.getElementById("todayInlineKillListCard");
-    const inlineKillTitle = document.getElementById("todayInlineKillListTitle");
 
     if (!this.schedule || !blocksContainer) return;
 
     if (badgeEl) badgeEl.textContent = this.schedule.key ? `SCHEDULE ${this.schedule.key.replace("C_", "")}` : "DAILY";
     if (dayNameEl) dayNameEl.textContent = `${this.schedule.weekday || ""} • ${this.schedule.name || ""}`;
     if (descEl) descEl.textContent = this.schedule.description || "";
+    this.renderDayModeSwitch();
 
     // Harness 3.0: Workload Governor Badge
     if (wlBadge) {
       const wl = this.schedule.workload;
       if (wl && wl.mode) {
         wlBadge.style.display = "inline-block";
-        wlBadge.textContent = wl.mode;
-        if (wl.mode === "SURGE") {
-          wlBadge.className = "mono-chip";
-          wlBadge.style.background = "rgba(239, 68, 68, 0.15)";
-          wlBadge.style.color = "#f87171";
-          wlBadge.style.border = "1px solid rgba(239, 68, 68, 0.35)";
-          wlBadge.title = `Surge Protocol: Academic load ${wl.academic_load_score}/100. High test density defense. Commute cutoff 16:30.`;
+        wlBadge.textContent = wl.mode === "SURGE_RECOVERY" ? "LOW ENERGY" : wl.mode;
+        if (wl.mode === "SURGE" || wl.mode === "DEFENSE") {
+          wlBadge.className = "mono-chip rose";
+          wlBadge.style.background = "";
+          wlBadge.style.color = "";
+          wlBadge.style.border = "";
+          wlBadge.title = `${wl.mode} Protocol: Test within 3 days (${wl.academic_load_score}/100).`;
         } else if (wl.mode === "BALANCED") {
           wlBadge.className = "mono-chip lavender";
           wlBadge.style.background = "";
           wlBadge.style.color = "";
           wlBadge.style.border = "";
-          wlBadge.title = `Balanced Mode: Academic load ${wl.academic_load_score}/100. Dual-track TUM Metro & school prep.`;
+          wlBadge.title = `Clean 3-day Horizon (Balanced): Advances TUM '28 + light exam prep.`;
+        } else if (wl.mode === "TRAVEL" || wl.mode === "SURGE_RECOVERY") {
+          wlBadge.className = "mono-chip";
+          wlBadge.style.background = "rgba(59, 130, 246, 0.14)";
+          wlBadge.style.color = "#93c5fd";
+          wlBadge.style.border = "1px solid rgba(59, 130, 246, 0.35)";
+          wlBadge.title = wl.mode_label || wl.mode;
         } else {
           wlBadge.className = "mono-chip green";
           wlBadge.style.background = "";
           wlBadge.style.color = "";
           wlBadge.style.border = "";
-          wlBadge.title = `Cruise Mode: Academic load ${wl.academic_load_score}/100. 100% TUM Metro priority focus.`;
+          wlBadge.title = `Cruise Mode: Clean horizon. 100% Deep Work & Training advance TUM '28.`;
         }
       } else {
         wlBadge.style.display = "none";
@@ -411,24 +489,44 @@ const Today = {
     }
 
     const blocks = this.schedule.blocks || [];
-    const isSunday = this.schedule.key === "G_REST" || (this.schedule.weekday || "").toLowerCase().includes("sun");
+    const calEvents = this.schedule.calendar_events || [];
+    const calOpt = this.schedule.calendar_optimization || {};
     const isUsTravel = Boolean(this.schedule.workload && this.schedule.workload.is_us_travel_mode);
 
-    // Harness 3.0: Standalone Kill List retired from primary view.
-    // TUM Roadmap deliverables and academic defense are directly embedded into deep work blocks.
     if (inlineKillCard) {
       inlineKillCard.style.display = "none";
     }
 
+    const gcalBannerHtml = (calEvents.length > 0 || (calOpt.blocks_optimized || 0) > 0)
+      ? `
+        <div class="gcal-context-banner" style="background: rgba(16, 185, 129, 0.06); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: var(--radius-sm); padding: 9px 12px; margin-bottom: 12px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: ${calEvents.length > 0 ? "6px" : "0"};">
+            <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #34d399; letter-spacing: 0.05em;">
+              GOOGLE CALENDAR SYNC &bull; ${calEvents.length} EXTERNAL EVENT${calEvents.length === 1 ? "" : "S"}
+            </span>
+            ${(calOpt.blocks_optimized || 0) > 0
+              ? `<span class="mono-chip" style="font-size: 9px; background: rgba(16, 185, 129, 0.16); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.35);">Auto-Optimized ${calOpt.blocks_optimized} Block${calOpt.blocks_optimized === 1 ? "" : "s"}</span>`
+              : ""}
+          </div>
+          ${calEvents.length > 0 ? `
+            <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+              ${calEvents.map((ev) => `
+                <span style="font-family: var(--font-mono); font-size: 10px; padding: 2px 8px; border-radius: 4px; background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); color: var(--text-primary);">
+                  <strong style="color: #34d399;">${ev.is_all_day ? "All Day" : `${this.escapeHtml(ev.start_time || "")}-${this.escapeHtml(ev.end_time || "")}`}</strong> ${this.escapeHtml(ev.summary || "")}
+                </span>
+              `).join("")}
+            </div>
+          ` : ""}
+        </div>
+      `
+      : "";
+
     const travelBannerHtml = isUsTravel
       ? `
         <div class="travel-protocol-banner" style="background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: var(--radius-sm); padding: 10px 14px; margin-bottom: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <span style="font-size: 18px;">✈️</span>
-            <div>
-              <div style="font-size: 11px; font-weight: 700; color: #60a5fa; letter-spacing: 0.05em; font-family: var(--font-mono);">TRAVEL MODE ACTIVE (OCT 4–18)</div>
-              <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Warsaw school schedule suspended. 60m minimal maintenance study hour to keep pace with zero guilt. Enjoy the trip.</div>
-            </div>
+          <div>
+            <div style="font-size: 11px; font-weight: 700; color: #60a5fa; letter-spacing: 0.05em; font-family: var(--font-mono);">FIELD / TRAVEL PROTOCOL ACTIVE</div>
+            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">Warsaw school schedule paused. 60m minimal maintenance study hour keeps momentum intact.</div>
           </div>
           <span class="mono-chip" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.4); font-size: 10px;">Travel Mode</span>
         </div>
@@ -444,31 +542,54 @@ const Today = {
             (block.focus.includes("Deep Work") ||
               block.focus.includes("SGH Library") ||
               block.focus.includes("Weekend Deep Work") ||
-              block.focus.includes("Weekend Focus") ||
               block.focus.includes("US Hotel Deep Work")));
+        const isTraining = block.type === "training";
         const isChecked = this.completedBlocks.has(String(idx));
-        const deliv = block.deliverable;
+        const deliv = this.getActiveBlockDeliverable(block, idx);
+        const physDeliv = block.physical_deliverable || null;
 
         let badgesHtml = "";
         if (block.is_school_dedicated) {
-          badgesHtml += `<span class="mono-chip rose" style="font-size: 9px; padding: 1px 6px; margin-left: 6px;">Acute Defense</span>`;
+          badgesHtml += `<span class="mono-chip rose" style="font-size: 9px; padding: 1px 6px; margin-left: 6px;">Defense &le;3d</span>`;
         } else if (deliv) {
           const comp = deliv.completed_count || 0;
           const tot = deliv.total_required || deliv.quantity || 1;
           const unit = deliv.unit_label || "reps";
-          badgesHtml += `<span class="mono-chip lavender" style="font-size: 9px; padding: 1px 6px; margin-left: 6px;" title="${this.escapeHtml(deliv.category || "TUM Roadmap")}">${comp}/${tot} ${this.escapeHtml(unit)}</span>`;
+          const canCycle = Array.isArray(block.candidate_deliverables) && block.candidate_deliverables.length > 1;
+          const streamName = deliv.category || deliv.stream || "TUM";
+          badgesHtml += `
+            <span
+              class="mono-chip lavender ${canCycle ? "clickable-chip" : ""}"
+              style="font-size: 9px; padding: 1px 6px; margin-left: 6px; ${canCycle ? "cursor: pointer;" : ""}"
+              ${canCycle ? `onclick="event.stopPropagation(); Today.cycleDeepWorkStream(${idx});"` : ""}
+              title="${canCycle ? `Click to switch TUM stream (${this.escapeHtml(streamName)})` : this.escapeHtml(streamName)}"
+            >TUM &bull; ${this.escapeHtml(streamName)}: ${comp}/${tot} ${this.escapeHtml(unit)}${canCycle ? " &#8635;" : ""}</span>
+          `;
+        } else if (isTraining && physDeliv) {
+          const pComp = physDeliv.completed_count || 0;
+          const pTot = physDeliv.total_required || 30;
+          badgesHtml += `<span class="mono-chip green" style="font-size: 9px; padding: 1px 6px; margin-left: 6px;" title="Checking off credits TUM '28 Physical">${pComp}/${pTot} ${this.escapeHtml(physDeliv.unit_label || "days")} &bull; Phys</span>`;
+        }
+        if (block.gcal_optimized) {
+          badgesHtml += `<span class="mono-chip" style="font-size: 9px; padding: 1px 6px; margin-left: 6px; background: rgba(16, 185, 129, 0.14); color: #34d399; border: 1px solid rgba(52, 211, 153, 0.35);" title="${this.escapeHtml(block.gcal_adjustment_reason || "Optimized around Google Calendar")}">GCal OPT &bull; was ${this.escapeHtml(block.original_time || "")}</span>`;
+        } else if (block.gcal_user_override) {
+          badgesHtml += `<span class="mono-chip lavender" style="font-size: 9px; padding: 1px 6px; margin-left: 6px;" title="Time customized in Google Calendar">GCal Override</span>`;
+        } else if (block.gcal_user_deleted) {
+          badgesHtml += `<span class="mono-chip rose" style="font-size: 9px; padding: 1px 6px; margin-left: 6px;">Deleted in GCal</span>`;
         }
 
-        const cutoffText = block.commute_cutoff ? ` • Cutoff ${block.commute_cutoff}` : " • Cutoff 16:30";
+        const cutoffText = block.commute_cutoff ? ` &bull; Cutoff ${block.commute_cutoff}` : " &bull; Cutoff 16:30";
         let compactActivity = this.escapeHtml(block.activity);
         if (isDeepWork) {
           if (block.is_school_dedicated) {
             compactActivity = `${this.escapeHtml(block.activity)}${cutoffText}`;
           } else if (deliv) {
-            compactActivity = `TUM Roadmap • ${this.escapeHtml(deliv.target_spec || deliv.title || block.activity)}${cutoffText}`;
+            compactActivity = `Advances TUM '28 (${this.escapeHtml(deliv.category || "Stream")}) &bull; ${this.escapeHtml(deliv.target_spec || deliv.title || block.activity)}${cutoffText}`;
           } else {
             compactActivity = `${this.escapeHtml(block.activity)}${cutoffText}`;
           }
+        } else if (isTraining && physDeliv) {
+          compactActivity = `${this.escapeHtml(block.activity)} &bull; Checking off logs +1 Physical day`;
         }
 
         let actionsHtml = "";
@@ -476,12 +597,12 @@ const Today = {
           actionsHtml = `
             <div style="display: flex; align-items: center; gap: 6px; flex-shrink: 0;">
               ${deliv && deliv.target_path ? `
-                <button class="btn-subtle" onclick="event.stopPropagation(); Today.launchResource('${deliv.action_type || 'url'}', '${this.escapeJs(deliv.target_path)}');" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer; white-space: nowrap;" title="Open Resource (${deliv.target_path})">Open ↗</button>
+                <button class="btn-subtle" onclick="event.stopPropagation(); Today.launchResource('${deliv.action_type || 'url'}', '${this.escapeJs(deliv.target_path)}');" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer; white-space: nowrap;" title="Open Resource (${deliv.target_path})">Open &nearr;</button>
               ` : ""}
               ${deliv && deliv.deliverable_id ? `
                 <button class="btn-subtle" onclick="event.stopPropagation(); Today.advanceDeliverable('${this.escapeJs(deliv.deliverable_id)}', 1);" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer; white-space: nowrap;" title="Log +1 completed rep">+1 Done</button>
               ` : ""}
-              <button class="btn-subtle" onclick="event.stopPropagation(); Today.openDeepWorkPlanModal(${idx});" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer; white-space: nowrap;" title="Open Hour-by-Hour Session Plan & Wind-Down Protocol">Open Plan →</button>
+              <button class="btn-subtle" onclick="event.stopPropagation(); Today.openDeepWorkPlanModal(${idx});" style="font-family: var(--font-mono); font-size: 10px; padding: 3px 8px; border: 1px solid var(--border-medium); border-radius: var(--radius-sm); background: var(--bg-card); color: var(--text-primary); cursor: pointer; white-space: nowrap;" title="Open Hour-by-Hour Session Plan & Wind-Down Protocol">Plan &rarr;</button>
             </div>
           `;
         }
@@ -491,7 +612,7 @@ const Today = {
             class="routine-block ${isDeepWork ? "deep-work clickable" : ""} ${isChecked ? "completed" : ""}"
             ${isDeepWork ? `onclick="Today.openDeepWorkPlanModal(${idx});"` : ""}
             ${isDeepWork ? 'title="Click to view divided execution plan & wind-down protocol"' : ""}
-            style="display: flex; align-items: center; gap: 10px; ${isDeepWork ? "cursor: pointer; border-left: 3px solid var(--accent-lavender);" : ""} ${isChecked ? "opacity: 0.65;" : ""}"
+            style="display: flex; align-items: center; gap: 10px; ${isDeepWork ? "cursor: pointer; border-left: 3px solid var(--accent-lavender);" : isTraining ? "border-left: 3px solid var(--color-green);" : ""} ${isChecked ? "opacity: 0.62;" : ""}"
           >
             <div 
               class="check-dot ${isChecked ? "checked" : ""}" 
@@ -501,7 +622,7 @@ const Today = {
             ></div>
             <div class="routine-time" style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: ${isDeepWork ? "var(--accent-lavender)" : "var(--text-secondary)"}; width: 85px; flex-shrink: 0; text-decoration: ${isChecked ? "line-through" : "none"};">${block.time}</div>
             <div class="routine-info" style="flex: 1; min-width: 0;">
-              <div class="routine-focus" style="font-size: 13px; font-weight: 600; color: ${isDeepWork ? "var(--text-primary)" : "var(--text-secondary)"}; text-decoration: ${isChecked ? "line-through" : "none"}; display: flex; align-items: center;">
+              <div class="routine-focus" style="font-size: 13px; font-weight: 600; color: ${isDeepWork ? "var(--text-primary)" : "var(--text-secondary)"}; text-decoration: ${isChecked ? "line-through" : "none"}; display: flex; align-items: center; flex-wrap: wrap;">
                 <span>${this.escapeHtml(block.focus)}</span>
                 ${badgesHtml}
               </div>
@@ -513,7 +634,10 @@ const Today = {
       })
       .join("");
 
-    blocksContainer.innerHTML = travelBannerHtml + blocksHtml;
+    blocksContainer.innerHTML = travelBannerHtml + gcalBannerHtml + blocksHtml;
+    if (typeof this.refreshGCalHeaderBadge === "function") {
+      this.refreshGCalHeaderBadge();
+    }
   },
 
   openDeepWorkPlanModal(idx) {
@@ -555,7 +679,7 @@ const Today = {
       if (timeEl) timeEl.textContent = `${block.time || "14:30 – 16:30"} • Commute Cutoff ${commuteCutoff}`;
     }
 
-    const deliv = block ? block.deliverable : null;
+    const deliv = block ? this.getActiveBlockDeliverable(block, idx) : null;
     const schoolDone = this.completedBlocks.has("study_school");
     const maturaDone = this.completedBlocks.has("study_matura");
     const codeDone = this.completedBlocks.has("study_code");
@@ -843,13 +967,49 @@ const Today = {
           null
         );
 
-        // Bi-directional link: checking off routine deep work directly advances TUM roadmap deliverable!
+        // Bi-directional link 1: checking off Clean Horizon TUM Deep Work advances selected TUM stream
         const block = (this.schedule && this.schedule.blocks && this.schedule.blocks[idx]);
-        if (block && block.deliverable && block.deliverable.deliverable_id && window.pywebview.api.update_deliverable_progress) {
-          const delta = isNowChecked ? (block.deliverable.quantity || 1) : -(block.deliverable.quantity || 1);
-          await window.pywebview.api.update_deliverable_progress(block.deliverable.deliverable_id, null, delta);
+        const activeDeliv = this.getActiveBlockDeliverable(block, idx);
+        if (block && block.is_tum_roadmap && activeDeliv && activeDeliv.deliverable_id && window.pywebview.api.update_deliverable_progress) {
+          const qty = activeDeliv.quantity || 1;
+          const delta = isNowChecked ? qty : -qty;
+          const res = await window.pywebview.api.update_deliverable_progress(activeDeliv.deliverable_id, null, delta);
+          if (res && typeof res.completed_count === "number") {
+            activeDeliv.completed_count = res.completed_count;
+            if (Array.isArray(block.candidate_deliverables)) {
+              const cand = block.candidate_deliverables.find((c) => c.deliverable_id === activeDeliv.deliverable_id);
+              if (cand) cand.completed_count = res.completed_count;
+            }
+          }
+          this.renderSchedule();
           if (window.MetroMap && typeof window.MetroMap.load === "function") {
             window.MetroMap.load();
+          }
+          if (window.HarnessApp && window.HarnessApp.showToast) {
+            window.HarnessApp.showToast(
+              isNowChecked ? `+${qty} ${activeDeliv.category || "TUM"} -> TUM '28` : `Reverted ${activeDeliv.category || "TUM"} progress`
+            );
+          }
+        }
+
+        // Bi-directional link 2: checking off any Training/Gym/Run block advances Physical stream (+1 day)
+        if (block && block.physical_deliverable && block.physical_deliverable.deliverable_id && window.pywebview.api.update_deliverable_progress) {
+          const physKey = `harness_phys_credited_${this.selectedDateStr}`;
+          const alreadyCredited = localStorage.getItem(physKey) === "1";
+          if ((isNowChecked && !alreadyCredited) || (!isNowChecked && alreadyCredited)) {
+            const pDelta = isNowChecked ? 1 : -1;
+            const res = await window.pywebview.api.update_deliverable_progress(block.physical_deliverable.deliverable_id, null, pDelta);
+            localStorage.setItem(physKey, isNowChecked ? "1" : "0");
+            if (res && typeof res.completed_count === "number") {
+              block.physical_deliverable.completed_count = res.completed_count;
+            }
+            this.renderSchedule();
+            if (window.MetroMap && typeof window.MetroMap.load === "function") {
+              window.MetroMap.load();
+            }
+            if (window.HarnessApp && window.HarnessApp.showToast) {
+              window.HarnessApp.showToast(isNowChecked ? "+1 Physical day -> TUM '28" : "Reverted Physical log");
+            }
           }
         }
       }
@@ -926,6 +1086,7 @@ const Today = {
     if (!this.gymRoutine) return;
     const exercises = this.gymRoutine.exercises || [];
     const allCompleted = exercises.length > 0 && exercises.every((_, idx) => this.completedExercises.has(String(idx)));
+    const isNowComplete = !allCompleted;
 
     if (allCompleted) {
       this.completedExercises.clear();
@@ -934,19 +1095,52 @@ const Today = {
     }
     this.renderGymCard();
 
+    // Sync corresponding routine training block + Physical deliverable once per day
+    const blocks = (this.schedule && this.schedule.blocks) || [];
+    const trainingIdx = blocks.findIndex((b) => b.type === "training");
+    if (trainingIdx !== -1) {
+      const key = String(trainingIdx);
+      if (isNowComplete) this.completedBlocks.add(key);
+      else this.completedBlocks.delete(key);
+      this.renderSchedule();
+    }
+
     const strVal = Array.from(this.completedExercises).join(",");
+    const blocksStr = Array.from(this.completedBlocks).join(",");
     try {
       if (window.pywebview && window.pywebview.api) {
         await window.pywebview.api.update_daily_log(
           this.selectedDateStr,
           null, null, null, null, null, null,
-          null,
+          trainingIdx !== -1 ? blocksStr : null,
           strVal
         );
+
+        const trainingBlock = trainingIdx !== -1 ? blocks[trainingIdx] : null;
+        const physDeliv = trainingBlock && trainingBlock.physical_deliverable;
+        if (physDeliv && physDeliv.deliverable_id && window.pywebview.api.update_deliverable_progress) {
+          const physKey = `harness_phys_credited_${this.selectedDateStr}`;
+          const alreadyCredited = localStorage.getItem(physKey) === "1";
+          if ((isNowComplete && !alreadyCredited) || (!isNowComplete && alreadyCredited)) {
+            const res = await window.pywebview.api.update_deliverable_progress(
+              physDeliv.deliverable_id,
+              null,
+              isNowComplete ? 1 : -1
+            );
+            localStorage.setItem(physKey, isNowComplete ? "1" : "0");
+            if (res && typeof res.completed_count === "number") {
+              physDeliv.completed_count = res.completed_count;
+            }
+            this.renderSchedule();
+            if (window.MetroMap && typeof window.MetroMap.load === "function") {
+              window.MetroMap.load();
+            }
+          }
+        }
       }
       if (window.Dashboard) window.Dashboard.load();
       if (window.HarnessApp && window.HarnessApp.showToast) {
-        window.HarnessApp.showToast(allCompleted ? "Workout reset" : "Workout marked completed");
+        window.HarnessApp.showToast(isNowComplete ? "Workout & +1 Physical logged -> TUM '28" : "Workout reset");
       }
     } catch (err) {
       console.error("Error toggling whole workout:", err);
@@ -1313,11 +1507,11 @@ const Today = {
 
   async loadEasyLinks() {
     const container = document.getElementById("easyLinksContainer");
-    if (!container) return;
 
     try {
       if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_easy_links) return;
       this.easyLinks = await window.pywebview.api.get_easy_links() || [];
+      if (!container) return;
 
       container.innerHTML = this.easyLinks
         .map((link, idx) => {
@@ -2360,6 +2554,325 @@ const Today = {
       alert(err.message || "Synthesis failed");
     } finally {
       if (btn) btn.textContent = "✨ Synthesize & Commit to Today";
+    }
+  },
+
+  // --------------------------------------------------------------------------
+  // Google Calendar Bidirectional Sync & Conflict Optimizer Controller
+  // --------------------------------------------------------------------------
+  _gcalOAuthState: "",
+  _gcalRedirectUri: "",
+
+  async refreshGCalHeaderBadge() {
+    const dot = document.getElementById("gcalSyncDot");
+    const textEl = document.getElementById("gcalSyncText");
+    if (!dot || !textEl) return;
+    try {
+      if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_gcalendar_status) return;
+      const st = await window.pywebview.api.get_gcalendar_status();
+      if (!st) return;
+      if (st.last_sync_status === "error") {
+        dot.style.background = "var(--color-rose)";
+        textEl.textContent = "GCal !";
+      } else if (st.connected) {
+        dot.style.background = "#10b981";
+        textEl.textContent = st.mode === "oauth" ? "GCal 2-Way" : "GCal iCal";
+      } else {
+        dot.style.background = "var(--text-tertiary)";
+        textEl.textContent = "GCal";
+      }
+    } catch (e) {}
+  },
+
+  async openGCalendarModal() {
+    const modal = document.getElementById("gcalendarModal");
+    if (!modal) return;
+    modal.classList.add("open");
+    await this.loadGCalendarModal();
+  },
+
+  closeGCalendarModal() {
+    const modal = document.getElementById("gcalendarModal");
+    if (modal) modal.classList.remove("open");
+  },
+
+  async loadGCalendarModal() {
+    try {
+      if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.get_gcalendar_status) return;
+      const st = await window.pywebview.api.get_gcalendar_status();
+      if (!st) return;
+
+      const chip = document.getElementById("gcalModalModeChip");
+      const emailEl = document.getElementById("gcalModalEmail");
+      const metaEl = document.getElementById("gcalModalMetaText");
+      const credEl = document.getElementById("gcalCredStateLabel");
+      const icsUrlEl = document.getElementById("gcalIcsSubscribeUrl");
+      const icalPrevEl = document.getElementById("gcalPrivateIcalPreview");
+
+      if (chip) {
+        chip.textContent = st.connected
+          ? (st.mode === "oauth" ? "OAuth 2-Way Connected" : "iCal Feed Active")
+          : "Not Connected";
+        chip.className = `mono-chip ${st.connected ? "green" : ""}`;
+      }
+      if (emailEl) {
+        emailEl.textContent = st.connected_email || (st.connected ? st.target_calendar_summary || "Google Calendar" : "No account linked");
+      }
+      if (metaEl) {
+        const lastAt = st.last_sync_at ? ` • Last sync: ${String(st.last_sync_at).slice(0, 16).replace("T", " ")}` : "";
+        const errTxt = st.last_error ? ` • Err: ${st.last_error}` : "";
+        metaEl.textContent = `Cached external: ${st.cached_events_count || 0} • Mapped pushed: ${st.mapped_events_count || 0} • Overrides: ${st.overrides_count || 0}${lastAt}${errTxt}`;
+      }
+      if (credEl) {
+        credEl.textContent = st.has_client_id ? `Client: ${st.client_id_masked || "configured"}` : "No Client JSON imported";
+      }
+      if (icsUrlEl) {
+        const origin = window.location && window.location.origin && window.location.origin.startsWith("http")
+          ? window.location.origin
+          : "http://127.0.0.1:5000";
+        const tokParam = st.ics_feed_token ? `?token=${encodeURIComponent(st.ics_feed_token)}` : "";
+        icsUrlEl.value = `${origin}/api/calendar.ics${tokParam}`;
+      }
+      if (icalPrevEl) {
+        const masked = st.private_ical_masked || [];
+        icalPrevEl.textContent = masked.length > 0
+          ? `Saved iCal feeds (${masked.length}): ${masked.join(", ")}`
+          : "No private Google iCal URLs saved yet.";
+      }
+
+      const setChk = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.checked = Boolean(val);
+      };
+      setChk("chkGcalSyncExams", st.sync_exams !== false);
+      setChk("chkGcalSyncHomework", st.sync_homework !== false);
+      setChk("chkGcalSyncPlan", st.sync_plan_blocks !== false);
+      setChk("chkGcalSyncSchool", st.sync_school_timetable !== false);
+      setChk("chkGcalIncludeSleep", Boolean(st.include_sleep_rest_blocks));
+      setChk("chkGcalImportTests", st.import_tagged_tests !== false);
+      setChk("chkGcalAutoOptimize", st.auto_optimize_schedule !== false);
+      setChk("chkGcalDedicatedCal", st.use_dedicated_calendar !== false);
+
+      const horEl = document.getElementById("gcalHorizonDays");
+      if (horEl) horEl.value = String(st.sync_horizon_days || 14);
+      this.refreshGCalHeaderBadge();
+    } catch (err) {
+      console.error("Failed loading GCal modal:", err);
+    }
+  },
+
+  async importGCalCredentials() {
+    const input = document.getElementById("gcalCredentialsJsonInput");
+    const raw = input ? input.value.trim() : "";
+    if (!raw) {
+      alert("Paste your Google Cloud OAuth credentials JSON first.");
+      return;
+    }
+    try {
+      const res = await window.pywebview.api.import_gcalendar_credentials(raw);
+      if (!res || !res.success) {
+        alert((res && res.error) || "Invalid OAuth credentials JSON.");
+        return;
+      }
+      if (input) input.value = "";
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast("Google OAuth Client credentials imported!");
+      }
+      await this.loadGCalendarModal();
+    } catch (err) {
+      alert(err.message || "Failed importing credentials");
+    }
+  },
+
+  async startGCalendarOAuth() {
+    try {
+      const st = await window.pywebview.api.get_gcalendar_status();
+      if (!st || !st.has_client_id) {
+        alert("Import Google Cloud OAuth Client JSON first.");
+        return;
+      }
+
+      const isLocalDesktop = window.pywebview && !window.location.hostname.includes("vercel.app");
+      if (isLocalDesktop && window.pywebview.api.start_gcalendar_oauth) {
+        const res = await window.pywebview.api.start_gcalendar_oauth();
+        if (!res || !res.started) {
+          alert((res && res.error) || "Could not start Google OAuth.");
+          return;
+        }
+        const manualBox = document.getElementById("gcalManualCodeBox");
+        if (manualBox) manualBox.style.display = "none";
+        if (window.HarnessApp && window.HarnessApp.showToast) {
+          window.HarnessApp.showToast("Opened Google login in your browser. Waiting for consent...");
+        }
+        // Poll up to 90s for callback completion
+        for (let i = 0; i < 45; i++) {
+          await new Promise((r) => setTimeout(r, 2000));
+          const cur = await window.pywebview.api.get_gcalendar_status();
+          if (cur && cur.oauth_connected) {
+            if (window.HarnessApp && window.HarnessApp.showToast) {
+              window.HarnessApp.showToast(`Connected Google Calendar: ${cur.connected_email || "Ready"}`);
+            }
+            await this.loadGCalendarModal();
+            return;
+          }
+          if (cur && cur.oauth_flow && cur.oauth_flow.status === "error") {
+            alert(cur.oauth_flow.error || "Google authorization failed.");
+            return;
+          }
+        }
+      } else {
+        const redirectUri = `${window.location.origin}/api/gcalendar/oauth/callback`;
+        const urlRes = await window.pywebview.api.get_gcalendar_oauth_url(redirectUri);
+        if (urlRes && urlRes.auth_url) {
+          this._gcalOAuthState = urlRes.state || "";
+          this._gcalRedirectUri = redirectUri;
+          const manualBox = document.getElementById("gcalManualCodeBox");
+          if (manualBox) manualBox.style.display = "block";
+          window.open(urlRes.auth_url, "_blank", "noopener");
+        }
+      }
+    } catch (err) {
+      alert(err.message || "OAuth initialization failed");
+    }
+  },
+
+  async submitManualGCalCode() {
+    const input = document.getElementById("gcalManualCodeInput");
+    const code = input ? input.value.trim() : "";
+    if (!code) return;
+    try {
+      await window.pywebview.api.complete_gcalendar_oauth_web(
+        code,
+        this._gcalRedirectUri || `${window.location.origin}/api/gcalendar/oauth/callback`,
+        this._gcalOAuthState || ""
+      );
+      if (input) input.value = "";
+      const manualBox = document.getElementById("gcalManualCodeBox");
+      if (manualBox) manualBox.style.display = "none";
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast("Google Calendar OAuth connected!");
+      }
+      await this.loadGCalendarModal();
+    } catch (err) {
+      alert(err.message || "Code exchange failed");
+    }
+  },
+
+  async saveGCalendarSettings() {
+    const getChk = (id, dflt) => {
+      const el = document.getElementById(id);
+      return el ? Boolean(el.checked) : dflt;
+    };
+    const horEl = document.getElementById("gcalHorizonDays");
+    const icalInput = document.getElementById("gcalPrivateIcalInput");
+    const payload = {
+      sync_exams: getChk("chkGcalSyncExams", true),
+      sync_homework: getChk("chkGcalSyncHomework", true),
+      sync_plan_blocks: getChk("chkGcalSyncPlan", true),
+      sync_school_timetable: getChk("chkGcalSyncSchool", true),
+      include_sleep_rest_blocks: getChk("chkGcalIncludeSleep", false),
+      import_tagged_tests: getChk("chkGcalImportTests", true),
+      auto_optimize_schedule: getChk("chkGcalAutoOptimize", true),
+      use_dedicated_calendar: getChk("chkGcalDedicatedCal", true),
+      sync_horizon_days: horEl ? parseInt(horEl.value, 10) || 14 : 14,
+    };
+    if (icalInput && icalInput.value.trim()) {
+      payload.private_ical_urls = icalInput.value.trim();
+    }
+    try {
+      await window.pywebview.api.save_gcalendar_settings(payload);
+      if (icalInput) icalInput.value = "";
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast("Saved Google Calendar preferences");
+      }
+      await this.loadGCalendarModal();
+      await this.load(this.selectedDateStr);
+      if (window.Dashboard && window.Dashboard.load) window.Dashboard.load();
+    } catch (err) {
+      alert(err.message || "Failed saving Google Calendar settings");
+    }
+  },
+
+  async syncGCalendarNow() {
+    try {
+      if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.sync_gcalendar_now) return;
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast("Cross-syncing with Google Calendar...");
+      }
+      const res = await window.pywebview.api.sync_gcalendar_now(this.selectedDateStr, false);
+      if (res && res.status === "unconfigured") {
+        if (window.HarnessApp && window.HarnessApp.showToast) {
+          window.HarnessApp.showToast("Configure Google OAuth or Private iCal URL first");
+        }
+        await this.openGCalendarModal();
+        return;
+      }
+      if (res && res.status === "error") {
+        alert(res.error || "Google Calendar sync error");
+        return;
+      }
+      await this.load(this.selectedDateStr);
+      await this.loadHomeworkAndExams();
+      if (window.Dashboard && window.Dashboard.load) await window.Dashboard.load();
+      await this.loadGCalendarModal();
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        const msg = `GCal synced: ${res.pulled_events || 0} pulled, +${res.pushed_created || 0}/~${res.pushed_updated || 0} pushed, ${res.imported_tests || 0} tests imported`;
+        window.HarnessApp.showToast(msg);
+      }
+    } catch (err) {
+      alert(err.message || "Google Calendar sync failed");
+    }
+  },
+
+  async disconnectGCalendar() {
+    if (!confirm("Disconnect Google Calendar tokens?")) return;
+    try {
+      await window.pywebview.api.disconnect_gcalendar(false);
+      await this.loadGCalendarModal();
+      await this.load(this.selectedDateStr);
+      if (window.HarnessApp && window.HarnessApp.showToast) {
+        window.HarnessApp.showToast("Google Calendar disconnected");
+      }
+    } catch (err) {
+      alert(err.message || "Disconnect failed");
+    }
+  },
+
+  copyGCalendarIcsUrl() {
+    const el = document.getElementById("gcalIcsSubscribeUrl");
+    if (!el || !el.value) return;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(el.value).then(() => {
+        if (window.HarnessApp && window.HarnessApp.showToast) {
+          window.HarnessApp.showToast("Copied .ics calendar feed URL!");
+        }
+      });
+    } else {
+      el.select();
+      document.execCommand("copy");
+    }
+  },
+
+  async downloadGCalendarIcs() {
+    const el = document.getElementById("gcalIcsSubscribeUrl");
+    if (window.location && window.location.protocol && window.location.protocol.startsWith("http") && el && el.value) {
+      const sep = el.value.includes("?") ? "&" : "?";
+      window.open(`${el.value}${sep}download=1`, "_blank");
+      return;
+    }
+    try {
+      const icsText = await window.pywebview.api.export_gcalendar_ics(14, this.selectedDateStr);
+      const blob = new Blob([icsText], { type: "text/calendar;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "harness_executive_os.ics";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      alert(err.message || "ICS export failed");
     }
   },
   escapeHtml(str) {

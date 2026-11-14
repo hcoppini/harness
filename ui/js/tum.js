@@ -72,6 +72,15 @@ const Tum = {
       this.data = await window.pywebview.api.get_tum_overview();
       this.renderGradesTable();
       this.renderBavarianAssessment();
+      if (window.MetroMap) {
+        window.MetroMap.tumOverview = this.data;
+        if (typeof window.MetroMap.renderComparisonHero === "function") {
+          window.MetroMap.renderComparisonHero();
+        }
+        if (typeof window.MetroMap.renderMobileHud === "function") {
+          window.MetroMap.renderMobileHud();
+        }
+      }
     } catch (err) {
       console.error("Error loading TUM overview:", err);
     }
