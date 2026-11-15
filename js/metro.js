@@ -115,21 +115,117 @@ const MetroMap = {
     return "phase1";
   },
 
+  /** Compute overall '26-'28 calendar progress for badges and target summary card. */
+  calculateJourneyProgress(now = new Date()) {
+    const startDate = new Date(2026, 8, 1);
+    const endDate = new Date(2028, 6, 31);
+    const totalMs = endDate.getTime() - startDate.getTime();
+    const totalDays = Math.round(totalMs / (1000 * 60 * 60 * 24));
+    if (now < startDate) {
+      return { startDate, endDate, totalDays, elapsedDays: 31, progressRatio: 0.044 };
+    }
+    const elapsedMs = Math.min(totalMs, Math.max(0, now.getTime() - startDate.getTime()));
+    const progressRatio = elapsedMs / totalMs;
+    const elapsedDays = Math.min(totalDays, Math.round(elapsedMs / (1000 * 60 * 60 * 24)));
+    return { startDate, endDate, totalDays, elapsedDays, progressRatio };
+  },
+
+  /** Parse station date ("YYYY-MM-DD" or "YYYY-MM") into local midnight timestamp. */
+  parseStationAnchorTime(dateStr) {
+    if (!dateStr) return null;
+    const str = String(dateStr).trim();
+    const fullMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(str);
+    if (fullMatch) {
+      return new Date(Number(fullMatch[1]), Number(fullMatch[2]) - 1, Number(fullMatch[3]), 0, 0, 0).getTime();
+    }
+    const monthMatch = /^(\d{4})-(\d{2})$/.exec(str);
+    if (monthMatch) {
+      return new Date(Number(monthMatch[1]), Number(monthMatch[2]) - 1, 1, 0, 0, 0).getTime();
+    }
+    const parsed = new Date(str);
+    return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+  },
+
+  /** Map any calendar date onto visual track X via piecewise-linear station anchors. */
+  buildTrackDateMapper(stations, startX, spacing, terminusX, startDate, endDate) {
+    const endAnchorTime = new Date(
+      endDate.getFullYear(),
+      endDate.getMonth(),
+      endDate.getDate(),
+      23,
+      59,
+      59,
+      999
+    ).getTime();
+
+    const anchors = (stations || []).map((st, idx) => ({
+      x: startX + idx * spacing,
+      rawTime: this.parseStationAnchorTime(st?.date),
+      time: null,
+    }));
+
+    if (anchors.length > 0) {
+      anchors[0].time = anchors[0].rawTime !== null ? anchors[0].rawTime : startDate.getTime();
+      for (let i = 1; i < anchors.length; i++) {
+        const prevTime = anchors[i - 1].time;
+        const cand = anchors[i].rawTime;
+        if (cand !== null && cand > prevTime) {
+          anchors[i].time = cand;
+          continue;
+        }
+        // Consecutive stations sharing a start month (e.g. kickoff-2026 & sep-2026) spread evenly before the next distinct anchor.
+        let nextValidIdx = -1;
+        let nextValidTime = endAnchorTime;
+        for (let j = i + 1; j < anchors.length; j++) {
+          if (anchors[j].rawTime !== null && anchors[j].rawTime > prevTime) {
+            nextValidIdx = j;
+            nextValidTime = anchors[j].rawTime;
+            break;
+          }
+        }
+        const spanEndIdx = nextValidIdx !== -1 ? nextValidIdx : anchors.length;
+        const spanSteps = spanEndIdx - (i - 1);
+        const fillEnd = nextValidIdx !== -1 ? nextValidIdx - 1 : anchors.length - 1;
+        for (let k = i; k <= fillEnd; k++) {
+          anchors[k].time = prevTime + ((k - (i - 1)) / spanSteps) * (nextValidTime - prevTime);
+        }
+        i = fillEnd;
+      }
+
+      const lastStationTime = anchors[anchors.length - 1].time;
+      anchors.push({
+        x: terminusX,
+        rawTime: endAnchorTime,
+        time: Math.max(endAnchorTime, lastStationTime + 24 * 60 * 60 * 1000),
+      });
+    }
+
+    return (dateInput) => {
+      if (!anchors.length) return startX;
+      const t = dateInput instanceof Date ? dateInput.getTime() : new Date(dateInput).getTime();
+      if (Number.isNaN(t)) return startX;
+      if (t < anchors[0].time) return startX - 35;
+      if (t >= anchors[anchors.length - 1].time) return terminusX;
+      for (let i = 0; i < anchors.length - 1; i++) {
+        const a = anchors[i];
+        const b = anchors[i + 1];
+        if (t >= a.time && t <= b.time) {
+          const spanMs = b.time - a.time;
+          const frac = spanMs > 0 ? (t - a.time) / spanMs : 0;
+          return a.x + frac * (b.x - a.x);
+        }
+      }
+      return terminusX;
+    };
+  },
+
   setPhaseFilter(phase) {
     this.activePhaseFilter = phase || "all";
     document.querySelectorAll(".metro-phase-btn").forEach((btn) => {
       btn.classList.toggle("active", (btn.getAttribute("data-phase") || "all") === this.activePhaseFilter);
     });
     if (this.data?.stations) {
-      const startDate = new Date(2026, 8, 1);
-      const endDate = new Date(2028, 6, 31);
-      const now = new Date();
-      let progressRatio = 0.044;
-      if (now >= startDate) {
-        const totalMs = endDate.getTime() - startDate.getTime();
-        const elapsedMs = Math.min(totalMs, Math.max(0, now.getTime() - startDate.getTime()));
-        progressRatio = elapsedMs / totalMs;
-      }
+      const { progressRatio } = this.calculateJourneyProgress();
       this.renderCardsGrid(this.data.stations, progressRatio);
     }
   },
@@ -870,26 +966,11 @@ const MetroMap = {
     canvasWrap.style.minWidth = `${totalWidth}px`;
     canvasWrap.style.height = `${svgHeight}px`;
 
-    // Date calculations
-    const startDate = new Date(2026, 8, 1);
-    const endDate = new Date(2028, 6, 31);
+    // Date calculations (global badge % over '26-'28; track X anchored to station calendar dates)
     const now = new Date();
-
-    let currentX = startX;
-    let totalDays = 699;
-    let elapsedDays = 31;
-    let progressRatio = 0.044;
-
-    if (now < startDate) {
-      currentX = startX - 35;
-    } else {
-      const totalMs = endDate.getTime() - startDate.getTime();
-      const elapsedMs = Math.min(totalMs, Math.max(0, now.getTime() - startDate.getTime()));
-      progressRatio = elapsedMs / totalMs;
-      totalDays = Math.round(totalMs / (1000 * 60 * 60 * 24));
-      elapsedDays = Math.min(totalDays, Math.round(elapsedMs / (1000 * 60 * 60 * 24)));
-      currentX = startX + progressRatio * totalTrackLength;
-    }
+    const { startDate, endDate, totalDays, elapsedDays, progressRatio } = this.calculateJourneyProgress(now);
+    const dateToX = this.buildTrackDateMapper(stations, startX, spacing, terminusX, startDate, endDate);
+    const currentX = dateToX(now);
 
     this.currentBeaconX = currentX;
 
@@ -1065,10 +1146,7 @@ const MetroMap = {
           const exDate = new Date(exam.exam_date + "T12:00:00");
           const diffDays = Math.round((exDate.getTime() - todayMid) / (1000 * 60 * 60 * 24));
           if (diffDays >= 0 && exDate >= startDate && exDate <= endDate) {
-            const elapsed = exDate.getTime() - startDate.getTime();
-            const totalMs = endDate.getTime() - startDate.getTime();
-            const ratio = elapsed / totalMs;
-            const testX = startX + ratio * totalTrackLength;
+            const testX = dateToX(exDate);
             const dueLabel = diffDays === 0 ? "TODAY" : diffDays === 1 ? "1d" : `${diffDays}d`;
             validExams.push({ ...exam, exDate, testX, diffDays, dueLabel });
           }

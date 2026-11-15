@@ -1,4 +1,7 @@
+import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 def test_html_tag_balancing():
@@ -173,4 +176,101 @@ def test_daily_exclusive_checkboxes_and_obsidian_ui_parity():
     ]
     for rel in mirrored_paths:
         assert (root / rel).read_bytes() == (root / "ui" / rel).read_bytes(), f"Mismatch between {rel} and ui/{rel}"
+
+
+def test_metro_timeline_maps_dates_between_station_anchors():
+    """Verify Today beacon and exam ticks interpolate piecewise-linearly between station anchor dates."""
+    node_bin = shutil.which("node")
+    assert node_bin, "Node.js is required to evaluate js/metro.js timeline math"
+
+    root = Path(__file__).resolve().parent.parent
+    probe_script = r"""
+const fs = require("fs");
+const vm = require("vm");
+const code = fs.readFileSync("js/metro.js", "utf8");
+const roadmap = JSON.parse(fs.readFileSync("data/metro_roadmap.json", "utf8"));
+
+function runAt(y, m, d, h = 12, exams = []) {
+  const RealDate = Date;
+  class FixedDate extends RealDate {
+    constructor(...args) {
+      if (args.length === 0) super(y, m - 1, d, h, 0, 0);
+      else super(...args);
+    }
+    static now() { return new RealDate(y, m - 1, d, h, 0, 0).getTime(); }
+  }
+  const elements = {
+    metroCanvasWrap: { style: {}, innerHTML: "", querySelectorAll: () => [] },
+    metroCardsGrid: { innerHTML: "" },
+    metroTestTooltip: { style: {}, id: "metroTestTooltip" },
+  };
+  const sandbox = {
+    Date: FixedDate,
+    Math, Number, String, Boolean, Array, Object, Set, Map, JSON, RegExp, Error,
+    encodeURIComponent, decodeURIComponent, console,
+    window: {},
+    document: {
+      documentElement: { getAttribute: () => "dark" },
+      getElementById: (id) => elements[id] || null,
+      querySelector: () => null,
+      querySelectorAll: () => [],
+      createElement: () => ({ style: {} }),
+      body: { appendChild: () => {} },
+    },
+  };
+  sandbox.window = sandbox;
+  vm.runInNewContext(code, sandbox);
+  sandbox.MetroMap.data = JSON.parse(JSON.stringify(roadmap));
+  sandbox.MetroMap.upcomingExams = exams;
+  sandbox.MetroMap.render();
+  const svg = elements.metroCanvasWrap.innerHTML;
+  const tests = [...svg.matchAll(/<g class="metro-test-tick"[^>]*data-date="([^"]+)"[^>]*>[\s\S]*?<circle cx="([^"]+)"/g)]
+    .map((m) => [m[1], Number(m[2])]);
+  return { beaconX: sandbox.MetroMap.currentBeaconX, tests, svg };
+}
+
+const novRun = runAt(2026, 11, 15, 22, [
+  { id: 1, subject: "Fizyka", title: "Test", exam_date: "2026-11-18", completed: false },
+  { id: 2, subject: "Geografia", title: "Spr", exam_date: "2026-12-05", completed: false },
+]);
+console.log(JSON.stringify({
+  nov15: novRun.beaconX,
+  nov15Tests: novRun.tests,
+  nov15HasPct: novRun.svg.includes("OF \u201926\u2013\u201928"),
+  sep01: runAt(2026, 9, 1, 12).beaconX,
+  sep16: runAt(2026, 9, 16, 12).beaconX,
+  oct15: runAt(2026, 10, 15, 12).beaconX,
+  aug27: runAt(2027, 8, 1, 12).beaconX,
+  jul28: runAt(2028, 7, 15, 12).beaconX,
+}));
+"""
+    proc = subprocess.run(
+        [node_bin, "-e", probe_script],
+        cwd=str(root),
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    out = json.loads(proc.stdout.strip())
+
+    def station_x(idx: int) -> float:
+        return 120.0 + idx * 220.0
+
+    # Nov 15, 2026 must sit nearly midway between NOV '26 (idx 3) and DEC '26 (idx 4), NOT before NOV '26
+    assert station_x(3) < out["nov15"] < station_x(4)
+    assert abs(out["nov15"] - (station_x(3) + 0.5 * 220.0)) < 15.0
+    assert out["nov15HasPct"] is True
+
+    # Exam ticks map onto their true station-anchored months too
+    exam_map = dict(out["nov15Tests"])
+    assert out["nov15"] < exam_map["2026-11-18"] < station_x(4)
+    assert station_x(4) < exam_map["2026-12-05"] < station_x(5)
+
+    # Monotonic progression across non-uniform station spans
+    assert station_x(0) <= out["sep01"] < station_x(1)
+    assert station_x(1) <= out["sep16"] < station_x(2)
+    assert station_x(2) < out["oct15"] < station_x(3)
+    assert station_x(11) < out["aug27"] < station_x(12)  # jul-aug-2027 2-month span
+    assert station_x(22) < out["jul28"] < station_x(22) + 120.0  # jul-2028 -> TUM terminal
+
 
