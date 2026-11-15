@@ -34,42 +34,42 @@ const MetroMap = {
   paceVelocity: null,
   upcomingExams: [],
 
-  // Stream Definitions (Compact schematic offsets tucked cleanly between exams and station labels)
+  // Stream Definitions (Evenly pitched horizontal subway lanes clear of station rings)
   streams: [
     {
       id: "german",
       name: "German Ladder",
       code: "DE",
       color: "#10b981",
-      yOffset: -22,
+      yOffset: -30,
     },
     {
       id: "academics",
       name: "Academics",
       code: "AC",
       color: "#a855f7",
-      yOffset: -11,
+      yOffset: -18,
     },
     {
       id: "code",
       name: "Code Sprint",
       code: "CD",
       color: "#38bdf8",
-      yOffset: 11,
+      yOffset: 18,
     },
     {
       id: "sigg",
       name: "SIGG GPW",
       code: "SG",
       color: "#f59e0b",
-      yOffset: 22,
+      yOffset: 30,
     },
     {
       id: "physical",
       name: "Physical / Mass",
       code: "PH",
       color: "#f43f5e",
-      yOffset: 32,
+      yOffset: 42,
     },
   ],
 
@@ -862,7 +862,7 @@ const MetroMap = {
     const spacing = 220;
     const startX = 120;
     const spineY = 148;
-    const svgHeight = 246;
+    const svgHeight = 258;
     const totalTrackLength = (stations.length - 1) * spacing;
     const terminusX = startX + totalTrackLength + 120;
     const totalWidth = terminusX + 160;
@@ -924,73 +924,78 @@ const MetroMap = {
       })
       .join("");
 
-    // Sleek Architectural Multi-Stream Harmonic Rails (Rendered subtly in 'All', spotlighted on filter)
+    // Continuous Architectural Parallel Subway Rails (no mid-route camel humps or eye loops)
     let streamRailsHtml = "";
     const filterStream = this.activeStreamFilter || "all";
+    const stationActiveYs = {};
+    stations.forEach((st) => {
+      stationActiveYs[st.id] = [];
+    });
+
     this.streams.forEach((stream) => {
       const isFocused = filterStream === stream.id;
       const isAll = filterStream === "all";
-      const railOpacity = isFocused ? "0.92" : isAll ? "0.3" : "0.08";
-      const strokeW = isFocused ? "2.6" : "1.5";
+      const railOpacity = isFocused ? "0.94" : isAll ? "0.34" : "0.08";
+      const strokeW = isFocused ? "2.6" : "1.6";
       const color = this.getStreamColor(stream.id);
       const yOffset = stream.yOffset;
       const branchY = spineY + yOffset;
-      const rampLen = Math.min(34, Math.abs(yOffset) * 1.35 + 10);
+      const rampLen = Math.min(54, Math.abs(yOffset) * 1.15 + 16);
 
       const indices = [];
       stations.forEach((st, idx) => {
         const branches = st.branches || [];
         if (branches.includes(stream.id) || branches.some((b) => this.normalizeStreamKey(b) === stream.id)) {
           indices.push(idx);
+          stationActiveYs[st.id].push({ y: branchY, color, isFocused });
         }
       });
 
       if (indices.length === 0) return;
 
-      const segments = [];
-      let curSeg = [indices[0]];
-      for (let i = 1; i < indices.length; i++) {
-        if (indices[i] === indices[i - 1] + 1) {
-          curSeg.push(indices[i]);
-        } else {
-          segments.push(curSeg);
-          curSeg = [indices[i]];
-        }
+      const firstIdx = indices[0];
+      const lastIdx = indices[indices.length - 1];
+      const segStartX = startX + firstIdx * spacing;
+      const segEndX = startX + lastIdx * spacing;
+      const ingressX = firstIdx === 0 ? Math.max(24, startX - 44) : segStartX - rampLen;
+      const egressX = lastIdx === stations.length - 1 ? terminusX : segEndX + rampLen;
+      const midIn = (ingressX + segStartX) / 2;
+      const midOut = (segEndX + egressX) / 2;
+
+      const pathD = `M ${ingressX} ${spineY} C ${midIn} ${spineY}, ${midIn} ${branchY}, ${segStartX} ${branchY} L ${segEndX} ${branchY} C ${midOut} ${branchY}, ${midOut} ${spineY}, ${egressX} ${spineY}`;
+      const approxLen = Math.round((egressX - ingressX) + Math.abs(yOffset) * 2 + 80);
+
+      streamRailsHtml += `
+        <g class="stream-tributary-branch ${isFocused ? "is-focused" : ""}" style="opacity: ${railOpacity}; transition: opacity 0.3s ease;">
+          <path d="${pathD}" class="metro-rail-draw"
+                style="--rail-len: ${approxLen}; stroke-dasharray: ${approxLen}; stroke-dashoffset: 0;"
+                fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"
+                ${isFocused ? `filter="url(#metroGlow)"` : ""} />
+          ${
+            isFocused || isAll
+              ? indices
+                  .map((idx) => {
+                    const px = startX + idx * spacing;
+                    return `<circle cx="${px}" cy="${branchY}" r="${isFocused ? 3.6 : 2.3}" fill="${color}" stroke="var(--bg-canvas)" stroke-width="1.2" />`;
+                  })
+                  .join("")
+              : ""
+          }
+        </g>
+      `;
+    });
+
+    // Subtle Vertical Station Interchange Spokes connecting active rails to their Station Hub
+    let interchangeSpokesHtml = "";
+    stations.forEach((st, idx) => {
+      const pts = stationActiveYs[st.id] || [];
+      if (pts.length === 0) return;
+      const posX = startX + idx * spacing;
+      const minY = Math.min(spineY, ...pts.map((p) => p.y));
+      const maxY = Math.max(spineY, ...pts.map((p) => p.y));
+      if (maxY > minY) {
+        interchangeSpokesHtml += `<line x1="${posX}" y1="${minY}" x2="${posX}" y2="${maxY}" stroke="rgba(255, 255, 255, 0.1)" stroke-width="1.2" />`;
       }
-      segments.push(curSeg);
-
-      segments.forEach((seg) => {
-        const firstIdx = seg[0];
-        const lastIdx = seg[seg.length - 1];
-        const segStartX = startX + firstIdx * spacing;
-        const segEndX = startX + lastIdx * spacing;
-        const ingressX = segStartX - rampLen;
-        const egressX = segEndX + rampLen;
-        const midIn = (ingressX + segStartX) / 2;
-        const midOut = (segEndX + egressX) / 2;
-
-        const pathD = `M ${ingressX} ${spineY} C ${midIn} ${spineY}, ${midIn} ${branchY}, ${segStartX} ${branchY} L ${segEndX} ${branchY} C ${midOut} ${branchY}, ${midOut} ${spineY}, ${egressX} ${spineY}`;
-        const approxLen = Math.round((egressX - ingressX) + Math.abs(yOffset) * 2 + 40);
-
-        streamRailsHtml += `
-          <g class="stream-tributary-branch ${isFocused ? "is-focused" : ""}" style="opacity: ${railOpacity}; transition: opacity 0.3s ease;">
-            <path d="${pathD}" class="metro-rail-draw"
-                  style="--rail-len: ${approxLen}; stroke-dasharray: ${approxLen}; stroke-dashoffset: 0;"
-                  fill="none" stroke="${color}" stroke-width="${strokeW}" stroke-linecap="round" stroke-linejoin="round"
-                  ${isFocused ? `filter="url(#metroGlow)"` : ""} />
-            ${
-              isFocused || isAll
-                ? seg
-                    .map((idx) => {
-                      const px = startX + idx * spacing;
-                      return `<circle cx="${px}" cy="${branchY}" r="${isFocused ? 3.2 : 2}" fill="${color}" stroke="var(--bg-canvas)" stroke-width="1" />`;
-                    })
-                    .join("")
-                : ""
-            }
-          </g>
-        `;
-      });
     });
 
     // Main Spine Track
@@ -1012,7 +1017,7 @@ const MetroMap = {
     // Today Pill geometry computed FIRST so exam solver reserves its bounding box & needle corridor
     const todayPillW = 152;
     const todayPillH = 30;
-    const todayPillY = 26;
+    const todayPillY = 22;
     const todayPillX = Math.max(14, currentX - todayPillW / 2);
 
     const occupiedBoxes = [
@@ -1090,7 +1095,7 @@ const MetroMap = {
         }
       });
 
-      const tierPillYs = [82, 58, 34]; // Tiers from bottom-most clear band upward (82..98 leaves 28px above highest rail)
+      const tierPillYs = [74, 50, 26]; // Tiers clear above highest green rail (-30 -> spineY - 30 = 118)
       const pillH = 16;
 
       clusters.forEach((cl, idx) => {
@@ -1168,9 +1173,9 @@ const MetroMap = {
         const lineColor = isUrgent ? "#ef4444" : "rgba(255, 255, 255, 0.25)";
         const textColor = isUrgent ? "#fca5a5" : "var(--text-primary)";
 
-        // Route cleanly via orthogonal elbow if offset away from anchor
+        // Route cleanly via orthogonal elbow above upper stream rails
         const dx = Math.abs(pillCenterX - testX);
-        const kneeY = Math.min(spineY - 30, pillBottomY + 6);
+        const kneeY = Math.min(spineY - 40, pillBottomY + 6);
         const leaderPath =
           dx <= 3
             ? `M ${testX} ${spineY - 4} L ${testX} ${pillBottomY}`
@@ -1253,7 +1258,7 @@ const MetroMap = {
       const pipSpacing = 6.5;
       const pipsStartX = posX - ((branches.length - 1) * pipSpacing) / 2;
       const pipsSvg = branches
-        .map((b, pIdx) => `<circle cx="${pipsStartX + pIdx * pipSpacing}" cy="${spineY + 70}" r="2" fill="${this.getStreamColor(this.normalizeStreamKey(b))}" />`)
+        .map((b, pIdx) => `<circle cx="${pipsStartX + pIdx * pipSpacing}" cy="${spineY + 84}" r="2" fill="${this.getStreamColor(this.normalizeStreamKey(b))}" />`)
         .join("");
 
       const labelNameColor = isActive ? "var(--accent-lavender)" : isCompleted ? "var(--text-secondary)" : "var(--text-tertiary)";
@@ -1265,10 +1270,10 @@ const MetroMap = {
            onmouseenter="MetroMap.highlightCardInGrid('${station.id}')"
            onmouseleave="MetroMap.clearHighlightCardInGrid()">
           ${nodeCircles}
-          <text x="${posX}" y="${spineY + 46}" text-anchor="middle" font-size="10.5" font-weight="${labelFontWeight}" fill="${labelNameColor}">
+          <text x="${posX}" y="${spineY + 60}" text-anchor="middle" font-size="10.5" font-weight="${labelFontWeight}" fill="${labelNameColor}">
             ${this.escapeHtml(station.name)}
           </text>
-          <text x="${posX}" y="${spineY + 59}" text-anchor="middle" font-family="var(--font-mono)" font-size="8.5" font-weight="${isActive ? "700" : "500"}" fill="${labelSubColor}">
+          <text x="${posX}" y="${spineY + 73}" text-anchor="middle" font-family="var(--font-mono)" font-size="8.5" font-weight="${isActive ? "700" : "500"}" fill="${labelSubColor}">
             ${labelSubText}
           </text>
           ${pipsSvg}
@@ -1283,10 +1288,10 @@ const MetroMap = {
         <circle cx="${terminusX}" cy="${spineY}" r="16" fill="none" stroke="#f59e0b" stroke-width="1.2" opacity="0.3" class="beacon-pulse" />
         <circle cx="${terminusX}" cy="${spineY}" r="11" fill="var(--bg-card)" stroke="#f59e0b" stroke-width="2" />
         <circle cx="${terminusX}" cy="${spineY}" r="4" fill="#f59e0b" />
-        <text x="${terminusX}" y="${spineY + 46}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#f59e0b">
+        <text x="${terminusX}" y="${spineY + 60}" text-anchor="middle" font-size="10.5" font-weight="800" fill="#f59e0b">
           TUM \u201928
         </text>
-        <text x="${terminusX}" y="${spineY + 59}" text-anchor="middle" font-family="var(--font-mono)" font-size="8" font-weight="700" fill="#f59e0b">
+        <text x="${terminusX}" y="${spineY + 73}" text-anchor="middle" font-family="var(--font-mono)" font-size="8" font-weight="700" fill="#f59e0b">
           Campus Heilbronn
         </text>
       </g>
@@ -1323,6 +1328,7 @@ const MetroMap = {
             </feMerge>
           </filter>
         </defs>
+        ${interchangeSpokesHtml}
         ${streamRailsHtml}
         ${trunkHtml}
         ${examsSvgHtml}
