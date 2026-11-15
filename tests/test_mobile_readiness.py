@@ -151,6 +151,7 @@ def test_daily_exclusive_checkboxes_and_obsidian_ui_parity():
         tum_slice = html[tum_start:tum_end]
         assert 'type="checkbox"' not in tum_slice
         assert 'check-dot' not in tum_slice
+        assert 'id="gcalendarModal" class="modal-overlay"' in html
 
     for filename in ["js/study.js", "ui/js/study.js"]:
         study_js = (root / filename).read_text(encoding="utf-8")

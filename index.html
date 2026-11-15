@@ -1881,58 +1881,24 @@
     </div>
   </div>
 
-  <!-- Notification Toast Container -->
-  <div id="toastContainer" class="toast-container"></div>
-
-  <!-- Mobile Bottom Dock Navigation (Phone Viewport) -->
-  <nav id="mobileBottomNav" class="mobile-bottom-nav">
-    <button class="mobile-nav-tab active" data-view="dashboard" aria-label="Cockpit">
-      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="3" y="3" width="7" height="7"></rect>
-        <rect x="14" y="3" width="7" height="7"></rect>
-        <rect x="14" y="14" width="7" height="7"></rect>
-        <rect x="3" y="14" width="7" height="7"></rect>
-      </svg>
-      <span class="mobile-tab-label">Cockpit</span>
-    </button>
-    <button class="mobile-nav-tab" data-view="today" aria-label="Daily">
-      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <polyline points="12 6 12 12 16 14"></polyline>
-      </svg>
-      <span class="mobile-tab-label">Today</span>
-    </button>
-    <button class="mobile-nav-tab" data-view="study" aria-label="Study">
-      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-      </svg>
-      <span class="mobile-tab-label">Study</span>
-    </button>
-    <button class="mobile-nav-tab" data-view="tum" aria-label="TUM '28">
-      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <line x1="4" y1="9" x2="20" y2="9"></line>
-        <line x1="4" y1="15" x2="20" y2="15"></line>
-        <line x1="10" y1="3" x2="8" y2="21"></line>
-        <line x1="16" y1="3" x2="14" y2="21"></line>
-      </svg>
-      <span class="mobile-tab-label">Roadmap</span>
-    </button>
-  </nav>
-
-  <!-- Google Calendar Bidirectional Sync & Optimizer Modal -->
-  <div id="gcalendarModal" class="modal-backdrop">
-    <div class="modal-dialog" style="max-width: 660px; max-height: 90vh; display: flex; flex-direction: column;">
-      <div class="modal-header">
+  <!-- 11. Google Calendar Bidirectional Sync & Optimizer Modal -->
+  <div id="gcalendarModal" class="modal-overlay">
+    <div class="modal-card" style="max-width: 660px; width: 94%; max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; padding: 0;">
+      <div style="padding: 14px 20px 12px; border-bottom: 1px solid var(--border-hairline); display: flex; justify-content: space-between; align-items: flex-start; background: var(--bg-surface-elevated);">
         <div>
-          <span class="modal-title">Google Calendar Cross-Sync &amp; Optimizer</span>
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #34d399; letter-spacing: 0.08em; text-transform: uppercase;">CALENDAR // CROSS-SYNC &amp; OPTIMIZER</span>
+          </div>
+          <div style="font-size: 15px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">
+            Google Calendar Cross-Sync &amp; Optimizer
+          </div>
           <div style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary); margin-top: 2px;">
             2-Way OAuth API + RFC 5545 Live Feed &bull; Auto-Shifts Plan Around Real Events
           </div>
         </div>
-        <button class="modal-close" onclick="Today.closeGCalendarModal()">&times;</button>
+        <button type="button" class="drawer-close-btn" onclick="Today.closeGCalendarModal()">&times;</button>
       </div>
-      <div class="modal-body" style="overflow-y: auto; display: flex; flex-direction: column; gap: 14px;">
+      <div style="padding: 18px 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 14px; flex: 1;">
         <!-- Live Connection & Stats Banner -->
         <div id="gcalModalStatusBanner" style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
           <div>
@@ -2010,6 +1976,45 @@
       </div>
     </div>
   </div>
+
+  <!-- Notification Toast Container -->
+  <div id="toastContainer" class="toast-container"></div>
+
+  <!-- Mobile Bottom Dock Navigation (Phone Viewport) -->
+  <nav id="mobileBottomNav" class="mobile-bottom-nav">
+    <button class="mobile-nav-tab active" data-view="dashboard" aria-label="Cockpit">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7"></rect>
+        <rect x="14" y="3" width="7" height="7"></rect>
+        <rect x="14" y="14" width="7" height="7"></rect>
+        <rect x="3" y="14" width="7" height="7"></rect>
+      </svg>
+      <span class="mobile-tab-label">Cockpit</span>
+    </button>
+    <button class="mobile-nav-tab" data-view="today" aria-label="Daily">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <polyline points="12 6 12 12 16 14"></polyline>
+      </svg>
+      <span class="mobile-tab-label">Today</span>
+    </button>
+    <button class="mobile-nav-tab" data-view="study" aria-label="Study">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+        <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+      </svg>
+      <span class="mobile-tab-label">Study</span>
+    </button>
+    <button class="mobile-nav-tab" data-view="tum" aria-label="TUM '28">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="4" y1="9" x2="20" y2="9"></line>
+        <line x1="4" y1="15" x2="20" y2="15"></line>
+        <line x1="10" y1="3" x2="8" y2="21"></line>
+        <line x1="16" y1="3" x2="14" y2="21"></line>
+      </svg>
+      <span class="mobile-tab-label">Roadmap</span>
+    </button>
+  </nav>
 
   <!-- App Script Modules -->
   <script src="js/api_bridge.js?v=6.0"></script>
