@@ -182,6 +182,389 @@
     // =========================================================================
     // Virtual Dynamic API Layer with Optimistic Persistence
     // =========================================================================
+    const PHANTOM_EXAM_KEYWORDS = ["trygonometria", "kinematyka", "wyszukiwania", "powstanie styczniowe"];
+    const ACADEMIC_CACHE_TTL_MS = 30000;
+    let _academicHydratedAt = 0;
+    let _academicHydrationPromise = null;
+
+    const isPhantomExam = (exam) => {
+      const text = `${(exam && exam.title) || ""} ${(exam && exam.scope) || ""}`.toLowerCase();
+      return PHANTOM_EXAM_KEYWORDS.some((kw) => text.includes(kw));
+    };
+
+    const normalizeIsoDay = (raw) => String(raw || "").trim().slice(0, 10);
+
+    const normalizeExamRecord = (r) => ({
+      id: r.id,
+      subject: r.subject || "",
+      title: r.title || "",
+      exam_date: normalizeIsoDay(r.exam_date),
+      scope: r.scope || "",
+      completed: Boolean(r.completed),
+      result_percentage: r.result_percentage ?? null,
+    });
+
+    const normalizeHomeworkRecord = (r) => ({
+      id: r.id,
+      subject: r.subject || "",
+      title: r.title || "",
+      due_date: normalizeIsoDay(r.due_date),
+      completed: Boolean(r.completed),
+      source: r.source || "vulcan",
+      priority: r.priority || 1,
+      notes: r.notes || "",
+    });
+
+    const calcUtcDaysLeft = (targetDateStr, todayStr) => {
+      const targetMs = new Date(`${targetDateStr}T00:00:00Z`).getTime();
+      const todayMs = new Date(`${todayStr}T00:00:00Z`).getTime();
+      if (Number.isNaN(targetMs) || Number.isNaN(todayMs)) return 0;
+      return Math.round((targetMs - todayMs) / (1000 * 3600 * 24));
+    };
+
+    const dedupeAcademicItems = (items, dateField) => {
+      const out = [];
+      const seen = new Set();
+      (items || []).forEach((item) => {
+        if (!item) return;
+        const dStr = normalizeIsoDay(item[dateField]);
+        if (!dStr) return;
+        const key = `${String(item.subject || "").trim().toLowerCase()}|${String(item.title || "").trim().toLowerCase()}|${dStr}`;
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push({ ...item, [dateField]: dStr });
+      });
+      return out;
+    };
+
+    const hasSupabaseConfigured = () => {
+      const cfg = getSyncConfig();
+      return Boolean(cfg && cfg.supabase_url && cfg.supabase_key && !cfg.supabase_url.includes("xfslkbcopnugiubkboux"));
+    };
+
+    const fetchAcademicFromSupabase = async () => {
+      if (!hasSupabaseConfigured()) return false;
+      if (_academicHydrationPromise) return _academicHydrationPromise;
+
+      _academicHydrationPromise = (async () => {
+        try {
+          const [sbExams, sbHw] = await Promise.all([
+            supabaseRequest("school_exams?select=*&order=exam_date.asc"),
+            supabaseRequest("homework_items?select=*&order=due_date.asc"),
+          ]);
+
+          let exams = Array.isArray(sbExams)
+            ? sbExams.filter((e) => !isPhantomExam(e)).map(normalizeExamRecord)
+            : null;
+          let hw = Array.isArray(sbHw) ? sbHw.map(normalizeHomeworkRecord) : null;
+
+          if (!exams || exams.length === 0 || !hw || hw.length === 0) {
+            try {
+              const cloudDocs = await fetchAllCloudDocuments();
+              if ((!exams || exams.length === 0) && Array.isArray(cloudDocs.cloud_exams)) {
+                exams = cloudDocs.cloud_exams.filter((e) => !isPhantomExam(e)).map(normalizeExamRecord);
+              }
+              if ((!hw || hw.length === 0) && Array.isArray(cloudDocs.cloud_homework)) {
+                hw = cloudDocs.cloud_homework.map(normalizeHomeworkRecord);
+              }
+            } catch (e) {}
+          }
+
+          let updated = false;
+          if (Array.isArray(exams)) {
+            setStore(STORAGE_KEYS.EXAMS, exams);
+            updated = true;
+          }
+          if (Array.isArray(hw)) {
+            setStore(STORAGE_KEYS.HOMEWORK, hw);
+            updated = true;
+          }
+          if (updated) {
+            _academicHydratedAt = Date.now();
+          }
+          return updated;
+        } catch (e) {
+          return false;
+        } finally {
+          _academicHydrationPromise = null;
+        }
+      })();
+
+      return _academicHydrationPromise;
+    };
+
+    const ensureFreshAcademicCache = async () => {
+      if (!hasSupabaseConfigured()) return false;
+      if (_academicHydratedAt > 0 && Date.now() - _academicHydratedAt < ACADEMIC_CACHE_TTL_MS) {
+        return true;
+      }
+      const timeoutPromise = new Promise((resolve) => setTimeout(() => resolve(false), 2500));
+      return await Promise.race([fetchAcademicFromSupabase(), timeoutPromise]);
+    };
+
+    const refreshUiModules = () => {
+      if (window.Today) {
+        if (typeof window.Today.refresh === "function") window.Today.refresh();
+        else if (typeof window.Today.load === "function") window.Today.load();
+      }
+      if (window.Study) {
+        if (typeof window.Study.refresh === "function") window.Study.refresh();
+        else if (typeof window.Study.load === "function") window.Study.load();
+      }
+      if (window.Dashboard) {
+        if (typeof window.Dashboard.refresh === "function") window.Dashboard.refresh();
+        else if (typeof window.Dashboard.load === "function") window.Dashboard.load();
+      }
+    };
+
+    const CLIENT_TIER_1_KEYWORDS = ["matematyka", "informatyka", "angielski", "math", "cs", "algorithm"];
+    const CLIENT_ESSAY_KEYWORDS = [
+      "esej",
+      "rozprawka",
+      "wypracowanie",
+      "tekst",
+      "opowiadanie",
+      "charakterystyka",
+      "analiza literacka",
+      "praca pisemna",
+    ];
+
+    const isClientTier1 = (subject) => {
+      const s = String(subject || "").toLowerCase();
+      return CLIENT_TIER_1_KEYWORDS.some((kw) => s.includes(kw));
+    };
+
+    const isClientEssay = (hw) => {
+      const text = `${hw && hw.title ? hw.title : ""} ${hw && hw.subject ? hw.subject : ""}`.toLowerCase();
+      return CLIENT_ESSAY_KEYWORDS.some((kw) => text.includes(kw));
+    };
+
+    const computeClientAcademicBalance = (upcomingExams, upcomingHw, existingBalance) => {
+      const prev = existingBalance && typeof existingBalance === "object" ? existingBalance : {};
+      const immediateExams = upcomingExams.filter((e) => e.days_left >= 1 && e.days_left <= 3);
+      const weekExams = upcomingExams.filter((e) => e.days_left >= 1 && e.days_left <= 7);
+      const windowExams = upcomingExams.filter((e) => e.days_left >= 1 && e.days_left <= 10);
+
+      let score = 0;
+      windowExams.forEach((e) => {
+        score += isClientTier1(e.subject) ? 2.5 : 1.0;
+      });
+      if (immediateExams.length > 0) score += 2.0;
+      if (weekExams.length > 1) score += (weekExams.length - 1) * 1.5;
+
+      const urgentHw = upcomingHw.filter((h) => h.days_left >= 0 && h.days_left <= 3);
+      let hasAcuteEssays = false;
+      upcomingHw.forEach((h) => {
+        const dl = h.days_left;
+        const essay = isClientEssay(h);
+        if (dl >= 0 && dl <= 1) score += 0.75;
+        else if (dl >= 2 && dl <= 5) score += 0.25;
+        if (essay && dl >= 0 && dl <= 2) {
+          score += 2.5;
+          hasAcuteEssays = true;
+        }
+      });
+
+      score = Math.round(Math.min(10.0, score) * 10) / 10;
+
+      const hasAcuteExams = immediateExams.length > 0;
+      const hasWeeklyExamSurge = weekExams.length >= 3;
+      const cruiseUnlocked = !hasAcuteExams && !hasAcuteEssays && !hasWeeklyExamSurge;
+
+      const totalExamsCount = upcomingExams.length;
+      const obligationsCount = totalExamsCount + urgentHw.length;
+
+      let mode = prev.mode || "CRUISE";
+      let modeLabel = prev.mode_label || "Optimal Window";
+      let badgeClass = prev.badge_class || "optimal";
+      let description = prev.description || "Low immediate school pressure. Green light for deep projects.";
+
+      if (mode !== "TRAVEL" && mode !== "SURGE_RECOVERY") {
+        if (score > 6.0 && hasAcuteExams) {
+          mode = "SURGE";
+          modeLabel = `Surge Mode • ${immediateExams.length} Imminent Tests`;
+          badgeClass = "rose";
+          description = "SURGE ACTIVE: Multiple immediate exam conflicts. Protect recovery & exam prep.";
+        } else if (hasAcuteExams || hasAcuteEssays) {
+          mode = "DEFENSE";
+          modeLabel = hasAcuteExams
+            ? `School Defense • Test in ${immediateExams[0].days_left}d`
+            : "Writing Defense • Essay Due Soon";
+          badgeClass = "rose";
+          description = "CRUISE LOCKED: Immediate exam or essay deadline within 72h.";
+        } else if (hasWeeklyExamSurge || score > 2.5) {
+          mode = "BALANCED";
+          modeLabel = hasWeeklyExamSurge
+            ? `Balanced Horizon • ${weekExams.length} Tests This Week`
+            : "Balanced Horizon • Standard Load";
+          badgeClass = "lavender";
+          description = hasWeeklyExamSurge
+            ? `CRUISE LOCKED: ${weekExams.length} tests scheduled within 7 days.`
+            : "Standard academic rhythm. Stay ahead on upcoming tests.";
+        } else {
+          mode = "CRUISE";
+          modeLabel = "Cruise Control • Deep Work Greenlight";
+          badgeClass = "optimal";
+          description = "Zero acute test pressure. Execute full TUM & agency sprint.";
+        }
+      }
+
+      return {
+        ...prev,
+        mode,
+        mode_label: modeLabel,
+        badge_class: badgeClass,
+        description,
+        workload_score: score,
+        cruise_unlocked: cruiseUnlocked,
+        immediate_exams_count: immediateExams.length,
+        week_exams_count: weekExams.length,
+        total_exams_count: totalExamsCount,
+        urgent_homework_count: urgentHw.length,
+        school_obligations_count: obligationsCount,
+        nearest_exam: upcomingExams.length > 0 ? upcomingExams[0] : null,
+      };
+    };
+
+    const overlayAcademicOnDashboard = (serverRes, todayStr, authoritativeAcademic) => {
+      if (!serverRes) return;
+
+      const localExamsRaw = getStore(STORAGE_KEYS.EXAMS, null);
+      const localHwRaw = getStore(STORAGE_KEYS.HOMEWORK, null);
+
+      const serverExams = Array.isArray(serverRes.radar && serverRes.radar.exams) ? serverRes.radar.exams : [];
+      const serverHw = Array.isArray(serverRes.radar && serverRes.radar.homework) ? serverRes.radar.homework : [];
+
+      const useLocalExams =
+        Array.isArray(localExamsRaw) &&
+        (authoritativeAcademic || (localExamsRaw.length > 0 && serverExams.length === 0));
+      const useLocalHw =
+        Array.isArray(localHwRaw) &&
+        (authoritativeAcademic || (localHwRaw.length > 0 && serverHw.length === 0));
+      if (!useLocalExams && !useLocalHw) return;
+
+      const activeExams = useLocalExams
+        ? dedupeAcademicItems(
+            localExamsRaw.map(normalizeExamRecord).filter((e) => e.exam_date && !e.completed && !isPhantomExam(e)),
+            "exam_date"
+          )
+        : [];
+      const activeHw = useLocalHw
+        ? dedupeAcademicItems(
+            localHwRaw.map(normalizeHomeworkRecord).filter((h) => h.due_date && !h.completed),
+            "due_date"
+          )
+        : [];
+
+      const examMap = new Map();
+      activeExams.forEach((ex) => {
+        if (!examMap.has(ex.exam_date)) examMap.set(ex.exam_date, []);
+        examMap.get(ex.exam_date).push(ex);
+      });
+
+      const hwMap = new Map();
+      activeHw.forEach((hw) => {
+        if (!hwMap.has(hw.due_date)) hwMap.set(hw.due_date, []);
+        hwMap.get(hw.due_date).push(hw);
+      });
+
+      if (serverRes.heatmap && Array.isArray(serverRes.heatmap.weeks)) {
+        serverRes.heatmap.weeks.forEach((w) => {
+          (w.days || []).forEach((d) => {
+            if (!d || !d.date) return;
+            const prevActivities = Array.isArray(d.activities) ? d.activities : [];
+            let nextActivities = prevActivities.filter((act) => {
+              if (useLocalExams && String(act).startsWith("[UPCOMING TEST] ")) return false;
+              if (useLocalHw && String(act).startsWith("[HOMEWORK DUE] ")) return false;
+              return true;
+            });
+
+            const showAnnotations = Boolean(d.is_future || d.is_today || d.date >= todayStr);
+
+            if (useLocalExams) {
+              const dayExams = examMap.get(d.date) || [];
+              d.exams = dayExams;
+              d.exam_count = dayExams.length;
+              d.has_exam = dayExams.length > 0;
+              if (showAnnotations && dayExams.length > 0) {
+                dayExams.forEach((ex) => {
+                  const label = `[UPCOMING TEST] ${ex.subject}: ${ex.title}`;
+                  if (!nextActivities.includes(label)) nextActivities.push(label);
+                });
+              }
+            }
+
+            if (useLocalHw) {
+              const dayHw = hwMap.get(d.date) || [];
+              d.homework = dayHw;
+              d.homework_count = dayHw.length;
+              d.has_homework = dayHw.length > 0;
+              if (showAnnotations && dayHw.length > 0) {
+                dayHw.forEach((hw) => {
+                  const label = `[HOMEWORK DUE] ${hw.subject}: ${hw.title}`;
+                  if (!nextActivities.includes(label)) nextActivities.push(label);
+                });
+              }
+            }
+
+            d.activities = nextActivities;
+          });
+        });
+      }
+
+      serverRes.radar = serverRes.radar || {};
+      serverRes.academic_balance = serverRes.academic_balance || {};
+
+      let upcomingExamsForBalance = serverExams.map((e) => ({
+        ...e,
+        days_left:
+          typeof e.days_left === "number"
+            ? e.days_left
+            : calcUtcDaysLeft(String(e.exam_date || "").slice(0, 10), todayStr),
+      }));
+      let upcomingHwForBalance = serverHw.map((h) => ({
+        ...h,
+        days_left:
+          typeof h.days_left === "number"
+            ? h.days_left
+            : calcUtcDaysLeft(String(h.due_date || "").slice(0, 10), todayStr),
+      }));
+
+      if (useLocalExams) {
+        upcomingExamsForBalance = activeExams
+          .filter((e) => e.exam_date >= todayStr)
+          .sort((a, b) => a.exam_date.localeCompare(b.exam_date))
+          .map((e) => ({ ...e, days_left: calcUtcDaysLeft(e.exam_date, todayStr) }));
+
+        serverRes.radar.exams = upcomingExamsForBalance.slice(0, 5);
+      }
+
+      if (useLocalHw) {
+        upcomingHwForBalance = activeHw
+          .filter((h) => h.due_date >= todayStr)
+          .sort((a, b) => a.due_date.localeCompare(b.due_date))
+          .map((h) => ({ ...h, days_left: calcUtcDaysLeft(h.due_date, todayStr) }));
+
+        serverRes.radar.homework = upcomingHwForBalance.slice(0, 5);
+      }
+
+      const nextBalance = computeClientAcademicBalance(
+        upcomingExamsForBalance,
+        upcomingHwForBalance,
+        serverRes.academic_balance
+      );
+      if (!useLocalExams && typeof serverRes.academic_balance.total_exams_count === "number") {
+        nextBalance.total_exams_count = serverRes.academic_balance.total_exams_count;
+        nextBalance.nearest_exam = serverRes.academic_balance.nearest_exam ?? nextBalance.nearest_exam;
+      }
+      if (!useLocalHw && typeof serverRes.academic_balance.urgent_homework_count === "number") {
+        nextBalance.urgent_homework_count = serverRes.academic_balance.urgent_homework_count;
+      }
+      nextBalance.school_obligations_count =
+        (nextBalance.total_exams_count || 0) + (nextBalance.urgent_homework_count || 0);
+      serverRes.academic_balance = nextBalance;
+    };
+
     const apiProxy = new Proxy(
       {},
       {
@@ -193,10 +576,10 @@
           if (prop === "get_dashboard") {
             return async function (clientDate = null) {
               const todayStr = clientDate || getLocalDateStr();
-              let serverRes = null;
-              try {
-                serverRes = await rpcCall("get_dashboard", [todayStr]);
-              } catch (e) {}
+              const [serverRes, authoritativeAcademic] = await Promise.all([
+                rpcCall("get_dashboard", [todayStr]).catch(() => null),
+                ensureFreshAcademicCache(),
+              ]);
 
               const localLogs = getStore(STORAGE_KEYS.DAILY_LOGS, {});
               const todayLog = localLogs[todayStr];
@@ -260,6 +643,8 @@
                     }
                   }
                 }
+
+                overlayAcademicOnDashboard(serverRes, todayStr, authoritativeAcademic);
 
                 return serverRes;
               }
@@ -1699,55 +2084,50 @@
                 if (Array.isArray(localHw)) {
                   localHw.forEach((h) => hwMap.set(h.id, h));
                 }
-                serverRes.forEach((sh) => {
-                  const existing = hwMap.get(sh.id);
-                  if (existing) {
-                    hwMap.set(sh.id, { ...sh, completed: existing.completed });
-                  } else {
-                    hwMap.set(sh.id, sh);
-                  }
-                });
-                localHw = Array.from(hwMap.values());
+                const authoritativeHw = await ensureFreshAcademicCache();
+                if (authoritativeHw) {
+                  const freshHw = getStore(STORAGE_KEYS.HOMEWORK, null);
+                  if (Array.isArray(freshHw)) localHw = freshHw;
+                } else {
+                  serverRes.forEach((sh) => {
+                    const existing = hwMap.get(sh.id);
+                    if (existing) {
+                      hwMap.set(sh.id, { ...sh, completed: existing.completed });
+                    } else {
+                      hwMap.set(sh.id, sh);
+                    }
+                  });
+                  localHw = Array.from(hwMap.values());
+                }
+              }
+
+              if (hasSupabaseConfigured() && !(serverRes && Array.isArray(serverRes))) {
+                const authoritativeHw = await ensureFreshAcademicCache();
+                if (authoritativeHw) {
+                  const freshHw = getStore(STORAGE_KEYS.HOMEWORK, null);
+                  if (Array.isArray(freshHw)) localHw = freshHw;
+                }
               }
 
               if (!localHw) {
-                const sbRes = await supabaseRequest(`homework_items?select=*&due_date=gte.${todayStr}&order=due_date.asc`);
+                const sbRes = await supabaseRequest(`homework_items?select=*&order=due_date.asc`);
                 if (sbRes && Array.isArray(sbRes)) {
-                  localHw = sbRes.map((r) => ({
-                    id: r.id,
-                    subject: r.subject,
-                    title: r.title,
-                    due_date: r.due_date,
-                    completed: Boolean(r.completed),
-                    source: r.source || "vulcan",
-                    priority: r.priority || 1,
-                    notes: r.notes || "",
-                  }));
+                  localHw = sbRes.map(normalizeHomeworkRecord);
+                  setStore(STORAGE_KEYS.HOMEWORK, localHw);
                 }
               }
 
               if (!Array.isArray(localHw)) localHw = [];
 
-              const todayDate = new Date(todayStr);
-              const validHw = [];
-              const seenKeys = new Set();
-              localHw.forEach((h) => {
-                if (!h.due_date) return;
-                if (h.due_date < todayStr) return; // Expired, auto-prune
-                const key = `${(h.subject || "").trim().toLowerCase()}|${(h.title || "").trim().toLowerCase()}|${(h.due_date || "").trim()}`;
-                if (seenKeys.has(key)) return;
-                seenKeys.add(key);
-                const itemDate = new Date(h.due_date);
-                const diffTime = itemDate.getTime() - todayDate.getTime();
-                const daysLeft = Math.round(diffTime / (1000 * 3600 * 24));
-                validHw.push({
+              const validHw = dedupeAcademicItems(localHw.map(normalizeHomeworkRecord), "due_date")
+                .filter((h) => h.due_date >= todayStr)
+                .sort((a, b) => a.due_date.localeCompare(b.due_date))
+                .map((h) => ({
                   ...h,
-                  days_left: daysLeft,
+                  days_left: calcUtcDaysLeft(h.due_date, todayStr),
                   completed: Boolean(h.completed),
-                });
-              });
+                }));
 
-              setStore(STORAGE_KEYS.HOMEWORK, validHw);
               return validHw.filter((h) => !h.completed);
             };
           }
@@ -1837,14 +2217,14 @@
           if (prop === "get_upcoming_exams") {
             return async function (limit = 15) {
               const todayStr = getLocalDateStr();
-              let serverRes = null;
-              try {
-                serverRes = await rpcCall("get_upcoming_exams", [limit]);
-              } catch (e) {}
+              const [serverRes, authoritativeExams] = await Promise.all([
+                rpcCall("get_upcoming_exams", [limit]).catch(() => null),
+                ensureFreshAcademicCache(),
+              ]);
 
               let localExams = getStore(STORAGE_KEYS.EXAMS, null);
 
-              if (serverRes && Array.isArray(serverRes)) {
+              if (!authoritativeExams && serverRes && Array.isArray(serverRes)) {
                 const exMap = new Map();
                 if (Array.isArray(localExams)) {
                   localExams.forEach((e) => exMap.set(e.id, e));
@@ -1858,52 +2238,32 @@
                   }
                 });
                 localExams = Array.from(exMap.values());
+                setStore(STORAGE_KEYS.EXAMS, localExams);
               }
 
               if (!localExams) {
-                const sbRes = await supabaseRequest(`school_exams?select=*&exam_date=gte.${todayStr}&order=exam_date.asc&limit=${limit}`);
+                const sbRes = await supabaseRequest("school_exams?select=*&order=exam_date.asc");
                 if (sbRes && Array.isArray(sbRes)) {
-                  localExams = sbRes.map((r) => ({
-                    id: r.id,
-                    subject: r.subject,
-                    title: r.title,
-                    exam_date: r.exam_date,
-                    scope: r.scope || "",
-                    completed: Boolean(r.completed),
-                    result_percentage: r.result_percentage,
-                  }));
+                  localExams = sbRes.map(normalizeExamRecord);
+                  setStore(STORAGE_KEYS.EXAMS, localExams);
                 }
               }
 
               if (!Array.isArray(localExams)) localExams = [];
-              localExams = localExams.filter((e) => {
-                const text = ((e.title || "") + " " + (e.scope || "")).toLowerCase();
-                return !text.includes("trygonometria") && !text.includes("kinematyka") && !text.includes("wyszukiwania") && !text.includes("powstanie styczniowe");
-              });
 
-              setStore(STORAGE_KEYS.EXAMS, localExams);
-
-              const todayDate = new Date(todayStr);
-              const validExams = [];
-              const seenExamKeys = new Set();
-              localExams
+              const validExams = dedupeAcademicItems(
+                localExams.map(normalizeExamRecord).filter((e) => !isPhantomExam(e)),
+                "exam_date"
+              )
                 .filter((e) => e.exam_date >= todayStr && !e.completed)
-                .forEach((e) => {
-                  const key = `${(e.subject || "").trim().toLowerCase()}|${(e.title || "").trim().toLowerCase()}|${(e.exam_date || "").trim()}`;
-                  if (seenExamKeys.has(key)) return;
-                  seenExamKeys.add(key);
-                  const itemDate = new Date(e.exam_date);
-                  const diffTime = itemDate.getTime() - todayDate.getTime();
-                  const daysLeft = Math.round(diffTime / (1000 * 3600 * 24));
-                  validExams.push({
-                    ...e,
-                    days_left: daysLeft,
-                    completed: Boolean(e.completed),
-                  });
-                });
+                .sort((a, b) => a.exam_date.localeCompare(b.exam_date))
+                .map((e) => ({
+                  ...e,
+                  days_left: calcUtcDaysLeft(e.exam_date, todayStr),
+                  completed: false,
+                }));
 
-              setStore(STORAGE_KEYS.EXAMS, validExams);
-              return validExams.filter((e) => !e.completed);
+              return typeof limit === "number" && limit > 0 ? validExams.slice(0, limit) : validExams;
             };
           }
 
@@ -2386,13 +2746,11 @@
     // Auto-hydrate from Supabase if credentials exist
     setTimeout(async () => {
       try {
-        const cfg = getSyncConfig();
-        if (cfg.supabase_url && cfg.supabase_key && !cfg.supabase_url.includes("xfslkbcopnugiubkboux")) {
+        if (hasSupabaseConfigured()) {
           console.log("[Harness Bridge] Hydrating state from Supabase...");
           await apiProxy.pull_supabase_to_local();
-          if (window.Today && typeof window.Today.refresh === "function") window.Today.refresh();
-          if (window.Study && typeof window.Study.refresh === "function") window.Study.refresh();
-          if (window.Dashboard && typeof window.Dashboard.refresh === "function") window.Dashboard.refresh();
+          _academicHydratedAt = Date.now();
+          refreshUiModules();
         }
       } catch (e) {
         console.warn("[Harness Bridge] Auto-hydration check notice:", e);
@@ -2405,9 +2763,8 @@
         if (document.visibilityState === "visible") {
           try {
             await apiProxy.pull_supabase_to_local();
-            if (window.Today && typeof window.Today.refresh === "function") window.Today.refresh();
-            if (window.Study && typeof window.Study.refresh === "function") window.Study.refresh();
-            if (window.Dashboard && typeof window.Dashboard.refresh === "function") window.Dashboard.refresh();
+            _academicHydratedAt = Date.now();
+            refreshUiModules();
           } catch (e) {}
         }
       });

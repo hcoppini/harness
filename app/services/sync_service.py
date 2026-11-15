@@ -7,6 +7,8 @@ Provides two-way synchronization between Laptop, Desktop PC, Vercel Web, and Sup
 import json
 import os
 import sqlite3
+import threading
+import time
 import urllib.request
 import urllib.error
 from datetime import datetime
@@ -781,6 +783,7 @@ def sync_station_deliverable_progress(conn: sqlite3.Connection) -> int:
     if remote_delivs is None:
         return 0
 
+    remote_map = {}
     synced_count = 0
     for rd in remote_delivs:
         d_id = rd.get("deliverable_id")
@@ -788,6 +791,7 @@ def sync_station_deliverable_progress(conn: sqlite3.Connection) -> int:
             continue
         rem_count = rd.get("completed_count", 0)
         rem_done = 1 if rd.get("is_completed") else 0
+        remote_map[d_id] = {"completed_count": rem_count, "is_completed": bool(rem_done)}
         if d_id in local_map:
             loc = local_map[d_id]
             max_count = max(loc["completed_count"], rem_count)
@@ -815,13 +819,19 @@ def sync_station_deliverable_progress(conn: sqlite3.Connection) -> int:
             )
             synced_count += 1
 
+    # Batch-push only deliverables missing or more complete locally (avoids 40+ sequential POSTs on startup)
     cursor.execute("SELECT deliverable_id, station_id, stream, title, total_required, completed_count, unit_label, is_completed FROM station_deliverable_progress")
+    to_push = []
     for row in cursor.fetchall():
-        _make_supabase_request(
-            "station_deliverable_progress?on_conflict=deliverable_id",
-            method="POST",
-            payload={
-                "deliverable_id": row["deliverable_id"],
+        d_id = row["deliverable_id"]
+        rem = remote_map.get(d_id)
+        if (
+            not rem
+            or row["completed_count"] > rem["completed_count"]
+            or (bool(row["is_completed"]) and not rem["is_completed"])
+        ):
+            to_push.append({
+                "deliverable_id": d_id,
                 "station_id": row["station_id"],
                 "stream": row["stream"],
                 "title": row["title"],
@@ -829,7 +839,13 @@ def sync_station_deliverable_progress(conn: sqlite3.Connection) -> int:
                 "completed_count": row["completed_count"],
                 "unit_label": row["unit_label"],
                 "is_completed": bool(row["is_completed"]),
-            },
+            })
+
+    if to_push:
+        _make_supabase_request(
+            "station_deliverable_progress?on_conflict=deliverable_id",
+            method="POST",
+            payload=to_push,
             headers_extra={"Prefer": "resolution=merge-duplicates"},
         )
 
@@ -1141,6 +1157,23 @@ def sync_projects(conn: sqlite3.Connection) -> int:
 # =========================================================================
 # 8b. School Exams Sync
 # =========================================================================
+def _fetch_cloud_setting_list(cloud_key: str) -> Optional[List[Dict[str, Any]]]:
+    """Fetch a JSON array fallback stored under app_settings (e.g. cloud_exams or cloud_homework)."""
+    rows = _make_supabase_request(f"app_settings?key=eq.{cloud_key}&select=value")
+    if not rows or not isinstance(rows, list):
+        return None
+    raw_val = rows[0].get("value")
+    if isinstance(raw_val, list):
+        return raw_val
+    if isinstance(raw_val, str) and raw_val.strip():
+        try:
+            parsed = json.loads(raw_val)
+            return parsed if isinstance(parsed, list) else None
+        except Exception:
+            return None
+    return None
+
+
 def sync_school_exams(conn: sqlite3.Connection) -> int:
     try:
         cursor = conn.cursor()
@@ -1150,8 +1183,14 @@ def sync_school_exams(conn: sqlite3.Connection) -> int:
         return 0
 
     remote_exams = _make_supabase_request("school_exams?select=*")
-    if remote_exams is None:
-        return 0
+    used_cloud_fallback = False
+    if remote_exams is None or len(remote_exams) == 0:
+        cloud_fallback = _fetch_cloud_setting_list("cloud_exams")
+        if cloud_fallback:
+            remote_exams = cloud_fallback
+            used_cloud_fallback = True
+        elif remote_exams is None:
+            return 0
 
     synced_count = 0
     for re in remote_exams:
@@ -1160,17 +1199,34 @@ def sync_school_exams(conn: sqlite3.Connection) -> int:
             continue
         r_comp = 1 if re.get("completed") else 0
         r_res = re.get("result_percentage")
+        r_date = str(re.get("exam_date", "") or "").strip()[:10]
+        r_subject = re.get("subject", "") or ""
+        r_title = re.get("title", "") or ""
+        r_scope = re.get("scope", "") or ""
+
         if r_id not in local_exams:
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO school_exams (id, subject, title, exam_date, scope, completed, result_percentage)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                (r_id, re.get("subject", ""), re.get("title", ""), re.get("exam_date", ""), re.get("scope", ""), r_comp, r_res),
+                (r_id, r_subject, r_title, r_date, r_scope, r_comp, r_res),
             )
             synced_count += 1
         else:
             loc = local_exams[r_id]
+            loc_date = str(loc.get("exam_date", "") or "").strip()[:10]
+            if (
+                r_subject != (loc["subject"] or "")
+                or r_title != (loc["title"] or "")
+                or r_date != loc_date
+                or r_scope != (loc["scope"] or "")
+            ):
+                cursor.execute(
+                    "UPDATE school_exams SET subject = ?, title = ?, exam_date = ?, scope = ? WHERE id = ?",
+                    (r_subject, r_title, r_date, r_scope, r_id),
+                )
+                synced_count += 1
             if loc["completed"] != r_comp or loc["result_percentage"] != r_res:
                 if loc["completed"] == 1 and r_comp == 0:
                     _make_supabase_request(
@@ -1178,10 +1234,10 @@ def sync_school_exams(conn: sqlite3.Connection) -> int:
                         method="POST",
                         payload={
                             "id": r_id,
-                            "subject": loc["subject"],
-                            "title": loc["title"],
-                            "exam_date": loc["exam_date"],
-                            "scope": loc["scope"],
+                            "subject": r_subject or loc["subject"],
+                            "title": r_title or loc["title"],
+                            "exam_date": r_date or loc_date,
+                            "scope": r_scope or loc["scope"],
                             "completed": True,
                             "result_percentage": loc["result_percentage"],
                         },
@@ -1200,10 +1256,10 @@ def sync_school_exams(conn: sqlite3.Connection) -> int:
                         method="POST",
                         payload={
                             "id": r_id,
-                            "subject": loc["subject"],
-                            "title": loc["title"],
-                            "exam_date": loc["exam_date"],
-                            "scope": loc["scope"],
+                            "subject": r_subject or loc["subject"],
+                            "title": r_title or loc["title"],
+                            "exam_date": r_date or loc_date,
+                            "scope": r_scope or loc["scope"],
                             "completed": bool(loc["completed"]),
                             "result_percentage": loc["result_percentage"],
                         },
@@ -1211,24 +1267,29 @@ def sync_school_exams(conn: sqlite3.Connection) -> int:
                     )
                     synced_count += 1
 
-    remote_ids = {re.get("id") for re in remote_exams if re.get("id")}
-    for l_id, loc in local_exams.items():
-        if l_id not in remote_ids:
+    if not used_cloud_fallback:
+        remote_ids = {re.get("id") for re in remote_exams if re.get("id")}
+        to_push = [
+            {
+                "id": l_id,
+                "subject": loc["subject"],
+                "title": loc["title"],
+                "exam_date": str(loc.get("exam_date", "") or "").strip()[:10],
+                "scope": loc["scope"] or "",
+                "completed": bool(loc["completed"]),
+                "result_percentage": loc["result_percentage"],
+            }
+            for l_id, loc in local_exams.items()
+            if l_id not in remote_ids
+        ]
+        if to_push:
             _make_supabase_request(
                 "school_exams?on_conflict=id",
                 method="POST",
-                payload={
-                    "id": l_id,
-                    "subject": loc["subject"],
-                    "title": loc["title"],
-                    "exam_date": loc["exam_date"],
-                    "scope": loc["scope"] or "",
-                    "completed": bool(loc["completed"]),
-                    "result_percentage": loc["result_percentage"],
-                },
+                payload=to_push,
                 headers_extra={"Prefer": "resolution=merge-duplicates"},
             )
-            synced_count += 1
+            synced_count += len(to_push)
 
     conn.commit()
     return synced_count
@@ -1246,8 +1307,14 @@ def sync_homework_items(conn: sqlite3.Connection) -> int:
         return 0
 
     remote_hw = _make_supabase_request("homework_items?select=*")
-    if remote_hw is None:
-        return 0
+    used_cloud_fallback = False
+    if remote_hw is None or len(remote_hw) == 0:
+        cloud_fallback = _fetch_cloud_setting_list("cloud_homework")
+        if cloud_fallback:
+            remote_hw = cloud_fallback
+            used_cloud_fallback = True
+        elif remote_hw is None:
+            return 0
 
     synced_count = 0
     for rh in remote_hw:
@@ -1255,17 +1322,33 @@ def sync_homework_items(conn: sqlite3.Connection) -> int:
         if not r_id:
             continue
         r_comp = 1 if rh.get("completed") else 0
+        r_due = str(rh.get("due_date", "") or "").strip()[:10]
+        r_subject = rh.get("subject", "") or ""
+        r_title = rh.get("title", "") or ""
+        r_notes = rh.get("notes", "") or ""
         if r_id not in local_hw:
             cursor.execute(
                 """
                 INSERT OR REPLACE INTO homework_items (id, subject, title, due_date, completed, source, priority, notes)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (r_id, rh.get("subject", ""), rh.get("title", ""), rh.get("due_date", ""), r_comp, rh.get("source", "manual"), rh.get("priority", 1), rh.get("notes", "")),
+                (r_id, r_subject, r_title, r_due, r_comp, rh.get("source", "manual"), rh.get("priority", 1), r_notes),
             )
             synced_count += 1
         else:
             loc = local_hw[r_id]
+            loc_due = str(loc.get("due_date", "") or "").strip()[:10]
+            if (
+                r_subject != (loc["subject"] or "")
+                or r_title != (loc["title"] or "")
+                or r_due != loc_due
+                or r_notes != (loc["notes"] or "")
+            ):
+                cursor.execute(
+                    "UPDATE homework_items SET subject = ?, title = ?, due_date = ?, notes = ? WHERE id = ?",
+                    (r_subject, r_title, r_due, r_notes, r_id),
+                )
+                synced_count += 1
             if loc["completed"] != r_comp:
                 if loc["completed"] == 1 and r_comp == 0:
                     _make_supabase_request(
@@ -1273,13 +1356,13 @@ def sync_homework_items(conn: sqlite3.Connection) -> int:
                         method="POST",
                         payload={
                             "id": r_id,
-                            "subject": loc["subject"],
-                            "title": loc["title"],
-                            "due_date": loc["due_date"],
+                            "subject": r_subject or loc["subject"],
+                            "title": r_title or loc["title"],
+                            "due_date": r_due or loc_due,
                             "completed": True,
                             "source": loc["source"],
                             "priority": loc["priority"],
-                            "notes": loc["notes"],
+                            "notes": r_notes or loc["notes"],
                         },
                         headers_extra={"Prefer": "resolution=merge-duplicates"},
                     )
@@ -1288,25 +1371,30 @@ def sync_homework_items(conn: sqlite3.Connection) -> int:
                     cursor.execute("UPDATE homework_items SET completed = 1 WHERE id = ?", (r_id,))
                     synced_count += 1
 
-    remote_ids = {rh.get("id") for rh in remote_hw if rh.get("id")}
-    for l_id, loc in local_hw.items():
-        if l_id not in remote_ids:
+    if not used_cloud_fallback:
+        remote_ids = {rh.get("id") for rh in remote_hw if rh.get("id")}
+        to_push = [
+            {
+                "id": l_id,
+                "subject": loc["subject"],
+                "title": loc["title"],
+                "due_date": str(loc.get("due_date", "") or "").strip()[:10],
+                "completed": bool(loc["completed"]),
+                "source": loc["source"] or "manual",
+                "priority": loc["priority"] or 1,
+                "notes": loc["notes"] or "",
+            }
+            for l_id, loc in local_hw.items()
+            if l_id not in remote_ids
+        ]
+        if to_push:
             _make_supabase_request(
                 "homework_items?on_conflict=id",
                 method="POST",
-                payload={
-                    "id": l_id,
-                    "subject": loc["subject"],
-                    "title": loc["title"],
-                    "due_date": loc["due_date"],
-                    "completed": bool(loc["completed"]),
-                    "source": loc["source"] or "manual",
-                    "priority": loc["priority"] or 1,
-                    "notes": loc["notes"] or "",
-                },
+                payload=to_push,
                 headers_extra={"Prefer": "resolution=merge-duplicates"},
             )
-            synced_count += 1
+            synced_count += len(to_push)
 
     conn.commit()
     return synced_count
@@ -2138,6 +2226,68 @@ def sync_with_web_server(conn: sqlite3.Connection, cfg: Optional[Dict[str, Any]]
 # =========================================================================
 # Master Multi-Entity Synchronizer
 # =========================================================================
+_ACADEMIC_SYNC_LOCK = threading.Lock()
+_LAST_ACADEMIC_SYNC_TS = 0.0
+
+
+def ensure_fresh_academic_sync(
+    conn: Optional[sqlite3.Connection] = None,
+    force: bool = False,
+    ttl_seconds: int = 45,
+    bypass_test_guard: bool = False,
+) -> Dict[str, Any]:
+    """
+    Lightweight, TTL-throttled sync for school_exams and homework_items so warm
+    serverless instances pick up newly pushed Vulcan tests/homework without running
+    full 15-table sync_all on every read.
+    """
+    global _LAST_ACADEMIC_SYNC_TS
+
+    if not bypass_test_guard and (
+        os.environ.get("PYTEST_CURRENT_TEST")
+        or os.environ.get("TESTING")
+        or os.environ.get("PYTEST_VERSION")
+    ):
+        return {"status": "skipped", "skipped": True, "synced_count": 0}
+
+    now = time.monotonic()
+    if not force and _LAST_ACADEMIC_SYNC_TS > 0 and (now - _LAST_ACADEMIC_SYNC_TS) < ttl_seconds:
+        return {"status": "skipped", "skipped": True, "synced_count": 0}
+
+    cfg = get_sync_config()
+    if not cfg.get("supabase_key"):
+        return {"status": "unconfigured", "skipped": True, "synced_count": 0}
+
+    with _ACADEMIC_SYNC_LOCK:
+        now_locked = time.monotonic()
+        if not force and _LAST_ACADEMIC_SYNC_TS > 0 and (now_locked - _LAST_ACADEMIC_SYNC_TS) < ttl_seconds:
+            return {"status": "skipped", "skipped": True, "synced_count": 0}
+
+        should_close = False
+        local_conn = conn
+        if local_conn is None:
+            local_conn = get_connection()
+            should_close = True
+
+        synced_count = 0
+        errors = []
+        try:
+            for step_name, step_fn in (("school_exams", sync_school_exams), ("homework_items", sync_homework_items)):
+                try:
+                    synced_count += int(step_fn(local_conn) or 0)
+                except Exception as ex:
+                    errors.append(f"{step_name}: {ex}")
+            _LAST_ACADEMIC_SYNC_TS = time.monotonic()
+            return {
+                "status": "synced" if not errors else "partial",
+                "synced_count": synced_count,
+                "errors": errors,
+            }
+        finally:
+            if should_close:
+                local_conn.close()
+
+
 def sync_all(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
     """Executes full bi-directional synchronization across all tables."""
     cfg = get_sync_config()
@@ -2178,29 +2328,30 @@ def sync_all(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
             elif web_res.get("status") == "offline":
                 errors.append(f"Web: {web_res.get('message', 'offline')}")
 
-        # Supabase Cloud Sync (if configured)
+        # Supabase Cloud Sync (if configured) — isolate each step so one failing table never aborts exams/homework
         if has_supabase:
-            try:
-                tasks_count = sync_tasks(conn)
-                logs_count = sync_daily_logs(conn)
-                metro_count = sync_metro_roadmap()
-                kill_count = sync_kill_list_items(conn)
-                deliv_count = sync_station_deliverable_progress(conn)
-                body_count = sync_body_metrics(conn)
-                workout_count = sync_workouts(conn)
-                project_count = sync_projects(conn)
-                exams_count = sync_school_exams(conn)
-                hw_count = sync_homework_items(conn)
-
-                tum_gr_count = sync_tum_grades(conn)
-                tum_ge_count = sync_tum_grade_entries(conn)
-                tum_ma_count = sync_tum_matura(conn)
-                tum_la_count = sync_tum_language(conn)
-                set_count = sync_app_settings()
-
-                total_synced += (tasks_count + logs_count + metro_count + kill_count + deliv_count + body_count + workout_count + project_count + exams_count + hw_count + tum_gr_count + tum_ge_count + tum_ma_count + tum_la_count + set_count)
-            except Exception as se:
-                errors.append(f"Supabase: {se}")
+            supabase_steps = [
+                ("tasks", lambda: sync_tasks(conn)),
+                ("daily_logs", lambda: sync_daily_logs(conn)),
+                ("metro_roadmap", lambda: sync_metro_roadmap()),
+                ("kill_list_items", lambda: sync_kill_list_items(conn)),
+                ("station_deliverable_progress", lambda: sync_station_deliverable_progress(conn)),
+                ("body_metrics", lambda: sync_body_metrics(conn)),
+                ("workouts", lambda: sync_workouts(conn)),
+                ("projects", lambda: sync_projects(conn)),
+                ("school_exams", lambda: sync_school_exams(conn)),
+                ("homework_items", lambda: sync_homework_items(conn)),
+                ("tum_grades", lambda: sync_tum_grades(conn)),
+                ("tum_grade_entries", lambda: sync_tum_grade_entries(conn)),
+                ("tum_matura", lambda: sync_tum_matura(conn)),
+                ("tum_language", lambda: sync_tum_language(conn)),
+                ("app_settings", lambda: sync_app_settings()),
+            ]
+            for step_name, step_fn in supabase_steps:
+                try:
+                    total_synced += int(step_fn() or 0)
+                except Exception as se:
+                    errors.append(f"Supabase({step_name}): {se}")
 
         now_iso = datetime.now().isoformat()
         cfg["last_synced_at"] = now_iso

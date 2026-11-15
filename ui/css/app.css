@@ -960,6 +960,7 @@ body {
 .heatmap-cell.cell-today {
   outline: 2px solid var(--text-primary);
   outline-offset: 1px;
+  position: relative;
 }
 
 .heatmap-cell.cell-future {
@@ -969,27 +970,57 @@ body {
   position: relative;
 }
 
-.heatmap-cell.cell-future.has-exam::after {
+.heatmap-cell.cell-future.has-homework {
+  opacity: 0.9;
+  border-color: var(--text-secondary);
+}
+
+.heatmap-cell.cell-future.has-exam {
+  opacity: 1;
+  background-color: rgba(239, 68, 68, 0.14);
+  border: 1px solid rgba(239, 68, 68, 0.72);
+}
+
+.heatmap-cell.cell-today.has-exam {
+  background-color: rgba(239, 68, 68, 0.18);
+  outline: 2px solid #ef4444;
+  outline-offset: 1px;
+}
+
+.heatmap-cell.cell-future.has-exam::after,
+.heatmap-cell.cell-today.has-exam::after {
   content: "";
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  width: 4px;
-  height: 4px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
-  background-color: var(--text-primary);
+  background-color: #ef4444;
+  box-shadow: 0 0 4px rgba(239, 68, 68, 0.65);
 }
 
-.heatmap-cell.cell-future.has-homework::before {
+.heatmap-cell.cell-today.lvl-3.has-exam::after,
+.heatmap-cell.cell-today.lvl-4.has-exam::after {
+  background-color: #ffffff;
+}
+
+.heatmap-cell.cell-future.has-homework::before,
+.heatmap-cell.cell-today.has-homework::before {
   content: "";
   position: absolute;
   top: 1.5px;
   right: 1.5px;
-  width: 3px;
-  height: 3px;
+  width: 3.5px;
+  height: 3.5px;
   border-radius: 50%;
-  background-color: var(--text-secondary);
+  background-color: var(--text-primary);
+}
+
+.heatmap-cell.cell-today.lvl-3.has-homework::before,
+.heatmap-cell.cell-today.lvl-4.has-homework::before {
+  background-color: var(--bg-canvas);
 }
 
 .heatmap-cell.empty {

@@ -387,16 +387,32 @@ def get_workload_analysis(
 
     cursor = conn.cursor()
 
-    # 1. Fetch upcoming exams
+    # 1. Fetch upcoming exams (normalize ISO date prefixes & deduplicate overlapping sync rows)
     cursor.execute(
         """
         SELECT * FROM school_exams
-        WHERE completed = 0 AND exam_date >= ? AND exam_date <= ?
-        ORDER BY exam_date ASC
+        WHERE completed = 0
+          AND substr(trim(exam_date), 1, 10) >= ?
+          AND substr(trim(exam_date), 1, 10) <= ?
+        ORDER BY substr(trim(exam_date), 1, 10) ASC, id ASC
         """,
         (target_dt.strftime("%Y-%m-%d"), end_dt.strftime("%Y-%m-%d")),
     )
-    exams = [dict(r) for r in cursor.fetchall()]
+    raw_exams = [dict(r) for r in cursor.fetchall()]
+    exams = []
+    seen_exam_keys = set()
+    for r in raw_exams:
+        norm_date = str(r.get("exam_date") or "").strip()[:10]
+        dedupe_key = (
+            (r.get("subject") or "").strip().lower(),
+            (r.get("title") or "").strip().lower(),
+            norm_date,
+        )
+        if dedupe_key in seen_exam_keys:
+            continue
+        seen_exam_keys.add(dedupe_key)
+        r["exam_date"] = norm_date or r.get("exam_date", "")
+        exams.append(r)
 
     tier_1_exams = []
     tier_2_exams = []
@@ -405,7 +421,7 @@ def get_workload_analysis(
 
     for e in exams:
         try:
-            ex_date = datetime.strptime(e["exam_date"], "%Y-%m-%d").date()
+            ex_date = datetime.strptime(str(e["exam_date"] or "").strip()[:10], "%Y-%m-%d").date()
             days_left = (ex_date - target_dt).days
         except Exception:
             ex_date = target_dt
@@ -421,11 +437,11 @@ def get_workload_analysis(
         if is_travel or is_recovery or is_us_travel_date(ex_date):
             e["is_travel_excused"] = True
 
-        # 3-day test factor ONLY: exams within 1 to 3 days trigger Defense readiness (T-0 exam day is already written)
+        # Acute (1..3 days) triggers Defense readiness; rolling 7-day window captures weekly exam density
         if days_left >= 1 and not e.get("is_travel_excused"):
             if 1 <= days_left <= 3:
                 immediate_exams.append(e)
-            if 1 <= days_left <= 5:
+            if 1 <= days_left <= 7:
                 week_exams.append(e)
 
             if e["is_tier_1"]:
@@ -437,8 +453,8 @@ def get_workload_analysis(
     cursor.execute(
         """
         SELECT * FROM homework_items
-        WHERE completed = 0 AND due_date <= ?
-        ORDER BY due_date ASC
+        WHERE completed = 0 AND substr(trim(due_date), 1, 10) <= ?
+        ORDER BY substr(trim(due_date), 1, 10) ASC, id ASC
         """,
         (hw_end_dt.strftime("%Y-%m-%d"),),
     )
@@ -449,7 +465,9 @@ def get_workload_analysis(
 
     for h in homework:
         try:
-            h_date = datetime.strptime(h["due_date"], "%Y-%m-%d").date()
+            clean_due = str(h["due_date"] or "").strip()[:10]
+            h["due_date"] = clean_due or h["due_date"]
+            h_date = datetime.strptime(clean_due, "%Y-%m-%d").date()
             days_left = (h_date - target_dt).days
         except Exception:
             h_date = target_dt
@@ -536,8 +554,9 @@ def get_workload_analysis(
     ]
     has_acute_exams = len(immediate_exams) > 0
     has_acute_essays = len(acute_essays_list) > 0
+    has_weekly_exam_surge = len(week_exams) >= 3
 
-    cruise_unlocked = not has_acute_exams and not has_acute_essays
+    cruise_unlocked = not has_acute_exams and not has_acute_essays and not has_weekly_exam_surge
 
     # Composite Workload score calculation:
     score = (len(tier_1_exams) * 2.5) + (len(tier_2_exams) * 1.0)
@@ -573,7 +592,7 @@ def get_workload_analysis(
         mode_label = "Surge Protocol • High Academic Density"
         badge_class = "amber"
         desc = f"High acute test density ({len(immediate_exams)} test(s) ≤3d, {len(tier_1_exams) + len(tier_2_exams)} total upcoming). Deep work prioritizes nearest test prep."
-    elif not cruise_unlocked:
+    elif has_acute_exams or has_acute_essays:
         mode = "DEFENSE"
         mode_label = "Defense Protocol • Test Within 3 Days"
         badge_class = "surge"
@@ -584,6 +603,11 @@ def get_workload_analysis(
             triage_reasons.append(f"{len(acute_essays_list)} essay draft(s) ≤2d")
         reason_str = ", ".join(triage_reasons) if triage_reasons else "Acute 3-day test defense"
         desc = f"DEFENSE PROTOCOL ACTIVE: {reason_str}. Deep work shifted to acute test preparation."
+    elif has_weekly_exam_surge:
+        mode = "BALANCED"
+        mode_label = f"Balanced Horizon • {len(week_exams)} Tests This Week"
+        badge_class = "lavender"
+        desc = f"CRUISE LOCKED: {len(week_exams)} tests scheduled within 7 days. Deep work pairs TUM Roadmap with early test preparation."
     elif score > 2.5:
         mode = "BALANCED"
         mode_label = "Balanced Horizon • Clean TUM + Early Test Prep"
@@ -1297,8 +1321,8 @@ def synthesize_adaptive_schedule(
                 },
             ]
 
-        # Scenario E: Clean Horizon with Upcoming Exam (4 to 5 days out) -> Balanced TUM + Foundation
-        elif exams and exams[0].get("days_left", 99) <= 5:
+        # Scenario E: Clean Horizon with Upcoming Exam (<=5d out or 3+ weekly exams) -> Balanced TUM + Foundation
+        elif exams and (exams[0].get("days_left", 99) <= 5 or analysis.get("week_exams_count", 0) >= 3):
             e = exams[0]
             p1, p2, p3 = compute_phase_durations(net_min, "medium_horizon")
             scope_info = f" ({e['scope'][:40]})" if e.get("scope") else ""

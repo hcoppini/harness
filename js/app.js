@@ -594,9 +594,18 @@ window.HarnessApp = {
               const count = res.synced_count || 0;
               if (diagEl) diagEl.innerHTML = `<span style="color: var(--color-green); font-weight: 600;">✓ Successfully hydrated ${count} records from Supabase into local storage!</span>`;
               this.showToast(`Hydrated ${count} records from Supabase!`);
-              if (window.Today && typeof window.Today.refresh === "function") window.Today.refresh();
-              if (window.Study && typeof window.Study.refresh === "function") window.Study.refresh();
-              if (window.Dashboard && typeof window.Dashboard.refresh === "function") window.Dashboard.refresh();
+              if (window.Today) {
+                if (typeof window.Today.refresh === "function") window.Today.refresh();
+                else if (typeof window.Today.load === "function") window.Today.load();
+              }
+              if (window.Study) {
+                if (typeof window.Study.refresh === "function") window.Study.refresh();
+                else if (typeof window.Study.load === "function") window.Study.load();
+              }
+              if (window.Dashboard) {
+                if (typeof window.Dashboard.refresh === "function") window.Dashboard.refresh();
+                else if (typeof window.Dashboard.load === "function") window.Dashboard.load();
+              }
               await this.refreshSyncModal();
             } else {
               const msg = res ? (res.error || res.message) : "Pull failed";

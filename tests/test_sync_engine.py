@@ -634,5 +634,180 @@ def test_upsert_remote_item(temp_sync_env):
         )
 
 
+def _ensure_exam_and_hw_tables(conn):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS school_exams (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            title TEXT NOT NULL,
+            exam_date TEXT NOT NULL,
+            scope TEXT DEFAULT '',
+            completed INTEGER DEFAULT 0,
+            result_percentage REAL,
+            source TEXT DEFAULT 'manual',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS homework_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            subject TEXT NOT NULL,
+            title TEXT NOT NULL,
+            due_date TEXT NOT NULL,
+            completed INTEGER DEFAULT 0,
+            source TEXT DEFAULT 'vulcan',
+            priority INTEGER DEFAULT 1,
+            notes TEXT DEFAULT '',
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS app_settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    conn.commit()
+
+
+def test_sync_school_exams_updates_fields_and_cloud_exams_fallback(temp_sync_env):
+    conn, _ = temp_sync_env
+    _ensure_exam_and_hw_tables(conn)
+
+    sync_service.save_sync_config({
+        "supabase_url": "https://test.supabase.co",
+        "supabase_key": "valid_key",
+        "auto_sync": True,
+        "last_synced_at": None,
+    })
+
+    conn.execute(
+        "INSERT INTO school_exams (id, subject, title, exam_date, scope, completed) VALUES (1010, 'Matematyka R', 'Old Title', '2026-11-18', 'Old Scope', 0)"
+    )
+    conn.commit()
+
+    def fake_req(endpoint, method="GET", payload=None, headers_extra=None):
+        if endpoint == "school_exams?select=*":
+            return [
+                {"id": 1010, "subject": "Matematyka R", "title": "New Title", "exam_date": "2026-11-19", "scope": "New Scope", "completed": False},
+                {"id": 1013, "subject": "Polski", "title": "Sprawdzian", "exam_date": "2026-11-17", "scope": "", "completed": False},
+            ]
+        return []
+
+    with patch.object(sync_service, "_make_supabase_request", side_effect=fake_req):
+        synced = sync_service.sync_school_exams(conn)
+        assert synced >= 2
+
+    rows = {r["id"]: dict(r) for r in conn.execute("SELECT * FROM school_exams").fetchall()}
+    assert rows[1010]["title"] == "New Title"
+    assert rows[1010]["exam_date"] == "2026-11-19"
+    assert rows[1010]["scope"] == "New Scope"
+    assert 1013 in rows
+    assert rows[1013]["exam_date"] == "2026-11-17"
+
+    # Cloud fallback when school_exams table returns empty
+    conn.execute("DELETE FROM school_exams")
+    conn.commit()
+    cloud_list = [
+        {"id": 1015, "subject": "Biologia", "title": "Genetyka", "exam_date": "2026-11-20", "scope": "", "completed": False}
+    ]
+
+    def fake_cloud_fallback(endpoint, method="GET", payload=None, headers_extra=None):
+        if endpoint == "school_exams?select=*":
+            return []
+        if "app_settings?key=eq.cloud_exams" in endpoint:
+            return [{"key": "cloud_exams", "value": json.dumps(cloud_list)}]
+        return []
+
+    with patch.object(sync_service, "_make_supabase_request", side_effect=fake_cloud_fallback):
+        synced_cloud = sync_service.sync_school_exams(conn)
+        assert synced_cloud >= 1
+
+    cloud_row = conn.execute("SELECT * FROM school_exams WHERE id = 1015").fetchone()
+    assert cloud_row is not None
+    assert cloud_row["exam_date"] == "2026-11-20"
+
+
+def test_sync_all_isolates_step_failures_and_batches_deliverables(temp_sync_env):
+    conn, _ = temp_sync_env
+    _ensure_exam_and_hw_tables(conn)
+
+    sync_service.save_sync_config({
+        "supabase_url": "https://test.supabase.co",
+        "supabase_key": "valid_key",
+        "auto_sync": True,
+        "last_synced_at": None,
+    })
+
+    # Seed 3 local deliverables not on remote to verify single batched POST
+    for i in range(1, 4):
+        conn.execute(
+            "INSERT INTO station_deliverable_progress (deliverable_id, station_id, stream, title, total_required, completed_count, is_completed) VALUES (?, 'sep-2026', 'Code', ?, 10, 2, 0)",
+            (f"deliv_{i}", f"Deliv {i}"),
+        )
+    conn.commit()
+
+    post_calls = []
+
+    def fake_req(endpoint, method="GET", payload=None, headers_extra=None):
+        if method == "POST":
+            post_calls.append((endpoint, payload))
+            return []
+        if endpoint == "school_exams?select=*":
+            return [{"id": 1017, "subject": "Fizyka", "title": "Optyka", "exam_date": "2026-11-23", "scope": "", "completed": False}]
+        return []
+
+    with patch.object(sync_service, "_make_supabase_request", side_effect=fake_req), \
+         patch.object(sync_service, "sync_tasks", side_effect=RuntimeError("boom in tasks")):
+        res = sync_service.sync_all(conn)
+
+    assert res["status"] == "synced"
+    row = conn.execute("SELECT * FROM school_exams WHERE id = 1017").fetchone()
+    assert row is not None, "Step failure in sync_tasks must not abort sync_school_exams"
+
+    deliv_posts = [c for c in post_calls if "station_deliverable_progress" in c[0]]
+    assert len(deliv_posts) == 1, f"Expected 1 batched POST for deliverables, got {len(deliv_posts)}"
+    assert isinstance(deliv_posts[0][1], list) and len(deliv_posts[0][1]) == 3
+
+
+def test_ensure_fresh_academic_sync_throttles_and_pulls(temp_sync_env, monkeypatch):
+    conn, _ = temp_sync_env
+    _ensure_exam_and_hw_tables(conn)
+
+    sync_service.save_sync_config({
+        "supabase_url": "https://test.supabase.co",
+        "supabase_key": "valid_key",
+        "auto_sync": True,
+        "last_synced_at": None,
+    })
+
+    calls = []
+
+    def fake_req(endpoint, method="GET", payload=None, headers_extra=None):
+        calls.append((method, endpoint))
+        if endpoint == "school_exams?select=*":
+            return [{"id": 1018, "subject": "Chemia", "title": "Kwasy", "exam_date": "2026-11-24", "scope": "", "completed": False}]
+        if endpoint == "homework_items?select=*":
+            return [{"id": 59, "subject": "Polski", "title": "Notatka", "due_date": "2026-11-16", "completed": False, "source": "vulcan", "priority": 1}]
+        return []
+
+    monkeypatch.setattr(sync_service, "_LAST_ACADEMIC_SYNC_TS", 0.0, raising=False)
+
+    with patch.object(sync_service, "_make_supabase_request", side_effect=fake_req):
+        res1 = sync_service.ensure_fresh_academic_sync(conn=conn, ttl_seconds=60, bypass_test_guard=True)
+        assert res1["synced_count"] >= 2
+        first_call_count = len(calls)
+
+        # Second call within TTL must skip HTTP calls
+        res2 = sync_service.ensure_fresh_academic_sync(conn=conn, ttl_seconds=60, bypass_test_guard=True)
+        assert res2.get("skipped") is True
+        assert len(calls) == first_call_count
+
+    assert conn.execute("SELECT exam_date FROM school_exams WHERE id = 1018").fetchone()["exam_date"] == "2026-11-24"
+    assert conn.execute("SELECT due_date FROM homework_items WHERE id = 59").fetchone()["due_date"] == "2026-11-16"
+
+
+
 
 

@@ -210,6 +210,16 @@ def rpc_dispatcher(method_name):
         kwargs = {}
 
     try:
+        if (
+            not app.config.get("TESTING")
+            and (os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"))
+            and method_name in {"get_dashboard", "get_today", "get_upcoming_exams", "get_upcoming_homework"}
+        ):
+            try:
+                sync_service.ensure_fresh_academic_sync()
+            except Exception:
+                pass
+
         method = getattr(api, method_name)
         result = method(*args, **kwargs)
 
@@ -740,6 +750,11 @@ def sync_exchange_endpoint():
 # --- Layer 0: Dashboard ---
 @app.route("/api/dashboard", methods=["GET"])
 def get_dashboard():
+    if not app.config.get("TESTING") and (os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV")):
+        try:
+            sync_service.ensure_fresh_academic_sync()
+        except Exception:
+            pass
     date_str = request.args.get("date")
     data = api.get_dashboard(client_date=date_str)
     return jsonify(data)

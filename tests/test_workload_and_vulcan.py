@@ -587,6 +587,32 @@ def test_three_day_defense_threshold_and_weekend_tum_linkage(test_db):
     assert workload_3d["immediate_count"] == 1
 
 
+def test_three_tests_this_week_never_cruise_mode(test_db):
+    """3+ tests within the 7-day rolling week or ISO-suffixed dates must never leave mode in CRUISE."""
+    base_date = "2026-11-15"
+
+    # 3 non-Tier-1 tests later this week (+4d, +6d, +7d) -> outside 3d window, all within 7d
+    homework_service.add_exam("Historia", "Sprawdzian I", "2026-11-19", conn=test_db)
+    homework_service.add_exam("Biologia", "Kartkówka Genetyka", "2026-11-21", conn=test_db)
+    homework_service.add_exam("Geografia", "Sprawdzian Polska", "2026-11-22", conn=test_db)
+    test_db.commit()
+
+    analysis = workload_governor.get_workload_analysis(target_date_str=base_date, conn=test_db)
+    assert analysis["week_exams_count"] == 3
+    assert analysis["cruise_unlocked"] is False
+    assert analysis["mode"] != "CRUISE"
+    assert analysis["mode"] in ("BALANCED", "DEFENSE", "SURGE")
+
+    # ISO time suffix + trailing space on an exam +2d out must parse and activate acute DEFENSE/SURGE
+    test_db.execute(
+        "INSERT INTO school_exams (subject, title, exam_date, scope, completed) VALUES ('Fizyka', 'Elektrostatyka', '2026-11-17T00:00:00 ', '', 0)"
+    )
+    test_db.commit()
+    analysis_iso = workload_governor.get_workload_analysis(target_date_str=base_date, conn=test_db)
+    assert analysis_iso["immediate_count"] == 1
+    assert analysis_iso["mode"] in ("DEFENSE", "SURGE")
+
+
 
 
 

@@ -11,8 +11,10 @@ from app.db import get_connection
 def _calculate_days_left(target_date_str: str, current_date_str: Optional[str] = None) -> int:
     """Calculates days remaining until target date (0 = Today, negative = overdue)."""
     try:
-        target = datetime.strptime(target_date_str, "%Y-%m-%d").date()
-        today = datetime.strptime(current_date_str, "%Y-%m-%d").date() if current_date_str else datetime.now().date()
+        clean_target = str(target_date_str or "").strip()[:10]
+        target = datetime.strptime(clean_target, "%Y-%m-%d").date()
+        clean_today = str(current_date_str or "").strip()[:10]
+        today = datetime.strptime(clean_today, "%Y-%m-%d").date() if clean_today else datetime.now().date()
         return (target - today).days
     except Exception:
         return 0
@@ -272,14 +274,14 @@ def get_upcoming_exams(
 
     # Auto-mark past exams as completed
     if not os.environ.get("PYTEST_CURRENT_TEST"):
-        cursor.execute("UPDATE school_exams SET completed = 1 WHERE exam_date < ? AND completed = 0", (current_date,))
+        cursor.execute("UPDATE school_exams SET completed = 1 WHERE substr(trim(exam_date), 1, 10) < ? AND completed = 0", (current_date,))
         conn.commit()
 
     cursor.execute(
         """
         SELECT * FROM school_exams
-        WHERE completed = 0 AND exam_date >= ?
-        ORDER BY exam_date ASC
+        WHERE completed = 0 AND substr(trim(exam_date), 1, 10) >= ?
+        ORDER BY substr(trim(exam_date), 1, 10) ASC, id ASC
         LIMIT ?
         """,
         (current_date, limit),
@@ -288,10 +290,11 @@ def get_upcoming_exams(
     exams = []
     seen_exams = set()
     for r in rows:
+        norm_date = str(r["exam_date"] or "").strip()[:10]
         key = (
             (r["subject"] or "").strip().lower(),
             (r["title"] or "").strip().lower(),
-            (r["exam_date"] or "").strip(),
+            norm_date,
         )
         if key in seen_exams:
             continue
@@ -300,11 +303,11 @@ def get_upcoming_exams(
             "id": r["id"],
             "subject": r["subject"],
             "title": r["title"],
-            "exam_date": r["exam_date"],
+            "exam_date": norm_date or r["exam_date"],
             "scope": r["scope"] or "",
             "completed": bool(r["completed"]),
             "result_percentage": r["result_percentage"],
-            "days_left": _calculate_days_left(r["exam_date"], current_date),
+            "days_left": _calculate_days_left(norm_date or r["exam_date"], current_date),
         })
 
     if close_conn:

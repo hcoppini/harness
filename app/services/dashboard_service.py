@@ -135,10 +135,16 @@ def get_heatmap_data(
         kd = kr["date"]
         daily_kill_items.setdefault(kd, []).append(dict(kr))
 
-    # 5. Fetch upcoming school exams and homework across the range for future indicator dots
+    # 5. Fetch upcoming school exams and homework across the range for future and today indicator dots
     try:
         cursor.execute(
-            "SELECT id, subject, title, exam_date, scope FROM school_exams WHERE exam_date >= ? AND exam_date <= ? AND completed = 0",
+            """
+            SELECT id, subject, title, exam_date, scope
+            FROM school_exams
+            WHERE completed = 0
+              AND substr(trim(exam_date), 1, 10) >= ?
+              AND substr(trim(exam_date), 1, 10) <= ?
+            """,
             (aligned_start_str, final_end_date_str),
         )
         exam_rows = cursor.fetchall()
@@ -146,11 +152,22 @@ def get_heatmap_data(
         exam_rows = []
     future_exams_map: Dict[str, List[Dict[str, Any]]] = {}
     for er in exam_rows:
-        future_exams_map.setdefault(er["exam_date"], []).append(dict(er))
+        edate = str(er["exam_date"] or "").strip()[:10]
+        if not edate:
+            continue
+        item = dict(er)
+        item["exam_date"] = edate
+        future_exams_map.setdefault(edate, []).append(item)
 
     try:
         cursor.execute(
-            "SELECT id, subject, title, due_date, priority FROM homework_items WHERE due_date >= ? AND due_date <= ? AND completed = 0",
+            """
+            SELECT id, subject, title, due_date, priority
+            FROM homework_items
+            WHERE completed = 0
+              AND substr(trim(due_date), 1, 10) >= ?
+              AND substr(trim(due_date), 1, 10) <= ?
+            """,
             (aligned_start_str, final_end_date_str),
         )
         hw_rows = cursor.fetchall()
@@ -158,7 +175,12 @@ def get_heatmap_data(
         hw_rows = []
     future_hw_map: Dict[str, List[Dict[str, Any]]] = {}
     for hr in hw_rows:
-        future_hw_map.setdefault(hr["due_date"], []).append(dict(hr))
+        ddate = str(hr["due_date"] or "").strip()[:10]
+        if not ddate:
+            continue
+        item = dict(hr)
+        item["due_date"] = ddate
+        future_hw_map.setdefault(ddate, []).append(item)
 
     # Build weekly columns
     weeks_list = []
@@ -264,12 +286,6 @@ def get_heatmap_data(
             # - Level 0: 0 checked boxes / empty -> Brightest / Ivory (#f0f0f0)
             if is_future:
                 level = 0
-                if has_exam:
-                    for ex in day_exams:
-                        activities.append(f"[UPCOMING TEST] {ex['subject']}: {ex['title']}")
-                if has_homework:
-                    for hw in day_hw:
-                        activities.append(f"[HOMEWORK DUE] {hw['subject']}: {hw['title']}")
             else:
                 unchecked_boxes = max(0, total_boxes - checked_boxes)
                 if total_boxes == 0:
@@ -285,6 +301,14 @@ def get_heatmap_data(
                         level = 2  # Mid gray
                     else:
                         level = 1  # Light gray
+
+            if is_future or is_today:
+                if has_exam:
+                    for ex in day_exams:
+                        activities.append(f"[UPCOMING TEST] {ex['subject']}: {ex['title']}")
+                if has_homework:
+                    for hw in day_hw:
+                        activities.append(f"[HOMEWORK DUE] {hw['subject']}: {hw['title']}")
 
             week_days.append({
                 "date": cur_str,

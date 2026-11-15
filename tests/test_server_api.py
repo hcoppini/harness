@@ -617,3 +617,22 @@ def test_vulcan_status_and_manual_exam_endpoints(client, tmp_path, monkeypatch):
 
 
 
+
+
+def test_rpc_get_dashboard_runs_fresh_academic_sync_when_vercel(client, monkeypatch):
+    import server
+    from unittest.mock import patch
+
+    monkeypatch.setenv("VERCEL", "1")
+    server.app.config["TESTING"] = False
+    try:
+        with patch.object(sync_service, "ensure_fresh_academic_sync", return_value={"status": "synced", "synced_count": 1}) as mock_sync:
+            res = client.post(
+                "/api/rpc/get_dashboard",
+                data=json.dumps({"args": ["2026-11-15"]}),
+                content_type="application/json",
+            )
+            assert res.status_code == 200
+            mock_sync.assert_called_once()
+    finally:
+        server.app.config["TESTING"] = True
