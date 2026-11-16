@@ -960,8 +960,8 @@ def auto_populate_kill_list(
         conn = get_connection()
         close_conn = True
 
-    from engine.workload_governor import is_us_travel_date
-    is_travel = is_us_travel_date(target_date)
+    from engine.workload_governor import is_travel_or_vacation_date
+    is_travel = is_travel_or_vacation_date(target_date)
     max_items = 1 if is_travel else 3
 
     cursor = conn.cursor()
@@ -985,8 +985,8 @@ def auto_populate_kill_list(
 
     # 1. Dynamically adapt school defense slots to weekly test volume and homework deadlines
     from app.services import homework_service
-    from engine.workload_governor import is_us_travel_date
-    is_travel = is_us_travel_date(target_date)
+    from engine.workload_governor import is_travel_or_vacation_date
+    is_travel = is_travel_or_vacation_date(target_date)
 
     upcoming_exams = homework_service.get_upcoming_exams(conn=conn, limit=5, today_str=target_date)
     acute_exams = [

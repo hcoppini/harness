@@ -115,11 +115,11 @@
       ]
     },
     "A_FRI": {
-      "name": "Schedule A: Friday (SGH Study + Boxing)",
+      "name": "Schedule A: Friday (Coding & Weekend Kickoff)",
       "days": [
         "Friday"
       ],
-      "description": "Ends at 14:15. Deep work at SGH Library + Boxing.",
+      "description": "School ends at 14:15. Commute home, JetBrains Youth Coding Club & school wrap-up, zero evening boxing. 100% free Friday evening.",
       "blocks": [
         {
           "time": "06:35 – 07:20",
@@ -135,36 +135,24 @@
         },
         {
           "time": "14:30 – 16:30",
-          "focus": "SGH Library: TUM Deep Work (2h)",
-          "activity": "60m Math R + 60m CS coding / SIGG analysis.",
+          "focus": "SGH Library / Home: JetBrains Club & Coding Sprint (2h)",
+          "activity": "60m Math R / Homework clearance + 60m JetBrains Youth Coding Club / Matura CS.",
           "type": "deep_work"
         },
         {
           "time": "16:30 – 17:15",
           "focus": "Commute Home & Chores",
-          "activity": "40 min commute home, chores, pre-boxing meal.",
+          "activity": "40 min commute home, quick chores, unpack for weekend.",
           "type": "chore"
         },
         {
-          "time": "17:20 – 20:30/21:00",
-          "focus": "Boxing Block",
-          "activity": "Boxing session / sparring wrap-up.",
-          "type": "training"
-        },
-        {
-          "time": "20:30/21:00 – 21:45",
-          "focus": "Nutrition & Shower",
-          "activity": "Dinner and wind-down.",
-          "type": "nutrition"
-        },
-        {
-          "time": "21:45 – 23:00",
+          "time": "17:15 – 22:45",
           "focus": "Weekend Kickoff Free Time",
-          "activity": "Guilt-free relaxation, gaming, or socializing.",
+          "activity": "Zero workouts. Guilt-free relaxation, gaming, friends, or side projects.",
           "type": "rest"
         },
         {
-          "time": "23:00 – 07:30",
+          "time": "22:45 – 07:30",
           "focus": "Sleep (8.5 hrs)",
           "activity": "Deep weekend recovery.",
           "type": "sleep"
@@ -211,8 +199,8 @@
         },
         {
           "time": "19:00 – 20:00",
-          "focus": "Dinner & German",
-          "activity": "Dinner + 20 min German input (Nicos Weg/Anki).",
+          "focus": "Dinner & Academic Review",
+          "activity": "Dinner + 20 min school prep / homework clearance (or German if horizon clear).",
           "type": "study"
         },
         {

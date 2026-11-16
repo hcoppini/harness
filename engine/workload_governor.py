@@ -81,6 +81,80 @@ def is_us_travel_date(target_date: Optional[Any] = None) -> bool:
     return date(2026, 10, 4) <= dt <= date(2026, 10, 18)
 
 
+TRAVEL_WINDOWS_FILE = DATA_DIR / "travel_windows.json"
+
+
+def get_travel_windows() -> List[Dict[str, Any]]:
+    """Loads configured travel/vacation windows (US trip, Christmas, Brazil, etc.)."""
+    if TRAVEL_WINDOWS_FILE.exists():
+        try:
+            with open(TRAVEL_WINDOWS_FILE, "r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data.get("windows", [])
+        except Exception:
+            pass
+    return [
+        {
+            "id": "us_2026",
+            "name": "US Deployment",
+            "destination": "United States",
+            "start_date": "2026-10-04",
+            "end_date": "2026-10-18",
+            "description": "Family travel & exploration. Daily 45-60m maintenance anchor.",
+        },
+        {
+            "id": "christmas_2026",
+            "name": "Christmas & Year-End Trip",
+            "destination": "Holiday Travel",
+            "start_date": "2026-12-22",
+            "end_date": "2027-01-03",
+            "description": "Christmas & New Year break. 30m daily oxygen line anchor.",
+        },
+        {
+            "id": "brazil_2027",
+            "name": "Brazil Expedition",
+            "destination": "Brazil",
+            "start_date": "2027-02-01",
+            "end_date": "2027-02-28",
+            "description": "Family trip to Brazil. Morning 30-45m maintenance anchor. 100% guilt-free exploration.",
+        },
+    ]
+
+
+def get_active_travel_window(target_date: Optional[Any] = None) -> Optional[Dict[str, Any]]:
+    """Returns the travel window matching target_date, or None."""
+    if target_date is None:
+        dt = datetime.now().date()
+    elif isinstance(target_date, str):
+        try:
+            dt = datetime.strptime(target_date[:10], "%Y-%m-%d").date()
+        except Exception:
+            dt = datetime.now().date()
+    elif isinstance(target_date, datetime):
+        dt = target_date.date()
+    elif isinstance(target_date, date):
+        dt = target_date
+    else:
+        dt = datetime.now().date()
+
+    for win in get_travel_windows():
+        try:
+            s = datetime.strptime(win["start_date"][:10], "%Y-%m-%d").date()
+            e = datetime.strptime(win["end_date"][:10], "%Y-%m-%d").date()
+            if s <= dt <= e:
+                return win
+        except Exception:
+            continue
+    return None
+
+
+def is_travel_or_vacation_date(target_date: Optional[Any] = None) -> bool:
+    """Returns True if target_date falls within any travel window or vacation."""
+    if is_us_travel_date(target_date):
+        return True
+    return get_active_travel_window(target_date) is not None
+
+
 def get_active_station_id(target_date: Optional[Any] = None) -> str:
     """
     Dynamically maps any target date between 2026 and 2028 to its active TUM Metro station ID.
@@ -381,7 +455,8 @@ def get_workload_analysis(
     hw_end_dt = target_dt + timedelta(days=7)
 
     op_mode = get_operating_mode()
-    is_travel = is_us_travel_date(target_dt) or (op_mode == "FIELD")
+    travel_win = get_active_travel_window(target_dt)
+    is_travel = is_us_travel_date(target_dt) or is_travel_or_vacation_date(target_dt) or (op_mode == "FIELD")
     is_recovery = (op_mode == "SURGE_RECOVERY")
     vulnerabilities = get_subject_vulnerabilities(conn=conn)
 
@@ -434,7 +509,7 @@ def get_workload_analysis(
         e["subject_gpa"] = subj_vuln.get("gpa", 4.0)
 
         # Travel or Recovery protocol: exams occurring during trip/recovery are excused post-event
-        if is_travel or is_recovery or is_us_travel_date(ex_date):
+        if is_travel or is_recovery or is_travel_or_vacation_date(ex_date):
             e["is_travel_excused"] = True
 
         # Acute (1..3 days) triggers Defense readiness; rolling 7-day window captures weekly exam density
@@ -479,7 +554,7 @@ def get_workload_analysis(
         h["is_vulnerable"] = subj_vuln.get("is_vulnerable", False)
         h["subject_gpa"] = subj_vuln.get("gpa", 4.0)
 
-        if is_travel or is_recovery or is_us_travel_date(h_date):
+        if is_travel or is_recovery or is_travel_or_vacation_date(h_date):
             h["is_travel_excused"] = True
 
         if not h.get("is_travel_excused"):
@@ -653,6 +728,10 @@ def get_workload_analysis(
         "cruise_unlocked": cruise_unlocked,
         "vulnerabilities": vulnerabilities,
         "is_us_travel_mode": is_travel,
+        "is_travel_mode": is_travel,
+        "active_travel_window": travel_win,
+        "travel_destination": travel_win["destination"] if travel_win else ("United States" if is_us_travel_date(target_dt) else "Travel / Field"),
+        "travel_name": travel_win["name"] if travel_win else ("US Deployment" if is_us_travel_date(target_dt) else "Travel / Field"),
         "is_recovery_mode": is_recovery,
         "operating_mode": op_mode,
     }
@@ -759,6 +838,18 @@ def _select_station_deliverables_for_schedule(
     station_delivs = kill_list_controller.get_station_deliverables(active_station_id, conn=conn)
     intellectual = [d for d in station_delivs if not _is_physical_deliverable(d)]
     physical_list = [d for d in station_delivs if _is_physical_deliverable(d)]
+
+    # STEM Emergency Filter: If Math or Physics is vulnerable (GPA < 2.5 or low grade),
+    # freeze German deliverables from taking top priority in deep work. Prioritize Academics & Code.
+    try:
+        vulns = get_subject_vulnerabilities(conn=conn)
+        stem_in_emergency = vulns.get("Matematyka", {}).get("is_vulnerable", False) or vulns.get("Fizyka", {}).get("is_vulnerable", False)
+        if stem_in_emergency:
+            stem_intel = [d for d in intellectual if (d.get("stream") or "").lower() in ("academics", "code")]
+            if stem_intel:
+                intellectual = stem_intel
+    except Exception:
+        pass
 
     incomplete_intel = [d for d in intellectual if not d.get("is_completed")]
     pool = incomplete_intel if incomplete_intel else intellectual
@@ -882,23 +973,39 @@ def synthesize_adaptive_schedule(
     # --------------------------------------------------------------------------
     # 0B. FIELD / TRAVEL PROTOCOL (Away from Warsaw workstation)
     # --------------------------------------------------------------------------
-    if analysis.get("is_us_travel_mode"):
+    if analysis.get("is_us_travel_mode") or analysis.get("is_travel_mode"):
         station_id = active_station_id
         chosen_payload = deliv_dict
         spec = deliv_spec
         net_min, cutoff_str = parse_block_net_minutes("09:30 – 10:30", default_minutes=60)
         p1, p2, p3 = compute_phase_durations(net_min, "us_travel")
+
+        dest = analysis.get("travel_destination", "Travel")
+        t_name = analysis.get("travel_name", "Travel Expedition")
+        is_us = (dest == "United States") or is_us_travel_date(target_dt)
+
+        deep_focus = (
+            f"US Hotel Deep Work • 60m Maintenance Anchor: {spec['title']}"
+            if is_us
+            else f"{dest} Deep Work • 45m Maintenance Anchor: {spec['title']}"
+        )
+        deep_activity = (
+            f"[US Travel Maintenance // {station_id}] 60m low-friction anchor: {p1}m {spec['target_spec']} + {p2}m self-correction + {p3}m German vocabulary. Momentum sustained; zero guilt."
+            if is_us
+            else f"[{t_name} Maintenance // {station_id}] 45m low-friction anchor: {p1}m {spec['target_spec']} + {p2}m self-correction + {p3}m review. Momentum sustained; zero guilt."
+        )
+
         travel_blocks = [
             {
                 "time": "08:30 – 09:30",
                 "focus": "Morning Fuel & Launch",
-                "activity": "Wake up, hydration, high-protein breakfast, plan day exploration/activities.",
+                "activity": f"Wake up, hydration, high-protein breakfast, plan {dest} exploration/activities.",
                 "type": "routine",
             },
             {
                 "time": "09:30 – 10:30",
-                "focus": f"US Hotel Deep Work • 60m Maintenance Anchor: {spec['title']}",
-                "activity": f"[US Travel Maintenance // {station_id}] 60m low-friction anchor: {p1}m {spec['target_spec']} + {p2}m self-correction + {p3}m German vocabulary. Momentum sustained; zero guilt.",
+                "focus": deep_focus,
+                "activity": deep_activity,
                 "type": "deep_work",
                 "is_tum_roadmap": True,
                 "is_school_dedicated": False,
@@ -929,10 +1036,10 @@ def synthesize_adaptive_schedule(
                     {
                         "phase_num": 3,
                         "phase_key": "study_code",
-                        "badge_label": "[3. GERMAN VOCABULARY]",
+                        "badge_label": "[3. CORE DRILL & REVIEW]",
                         "duration_min": p3,
-                        "title": "German A2 Vocabulary Recall",
-                        "description": f"{p3}m active recall of German A2 vocabulary and grammar structures.",
+                        "title": "JetBrains / Algorithms or Vocabulary Recall",
+                        "description": f"{p3}m active recall or unassisted coding. Keep momentum clean.",
                         "type": "german_code",
                         "color": "#10b981",
                     },
@@ -943,7 +1050,7 @@ def synthesize_adaptive_schedule(
             {
                 "time": "10:30 – 18:30",
                 "focus": "Travel Program, Exploration & Free Time",
-                "activity": "Scheduled trip activities, city transit, cultural immersion, boxing, and exploration. Zero guilt.",
+                "activity": f"Scheduled trip activities in {dest}, transit, family, boxing, and exploration. Zero guilt.",
                 "type": "travel",
             },
             {
@@ -973,8 +1080,12 @@ def synthesize_adaptive_schedule(
         ]
         _attach_physical_to_training_blocks(travel_blocks, phys_dict)
         schedule["blocks"] = travel_blocks
-        schedule["name"] = f"US Travel Protocol ({target_dt.strftime('%A')})"
-        schedule["description"] = "Travel Mode Active (Oct 4–18). Warsaw schedule suspended. 60m minimal maintenance anchor to keep pace with zero guilt. Enjoy your trip."
+        if is_us:
+            schedule["name"] = f"US Travel Protocol ({target_dt.strftime('%A')})"
+            schedule["description"] = "Travel Mode Active (Oct 4–18). Warsaw schedule suspended. 60m minimal maintenance anchor to keep pace with zero guilt. Enjoy your trip."
+        else:
+            schedule["name"] = f"{t_name} ({target_dt.strftime('%A')})"
+            schedule["description"] = f"Travel Mode Active ({dest}). Warsaw schedule suspended. 45m minimal maintenance anchor to sustain momentum with zero guilt. Enjoy your trip."
         return schedule
 
     exams = analysis.get("upcoming_exams", [])

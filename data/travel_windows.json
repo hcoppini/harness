@@ -1,0 +1,28 @@
+{
+  "windows": [
+    {
+      "id": "us_2026",
+      "name": "US Deployment",
+      "destination": "United States",
+      "start_date": "2026-10-04",
+      "end_date": "2026-10-18",
+      "description": "Family travel & exploration. Daily 45-60m maintenance anchor. School timetable suspended."
+    },
+    {
+      "id": "christmas_2026",
+      "name": "Christmas & Year-End Trip",
+      "destination": "Holiday & Christmas Travel",
+      "start_date": "2026-12-22",
+      "end_date": "2027-01-03",
+      "description": "Christmas & New Year break. 30m daily oxygen line anchor. Zero school debt before departure."
+    },
+    {
+      "id": "brazil_2027",
+      "name": "Brazil Expedition",
+      "destination": "Brazil",
+      "start_date": "2027-02-01",
+      "end_date": "2027-02-28",
+      "description": "Family trip to Brazil. Morning 30-45m maintenance anchor. 100% guilt-free exploration, boxing, and rest."
+    }
+  ]
+}

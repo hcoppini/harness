@@ -260,6 +260,24 @@ def get_heatmap_data(
             if dl.get("has_reflection", False):
                 activities.append("[DONE] Evening reflection audit completed")
 
+            # Check travel / field mode
+            is_travel_day = False
+            travel_destination = None
+            try:
+                from engine import workload_governor
+                twin = workload_governor.get_active_travel_window(cur_str)
+                if twin:
+                    is_travel_day = True
+                    travel_destination = twin.get("destination", "Travel")
+                elif workload_governor.is_us_travel_date(cur_str):
+                    is_travel_day = True
+                    travel_destination = "United States"
+            except Exception:
+                pass
+
+            if is_travel_day:
+                activities.append(f"[TRAVEL / FIELD] {travel_destination} — Warsaw schedule excused")
+
             # Total boxes and checked boxes
             total_boxes = total_routine_blocks + total_gym_exercises + total_tasks
             checked_boxes = checked_routine_blocks + checked_gym_exercises + checked_tasks
@@ -280,8 +298,8 @@ def get_heatmap_data(
 
             # Map to Monochrome Inverted Levels:
             # - Level 4: 100% completed (all boxes checked, 0 unchecked) -> Super Dark Pitch Black (#000000)
-            # - Level 3: 1 unchecked box (or >= 75% completed) -> Dark Charcoal (#333333)
-            # - Level 2: 2-3 unchecked boxes (or >= 40% completed) -> Mid Gray (#777777)
+            # - Level 3: Core anchors met (>= 50% or <= 2 unchecked or 2+ routine blocks) -> Dark Charcoal (#333333)
+            # - Level 2: Partial execution (>= 2 boxes checked) -> Mid Gray (#777777)
             # - Level 1: > 0 checked boxes -> Light Gray (#bbbbbb)
             # - Level 0: 0 checked boxes / empty -> Brightest / Ivory (#f0f0f0)
             if is_future:
@@ -293,12 +311,14 @@ def get_heatmap_data(
                 else:
                     if checked_boxes == 0:
                         level = 0
+                    elif is_travel_day and (checked_boxes >= 1 or dl.get("has_reflection", False)):
+                        level = 4  # Travel maintenance anchor met = 100% victory
                     elif unchecked_boxes == 0 or checked_boxes >= total_boxes:
                         level = 4  # Super dark black for 100% completion!
-                    elif unchecked_boxes == 1 or (checked_boxes / total_boxes >= 0.75):
-                        level = 3  # Dark charcoal
-                    elif unchecked_boxes <= 3 or (checked_boxes / total_boxes >= 0.40):
-                        level = 2  # Mid gray
+                    elif unchecked_boxes <= 2 or (checked_boxes / total_boxes >= 0.50) or checked_routine_blocks >= 2:
+                        level = 3  # Dark charcoal: core anchors completed
+                    elif (checked_boxes / total_boxes >= 0.25) or checked_boxes >= 2:
+                        level = 2  # Mid gray: partial execution
                     else:
                         level = 1  # Light gray
 
