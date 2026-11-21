@@ -960,6 +960,34 @@ def auto_sync_vulcan_route():
     return jsonify(res or {"status": "fresh"})
 
 
+# --- A2UI Protocol: Plans / Logs & Dynamic Outings ---
+@app.route("/api/a2ui/status", methods=["GET"])
+def a2ui_status_route():
+    return jsonify(api.get_a2ui_status())
+
+
+@app.route("/api/a2ui/outings", methods=["GET"])
+def a2ui_outings_route():
+    return jsonify(api.get_a2ui_outings())
+
+
+@app.route("/api/a2ui/chat", methods=["POST"])
+def a2ui_chat_route():
+    payload = request.get_json(silent=True) or {}
+    msg = payload.get("message", "")
+    stance = payload.get("stance", "coach")
+    date_str = payload.get("date")
+    return jsonify(api.send_a2ui_message(msg, stance=stance, date_str=date_str))
+
+
+@app.route("/api/a2ui/action", methods=["POST"])
+def a2ui_action_route():
+    payload = request.get_json(silent=True) or {}
+    action_name = payload.get("action", "")
+    data_payload = payload.get("payload") or {}
+    return jsonify(api.apply_a2ui_action(action_name, data_payload))
+
+
 # --- Layer 2: TUM Metro & Bavarian Aptitude ---
 @app.route("/api/tum/overview", methods=["GET"])
 def get_tum_overview():
@@ -1035,6 +1063,16 @@ def toggle_metro_deliverable(station_id):
     if not key:
         return jsonify({"error": "deliverable_key is required"}), 400
     res = api.toggle_station_deliverable(station_id, key)
+    return jsonify(res)
+
+
+@app.route("/api/metro/<station_id>/sidequest", methods=["POST"])
+def toggle_metro_sidequest(station_id):
+    payload = request.get_json(silent=True) or {}
+    sq_id = payload.get("sidequest_id", "")
+    if not sq_id:
+        return jsonify({"error": "sidequest_id is required"}), 400
+    res = api.toggle_station_sidequest(station_id, sq_id)
     return jsonify(res)
 
 @app.route("/api/metro/<station_id>/status", methods=["POST"])

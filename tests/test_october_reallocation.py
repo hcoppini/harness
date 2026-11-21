@@ -41,22 +41,21 @@ def test_station_states_and_reallocation():
 
     assert "nov-2026" in stations
     assert stations["nov-2026"]["status"] == "active"
-    assert stations["nov-2026"]["deliverable_counts"]["Academics"]["total"] == 42
-    assert stations["nov-2026"]["deliverable_counts"]["Code"]["total"] == 17
+    assert stations["nov-2026"]["deliverable_counts"]["Academics"]["total"] == 18
+    assert stations["nov-2026"]["deliverable_counts"]["Physical"]["total"] == 16
+    assert len(stations["nov-2026"].get("sidequests", [])) >= 2
 
-    # Dec 2026
-    assert stations["dec-2026"]["deliverable_counts"]["Academics"]["total"] == 42
-    assert stations["dec-2026"]["deliverable_counts"]["German"]["total"] == 110
+    # Dec 2026 (school grades lock + break Sidequests, no cumulative catch-up penalty)
+    assert stations["dec-2026"]["deliverable_counts"]["Academics"]["total"] == 15
+    assert len(stations["dec-2026"].get("sidequests", [])) >= 2
 
-    # Summer months
-    assert stations["jun-2027"]["deliverable_counts"]["Academics"]["total"] == 46
-    assert stations["jun-2027"]["deliverable_counts"]["Code"]["total"] == 21
+    # Year 3 final & Summer vacation acceleration (Programming moves to Summer/Break)
+    assert stations["jun-2027"]["deliverable_counts"]["Academics"]["total"] == 12
+    assert stations["jul-aug-2027"]["deliverable_counts"]["Code"]["total"] == 25
+    assert stations["jul-aug-2027"]["deliverable_counts"]["Academics"]["total"] == 35
 
-    assert stations["jul-aug-2027"]["deliverable_counts"]["Academics"]["total"] == 54
-    assert stations["jul-aug-2027"]["deliverable_counts"]["German"]["total"] == 165
-
-    assert stations["sep-2027"]["deliverable_counts"]["Academics"]["total"] == 46
-    assert stations["sep-2027"]["deliverable_counts"]["Code"]["total"] == 22
+    assert stations["sep-2027"]["deliverable_counts"]["Academics"]["total"] == 18
+    assert stations["sep-2027"]["deliverable_counts"]["Code"]["total"] == 15
 
 
 def test_operating_mode_toggle_and_governor(test_env):

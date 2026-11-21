@@ -399,7 +399,14 @@ const Today = {
     if (!window.pywebview || !window.pywebview.api || !window.pywebview.api.set_operating_mode) return;
     try {
       await window.pywebview.api.set_operating_mode(mode);
-      const label = mode === "SURGE_RECOVERY" ? "Low Energy" : mode === "FIELD" ? "Travel" : "Standard";
+      const label =
+        mode === "SURGE_RECOVERY"
+          ? "Low Energy"
+          : mode === "BREAK"
+          ? "Break Sprint"
+          : mode === "FIELD"
+          ? "Travel"
+          : "Standard";
       if (window.HarnessApp && window.HarnessApp.showToast) {
         window.HarnessApp.showToast(`Day Mode -> ${label}`);
       }
@@ -412,6 +419,14 @@ const Today = {
     }
   },
 
+  startBriefSprint(minutes, subject) {
+    if (window.FocusTimer && typeof window.FocusTimer.startCustomSprint === "function") {
+      window.FocusTimer.startCustomSprint(minutes, subject);
+    } else if (window.HarnessApp && window.HarnessApp.showToast) {
+      window.HarnessApp.showToast(`Start ${minutes}m focus: ${subject}`);
+    }
+  },
+
   renderDayModeSwitch() {
     const host = document.getElementById("dayModeSwitchContainer");
     if (!host) return;
@@ -421,6 +436,7 @@ const Today = {
     const modes = [
       { key: "FORTRESS", label: "Standard" },
       { key: "SURGE_RECOVERY", label: "Low Energy" },
+      { key: "BREAK", label: "Break Sprint" },
       { key: "FIELD", label: "Travel" },
     ];
     host.innerHTML = `
@@ -433,6 +449,96 @@ const Today = {
             title="Switch daily protocol to ${m.label}"
           >${m.label}</button>
         `).join("")}
+      </div>
+    `;
+  },
+
+  renderStudyBriefBanner(wl) {
+    if (!wl) return "";
+
+    if (wl.mode === "BREAK") {
+      return `
+        <div class="study-brief-card is-break">
+          <div class="study-brief-header">
+            <span class="study-brief-eyebrow" style="color: var(--accent-lavender);">BREAK SPRINT ACTIVE &bull; ZERO SCHOOL TESTS TO DEFEND</span>
+            <span class="mono-chip lavender" style="font-size: 9px;">Programming &amp; Sidequests</span>
+          </div>
+          <div style="font-size: 12px; color: var(--text-secondary); margin-bottom: 8px;">
+            School is off. Use fresh morning hours for unassisted coding, JetBrains / CS projects, and optional Roadmap Sidequests.
+          </div>
+          <div style="display: flex; flex-wrap: wrap; gap: 6px;">
+            <button type="button" class="btn-subtle study-brief-cta" onclick="Today.startBriefSprint(60, 'Break Coding Sprint')">Start 60m Coding &nearr;</button>
+            <button type="button" class="btn-subtle study-brief-cta" onclick="window.HarnessApp && window.HarnessApp.switchLayer && window.HarnessApp.switchLayer('tum')">Open Sidequests in TUM Metro &rarr;</button>
+          </div>
+        </div>
+      `;
+    }
+
+    const brief = wl.exam_week_plan;
+    if (!brief || !Array.isArray(brief.targets) || brief.targets.length === 0) {
+      return "";
+    }
+
+    const activeTargets = brief.targets.filter((t) => t.role === "NOW" || t.role === "HEAD_START");
+    const parkedTargets = brief.targets.filter((t) => t.role === "PARKED");
+
+    const rowsHtml = activeTargets.map((t) => {
+      const isNow = t.role === "NOW";
+      const roleColor = isNow ? "#f87171" : "var(--accent-lavender)";
+      const gpaVal = t.subject_gpa !== null && t.subject_gpa !== undefined ? Number(t.subject_gpa) : null;
+      const gpaChip = gpaVal !== null && t.is_vulnerable
+        ? `<span class="mono-chip rose" style="font-size: 9px; padding: 1px 5px;">Avg ${gpaVal.toFixed(1)}</span>`
+        : "";
+      return `
+        <div class="study-brief-row">
+          <div style="flex: 1; min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span style="font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; color: ${roleColor};">
+                ${isNow ? "DO NOW" : "HEAD START"} &bull; ${t.allocated_minutes}M
+              </span>
+              <strong style="font-size: 12.5px; color: var(--text-primary);">${this.escapeHtml(t.subject)}</strong>
+              <span class="mono-chip ${t.days_left <= 1 ? "rose" : t.days_left <= 3 ? "amber" : ""}" style="font-size: 9px; padding: 1px 5px;">${this.escapeHtml(t.due_label || `${t.days_left}d`)}</span>
+              ${gpaChip}
+            </div>
+            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+              <strong>Topic:</strong> ${this.escapeHtml(t.scope || t.title || t.subject)}
+            </div>
+            <div style="font-size: 10.5px; color: var(--text-tertiary); margin-top: 1px;">
+              ${this.escapeHtml(t.action || "")}
+            </div>
+          </div>
+          <button
+            type="button"
+            class="btn-subtle study-brief-cta"
+            onclick="Today.startBriefSprint(${t.allocated_minutes}, '${this.escapeJs(t.subject)}')"
+          >Start ${t.allocated_minutes}m</button>
+        </div>
+      `;
+    }).join("");
+
+    const parkedHtml = parkedTargets.length > 0
+      ? `
+        <div class="study-brief-parked">
+          <span style="font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary); font-weight: 700;">PARKED TONIGHT:</span>
+          ${parkedTargets.map((t) => `
+            <span class="study-brief-parked-pill" title="${this.escapeHtml(t.action || "")}">
+              [${this.escapeHtml(t.due_label || `${t.days_left}d`)}] ${this.escapeHtml(t.subject)} &mdash; ${this.escapeHtml((t.scope || t.title || "").slice(0, 28))}
+            </span>
+          `).join("")}
+        </div>
+      `
+      : "";
+
+    return `
+      <div class="study-brief-card">
+        <div class="study-brief-header">
+          <span class="study-brief-eyebrow">TONIGHT'S STUDY BRIEF &bull; ${brief.total_week_tests} TEST${brief.total_week_tests === 1 ? "" : "S"} THIS WEEK</span>
+          <span class="mono-chip" style="font-size: 9px;">${brief.budget_minutes}m Cap</span>
+        </div>
+        <div class="study-brief-list">
+          ${rowsHtml}
+        </div>
+        ${parkedHtml}
       </div>
     `;
   },
@@ -457,19 +563,24 @@ const Today = {
       const wl = this.schedule.workload;
       if (wl && wl.mode) {
         wlBadge.style.display = "inline-block";
-        wlBadge.textContent = wl.mode === "SURGE_RECOVERY" ? "LOW ENERGY" : wl.mode;
+        wlBadge.textContent =
+          wl.mode === "SURGE_RECOVERY"
+            ? "LOW ENERGY"
+            : wl.mode === "BREAK"
+            ? "BREAK SPRINT"
+            : wl.mode;
         if (wl.mode === "SURGE" || wl.mode === "DEFENSE") {
           wlBadge.className = "mono-chip rose";
           wlBadge.style.background = "";
           wlBadge.style.color = "";
           wlBadge.style.border = "";
           wlBadge.title = `${wl.mode} Protocol: Test within 3 days (${wl.academic_load_score}/100).`;
-        } else if (wl.mode === "BALANCED") {
+        } else if (wl.mode === "BALANCED" || wl.mode === "BREAK") {
           wlBadge.className = "mono-chip lavender";
           wlBadge.style.background = "";
           wlBadge.style.color = "";
           wlBadge.style.border = "";
-          wlBadge.title = `Clean 3-day Horizon (Balanced): Advances TUM '28 + light exam prep.`;
+          wlBadge.title = wl.mode_label || "Balanced Track";
         } else if (wl.mode === "TRAVEL" || wl.mode === "SURGE_RECOVERY") {
           wlBadge.className = "mono-chip";
           wlBadge.style.background = "rgba(59, 130, 246, 0.14)";
@@ -634,7 +745,8 @@ const Today = {
       })
       .join("");
 
-    blocksContainer.innerHTML = travelBannerHtml + gcalBannerHtml + blocksHtml;
+    const studyBriefHtml = this.renderStudyBriefBanner(this.schedule.workload);
+    blocksContainer.innerHTML = travelBannerHtml + gcalBannerHtml + studyBriefHtml + blocksHtml;
     if (typeof this.refreshGCalHeaderBadge === "function") {
       this.refreshGCalHeaderBadge();
     }

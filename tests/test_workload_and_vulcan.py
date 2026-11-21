@@ -377,7 +377,7 @@ def test_acute_defense_single_nearest_exam_dominance(test_db):
     assert len(phases) == 3
     total_phase_min = sum(p["duration_min"] for p in phases)
     assert total_phase_min == deep_block["net_minutes"]
-    assert deep_block["commute_cutoff"] == "16:30"
+    assert deep_block["commute_cutoff"] == "15:30"
 
     # Descriptions must reference their exact duration minutes
     for p in phases:
@@ -415,8 +415,8 @@ def test_medium_horizon_balanced_foundation(test_db):
 def test_pure_cruise_3_pillar_pipeline(test_db):
     """
     Verifies that when no exams or urgent homework loom,
-    the session synthesizes the 3-Pillar TUM Metro Pipeline:
-    50m Active Station Sprint + 35m Matura R + 25m German A2.
+    Monday Boxing day caps cognitive work at the realistic 60m window (55m net),
+    while phases cleanly sum to net_minutes and bind the active TUM deliverable.
     """
     test_date = "2026-11-02"  # Monday, clear academic horizon
 
@@ -430,11 +430,8 @@ def test_pure_cruise_3_pillar_pipeline(test_db):
 
     phases = deep_block["plan_phases"]
     assert len(phases) == 3
-    assert phases[0]["duration_min"] == 50
-    assert phases[1]["duration_min"] == 35
-    assert phases[2]["duration_min"] == 25
+    assert deep_block["net_minutes"] == 55
     assert sum(p["duration_min"] for p in phases) == deep_block["net_minutes"]
-    assert deep_block["net_minutes"] == 110
 
 
 def test_homework_service_positional_string_guard(test_db):
@@ -611,6 +608,131 @@ def test_three_tests_this_week_never_cruise_mode(test_db):
     analysis_iso = workload_governor.get_workload_analysis(target_date_str=base_date, conn=test_db)
     assert analysis_iso["immediate_count"] == 1
     assert analysis_iso["mode"] in ("DEFENSE", "SURGE")
+
+
+def test_same_day_duplicate_score_different_assessments_not_collapsed(test_db):
+    """Two different assessments with the same score on the same day must stay distinct (e.g. Math 1 Sprawdzian + 1 Kartkowka + 2 = 1.33)."""
+    import app.services.vulcan_service as vs
+
+    cfg = {"enabled": True, "demo_mode": False, "registered_device": {"device_id": "test"}}
+    payload = {
+        "exams": [],
+        "homework": [],
+        "grades": [
+            {
+                "subject": "Matematyka",
+                "semester": 1,
+                "raw_input": "1",
+                "numeric_value": 1.0,
+                "weight": 1.0,
+                "category": "Sprawdzian",
+                "description": "geometria płaska - okręgi i koła",
+                "date": "2026-10-26",
+            },
+            {
+                "subject": "Matematyka",
+                "semester": 1,
+                "raw_input": "1",
+                "numeric_value": 1.0,
+                "weight": 1.0,
+                "category": "Kartkówka",
+                "description": "okrąg wpisany, opisany",
+                "date": "2026-10-26",
+            },
+            {
+                "subject": "Matematyka",
+                "semester": 1,
+                "raw_input": "2",
+                "numeric_value": 2.0,
+                "weight": 1.0,
+                "category": "Kartkówka",
+                "description": "tożsamości",
+                "date": "2026-11-02",
+            },
+        ],
+    }
+
+    old_fetch = vs._fetch_live_vulcan_payload
+    old_cfg = vs.get_vulcan_config
+    vs.get_vulcan_config = lambda: cfg
+    vs._fetch_live_vulcan_payload = lambda c, d: payload
+    try:
+        vs.sync_vulcan_data(client_date="2026-11-16", conn=test_db)
+        rows = test_db.execute(
+            "SELECT raw_input, category, description FROM tum_grade_entries WHERE subject = 'Matematyka' AND semester = 1 ORDER BY date ASC, id ASC"
+        ).fetchall()
+        assert len(rows) == 3
+        grade_row = test_db.execute(
+            "SELECT actual_grade FROM tum_grades WHERE subject = 'Matematyka' AND semester = 1"
+        ).fetchone()
+        assert grade_row is not None
+        assert grade_row["actual_grade"] == 1.33
+    finally:
+        vs._fetch_live_vulcan_payload = old_fetch
+        vs.get_vulcan_config = old_cfg
+
+
+def test_exam_week_study_brief_four_tests_allocation(test_db):
+    """
+    With 4 tests scheduled across a week on a Tuesday (1.5h / 85m net ceiling),
+    Harness must rank all 4 tests, allocate tonight's 85m budget across at most 2 targets
+    showing exact topics/scopes, park later tests, and bind them into plan_phases.
+    """
+    tue_date = "2026-11-17"
+    # Vulnerable low GPA in Fizyka & Informatyka
+    test_db.execute(
+        "INSERT INTO tum_grade_entries (subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average) VALUES ('Fizyka', 1, '1', 1.0, 1.0, 'Bieżące', 'termodynamika', '2026-10-05', 1)"
+    )
+    test_db.execute(
+        "INSERT INTO tum_grade_entries (subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average) VALUES ('Informatyka', 1, '3', 3.0, 1.0, 'Bieżące', 'C++', '2026-09-23', 1)"
+    )
+    homework_service.add_exam("Język polski", "Poprawa - Rozprawka", "2026-11-18", scope="Wstęp, teza, argument, przykład, kontekst", conn=test_db)
+    homework_service.add_exam("Fizyka", "Sprawdzian: Elektrostatyka", "2026-11-19", scope="Prawo Coulomba, pole elektryczne", conn=test_db)
+    homework_service.add_exam("Język niemiecki", "Kartkówka: Pogoda", "2026-11-20", scope="Słownictwo pogoda", conn=test_db)
+    homework_service.add_exam("Informatyka", "Sprawdzian: NWD/NWW", "2026-11-23", scope="Funkcje i algorytmy NWD, NWW", conn=test_db)
+    test_db.commit()
+
+    sched = today_service.get_schedule_for_date(tue_date, conn=test_db)
+    brief = sched["workload"].get("exam_week_plan")
+    assert brief is not None
+    assert brief["total_week_tests"] == 4
+    assert brief["budget_minutes"] == 85  # Tue Schedule B: 90m window -> 85m net
+    targets = brief["targets"]
+    assert len(targets) == 4
+
+    now_items = [t for t in targets if t["role"] in ("NOW", "HEAD_START")]
+    parked_items = [t for t in targets if t["role"] == "PARKED"]
+    assert 1 <= len(now_items) <= 2
+    assert len(parked_items) == 4 - len(now_items)
+    assert now_items[0]["subject"] == "Język polski"
+    assert sum(t["allocated_minutes"] for t in targets) == 85
+
+    deep_block = next(b for b in sched["blocks"] if b.get("type") == "deep_work")
+    assert deep_block["net_minutes"] == 85
+    assert deep_block["is_school_dedicated"] is True
+    assert sum(p["duration_min"] for p in deep_block["plan_phases"]) == 85
+
+
+def test_break_sprint_and_low_energy_modes(test_db):
+    """Verifies BREAK (vacation/holiday programming sprint) and SURGE_RECOVERY (Low Energy 30m floor)."""
+    orig_mode = workload_governor.get_operating_mode()
+    try:
+        workload_governor.set_operating_mode("BREAK")
+        sched_break = today_service.get_schedule_for_date("2026-11-17", conn=test_db)  # Tuesday
+        assert sched_break["workload"]["mode"] == "BREAK"
+        assert not any("Liceum" in b.get("focus", "") for b in sched_break["blocks"])
+        assert any("Gym" in b.get("focus", "") for b in sched_break["blocks"])
+        deep_break = next(b for b in sched_break["blocks"] if b.get("type") == "deep_work")
+        assert deep_break["net_minutes"] >= 120
+        assert sum(p["duration_min"] for p in deep_break["plan_phases"]) == deep_break["net_minutes"]
+
+        workload_governor.set_operating_mode("SURGE_RECOVERY")
+        sched_low = today_service.get_schedule_for_date("2026-11-17", conn=test_db)
+        assert sched_low["workload"]["mode"] == "SURGE_RECOVERY"
+        deep_low = next(b for b in sched_low["blocks"] if b.get("type") == "deep_work")
+        assert deep_low["net_minutes"] <= 35
+    finally:
+        workload_governor.set_operating_mode(orig_mode)
 
 
 

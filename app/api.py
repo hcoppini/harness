@@ -554,6 +554,11 @@ class HarnessAPI:
         self._trigger_auto_sync()
         return res
 
+    def toggle_station_sidequest(self, station_id: str, sidequest_id: str) -> Dict[str, Any]:
+        res = tum_service.toggle_station_sidequest(station_id, sidequest_id)
+        self._trigger_auto_sync()
+        return res
+
     def advance_station(self, station_id: str, pass_over_unfinished: bool = True) -> Dict[str, Any]:
         res = tum_service.advance_station(station_id, pass_over_unfinished)
         self._trigger_auto_sync()
@@ -1002,6 +1007,41 @@ class HarnessAPI:
             auto_push_tasks=auto_push_tasks,
         )
         self._trigger_auto_sync()
+        return res
+
+    # --- A2UI Protocol: Dynamic Outings, Plan Rearrangement & Ollama/Free Cloud Bridge ---
+    def get_a2ui_status(self) -> Dict[str, Any]:
+        from app.services import a2ui_planner_service
+        return a2ui_planner_service.get_a2ui_status()
+
+    def get_a2ui_outings(self) -> List[Dict[str, Any]]:
+        from app.services import a2ui_planner_service
+        return a2ui_planner_service.get_outings()
+
+    def send_a2ui_message(
+        self,
+        user_message: str,
+        stance: str = "coach",
+        date_str: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        from app.services import a2ui_planner_service
+        res = a2ui_planner_service.process_plan_message(
+            user_message=user_message,
+            stance=stance,
+            date_str=date_str,
+        )
+        self._trigger_auto_sync()
+        return res
+
+    def apply_a2ui_action(
+        self,
+        action_name: str,
+        payload: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        from app.services import a2ui_planner_service
+        res = a2ui_planner_service.apply_a2ui_action(action_name, payload or {})
+        if action_name in ("apply_outing", "delete_outing") and res.get("success"):
+            self._trigger_auto_sync()
         return res
 
     # --- Google Calendar Bidirectional Sync & Conflict Optimization ---

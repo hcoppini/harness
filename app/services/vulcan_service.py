@@ -955,8 +955,11 @@ def sync_vulcan_data(
             # 3. Both are Nieprzygotowanie
             elif ("nieprzygotowan" in cat_clean or cat_clean == "np") and ("nieprzygotowan" in c_cat or c_cat == "np"):
                 is_match = True
-            # 4. Same raw input
-            elif raw_clean == c_raw:
+            # 4. Same raw input ONLY when neither distinct descriptions nor distinct categories separate two same-day entries
+            elif raw_clean == c_raw and (
+                (not desc_clean or not c_desc or desc_clean == c_desc)
+                and (not cat_clean or not c_cat or cat_clean == c_cat)
+            ):
                 is_match = True
             # 5. Absence ('nb') replaced with real grade on same date and same category
             elif c_raw == "nb" and (c_cat == cat_clean or (desc_clean and c_desc and desc_clean in c_desc)):

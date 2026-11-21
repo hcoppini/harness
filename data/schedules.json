@@ -1,11 +1,11 @@
 {
   "schedules": {
     "A_MON": {
-      "name": "Schedule A: Monday (SGH Study + Boxing)",
+      "name": "Schedule A: Monday (Focused Study + Boxing)",
       "days": [
         "Monday"
       ],
-      "description": "Late start (08:50). Finish at 14:15, direct transition to SGH Library for TUM prep before boxing.",
+      "description": "Late start (08:50). Realistic 60m focused school study after lessons, then comfortable buffer before 2x/wk Boxing.",
       "blocks": [
         {
           "time": "07:15 – 08:00",
@@ -20,15 +20,15 @@
           "type": "school"
         },
         {
-          "time": "14:30 – 16:30",
-          "focus": "SGH Library: TUM Deep Work (2h)",
-          "activity": "60m Math Rozszerzona + 60m CS Matura/Raw Coding (No AI).",
+          "time": "14:30 – 15:30",
+          "focus": "SGH Library / Home: Focused Study (60m)",
+          "activity": "60m focused clearance: nearest test / Math gaps or homework before boxing.",
           "type": "deep_work"
         },
         {
-          "time": "16:30 – 17:15",
-          "focus": "Commute Home & Chores",
-          "activity": "40 min commute home, quick chores, pre-boxing fuel.",
+          "time": "15:30 – 17:15",
+          "focus": "Commute Home, Meal & Boxing Prep",
+          "activity": "40 min commute home, real meal, pack boxing bag without rushing.",
           "type": "chore"
         },
         {
@@ -40,7 +40,7 @@
         {
           "time": "20:30/21:00 – 21:45",
           "focus": "Nutrition & Shower",
-          "activity": "Heavy post-workout dinner, protein, hot shower.",
+          "activity": "Post-workout dinner, protein, hot shower.",
           "type": "nutrition"
         },
         {
@@ -58,11 +58,11 @@
       ]
     },
     "A_WED": {
-      "name": "Schedule A: Wednesday (Fast Study + Boxing)",
+      "name": "Schedule A: Wednesday (Focused Study + Boxing)",
       "days": [
         "Wednesday"
       ],
-      "description": "School ends at 15:05. Compressed 60-min deep work sprint at SGH Library before commute.",
+      "description": "School ends at 15:05. Tight 60m focused study window before commute & Boxing.",
       "blocks": [
         {
           "time": "06:35 – 07:20",
@@ -77,15 +77,15 @@
           "type": "school"
         },
         {
-          "time": "15:15 – 16:30",
-          "focus": "SGH Library: Deep Work (75m)",
-          "activity": "High-intensity Math R problem set or raw CS logic.",
+          "time": "15:15 – 16:15",
+          "focus": "SGH Library / Home: Focused Study (60m)",
+          "activity": "60m targeted prep on upcoming test / Math catch-up before heading home.",
           "type": "deep_work"
         },
         {
-          "time": "16:30 – 17:15",
-          "focus": "Commute Home & Chores",
-          "activity": "40 min commute home, quick chores, pre-workout meal.",
+          "time": "16:15 – 17:15",
+          "focus": "Commute Home, Meal & Boxing Prep",
+          "activity": "40 min commute home, quick meal & boxing bag prep.",
           "type": "chore"
         },
         {
@@ -119,7 +119,7 @@
       "days": [
         "Friday"
       ],
-      "description": "School ends at 14:15. Commute home, JetBrains Youth Coding Club & school wrap-up, zero evening boxing. 100% free Friday evening.",
+      "description": "School ends at 14:15. Max 90m focused wrap-up / JetBrains Club, then 100% free Friday evening.",
       "blocks": [
         {
           "time": "06:35 – 07:20",
@@ -134,21 +134,21 @@
           "type": "school"
         },
         {
-          "time": "14:30 – 16:30",
-          "focus": "SGH Library / Home: JetBrains Club & Coding Sprint (2h)",
-          "activity": "60m Math R / Homework clearance + 60m JetBrains Youth Coding Club / Matura CS.",
+          "time": "14:30 – 16:00",
+          "focus": "SGH Library / Home: JetBrains Club & Wrap-Up (90m)",
+          "activity": "Weekend homework/test triage or JetBrains Youth Coding Club / CS Sidequest.",
           "type": "deep_work"
         },
         {
-          "time": "16:30 – 17:15",
+          "time": "16:00 – 16:45",
           "focus": "Commute Home & Chores",
-          "activity": "40 min commute home, quick chores, unpack for weekend.",
+          "activity": "40 min commute home, unpack for weekend.",
           "type": "chore"
         },
         {
-          "time": "17:15 – 22:45",
+          "time": "16:45 – 22:45",
           "focus": "Weekend Kickoff Free Time",
-          "activity": "Zero workouts. Guilt-free relaxation, gaming, friends, or side projects.",
+          "activity": "Zero workouts. Guilt-free relaxation, gaming, friends, or optional sidequests.",
           "type": "rest"
         },
         {
@@ -160,12 +160,12 @@
       ]
     },
     "B": {
-      "name": "Schedule B: Gym & TUM Sprint Days",
+      "name": "Schedule B: Gym & TUM Sprint (1.5h Cap)",
       "days": [
         "Tuesday",
         "Thursday"
       ],
-      "description": "School ends 14:15. Deep work in SGH Library followed by commute home and 50m targeted gym lift.",
+      "description": "School ends 14:15. Realistic 1.5h focused study ceiling, followed by commute, 50m gym lift, and completely free evening.",
       "blocks": [
         {
           "time": "06:35 – 07:20",
@@ -176,19 +176,19 @@
         {
           "time": "08:00 – 14:15",
           "focus": "Liceum",
-          "activity": "Engagement in classes; eliminate minor homework.",
+          "activity": "Focus in class; finish easy items between lessons.",
           "type": "school"
         },
         {
-          "time": "14:30 – 16:30",
-          "focus": "SGH Library: TUM Deep Work (2h)",
-          "activity": "60m Math Rozszerzona + 60m Raw Coding/CS Matura.",
+          "time": "14:30 – 16:00",
+          "focus": "SGH Library / Home: Focused Study (1.5h Max)",
+          "activity": "90m cap: class Math catch-up + upcoming tests (optional Sidequest only if horizon is clear).",
           "type": "deep_work"
         },
         {
-          "time": "16:30 – 17:15",
+          "time": "16:00 – 16:55",
           "focus": "Commute Home & Chores",
-          "activity": "40 min commute home, complete daily chores, change for gym.",
+          "activity": "40 min commute home, chores, change for gym.",
           "type": "chore"
         },
         {
@@ -198,15 +198,15 @@
           "type": "training"
         },
         {
-          "time": "19:00 – 20:00",
-          "focus": "Dinner & Academic Review",
-          "activity": "Dinner + 20 min school prep / homework clearance (or German if horizon clear).",
-          "type": "study"
+          "time": "19:00 – 19:45",
+          "focus": "Dinner & Recovery",
+          "activity": "High-protein post-workout dinner and shower. Zero forced night study.",
+          "type": "nutrition"
         },
         {
-          "time": "20:00 – 22:45",
-          "focus": "Free Time (2h 45m)",
-          "activity": "Completely free evening. Gaming, personal projects, friends.",
+          "time": "19:45 – 22:45",
+          "focus": "Free Time (3h)",
+          "activity": "Guilt-free evening. Gaming, friends, or optional sidequests only if you want.",
           "type": "rest"
         },
         {
@@ -222,22 +222,22 @@
       "days": [
         "Saturday"
       ],
-      "description": "5k Zone 2 Recovery Run, then 2 hrs TUM Deep Work. Afternoon and night 100% open.",
+      "description": "Optional 5k Zone 2 Run, then 1.5h catch-up or Sidequest sprint. Afternoon and night 100% open.",
       "blocks": [
         {
           "time": "09:30 – 10:15",
           "focus": "Running",
-          "activity": "5k Zone 2 Recovery Run.",
+          "activity": "5k Zone 2 Recovery Run (optional if sore/tired).",
           "type": "training"
         },
         {
-          "time": "11:00 – 13:00",
-          "focus": "TUM Deep Work (2 hrs)",
-          "activity": "Timed exam sheets or startup/coding project work.",
+          "time": "11:00 – 12:30",
+          "focus": "TUM Deep Work (90m)",
+          "activity": "Next week test preview, Math catch-up, or optional Coding Sidequest.",
           "type": "deep_work"
         },
         {
-          "time": "13:00 onwards",
+          "time": "12:30 onwards",
           "focus": "100% Free Time",
           "activity": "Entire afternoon and night completely open.",
           "type": "rest"

@@ -170,6 +170,7 @@ def test_daily_exclusive_checkboxes_and_obsidian_ui_parity():
         "js/dashboard.js",
         "js/focus_timer.js",
         "js/metro.js",
+        "js/plans_logs.js",
         "js/study.js",
         "js/today.js",
         "js/tum.js",
@@ -272,5 +273,65 @@ console.log(JSON.stringify({
     assert station_x(2) < out["oct15"] < station_x(3)
     assert station_x(11) < out["aug27"] < station_x(12)  # jul-aug-2027 2-month span
     assert station_x(22) < out["jul28"] < station_x(22) + 120.0  # jul-2028 -> TUM terminal
+
+
+def test_today_study_brief_and_metro_sidequests_ui_render():
+    """Verify Study Brief, Break Sprint banner, and Metro Sidequests render cleanly in Node VM with zero checkboxes."""
+    node_bin = shutil.which("node")
+    assert node_bin, "Node.js is required to evaluate UI JS renderers"
+
+    root = Path(__file__).resolve().parent.parent
+    probe = r"""
+const fs = require("fs");
+const vm = require("vm");
+const roadmap = JSON.parse(fs.readFileSync("data/metro_roadmap.json", "utf8"));
+const sandbox = {
+  Date, Math, Number, String, Boolean, Array, Object, Set, Map, JSON, RegExp, Error,
+  encodeURIComponent, decodeURIComponent, console, setTimeout, clearTimeout, setInterval, clearInterval,
+  localStorage: { getItem: () => null, setItem: () => {} },
+  window: {},
+  document: {
+    documentElement: { getAttribute: () => "dark" },
+    getElementById: () => null,
+    querySelector: () => null,
+    querySelectorAll: () => [],
+    createElement: () => ({ style: {} }),
+    body: { appendChild: () => {} },
+    addEventListener: () => {},
+  },
+};
+sandbox.window = sandbox;
+vm.runInNewContext(fs.readFileSync("js/today.js", "utf8"), sandbox);
+vm.runInNewContext(fs.readFileSync("js/metro.js", "utf8"), sandbox);
+
+const briefHtml = sandbox.Today.renderStudyBriefBanner({
+  mode: "SURGE",
+  exam_week_plan: {
+    budget_minutes: 55,
+    total_week_tests: 4,
+    targets: [
+      { rank: 1, role: "NOW", subject: "Język polski", title: "Poprawa", scope: "Rozprawka", days_left: 1, due_label: "TOMORROW", subject_gpa: 4.0, is_vulnerable: false, allocated_minutes: 37, action: "Practice outline" },
+      { rank: 2, role: "HEAD_START", subject: "Fizyka", title: "Sprawdzian", scope: "Elektrostatyka", days_left: 3, due_label: "3d", subject_gpa: 1.0, is_vulnerable: true, allocated_minutes: 18, action: "Preview concepts" },
+      { rank: 3, role: "PARKED", subject: "Informatyka", title: "NWD/NWW", scope: "Algorytmy", days_left: 7, due_label: "7d", subject_gpa: 3.0, is_vulnerable: true, allocated_minutes: 0, action: "Park until Fri" },
+    ],
+  },
+});
+const breakHtml = sandbox.Today.renderStudyBriefBanner({ mode: "BREAK" });
+const novStation = roadmap.stations.find((s) => s.id === "nov-2026");
+const sqHtml = sandbox.MetroMap.renderStationSidequestsHtml(novStation);
+
+console.log(JSON.stringify({
+  hasStudyBrief: briefHtml.includes("TONIGHT'S STUDY BRIEF") && briefHtml.includes("DO NOW") && briefHtml.includes("HEAD START") && briefHtml.includes("PARKED TONIGHT"),
+  hasBreakBanner: breakHtml.includes("BREAK SPRINT ACTIVE"),
+  hasSidequests: sqHtml.includes("OPTIONAL SIDEQUESTS") && sqHtml.includes("toggleSidequest") && sqHtml.includes("JetBrains"),
+  noCheckboxesInSidequests: !sqHtml.includes('type="checkbox"') && !sqHtml.includes("check-dot"),
+}));
+"""
+    proc = subprocess.run([node_bin, "-e", probe], cwd=str(root), capture_output=True, text=True, check=True)
+    out = json.loads(proc.stdout.strip())
+    assert out["hasStudyBrief"] is True
+    assert out["hasBreakBanner"] is True
+    assert out["hasSidequests"] is True
+    assert out["noCheckboxesInSidequests"] is True
 
 

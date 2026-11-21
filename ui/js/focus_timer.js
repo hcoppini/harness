@@ -158,6 +158,26 @@ const FocusTimer = {
     this.updateDisplay();
   },
 
+  startCustomSprint(minutes, label = null) {
+    const mins = Math.max(5, parseInt(minutes, 10) || 25);
+    this.pauseTimer();
+    this.durationSeconds = mins * 60;
+    this.remainingSeconds = this.durationSeconds;
+    this.currentPresetName = label || `${mins}m Focus`;
+
+    document.querySelectorAll("#focusTimerModal .btn-ghost-icon").forEach((btn, idx) => {
+      if (idx < this.presets.length) btn.classList.remove("active");
+    });
+
+    this.updateDisplay();
+    const modal = document.getElementById("focusTimerModal");
+    if (modal) modal.style.display = "flex";
+    this.startTimer();
+    if (window.HarnessApp && window.HarnessApp.showToast) {
+      window.HarnessApp.showToast(`Timer started: ${mins}m • ${this.currentPresetName}`);
+    }
+  },
+
   toggleTimer() {
     if (this.isRunning) {
       this.pauseTimer();

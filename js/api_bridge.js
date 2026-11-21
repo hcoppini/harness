@@ -31,6 +31,7 @@
       KNOWLEDGE: "harness_knowledge_v3",
       HOMEWORK: "harness_homework_v3",
       EXAMS: "harness_exams_v3",
+      OUTINGS: "harness_outings_v1",
     };
 
     const getStore = (key, defaultVal) => {
@@ -186,6 +187,7 @@
     const ACADEMIC_CACHE_TTL_MS = 30000;
     let _academicHydratedAt = 0;
     let _academicHydrationPromise = null;
+    let _activeClientDate = null;
 
     const isPhantomExam = (exam) => {
       const text = `${(exam && exam.title) || ""} ${(exam && exam.scope) || ""}`.toLowerCase();
@@ -379,7 +381,7 @@
       let badgeClass = prev.badge_class || "optimal";
       let description = prev.description || "Low immediate school pressure. Green light for deep projects.";
 
-      if (mode !== "TRAVEL" && mode !== "SURGE_RECOVERY") {
+      if (mode !== "TRAVEL" && mode !== "SURGE_RECOVERY" && mode !== "BREAK") {
         if (score > 6.0 && hasAcuteExams) {
           mode = "SURGE";
           modeLabel = `Surge Mode • ${immediateExams.length} Imminent Tests`;
@@ -575,7 +577,8 @@
           // 0. Dashboard Operations
           if (prop === "get_dashboard") {
             return async function (clientDate = null) {
-              const todayStr = clientDate || getLocalDateStr();
+              if (clientDate) _activeClientDate = clientDate;
+              const todayStr = clientDate || _activeClientDate || getLocalDateStr();
               const [serverRes, authoritativeAcademic] = await Promise.all([
                 rpcCall("get_dashboard", [todayStr]).catch(() => null),
                 ensureFreshAcademicCache(),
@@ -1407,11 +1410,23 @@
                   serverRes.stations.forEach((ss) => {
                     const ls = localStationsMap[ss.id];
                     if (ls) {
-                      if (Array.isArray(ls.completed_deliverables) && ls.completed_deliverables.length > (ss.completed_deliverables || []).length) {
-                        ss.completed_deliverables = ls.completed_deliverables;
+                      const validDelivKeys = new Set(Object.keys(ss.deliverables || {}));
+                      if (Array.isArray(ls.completed_deliverables)) {
+                        const filteredLocal = ls.completed_deliverables.filter((k) => validDelivKeys.has(k));
+                        if (filteredLocal.length > (ss.completed_deliverables || []).length) {
+                          ss.completed_deliverables = filteredLocal;
+                        }
                       }
                       if (Array.isArray(ls.passed_over_deliverables)) {
-                        ss.passed_over_deliverables = ls.passed_over_deliverables;
+                        ss.passed_over_deliverables = ls.passed_over_deliverables.filter((k) => validDelivKeys.has(k));
+                      }
+                      if (Array.isArray(ls.completed_sidequests)) {
+                        const validSqIds = new Set((ss.sidequests || []).map((q) => q.id));
+                        const mergedSq = new Set([
+                          ...(ss.completed_sidequests || []),
+                          ...ls.completed_sidequests.filter((id) => validSqIds.has(id)),
+                        ]);
+                        ss.completed_sidequests = Array.from(mergedSq);
                       }
                       if (ls.status === "completed" && ss.status !== "completed") {
                         ss.status = "completed";
@@ -1504,6 +1519,41 @@
                 station_completed: targetStation.status === "completed",
                 next_station_id: nextStation ? nextStation.id : null,
                 next_station_name: nextStation ? nextStation.name : null,
+              };
+            };
+          }
+
+          if (prop === "toggle_station_sidequest") {
+            return async function (stationId, sidequestId) {
+              let roadmap = getStore(STORAGE_KEYS.METRO, null);
+              if (!roadmap || !Array.isArray(roadmap.stations)) {
+                roadmap = await apiProxy.get_metro_roadmap();
+              }
+
+              const targetStation = (roadmap.stations || []).find((s) => s.id === stationId);
+              if (!targetStation) {
+                return { success: false, error: `Station ${stationId} not found` };
+              }
+
+              targetStation.completed_sidequests = targetStation.completed_sidequests || [];
+              const wasDone = targetStation.completed_sidequests.includes(sidequestId);
+              if (wasDone) {
+                targetStation.completed_sidequests = targetStation.completed_sidequests.filter((id) => id !== sidequestId);
+              } else {
+                targetStation.completed_sidequests.push(sidequestId);
+              }
+
+              setStore(STORAGE_KEYS.METRO, roadmap);
+              syncCloudDocument("cloud_metro_roadmap", roadmap);
+              rpcCall("toggle_station_sidequest", [stationId, sidequestId]).catch(() => {});
+
+              return {
+                success: true,
+                station_id: stationId,
+                sidequest_id: sidequestId,
+                is_completed: !wasDone,
+                completed_sidequests: targetStation.completed_sidequests,
+                total_sidequests: (targetStation.sidequests || []).length,
               };
             };
           }
@@ -2071,7 +2121,7 @@
           // 4. Homework Operations
           if (prop === "get_upcoming_homework") {
             return async function (dateStr = null) {
-              const todayStr = dateStr || getLocalDateStr();
+              const todayStr = dateStr || _activeClientDate || getLocalDateStr();
               let serverRes = null;
               try {
                 serverRes = await rpcCall("get_upcoming_homework", [todayStr]);
@@ -2215,8 +2265,8 @@
 
           // 5. School Exam Operations
           if (prop === "get_upcoming_exams") {
-            return async function (limit = 15) {
-              const todayStr = getLocalDateStr();
+            return async function (limit = 15, dateStr = null) {
+              const todayStr = dateStr || _activeClientDate || getLocalDateStr();
               const [serverRes, authoritativeExams] = await Promise.all([
                 rpcCall("get_upcoming_exams", [limit]).catch(() => null),
                 ensureFreshAcademicCache(),
@@ -2728,6 +2778,36 @@
                 if (Array.isArray(serverRes)) return serverRes;
               } catch (e) {}
               return [];
+            };
+          }
+
+          if (prop === "get_a2ui_outings") {
+            return async function () {
+              try {
+                const serverRes = await rpcCall("get_a2ui_outings", []);
+                if (Array.isArray(serverRes)) {
+                  setStore(STORAGE_KEYS.OUTINGS, serverRes);
+                  return serverRes;
+                }
+              } catch (e) {}
+              return getStore(STORAGE_KEYS.OUTINGS, []);
+            };
+          }
+
+          if (prop === "apply_a2ui_action") {
+            return async function (actionName, payload = {}) {
+              let serverRes = null;
+              try {
+                serverRes = await rpcCall("apply_a2ui_action", [actionName, payload]);
+              } catch (e) {}
+              if (serverRes && serverRes.success && Array.isArray(serverRes.outings)) {
+                setStore(STORAGE_KEYS.OUTINGS, serverRes.outings);
+                syncCloudDocument("cloud_travel_windows", {
+                  windows: serverRes.outings,
+                  updated_at: new Date().toISOString(),
+                });
+              }
+              return serverRes || { success: false, error: "Server unavailable" };
             };
           }
 

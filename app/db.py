@@ -439,6 +439,13 @@ def init_db(db_path: Optional[Path] = None) -> None:
     except Exception as e:
         print(f"Warning: gcalendar tables init notice: {e}")
 
+    # 11. Travel Windows & A2UI Outings (Cross-Device Synced)
+    try:
+        from app.services.a2ui_planner_service import ensure_travel_window_tables
+        ensure_travel_window_tables(conn)
+    except Exception as e:
+        print(f"Warning: travel_windows table init notice: {e}")
+
     conn.commit()
     conn.close()
 

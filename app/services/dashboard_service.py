@@ -260,23 +260,37 @@ def get_heatmap_data(
             if dl.get("has_reflection", False):
                 activities.append("[DONE] Evening reflection audit completed")
 
-            # Check travel / field mode
+            # Check travel / field & break sprint windows (past, today, and future!)
             is_travel_day = False
+            is_break_day = False
             travel_destination = None
+            outing_name = None
+            outing_type = None
             try:
                 from engine import workload_governor
                 twin = workload_governor.get_active_travel_window(cur_str)
+                bwin = workload_governor.get_active_break_window(cur_str) if not twin else None
                 if twin:
                     is_travel_day = True
+                    outing_type = "travel"
                     travel_destination = twin.get("destination", "Travel")
+                    outing_name = twin.get("name") or travel_destination
                 elif workload_governor.is_us_travel_date(cur_str):
                     is_travel_day = True
+                    outing_type = "travel"
                     travel_destination = "United States"
+                    outing_name = "US Deployment"
+                elif bwin:
+                    is_break_day = True
+                    outing_type = "break"
+                    outing_name = bwin.get("name") or "Break Sprint"
             except Exception:
                 pass
 
             if is_travel_day:
-                activities.append(f"[TRAVEL / FIELD] {travel_destination} — Warsaw schedule excused")
+                activities.append(f"[TRAVEL / FIELD] {outing_name} ({travel_destination}) — Warsaw schedule excused")
+            elif is_break_day:
+                activities.append(f"[BREAK SPRINT] {outing_name} — Programming & Sidequests")
 
             # Total boxes and checked boxes
             total_boxes = total_routine_blocks + total_gym_exercises + total_tasks
@@ -346,6 +360,9 @@ def get_heatmap_data(
                 "has_homework": has_homework,
                 "homework_count": len(day_hw),
                 "homework": day_hw,
+                "has_outing": is_travel_day or is_break_day,
+                "outing_type": outing_type,
+                "outing_name": outing_name,
                 "activities": activities,
             })
 

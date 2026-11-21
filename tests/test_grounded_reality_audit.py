@@ -52,24 +52,22 @@ def test_boxing_reduced_to_two_days_a_week():
 
 
 def test_travel_windows_detection():
-    """Verifies that US (Oct 2026), Christmas (Dec 2026), and Brazil (Feb 2027) are recognized."""
-    # US trip (historical)
+    """Verifies confirmed vs tentative break/travel windows: confirmed US (Oct 2026) activates travel, unconfirmed Christmas break triggers BREAK, and unconfirmed Brazil does not hijack standard weeks."""
+    # Confirmed US trip (historical)
     assert workload_governor.is_travel_or_vacation_date("2026-10-10") is True
     assert workload_governor.is_us_travel_date("2026-10-10") is True
 
-    # Christmas window
+    # Official Christmas break window is a school break (not forced flight travel until dates confirmed)
     christmas_date = "2026-12-25"
-    assert workload_governor.is_travel_or_vacation_date(christmas_date) is True
-    win_xmas = workload_governor.get_active_travel_window(christmas_date)
+    win_xmas = workload_governor.get_active_travel_window(christmas_date, include_unconfirmed=True)
     assert win_xmas is not None
-    assert "Christmas" in win_xmas["name"] or "Holiday" in win_xmas["destination"]
+    assert win_xmas.get("type") == "break"
+    assert workload_governor.get_active_break_window(christmas_date) is not None
 
-    # Brazil window (Feb 2027)
+    # Unconfirmed Brazil dates must NOT hijack normal February schedule unless confirmed
     brazil_date = "2027-02-15"
-    assert workload_governor.is_travel_or_vacation_date(brazil_date) is True
-    win_brazil = workload_governor.get_active_travel_window(brazil_date)
-    assert win_brazil is not None
-    assert "Brazil" in win_brazil["destination"]
+    assert workload_governor.get_active_travel_window(brazil_date) is None
+    assert workload_governor.is_travel_or_vacation_date(brazil_date) is False
 
     # Non-travel date
     assert workload_governor.is_travel_or_vacation_date("2026-11-16") is False
@@ -77,18 +75,24 @@ def test_travel_windows_detection():
 
 
 def test_brazil_travel_schedule_synthesis(test_db):
-    """Verifies that schedule in Brazil shifts to 45m maintenance anchor with zero school guilt."""
-    brazil_date = "2027-02-10"  # Wednesday in Brazil
-    sched = today_service.get_schedule_for_date(brazil_date, conn=test_db)
+    """Verifies explicit BREAK mode synthesizes a 2h+ programming sprint with zero school guilt, and FIELD mode triggers Travel maintenance."""
+    orig_mode = workload_governor.get_operating_mode()
+    try:
+        workload_governor.set_operating_mode("BREAK")
+        sched = today_service.get_schedule_for_date("2026-12-28", conn=test_db)
+        assert sched["workload"]["mode"] == "BREAK"
+        deep_block = next((b for b in sched["blocks"] if b.get("type") == "deep_work"), None)
+        assert deep_block is not None
+        assert deep_block["is_school_dedicated"] is False
 
-    assert sched["workload"]["is_travel_mode"] is True
-    assert "Brazil" in sched["workload"]["travel_destination"]
-
-    # Deep work block is maintenance anchor
-    deep_block = next((b for b in sched["blocks"] if b.get("type") == "deep_work"), None)
-    assert deep_block is not None
-    assert "Brazil" in deep_block["focus"] or "Maintenance" in deep_block["focus"]
-    assert deep_block["is_school_dedicated"] is False
+        workload_governor.set_operating_mode("FIELD")
+        travel_sched = today_service.get_schedule_for_date("2027-02-10", conn=test_db)
+        assert travel_sched["workload"]["is_travel_mode"] is True
+        travel_deep = next((b for b in travel_sched["blocks"] if b.get("type") == "deep_work"), None)
+        assert travel_deep is not None
+        assert travel_deep["is_school_dedicated"] is False
+    finally:
+        workload_governor.set_operating_mode(orig_mode)
 
 
 def test_heatmap_honors_travel_mode(test_db):
@@ -130,10 +134,10 @@ def test_jetbrains_club_project_active(test_db):
 
 
 def test_travel_mode_kill_list_capped_at_single_anchor(test_db):
-    """Verifies that Kill List generation during Brazil travel window caps at 1 maintenance anchor and freezes school defense."""
+    """Verifies that Kill List generation during confirmed US travel window caps at 1 maintenance anchor and freezes school defense."""
     from engine import kill_list_controller
-    brazil_date = "2027-02-10"
-    res = kill_list_controller.auto_populate_kill_list(date_str=brazil_date, conn=test_db)
+    travel_date = "2026-10-10"
+    res = kill_list_controller.auto_populate_kill_list(date_str=travel_date, conn=test_db)
     items = res.get("items", [])
     assert len(items) <= 1, f"Expected max 1 deliverable during travel window, got {len(items)}"
     for item in items:

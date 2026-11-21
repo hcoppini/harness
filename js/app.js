@@ -250,6 +250,7 @@ window.HarnessApp = {
     if (viewName === "projects" && window.Projects) window.Projects.load();
     if (viewName === "body" && window.Body) window.Body.load();
     if (viewName === "knowledge" && window.Knowledge) window.Knowledge.load();
+    if (viewName === "plans" && window.PlansLogs) window.PlansLogs.load();
   },
 
   bindModals() {
@@ -285,6 +286,9 @@ window.HarnessApp = {
       } else if (e.key === "3") {
         e.preventDefault();
         this.switchView("tum");
+      } else if (e.key === "4") {
+        e.preventDefault();
+        this.switchView("plans");
       } else if (e.key === "0" || e.key === "`") {
         e.preventDefault();
         this.switchView("dashboard");

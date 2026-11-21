@@ -193,7 +193,7 @@ def test_conflict_aware_schedule_optimization(gcal_env):
     # Verify Deep Work block index stayed valid, moved out of 14:30-16:00 conflict, and phases sum to net_minutes
     dw_block = next(b for b in sched["blocks"] if b.get("type") == "deep_work")
     assert dw_block.get("gcal_optimized") is True
-    assert dw_block.get("original_time") == "14:30 – 16:30"
+    assert dw_block.get("original_time") == "14:30 – 16:00"
     assert "Orthodontist Checkup" in dw_block.get("gcal_adjustment_reason", "")
 
     new_win = gcalendar_service.parse_time_window(dw_block["time"])

@@ -28,16 +28,17 @@ QUIZ_KEYWORDS = ["kartkówka", "kartkowka", "odpowiedź", "odpowiedz ustna", "we
 def get_operating_mode() -> str:
     """
     Returns the current active system operating mode:
-    - 'FORTRESS' (Default): Standard Warsaw Liceum, SGH deep work, high problem quotas.
-    - 'FIELD': Travel / Away from workstation / Holiday. Suspends Warsaw schedules, reduces to unbreakable floor anchor.
-    - 'SURGE_RECOVERY': Life recovery / Illness / Family surge. Preserves biological baseline floor (protein, sleep, log).
+    - 'FORTRESS' (Default): Standard school term, feasible <=1.5h cognitive cap, grade-first priority.
+    - 'BREAK': At-home school vacation / holiday sprint. Zero school defense -> 2-3h Programming & Sidequests.
+    - 'FIELD': Confirmed Travel / Away from workstation. Suspends Warsaw schedule, minimal maintenance anchor.
+    - 'SURGE_RECOVERY': Low Energy / Recovery day. Preserves biological floor + 30m low-friction micro-block.
     """
     if OPERATING_MODE_FILE.exists():
         try:
             with open(OPERATING_MODE_FILE, "r", encoding="utf-8") as f:
                 cfg = json.load(f)
                 mode = (cfg.get("mode") or "").strip().upper()
-                if mode in ("FORTRESS", "FIELD", "SURGE_RECOVERY"):
+                if mode in ("FORTRESS", "FIELD", "SURGE_RECOVERY", "BREAK"):
                     return mode
         except Exception:
             pass
@@ -46,11 +47,14 @@ def get_operating_mode() -> str:
 
 def set_operating_mode(mode: str) -> Dict[str, Any]:
     """
-    Sets the active system operating mode ('FORTRESS', 'FIELD', or 'SURGE_RECOVERY').
+    Sets the active system operating mode ('FORTRESS', 'FIELD', 'SURGE_RECOVERY', or 'BREAK').
     """
     clean_mode = (mode or "").strip().upper()
-    if clean_mode not in ("FORTRESS", "FIELD", "SURGE_RECOVERY"):
-        return {"success": False, "error": f"Invalid mode: {mode}. Must be FORTRESS, FIELD, or SURGE_RECOVERY."}
+    if clean_mode not in ("FORTRESS", "FIELD", "SURGE_RECOVERY", "BREAK"):
+        return {
+            "success": False,
+            "error": f"Invalid mode: {mode}. Must be FORTRESS, FIELD, SURGE_RECOVERY, or BREAK.",
+        }
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
     with open(OPERATING_MODE_FILE, "w", encoding="utf-8") as f:
@@ -121,23 +125,49 @@ def get_travel_windows() -> List[Dict[str, Any]]:
     ]
 
 
-def get_active_travel_window(target_date: Optional[Any] = None) -> Optional[Dict[str, Any]]:
-    """Returns the travel window matching target_date, or None."""
+def _coerce_date(target_date: Optional[Any]) -> date:
     if target_date is None:
-        dt = datetime.now().date()
-    elif isinstance(target_date, str):
+        return datetime.now().date()
+    if isinstance(target_date, str):
         try:
-            dt = datetime.strptime(target_date[:10], "%Y-%m-%d").date()
+            return datetime.strptime(target_date[:10], "%Y-%m-%d").date()
         except Exception:
-            dt = datetime.now().date()
-    elif isinstance(target_date, datetime):
-        dt = target_date.date()
-    elif isinstance(target_date, date):
-        dt = target_date
-    else:
-        dt = datetime.now().date()
+            return datetime.now().date()
+    if isinstance(target_date, datetime):
+        return target_date.date()
+    if isinstance(target_date, date):
+        return target_date
+    return datetime.now().date()
 
+
+def get_active_travel_window(
+    target_date: Optional[Any] = None,
+    include_unconfirmed: bool = False,
+) -> Optional[Dict[str, Any]]:
+    """Returns a confirmed travel/vacation window matching target_date, or None."""
+    dt = _coerce_date(target_date)
     for win in get_travel_windows():
+        if not include_unconfirmed and win.get("confirmed") is False:
+            continue
+        try:
+            s = datetime.strptime(win["start_date"][:10], "%Y-%m-%d").date()
+            e = datetime.strptime(win["end_date"][:10], "%Y-%m-%d").date()
+            if s <= dt <= e:
+                if include_unconfirmed or win.get("type", "travel") == "travel":
+                    return win
+        except Exception:
+            continue
+    return None
+
+
+def get_active_break_window(target_date: Optional[Any] = None) -> Optional[Dict[str, Any]]:
+    """Returns an active confirmed school break window ('type': 'break') matching target_date, or None."""
+    dt = _coerce_date(target_date)
+    for win in get_travel_windows():
+        if win.get("confirmed") is False:
+            continue
+        if win.get("type") != "break":
+            continue
         try:
             s = datetime.strptime(win["start_date"][:10], "%Y-%m-%d").date()
             e = datetime.strptime(win["end_date"][:10], "%Y-%m-%d").date()
@@ -149,10 +179,121 @@ def get_active_travel_window(target_date: Optional[Any] = None) -> Optional[Dict
 
 
 def is_travel_or_vacation_date(target_date: Optional[Any] = None) -> bool:
-    """Returns True if target_date falls within any travel window or vacation."""
+    """Returns True if target_date falls within a confirmed away-travel window."""
     if is_us_travel_date(target_date):
         return True
-    return get_active_travel_window(target_date) is not None
+    return get_active_travel_window(target_date, include_unconfirmed=False) is not None
+
+
+def build_exam_week_plan(
+    upcoming_exams: List[Dict[str, Any]],
+    budget_minutes: int = 85,
+    target_date_str: Optional[str] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    Ranks all exams due within the next 7 days (1 <= days_left <= 7) and splits
+    today's realistic cognitive budget across at most 2 concrete topics, parking
+    remaining tests with a clear start-day cue so opening Harness answers
+    'what should I study tonight?' in 2 seconds.
+    """
+    target_dt = _coerce_date(target_date_str)
+    week_tests = [
+        e for e in (upcoming_exams or [])
+        if 1 <= int(e.get("days_left", 99)) <= 7 and not e.get("is_travel_excused")
+    ]
+    if not week_tests:
+        return None
+
+    scored: List[Tuple[Tuple[int, int, int], Dict[str, Any]]] = []
+    for ex in week_tests:
+        dl = max(1, int(ex.get("days_left", 7)))
+        proximity = {1: 120, 2: 85, 3: 60, 4: 40, 5: 28, 6: 18}.get(dl, 12)
+        gpa = ex.get("subject_gpa")
+        is_vuln = bool(ex.get("is_vulnerable"))
+        risk = 45 if (gpa is not None and gpa < 2.5) else (28 if (gpa is not None and gpa < 3.8) else (20 if is_vuln else 0))
+        tier_bonus = 12 if ex.get("is_tier_1") else 0
+        title_low = (ex.get("title") or "").lower()
+        scope_low = (ex.get("scope") or "").lower()
+        type_bonus = (
+            30 if ("popraw" in title_low or "popraw" in scope_low)
+            else (18 if any(k in title_low for k in EXAM_MAJOR_KEYWORDS) else 8)
+        )
+        priority_score = proximity + risk + tier_bonus + type_bonus
+        scored.append(((-priority_score, dl, int(ex.get("id") or 0)), ex))
+
+    scored.sort(key=lambda pair: pair[0])
+    ordered = [pair[1] for pair in scored]
+
+    allocations: List[int] = [0] * len(ordered)
+    roles: List[str] = ["PARKED"] * len(ordered)
+
+    if len(ordered) == 1:
+        allocations[0] = budget_minutes
+        roles[0] = "NOW"
+    else:
+        second = ordered[1]
+        second_dl = int(second.get("days_left", 7))
+        need_head_start = (
+            second_dl <= 5
+            or bool(second.get("is_vulnerable"))
+            or (second.get("subject_gpa") is not None and float(second["subject_gpa"]) < 3.5)
+        )
+        if need_head_start and budget_minutes >= 40:
+            first_dl = int(ordered[0].get("days_left", 1))
+            primary_ratio = 0.68 if first_dl == 1 else 0.60
+            m1 = max(25, min(budget_minutes - 15, int(round(budget_minutes * primary_ratio))))
+            m2 = budget_minutes - m1
+            allocations[0], roles[0] = m1, "NOW"
+            allocations[1], roles[1] = m2, "HEAD_START"
+        else:
+            allocations[0], roles[0] = budget_minutes, "NOW"
+
+    def _build_action(ex: Dict[str, Any], role: str) -> str:
+        dl = int(ex.get("days_left", 1))
+        scope = (ex.get("scope") or "").strip()
+        title = (ex.get("title") or "").strip()
+        topic = scope or title or ex.get("subject", "Test")
+        if role == "PARKED":
+            lead_days = 3 if any(k in title.lower() for k in EXAM_MAJOR_KEYWORDS) else 2
+            start_dt = target_dt + timedelta(days=max(1, dl - lead_days))
+            return f"Park tonight — start {start_dt.strftime('%a %b %d')} ({topic[:65]})"
+        if role == "HEAD_START":
+            return f"Early head-start: preview core concepts & 2-3 basic problems on {topic[:95]}"
+        if any(k in f"{title} {scope}".lower() for k in ESSAY_KEYWORDS):
+            return f"Practice essay structure + write full thesis/arguments on: {topic[:95]}"
+        if dl == 1:
+            return f"Final lock-in for tomorrow: active problems & mistake-edge check on {topic[:95]}"
+        return f"Core drills without notes on: {topic[:95]}"
+
+    targets = []
+    for idx, ex in enumerate(ordered):
+        dl = int(ex.get("days_left", 1))
+        scope = (ex.get("scope") or ex.get("title") or "").strip()
+        role = roles[idx]
+        targets.append({
+            "rank": idx + 1,
+            "role": role,
+            "id": ex.get("id"),
+            "subject": ex.get("subject", "School"),
+            "title": ex.get("title", ""),
+            "scope": scope,
+            "exam_date": ex.get("exam_date", ""),
+            "days_left": dl,
+            "due_label": "TOMORROW" if dl == 1 else f"{dl}d",
+            "subject_gpa": ex.get("subject_gpa"),
+            "is_vulnerable": bool(ex.get("is_vulnerable")),
+            "allocated_minutes": int(allocations[idx]),
+            "action": _build_action(ex, role),
+        })
+
+    active_names = [f"{t['subject']} ({t['allocated_minutes']}m)" for t in targets if t["allocated_minutes"] > 0]
+    headline = f"{len(week_tests)} test{'s' if len(week_tests) != 1 else ''} this week • Tonight: {' + '.join(active_names)}"
+    return {
+        "budget_minutes": int(budget_minutes),
+        "total_week_tests": len(week_tests),
+        "headline": headline,
+        "targets": targets,
+    }
 
 
 def get_active_station_id(target_date: Optional[Any] = None) -> str:
@@ -455,9 +596,11 @@ def get_workload_analysis(
     hw_end_dt = target_dt + timedelta(days=7)
 
     op_mode = get_operating_mode()
-    travel_win = get_active_travel_window(target_dt)
-    is_travel = is_us_travel_date(target_dt) or is_travel_or_vacation_date(target_dt) or (op_mode == "FIELD")
+    travel_win = get_active_travel_window(target_dt, include_unconfirmed=False)
+    break_win = get_active_break_window(target_dt)
+    is_travel = is_us_travel_date(target_dt) or (travel_win is not None) or (op_mode == "FIELD")
     is_recovery = (op_mode == "SURGE_RECOVERY")
+    is_break = (op_mode == "BREAK") or (not is_travel and not is_recovery and break_win is not None)
     vulnerabilities = get_subject_vulnerabilities(conn=conn)
 
     cursor = conn.cursor()
@@ -654,14 +797,21 @@ def get_workload_analysis(
         mode = "TRAVEL"
         mode_label = "Field Mode • Minimal Maintenance Floor"
         badge_class = "travel"
-        desc = "Field / Travel Mode Active. Warsaw Liceum timetable suspended. School surge frozen. 60m minimal maintenance study hour to keep pace with zero guilt. Enjoy your trip."
+        desc = "Field / Travel Mode Active. Warsaw Liceum timetable suspended. School surge frozen. 45–60m minimal maintenance study hour to keep pace with zero guilt."
         score = 1.0
     elif is_recovery:
         mode = "SURGE_RECOVERY"
-        mode_label = "Surge Recovery • Biological Baseline Floor"
+        mode_label = "Low Energy • Biological Baseline Floor (30m)"
         badge_class = "travel"
-        desc = "Life Recovery / Family Surge Mode Active. High-friction deadlines excused. Priority on biological baseline, sleep, protein, and micro-habits."
+        desc = "Low Energy Mode Active. Study trimmed to a 30m minimum floor; rest, training, and sleep take priority."
         score = 1.0
+    elif is_break:
+        mode = "BREAK"
+        mode_label = "Break Sprint • Programming & Sidequests"
+        badge_class = "lavender"
+        desc = "No-School Break Sprint Active. Zero school deadlines to defend — morning energy dedicated to programming, CS/Matura foundations & optional Sidequests."
+        score = 1.5
+        cruise_unlocked = True
     elif score > 6.0 and has_acute_exams:
         mode = "SURGE"
         mode_label = "Surge Protocol • High Academic Density"
@@ -699,6 +849,12 @@ def get_workload_analysis(
 
     future_exams = [e for e in exams if e.get("days_left", 0) >= 1 and not e.get("is_travel_excused")]
     today_exams = [e for e in exams if e.get("days_left", 0) == 0]
+    default_budget = 55 if target_dt.weekday() in (0, 2) else 85
+    exam_week_plan = None if (is_travel or is_break) else build_exam_week_plan(
+        future_exams,
+        budget_minutes=30 if is_recovery else default_budget,
+        target_date_str=target_dt.strftime("%Y-%m-%d"),
+    )
 
     return {
         "date": target_dt.strftime("%Y-%m-%d"),
@@ -715,6 +871,7 @@ def get_workload_analysis(
         "upcoming_exams": future_exams,
         "today_exams": today_exams,
         "all_exams": exams,
+        "exam_week_plan": exam_week_plan,
         "homework_count": len(homework),
         "urgent_homework_count": len(urgent_homework),
         "urgent_homework": urgent_homework,
@@ -729,7 +886,9 @@ def get_workload_analysis(
         "vulnerabilities": vulnerabilities,
         "is_us_travel_mode": is_travel,
         "is_travel_mode": is_travel,
+        "is_break_mode": is_break,
         "active_travel_window": travel_win,
+        "active_break_window": break_win,
         "travel_destination": travel_win["destination"] if travel_win else ("United States" if is_us_travel_date(target_dt) else "Travel / Field"),
         "travel_name": travel_win["name"] if travel_win else ("US Deployment" if is_us_travel_date(target_dt) else "Travel / Field"),
         "is_recovery_mode": is_recovery,
@@ -737,11 +896,11 @@ def get_workload_analysis(
     }
 
 
-def parse_block_net_minutes(time_str: str, default_minutes: int = 110) -> Tuple[int, str]:
+def parse_block_net_minutes(time_str: str, default_minutes: int = 85) -> Tuple[int, str]:
     """
-    Parses a time window string (e.g. '14:30 – 16:30' or '14:30 - 16:00') into:
+    Parses a time window string (e.g. '14:30 – 16:00' or '14:30 - 15:30') into:
     (net_minutes, cutoff_time_str).
-    Subtracts a 10-minute commute buffer when total duration >= 90 minutes.
+    Subtracts a 10-minute wind-down buffer when total duration > 90 minutes, or 5m for 60–90m.
     """
     try:
         parts = time_str.replace("–", "-").split("-")
@@ -750,12 +909,12 @@ def parse_block_net_minutes(time_str: str, default_minutes: int = 110) -> Tuple[
             e_h, e_m = [int(p) for p in parts[1].strip().split(":")]
             total_duration = (e_h * 60 + e_m) - (s_h * 60 + s_m)
             cutoff_str = parts[1].strip()
-            buffer = 10 if total_duration >= 90 else (5 if total_duration >= 60 else 0)
+            buffer = 10 if total_duration > 90 else (5 if total_duration >= 60 else 0)
             net = max(15, total_duration - buffer)
             return net, cutoff_str
     except Exception:
         pass
-    return default_minutes, "16:30"
+    return default_minutes, "16:00"
 
 
 def compute_phase_durations(total_net_min: int, scenario_type: str) -> Tuple[int, int, int]:
@@ -912,62 +1071,162 @@ def synthesize_adaptive_schedule(
     )
 
     # --------------------------------------------------------------------------
-    # 0A. SURGE RECOVERY PROTOCOL (Low Energy / Illness / Family Surge)
+    # 0A. SURGE RECOVERY PROTOCOL (Low Energy — 30m Minimum Floor)
     # --------------------------------------------------------------------------
     if analysis.get("is_recovery_mode") or analysis.get("mode") == "SURGE_RECOVERY":
+        dw_time = "10:00 – 10:30" if is_weekend else "14:30 – 15:00"
+        top_target = (analysis.get("exam_week_plan") or {}).get("targets", [None])[0]
+        floor_focus = (
+            f"Biological Floor (30m) • {top_target['subject']}: {top_target['title'][:35]}"
+            if top_target
+            else "Biological Floor (30m) • Unbreakable Micro-Habit"
+        )
+        floor_desc = (
+            f"30m minimum pass check on {top_target['scope'] or top_target['title']}. Zero perfectionism; rest afterwards."
+            if top_target
+            else "15m light review or 1 small Sidequest rep + 15m wind-down. Streak kept without burnout."
+        )
         recovery_blocks = [
             {
                 "time": "08:30 – 09:30",
-                "focus": "Morning Fuel & Launch",
-                "activity": "Gentle wake up, hydration, high-protein breakfast. Nervous system recovery.",
+                "focus": "Morning Fuel & Hydration",
+                "activity": "Calm wake-up, high-protein breakfast. Protect sleep & recovery.",
                 "type": "routine",
             },
             {
-                "time": "10:00 – 10:45",
-                "focus": "Biological Floor • Micro-Habits (45m)",
-                "activity": "[Unbreakable Floor] 20m mobile German Anki vocabulary + 15m review/planning + 10m mental check-in. Momentum sustained; zero guilt.",
+                "time": dw_time,
+                "focus": floor_focus,
+                "activity": f"[Low Energy // 30m Floor] {floor_desc}",
                 "type": "deep_work",
-                "is_tum_roadmap": True,
-                "is_school_dedicated": False,
-                "net_minutes": 45,
-                "deliverable": deliv_dict,
+                "is_tum_roadmap": not bool(top_target),
+                "is_school_dedicated": bool(top_target),
+                "net_minutes": 30,
+                "deliverable": None if top_target else deliv_dict,
                 "candidate_deliverables": candidate_deliverables,
+                "plan_phases": [
+                    {
+                        "phase_num": 1,
+                        "phase_key": "study_school",
+                        "badge_label": "[LOW ENERGY FLOOR • 30M]",
+                        "unit_target": "30m Minimum Pass Check",
+                        "proof_type": "completed_artifact",
+                        "duration_min": 30,
+                        "title": floor_focus,
+                        "description": floor_desc,
+                        "type": "school_defense" if top_target else "tum_deliverable",
+                        "color": "var(--accent-lavender)",
+                    }
+                ],
             },
             {
-                "time": "12:00 – 18:30",
-                "focus": "Rest, Family Duties & Life Recovery",
-                "activity": "Family obligations, restorative downtime, low cognitive load. Zero academic guilt.",
-                "type": "rest",
-            },
-            {
-                "time": "18:30 – 19:15",
-                "focus": "Light Mobility & Walk",
-                "activity": "45 min outdoor walk, fresh air, light mobility/stretching.",
+                "time": "17:45 – 18:30",
+                "focus": "Optional Walk / Light Mobility",
+                "activity": "45 min outdoor walk or stretching if energy allows; skip workout guilt-free if exhausted.",
                 "type": "training",
             },
             {
-                "time": "19:30 – 21:00",
-                "focus": "High-Protein Dinner & Daily Log",
-                "activity": "Nutritious dinner, protein target met, 60-second status check-in on Harness.",
-                "type": "nutrition",
-            },
-            {
-                "time": "21:00 – 22:30",
-                "focus": "Evening Wind Down & Read",
-                "activity": "Decompress, read, zero screen glare before bed.",
+                "time": "19:00 – 22:30",
+                "focus": "Dinner, Zero Cognitive Load & Early Sleep",
+                "activity": "Protein dinner, full screen-off recovery, sleep.",
                 "type": "rest",
-            },
-            {
-                "time": "22:30 – 07:30",
-                "focus": "Restorative Sleep (9 hrs)",
-                "activity": "Deep cellular and nervous system recovery.",
-                "type": "sleep",
             },
         ]
         _attach_physical_to_training_blocks(recovery_blocks, phys_dict)
         schedule["blocks"] = recovery_blocks
-        schedule["name"] = f"Recovery Protocol ({target_dt.strftime('%A')})"
-        schedule["description"] = "Life Recovery / Family Surge Mode Active. High-friction commitments paused. Biological floor and streak preserved."
+        schedule["name"] = f"Recovery Protocol • Low Energy ({target_dt.strftime('%A')})"
+        schedule["description"] = "Low Energy active: cognitive demand trimmed to a single 30m floor so one tired day never breaks the week."
+        return schedule
+
+    # --------------------------------------------------------------------------
+    # 0B. BREAK SPRINT PROTOCOL (At-Home School Holidays / Vacations -> Programming & Sidequests)
+    # --------------------------------------------------------------------------
+    if analysis.get("is_break_mode") or analysis.get("mode") == "BREAK":
+        training_blocks = [dict(b) for b in blocks if b.get("type") == "training"]
+        break_win = analysis.get("active_break_window") or {}
+        break_title = break_win.get("name") or "Break Sprint"
+        net_min, cutoff_str = parse_block_net_minutes("09:30 – 12:00", default_minutes=140)
+        p1 = 65
+        p2 = 45
+        p3 = max(15, net_min - p1 - p2)
+        p1 = net_min - p2 - p3
+
+        break_blocks = [
+            {
+                "time": "08:30 – 09:30",
+                "focus": "Morning Fuel & Unhurried Launch",
+                "activity": "Full sleep, high-protein breakfast, zero morning school commute.",
+                "type": "routine",
+            },
+            {
+                "time": "09:30 – 12:00",
+                "focus": f"{break_title} • Programming & Sidequests",
+                "activity": "[No-School Vacation Acceleration] Morning programming build (JetBrains / C++ / Python) + CS/Math foundations + Optional Sidequest.",
+                "type": "deep_work",
+                "is_tum_roadmap": True,
+                "is_school_dedicated": False,
+                "net_minutes": net_min,
+                "commute_cutoff": cutoff_str,
+                "deliverable": deliv_dict,
+                "candidate_deliverables": candidate_deliverables,
+                "plan_phases": [
+                    {
+                        "phase_num": 1,
+                        "phase_key": "study_code",
+                        "badge_label": "[1. PROGRAMMING / BUILD SPRINT]",
+                        "unit_target": "1 Unassisted Feature / Algo Set",
+                        "proof_type": "code_or_math",
+                        "duration_min": p1,
+                        "title": "Programming Mastery: Raw Code / Project Build",
+                        "description": f"{p1}m deep coding without school test pressure (JetBrains Club problems, C++/Python algorithms, or Harness/agency build).",
+                        "type": "tum_deliverable",
+                        "color": "var(--accent-lavender)",
+                    },
+                    {
+                        "phase_num": 2,
+                        "phase_key": "study_matura",
+                        "badge_label": "[2. MATH / CS FOUNDATIONS]",
+                        "unit_target": "4–6 Core Problems (Self-Checked)",
+                        "proof_type": "problem_count",
+                        "duration_min": p2,
+                        "title": "Math & CS Weak-Topic Repair",
+                        "description": f"{p2}m calm unassisted Math/CS foundation repair so Semester return feels effortless.",
+                        "type": "matura_r",
+                        "color": "#0284c7",
+                    },
+                    {
+                        "phase_num": 3,
+                        "phase_key": "study_school",
+                        "badge_label": "[3. OPTIONAL SIDEQUEST]",
+                        "unit_target": "1 Bonus Sidequest Logged",
+                        "proof_type": "vocab_or_git",
+                        "duration_min": p3,
+                        "title": "Optional Sidequest (German / SIGG / Portfolio)",
+                        "description": f"{p3}m bonus progress on German input, SIGG scanner review, or optional roadmap Sidequests.",
+                        "type": "german_code",
+                        "color": "#10b981",
+                    },
+                ],
+            },
+            {
+                "time": "12:00 – 17:15",
+                "focus": "Open Afternoon • Zero School Guilt",
+                "activity": "Afternoon completely free for rest, hobbies, friends, or extra Sidequests only if motivated.",
+                "type": "rest",
+            },
+        ]
+        break_blocks.extend(training_blocks)
+        break_blocks.extend([
+            {
+                "time": "20:00 – 23:00",
+                "focus": "Evening Unwind & Sleep",
+                "activity": "Dinner, relaxation, consistent sleep.",
+                "type": "rest",
+            },
+        ])
+        _attach_physical_to_training_blocks(break_blocks, phys_dict)
+        schedule["blocks"] = break_blocks
+        schedule["name"] = f"{break_title} ({target_dt.strftime('%A')})"
+        schedule["description"] = "School break active: zero homework/exam stress. Morning dedicated to honing programming & Sidequests; afternoon open."
         return schedule
 
     # --------------------------------------------------------------------------
@@ -1237,57 +1496,124 @@ def synthesize_adaptive_schedule(
                 },
             ]
 
-        # Scenario B: Single Nearest Exam Dominance (1 to 3 days out)
-        elif acute_exams:
-            top_exam = acute_exams[0]
-            p1, p2, p3 = compute_phase_durations(net_min, "acute_school_defense")
-            scope_str = top_exam.get("scope") or top_exam.get("title") or ""
-            b["focus"] = f"Deep Work • {top_exam['subject']} Prep: Acute Defense"
-            b["activity"] = (
-                f"[Acute Defense // T-{top_exam.get('days_left', 1)}] {top_exam['subject']} Scope & Core Theory + "
-                f"6 Past Paper Problems + Error Bank Blitz."
+        # Scenario B: Exam Week Priority Allocator (acute <=3d exams OR 2+ tests this week)
+        elif acute_exams or analysis.get("week_exams_count", 0) >= 2:
+            brief = build_exam_week_plan(
+                exams,
+                budget_minutes=net_min,
+                target_date_str=target_dt.strftime("%Y-%m-%d"),
             )
+            analysis["exam_week_plan"] = brief
+            targets = brief["targets"] if brief else []
+            primary = targets[0] if targets else {
+                "subject": acute_exams[0]["subject"],
+                "title": acute_exams[0].get("title", ""),
+                "scope": acute_exams[0].get("scope", ""),
+                "days_left": acute_exams[0].get("days_left", 1),
+                "due_label": "TOMORROW" if acute_exams[0].get("days_left", 1) == 1 else f"{acute_exams[0].get('days_left', 1)}d",
+                "allocated_minutes": net_min,
+            }
+            secondary = next((t for t in targets[1:] if t.get("role") == "HEAD_START" and t.get("allocated_minutes", 0) > 0), None)
+            primary_topic = primary.get("scope") or primary.get("title") or primary["subject"]
+
+            b["focus"] = f"Deep Work • {primary['subject']} Prep: Acute Defense"
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
             b["deliverable"] = None
-            b["plan_phases"] = [
-                {
-                    "phase_num": 1,
-                    "phase_key": "study_school",
-                    "badge_label": "[1. SCOPE & THEORY BLITZ]",
-                    "unit_target": "1 Condensed Formula/Concept Sheet",
-                    "proof_type": "paper_ink",
-                    "duration_min": p1,
-                    "title": f"{top_exam['subject']}: Core Theory, Definitions & Formulas",
-                    "description": f"{p1}m active recall of {top_exam['subject']} concepts ({scope_str[:40]}). Formulate flashcards and synthesize cheat sheet.",
-                    "type": "school_defense",
-                    "color": "var(--accent-lavender)",
-                },
-                {
-                    "phase_num": 2,
-                    "phase_key": "study_matura",
-                    "badge_label": "[2. PROBLEM DRILLS & PAST PAPERS]",
-                    "unit_target": "6 Unassisted Problems (Self-Corrected)",
-                    "proof_type": "cke_tasks",
-                    "duration_min": p2,
-                    "title": f"{top_exam['subject']}: Past Papers & Timed Drills",
-                    "description": f"{p2}m unassisted problem solving on {top_exam['subject']} ({top_exam.get('title')}). Red-pen verification and immediate mistake logging.",
-                    "type": "school_defense",
-                    "color": "#0284c7",
-                },
-                {
-                    "phase_num": 3,
-                    "phase_key": "study_code",
-                    "badge_label": "[3. ERROR BANK & MOCK BLITZ]",
-                    "unit_target": "5 Edge Cases / Trap Cards Logged",
-                    "proof_type": "problem_count",
-                    "duration_min": p3,
-                    "title": f"{top_exam['subject']}: Error Bank & High-Yield Blitz",
-                    "description": f"{p3}m rapid-fire drill of past mistakes, edge cases, and high-frequency exam traps before morning clearance.",
-                    "type": "school_defense",
-                    "color": "#10b981",
-                },
-            ]
+
+            if secondary:
+                prim_min = int(primary.get("allocated_minutes", max(25, net_min - 20)))
+                sec_min = int(secondary.get("allocated_minutes", max(10, net_min - prim_min)))
+                p1 = max(10, prim_min // 2)
+                p2 = max(10, prim_min - p1)
+                p3 = max(10, net_min - p1 - p2)
+                sec_topic = secondary.get("scope") or secondary.get("title") or secondary["subject"]
+                b["activity"] = (
+                    f"[Study Brief // {len(targets)} Tests This Week] "
+                    f"{primary['subject']} ({primary['due_label']}): {prim_min}m on {primary_topic[:45]} + "
+                    f"Head Start {secondary['subject']} ({secondary['due_label']}): {p3}m on {sec_topic[:35]}."
+                )
+                b["plan_phases"] = [
+                    {
+                        "phase_num": 1,
+                        "phase_key": "study_school",
+                        "badge_label": f"[1. DO NOW • {primary['due_label']}]",
+                        "unit_target": f"{primary['subject']} Scope Check",
+                        "proof_type": "paper_ink",
+                        "duration_min": p1,
+                        "title": f"{primary['subject']}: {primary['title'] or 'Core Concepts'}",
+                        "description": f"{p1}m active recall from notes/book on: {primary_topic[:80]}.",
+                        "type": "school_defense",
+                        "color": "var(--accent-lavender)",
+                    },
+                    {
+                        "phase_num": 2,
+                        "phase_key": "study_matura",
+                        "badge_label": f"[2. ACTIVE DRILL • {primary['subject'].upper()}]",
+                        "unit_target": "Problems / Outline Without Notes",
+                        "proof_type": "problem_count",
+                        "duration_min": p2,
+                        "title": f"{primary['subject']}: Timed Practice & Gaps",
+                        "description": f"{p2}m solve/write without notes on {primary_topic[:65]} and check weak spots.",
+                        "type": "school_defense",
+                        "color": "#0284c7",
+                    },
+                    {
+                        "phase_num": 3,
+                        "phase_key": "study_code",
+                        "badge_label": f"[3. HEAD START • {secondary['due_label']}]",
+                        "unit_target": f"{secondary['subject']} Pre-Study",
+                        "proof_type": "completed_artifact",
+                        "duration_min": p3,
+                        "title": f"Head Start: {secondary['subject']} ({secondary['due_label']})",
+                        "description": f"{p3}m early look at {secondary['subject']} ({sec_topic[:65]}) so later this week stays calm.",
+                        "type": "school_defense",
+                        "color": "#10b981",
+                    },
+                ]
+            else:
+                p1, p2, p3 = compute_phase_durations(net_min, "acute_school_defense")
+                b["activity"] = (
+                    f"[Exam Defense // {primary['due_label']}] {primary['subject']} ({primary_topic[:65]})."
+                )
+                b["plan_phases"] = [
+                    {
+                        "phase_num": 1,
+                        "phase_key": "study_school",
+                        "badge_label": "[1. SCOPE & THEORY CHECK]",
+                        "unit_target": "Core Definitions & Formulas",
+                        "proof_type": "paper_ink",
+                        "duration_min": p1,
+                        "title": f"{primary['subject']}: Scope & Theory Check",
+                        "description": f"{p1}m active recall of {primary['subject']} concepts ({primary_topic[:60]}). Write key steps from memory.",
+                        "type": "school_defense",
+                        "color": "var(--accent-lavender)",
+                    },
+                    {
+                        "phase_num": 2,
+                        "phase_key": "study_matura",
+                        "badge_label": "[2. UNASSISTED PRACTICE]",
+                        "unit_target": "Practice Set (Self-Checked)",
+                        "proof_type": "cke_tasks",
+                        "duration_min": p2,
+                        "title": f"{primary['subject']}: Timed Drills & Problems",
+                        "description": f"{p2}m unassisted problem solving on {primary['subject']} ({primary['title']}). Verify mistakes immediately.",
+                        "type": "school_defense",
+                        "color": "#0284c7",
+                    },
+                    {
+                        "phase_num": 3,
+                        "phase_key": "study_code",
+                        "badge_label": "[3. WEAK SPOT LOCK-IN]",
+                        "unit_target": "Edge Cases Cleared",
+                        "proof_type": "problem_count",
+                        "duration_min": p3,
+                        "title": f"{primary['subject']}: Error Review & Final Wrap",
+                        "description": f"{p3}m redo missed steps cleanly so tomorrow feels predictable.",
+                        "type": "school_defense",
+                        "color": "#10b981",
+                    },
+                ]
 
         # Scenario C: Defense Protocol Active (only when 3-day test defense is unlocked/locked)
         elif analysis.get("mode") == "DEFENSE":

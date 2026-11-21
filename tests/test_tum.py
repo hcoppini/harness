@@ -144,5 +144,29 @@ def test_metro_roadmap_sqlite_deliverable_overlay(test_db):
     phys_counts = nov_station.get("deliverable_counts", {}).get("Physical")
     assert phys_counts is not None
     assert phys_counts["count"] == 7
-    assert phys_counts["total"] == 30
+    assert phys_counts["total"] == 16  # Reconciled with feasible nov-2026 station ceiling
+
+
+def test_metro_roadmap_sidequests_optional_and_toggleable():
+    """Optional Sidequests render cleanly per station and never affect required station completion."""
+    orig_file = tum_service.DATA_DIR / "metro_roadmap.json"
+    orig_content = orig_file.read_text(encoding="utf-8")
+    try:
+        roadmap = tum_service.get_metro_roadmap()
+        nov_station = next(s for s in roadmap["stations"] if s["id"] == "nov-2026")
+        sidequests = nov_station.get("sidequests", [])
+        assert len(sidequests) >= 2
+        sq_id = sidequests[0]["id"]
+
+        res_on = tum_service.toggle_station_sidequest("nov-2026", sq_id)
+        assert res_on["success"] is True
+        assert res_on["is_completed"] is True
+        assert sq_id in res_on["completed_sidequests"]
+
+        res_off = tum_service.toggle_station_sidequest("nov-2026", sq_id)
+        assert res_off["success"] is True
+        assert res_off["is_completed"] is False
+        assert sq_id not in res_off["completed_sidequests"]
+    finally:
+        orig_file.write_text(orig_content, encoding="utf-8")
 

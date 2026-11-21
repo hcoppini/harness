@@ -226,10 +226,11 @@ window.Dashboard = {
           const isFutureClass = day.is_future ? " cell-future" : "";
           const hasExamClass = day.has_exam ? " has-exam" : "";
           const hasHwClass = day.has_homework ? " has-homework" : "";
+          const outingClass = day.outing_type === "travel" ? " has-travel" : (day.outing_type === "break" ? " has-break" : "");
 
           html += `
             <div 
-              class="heatmap-cell lvl-${level}${isTodayClass}${isFutureClass}${hasExamClass}${hasHwClass}" 
+              class="heatmap-cell lvl-${level}${isTodayClass}${isFutureClass}${hasExamClass}${hasHwClass}${outingClass}" 
               data-date="${dateStr}"
               data-count="${count}"
               data-total="${totalBoxes}"
@@ -238,6 +239,7 @@ window.Dashboard = {
               data-is-future="${day.is_future ? "1" : "0"}"
               data-has-exam="${day.has_exam ? "1" : "0"}"
               data-has-hw="${day.has_homework ? "1" : "0"}"
+              data-outing="${day.outing_type || ""}"
               data-display="${day.display_date || dateStr}"
             ></div>
           `;
@@ -295,7 +297,11 @@ window.Dashboard = {
 
         let statusBadge = "";
         if (isFuture) {
-          if (dayInfo.has_exam || dayInfo.has_homework) {
+          if (dayInfo.outing_type === "travel") {
+            statusBadge = `<span style="color: #60a5fa; font-weight: 700; font-size: 10px;">[Travel Window]</span>`;
+          } else if (dayInfo.outing_type === "break") {
+            statusBadge = `<span style="color: var(--accent-lavender); font-weight: 700; font-size: 10px;">[Break Sprint]</span>`;
+          } else if (dayInfo.has_exam || dayInfo.has_homework) {
             statusBadge = `<span style="color: var(--text-primary); font-weight: 700; font-size: 10px;">[Exam / Deadline Scheduled]</span>`;
           } else {
             statusBadge = `<span style="color: var(--text-tertiary); font-size: 10px;">(Future Date)</span>`;

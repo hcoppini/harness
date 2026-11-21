@@ -658,13 +658,16 @@ def get_metro_roadmap(conn: Optional[sqlite3.Connection] = None) -> Dict[str, An
                 live = live_map.get(stream)
                 if not live:
                     continue
+                existing_meta = counts.get(key) or {}
+                target_total = existing_meta.get("total") or live["total"]
+                target_unit = existing_meta.get("unit") or live["unit"]
                 counts[key] = {
-                    "count": live["count"],
-                    "total": live["total"],
-                    "unit": live["unit"],
+                    "count": min(int(live["count"] or 0), int(target_total)),
+                    "total": int(target_total),
+                    "unit": target_unit,
                     "deliverable_id": live["deliverable_id"],
                 }
-                if live["is_completed"] and key not in completed_keys:
+                if (live["is_completed"] or int(live["count"] or 0) >= int(target_total)) and key not in completed_keys:
                     completed_keys.append(key)
             st["completed_deliverables"] = completed_keys
     except Exception:
@@ -779,6 +782,44 @@ def toggle_station_deliverable(station_id: str, deliverable_key: str) -> Dict[st
         return {"success": False, "error": str(e)}
 
 
+def toggle_station_sidequest(station_id: str, sidequest_id: str) -> Dict[str, Any]:
+    """Toggles completion of an optional Sidequest on a Metro station without affecting required station %."""
+    roadmap_file = DATA_DIR / "metro_roadmap.json"
+    if not roadmap_file.exists():
+        return {"success": False, "error": "Roadmap file not found"}
+
+    try:
+        with open(roadmap_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        target_station = next((s for s in data.get("stations", []) if s.get("id") == station_id), None)
+        if not target_station:
+            return {"success": False, "error": f"Station {station_id} not found"}
+
+        completed_sq = list(target_station.get("completed_sidequests") or [])
+        if sidequest_id in completed_sq:
+            completed_sq.remove(sidequest_id)
+            is_completed = False
+        else:
+            completed_sq.append(sidequest_id)
+            is_completed = True
+
+        target_station["completed_sidequests"] = completed_sq
+        with open(roadmap_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        return {
+            "success": True,
+            "station_id": station_id,
+            "sidequest_id": sidequest_id,
+            "is_completed": is_completed,
+            "completed_sidequests": completed_sq,
+            "total_sidequests": len(target_station.get("sidequests") or []),
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
 def advance_station(station_id: str, pass_over_unfinished: bool = True) -> Dict[str, Any]:
     """Advances from the current station to the next station.
     Marks unfinished deliverables as passed over, marks current station completed,
@@ -831,6 +872,44 @@ def advance_station(station_id: str, pass_over_unfinished: bool = True) -> Dict[
             "passed_over_deliverables": passed_over_list,
             "next_station_id": next_station.get("id") if next_station else None,
             "next_station_name": next_station.get("name") if next_station else None,
+        }
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def toggle_station_sidequest(station_id: str, sidequest_id: str) -> Dict[str, Any]:
+    """Toggles completion of an optional Sidequest on a Metro station without affecting required station %."""
+    roadmap_file = DATA_DIR / "metro_roadmap.json"
+    if not roadmap_file.exists():
+        return {"success": False, "error": "Roadmap file not found"}
+
+    try:
+        with open(roadmap_file, "r", encoding="utf-8") as f:
+            data = json.load(f)
+
+        target_station = next((s for s in data.get("stations", []) if s.get("id") == station_id), None)
+        if not target_station:
+            return {"success": False, "error": f"Station {station_id} not found"}
+
+        completed_sq = list(target_station.get("completed_sidequests") or [])
+        if sidequest_id in completed_sq:
+            completed_sq.remove(sidequest_id)
+            is_completed = False
+        else:
+            completed_sq.append(sidequest_id)
+            is_completed = True
+
+        target_station["completed_sidequests"] = completed_sq
+        with open(roadmap_file, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+
+        return {
+            "success": True,
+            "station_id": station_id,
+            "sidequest_id": sidequest_id,
+            "is_completed": is_completed,
+            "completed_sidequests": completed_sq,
+            "total_sidequests": len(target_station.get("sidequests") or []),
         }
     except Exception as e:
         return {"success": False, "error": str(e)}

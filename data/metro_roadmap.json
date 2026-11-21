@@ -99,7 +99,7 @@
       "id": "nov-2026",
       "date": "2026-11",
       "month_label": "NOV '26",
-      "name": "Etap Główny (20k PLN)",
+      "name": "Sem 1 Grade Rescue (Recalibrated)",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": true,
       "status": "active",
@@ -109,34 +109,45 @@
         "sigg",
         "physical"
       ],
-      "objective": "Launch 25. edycja SIGG Etap Główny (20 000 PLN capital) & CKE data parsing tasks. [Includes +2 Math R & +2 Code catch-up].",
+      "objective": "Defend acute Nov exams (Informatyka, Niemiecki, Math Trygonometria) + lock 140g protein floor. JetBrains triggers upon Codeforces invite.",
       "deliverables": {
-        "Academics": "Mid-semester review. All subjects > 4.0, Math and CS locked at 5.0+. Target: 42 Math R problems (40 base + 2 Oct catch-up).",
-        "SIGG": "Start Etapu Głównego (16 listopada 2026 – 12 marca 2027). Kapitał 20 000 zł na akcje WIG20/mWIG40 i ETF-y. Złożyć obowiązkową pierwszą transakcję. Śledzić 4 premie lotne w trakcie etapu. (Gra Testowa na GPWtr@der 2-13.11).",
-        "Code": "Transition to CKE Matura programming tasks in Python/C++. Target: 17 exercises (15 base + 2 Oct catch-up).",
-        "Physical": "Weight 69.5 kg; 5k run pace under 4:40."
+        "Academics": "Acute Exam Defense: pass/ace Nov tests (Mon Informatyka, Tue Niemiecki, Fri Matematyka trygonometria). Complete 18 targeted paper-and-ink problems.",
+        "Physical": "140g Daily Protein Floor + Sunday Run & Boxing resumption (9 days remaining in Nov)."
       },
-      "next_action": "Gra Testowa na GPWtr@der (start 2.11) & pierwsze zadania Math R (42 zadania).",
+      "sidequests": [
+        {
+          "id": "sq_nov_jetbrains",
+          "stream": "Code",
+          "title": "JetBrains Youth Coding Club",
+          "detail": "Prerecorded lecture + Codeforces contest (solve >=50%). Triggered immediately once admin approves Codeforces group access.",
+          "xp_label": "PROGRAMMING"
+        },
+        {
+          "id": "sq_nov_sigg",
+          "stream": "SIGG",
+          "title": "SIGG Etap Główny (Low Maintenance)",
+          "detail": "Stage 1 active with opening trades placed. Low-maintenance monitoring with team.",
+          "xp_label": "CONTEST"
+        },
+        {
+          "id": "sq_nov_german",
+          "stream": "German",
+          "title": "German Kapitel 1 Open-Book Prep",
+          "detail": "Index textbook pages, direction, and weather vocabulary for Tuesday's open-book sprawdzian.",
+          "xp_label": "LANGUAGE"
+        }
+      ],
+      "next_action": "Mon Informatyka (NWD/NWW/fractions) -> Tue Niemiecki (open-book) -> Fri Matematyka (Trygonometria).",
       "deliverable_counts": {
         "Academics": {
           "count": 0,
-          "total": 42,
-          "unit": "problems"
-        },
-        "Code": {
-          "count": 0,
-          "total": 17,
-          "unit": "exercises"
-        },
-        "SIGG": {
-          "count": 0,
-          "total": 5,
-          "unit": "modules"
+          "total": 18,
+          "unit": "sessions"
         },
         "Physical": {
-          "count": 0,
-          "total": 30,
-          "unit": "days"
+          "count": 4,
+          "total": 16,
+          "unit": "sessions"
         }
       }
     },
@@ -154,34 +165,45 @@
         "sigg",
         "german"
       ],
-      "objective": "Lock in high grades on Sem 1 transcript & audit stock scanner.",
+      "objective": "Lock Semester 1 proposed grades cleanly before Dec 23 holiday break; shift to Break Sprint programming once school pauses.",
       "deliverables": {
-        "Academics": "Finalize Semester 1 proposed grades. No grade below 4; Math, CS, English at 5 or 6. Target: 42 Math R problems (40 base + 2 Oct catch-up).",
-        "SIGG": "Etap Główny (20 000 zł): Przegląd portfela akcji/ETF przed przerwą świąteczną i okresem niskiej płynności. Polowanie na premię lotną.",
-        "German": "A2 certification test (self-assessment or mock). Begin transition to B1 materials. Target: 110 words in Anki (100 base + 10 Oct catch-up).",
-        "Code": "Audit desktop/polish_stocks_day_trade-main and understand every function without AI explanation. Target: 17 exercises (15 base + 2 Oct catch-up)."
+        "Academics": "Finalize Semester 1 proposed grades: raise Math & Physics out of danger and protect 4.0+ in core subjects.",
+        "Physical": "Maintain 4x/wk Boxing & Gym anchor across pre-holiday weeks."
       },
-      "next_action": "Review Semester 1 transcript and ensure all STEM subjects are 5.0+.",
+      "sidequests": [
+        {
+          "id": "sq_dec_break_code",
+          "stream": "Code",
+          "title": "Christmas Break Programming Sprint",
+          "detail": "Switch Today to Break Sprint (Dec 23+): build 1 unassisted Python/C++ project or CKE set with zero school tests.",
+          "xp_label": "VACATION BUILD"
+        },
+        {
+          "id": "sq_dec_sigg",
+          "stream": "SIGG",
+          "title": "Pre-Holiday Portfolio Check",
+          "detail": "Quick 15m check on WIG20/ETF positions before low-liquidity holiday week.",
+          "xp_label": "CONTEST"
+        },
+        {
+          "id": "sq_dec_german",
+          "stream": "German",
+          "title": "A2 Self-Check / Anki Sprint",
+          "detail": "Optional 20m/day A2 polish during winter break.",
+          "xp_label": "LANGUAGE"
+        }
+      ],
+      "next_action": "Lock Semester 1 grades cleanly, then pivot Dec 23+ into Break Sprint coding.",
       "deliverable_counts": {
         "Academics": {
           "count": 0,
-          "total": 42,
-          "unit": "problems"
+          "total": 15,
+          "unit": "sessions"
         },
-        "SIGG": {
+        "Physical": {
           "count": 0,
-          "total": 5,
-          "unit": "modules"
-        },
-        "German": {
-          "count": 0,
-          "total": 110,
-          "unit": "words"
-        },
-        "Code": {
-          "count": 0,
-          "total": 17,
-          "unit": "exercises"
+          "total": 14,
+          "unit": "sessions"
         }
       }
     },
@@ -189,7 +211,7 @@
       "id": "jan-2027",
       "date": "2027-01",
       "month_label": "JAN '27",
-      "name": "Etap Główny Midpoint",
+      "name": "Sem 1 Close & Rebound",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": false,
       "status": "upcoming",
@@ -198,28 +220,38 @@
         "code",
         "sigg"
       ],
-      "objective": "SIGG Etap Główny portfolio midpoint audit & dynamic programming drills.",
+      "objective": "Official Semester 1 transcript finalized & weak Math topics repaired.",
       "deliverables": {
-        "Academics": "Formal Semester 1 grades locked onto official transcript. Target: 42 Math R problems (40 base + 2 Oct catch-up).",
-        "SIGG": "Półmetek Etapu Głównego (trwa do 12 marca). Audyt portfela akcji/ETF, kontrola obsunięcia kapitału (drawdown) i rywalizacja w modułach wiedzy.",
-        "Code": "Solve 17 dynamic programming and recursion problems from previous Matura sheets (15 base + 2 Oct catch-up)."
+        "Academics": "Formal Semester 1 grades locked onto transcript; patch top 2 Math weak areas in <=90m/day.",
+        "Physical": "Consistent 2x Boxing + 2x Gym weekly floor."
       },
-      "next_action": "Zoptymalizować pozycje w portfelu SIGG (akcje i ETF-y) pod kątem dynamiki sektorowej.",
+      "sidequests": [
+        {
+          "id": "sq_jan_algo",
+          "stream": "Code",
+          "title": "Recursion & C++ Practice",
+          "detail": "Solve 8–10 core recursion/loop tasks during spare Friday/Saturday slots.",
+          "xp_label": "PROGRAMMING"
+        },
+        {
+          "id": "sq_jan_sigg",
+          "stream": "SIGG",
+          "title": "Etap Główny Midpoint Check",
+          "detail": "Audit portfolio drawdown & quiz modules when spare time opens.",
+          "xp_label": "CONTEST"
+        }
+      ],
+      "next_action": "Ensure formal Semester 1 transcript closes cleanly with zero surprises.",
       "deliverable_counts": {
         "Academics": {
           "count": 0,
-          "total": 42,
-          "unit": "problems"
+          "total": 15,
+          "unit": "sessions"
         },
-        "SIGG": {
+        "Physical": {
           "count": 0,
-          "total": 5,
-          "unit": "modules"
-        },
-        "Code": {
-          "count": 0,
-          "total": 17,
-          "unit": "exercises"
+          "total": 16,
+          "unit": "sessions"
         }
       }
     },
@@ -227,44 +259,55 @@
       "id": "feb-2027",
       "date": "2027-02",
       "month_label": "FEB '27",
-      "name": "Winter Intensive",
+      "name": "Winter Break / Sem 2 Start",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": false,
       "status": "upcoming",
       "branches": [
         "academics",
+        "code",
         "sigg",
         "german",
         "physical"
       ],
-      "objective": "Winter break math acceleration & futures simulation.",
+      "objective": "Use confirmed at-home winter break days (Break Sprint) for heavy coding & Math resets; flip to Travel only when trip dates are locked.",
       "deliverables": {
-        "Academics": "Complete 5 full Math Rozszerzona past sheets (CKE 2020-2024). Target: 42 Math R problems (40 base + 2 Oct catch-up).",
-        "SIGG": "Etap Główny w fazie finałowej (do 12 marca). Przygotowanie do rozgrywki na kontraktach terminowych (start 15 marca): symulacja mechaniki dźwigni FW20 i pozycji krótkich.",
-        "German": "B1 grammar foundations (Subjunctive II, passive voice, subordinate clauses). Target: 112 words (100 base + 12 Oct catch-up).",
-        "Physical": "Weight 71.0 kg; bench/squat/deadlift baseline increase of 5%."
+        "Academics": "Keep Sem 2 clean from Day 1; target 20 focused Math practice sessions.",
+        "Code": "Winter Break Coding Sprint: hone Python/C++ algorithms while zero tests loom.",
+        "Physical": "Maintain 4x/wk training rhythm (or Travel mobility if away)."
       },
-      "next_action": "Solve 5 complete Math R arkusze under timed conditions.",
+      "sidequests": [
+        {
+          "id": "sq_feb_german",
+          "stream": "German",
+          "title": "B1 Grammar Primer",
+          "detail": "Optional 20m daily German blocks during winter break mornings.",
+          "xp_label": "LANGUAGE"
+        },
+        {
+          "id": "sq_feb_sigg",
+          "stream": "SIGG",
+          "title": "FW20 Futures Dry-Run",
+          "detail": "Review futures margin mechanics ahead of March stage.",
+          "xp_label": "CONTEST"
+        }
+      ],
+      "next_action": "Confirm travel dates once booked; run Break Sprint on any at-home holiday days.",
       "deliverable_counts": {
         "Academics": {
           "count": 0,
-          "total": 42,
-          "unit": "problems"
+          "total": 20,
+          "unit": "sessions"
         },
-        "SIGG": {
+        "Code": {
           "count": 0,
-          "total": 5,
-          "unit": "modules"
-        },
-        "German": {
-          "count": 0,
-          "total": 112,
-          "unit": "words"
+          "total": 12,
+          "unit": "exercises"
         },
         "Physical": {
           "count": 0,
-          "total": 30,
-          "unit": "days"
+          "total": 14,
+          "unit": "sessions"
         }
       }
     },
@@ -272,7 +315,7 @@
       "id": "mar-2027",
       "date": "2027-03",
       "month_label": "MAR '27",
-      "name": "Kontrakty Terminowe",
+      "name": "Sem 2 Consolidation",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": true,
       "status": "upcoming",
@@ -281,28 +324,38 @@
         "code",
         "sigg"
       ],
-      "objective": "Finisz Etapu Głównego (12.03) i rozgrywka na kontraktach terminowych (15-26.03).",
+      "objective": "Hold Sem 2 grades >= 4.0 across all STEM subjects with calm weekly pacing.",
       "deliverables": {
-        "SIGG": "12 marca: Zakończenie Etapu Głównego. 15–26 marca: Dedykowana rozgrywka na kontraktach terminowych z osobną pulą 10 000 zł. Ścisły risk management i stop-loss na kontraktach FW20.",
-        "Academics": "Q3 school grades checkup. Ensure Polish, History, and Biology stay >= 4.0. Target: 42 Math R problems (40 base + 2 Oct catch-up).",
-        "Code": "Master SQL databases and Access/Excel data processing modules required for Matura Informatyka. Target: 16 exercises (15 base + 1 Oct catch-up)."
+        "Academics": "Q3 transcript check: zero subjects below 4.0; steady weekly exam triage.",
+        "Physical": "Steady 2x Boxing + 2x Gym floor."
       },
-      "next_action": "Obrót kontraktami terminowymi FW20 w dedykowanym etapie (15–26 marca) z puli 10 000 zł.",
-      "deliverable_counts": {
-        "SIGG": {
-          "count": 0,
-          "total": 5,
-          "unit": "modules"
+      "sidequests": [
+        {
+          "id": "sq_mar_sigg",
+          "stream": "SIGG",
+          "title": "SIGG Contracts Stage (15-26.03)",
+          "detail": "Optional 15m checks during dedicated futures round with risk limits.",
+          "xp_label": "CONTEST"
         },
+        {
+          "id": "sq_mar_sql",
+          "stream": "Code",
+          "title": "Matura CS SQL / Data Tasks",
+          "detail": "Run SQL & data-parsing Sidequests on free Friday/Saturday sessions.",
+          "xp_label": "PROGRAMMING"
+        }
+      ],
+      "next_action": "Protect Q3 grades first; touch SIGG/SQL only in spare slots.",
+      "deliverable_counts": {
         "Academics": {
           "count": 0,
-          "total": 42,
-          "unit": "problems"
+          "total": 18,
+          "unit": "sessions"
         },
-        "Code": {
+        "Physical": {
           "count": 0,
           "total": 16,
-          "unit": "exercises"
+          "unit": "sessions"
         }
       }
     },
@@ -310,7 +363,7 @@
       "id": "apr-2027",
       "date": "2027-04",
       "month_label": "APR '27",
-      "name": "Ranking & Wielki Finał GPW",
+      "name": "Spring Term & Easter Break",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": false,
       "status": "upcoming",
@@ -319,28 +372,38 @@
         "sigg",
         "german"
       ],
-      "objective": "Oficjalny ranking (12.04) i Wielki Finał w Sali Notowań GPW w Warszawie (22.04).",
+      "objective": "Use Easter break for extra programming/German without burning out on school weeks.",
       "deliverables": {
-        "SIGG": "12 kwietnia: Ogłoszenie rankingu oficjalnego. 22 kwietnia: Wielki Finał 25. edycji w Sali Notowań GPW w Warszawie dla 50 najlepszych zespołów w Polsce (pula nagród >200 tys. zł, laptopy MacBook).",
-        "Academics": "End-of-year sprint begins. Target 5.0+ in all core STEM subjects. Target: 42 Math R problems (40 base + 2 Oct catch-up).",
-        "German": "B1 intermediate listening comprehension (DW Langsam gesprochene Nachrichten). Target: 113 words (100 base + 13 Oct catch-up)."
+        "Academics": "Keep STEM subjects strong ahead of year-end sprint; Easter break catch-up.",
+        "Physical": "Maintain 4x/wk training floor."
       },
-      "next_action": "Udział w Wielkim Finale 25. edycji SIGG w Sali Notowań GPW w Warszawie (22 kwietnia).",
-      "deliverable_counts": {
-        "SIGG": {
-          "count": 0,
-          "total": 5,
-          "unit": "modules"
+      "sidequests": [
+        {
+          "id": "sq_apr_sigg",
+          "stream": "SIGG",
+          "title": "SIGG Official Ranking / Finals",
+          "detail": "Track April 12 ranking / April 22 GPW Finals if qualified.",
+          "xp_label": "CONTEST"
         },
+        {
+          "id": "sq_apr_german",
+          "stream": "German",
+          "title": "Easter Break German & Listening",
+          "detail": "DW Langsam gesprochene Nachrichten sessions during spring break.",
+          "xp_label": "LANGUAGE"
+        }
+      ],
+      "next_action": "Stay steady through April tests and flip Easter days to Break Sprint.",
+      "deliverable_counts": {
         "Academics": {
           "count": 0,
-          "total": 42,
-          "unit": "problems"
+          "total": 16,
+          "unit": "sessions"
         },
-        "German": {
+        "Physical": {
           "count": 0,
-          "total": 113,
-          "unit": "words"
+          "total": 16,
+          "unit": "sessions"
         }
       }
     },
@@ -348,7 +411,7 @@
       "id": "may-2027",
       "date": "2027-05",
       "month_label": "MAY '27",
-      "name": "Trial Matura Audit",
+      "name": "Matura Weekend & May Push",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": false,
       "status": "upcoming",
@@ -356,22 +419,31 @@
         "academics",
         "physical"
       ],
-      "objective": "Write official 2027 Matura 1 year early under timed exam conditions.",
+      "objective": "Ace Class 3 May sprawdziany and leverage May holiday days (`majówka` + Matura days off) cleanly.",
       "deliverables": {
-        "Academics": "Sit down with 2027 official Matura papers written by 4th-graders. Score yourself under real exam timing (aim for >70% raw score on Math R 1 year early). Target: 42 Math R problems (40 base + 2 Oct catch-up).",
-        "Physical": "Body weight 72.5 kg at 14-15% body fat."
+        "Academics": "Prioritize Class 3 proposed annual grades above all else in <=90m/day blocks.",
+        "Physical": "Track weight trend steadily without stress."
       },
-      "next_action": "Score 2027 official CKE Math sheet and identify gap topics.",
+      "sidequests": [
+        {
+          "id": "sq_may_trial",
+          "stream": "Code",
+          "title": "2027 Matura Days-Off Sprint",
+          "detail": "Try 1 timed CS/Math sheet or code project on free Matura exam days.",
+          "xp_label": "MATURA PREVIEW"
+        }
+      ],
+      "next_action": "Focus on Class 3 annual grade stabilization.",
       "deliverable_counts": {
         "Academics": {
           "count": 0,
-          "total": 42,
-          "unit": "problems"
+          "total": 16,
+          "unit": "sessions"
         },
         "Physical": {
           "count": 0,
-          "total": 30,
-          "unit": "days"
+          "total": 16,
+          "unit": "sessions"
         }
       }
     },
@@ -388,28 +460,31 @@
         "code",
         "harness"
       ],
-      "objective": "Milepost 1 for TUM: 3rd Class Liceum Final Transcript (GPA >= 4.8).",
+      "objective": "Lock Class 3 Final Transcript cleanly, then open full Summer Vacation Acceleration.",
       "deliverables": {
-        "Academics": "Milepost 1 for TUM: 3rd Class Liceum Final Transcript completed with GPA >= 4.8. Target: 46 Math R problems (40 base + 6 summer catch-up).",
-        "Code": "Complete a standalone, production-ready project for your portfolio without AI-generated scaffolding. Target: 21 tasks (15 base + 6 summer catch-up).",
-        "Harness": "Update portfolio database with SIGG credentials and year-end metrics."
+        "Academics": "Milepost 1: Finalize 3rd-year Liceum grades cleanly on official świadectwo.",
+        "Physical": "Transition smoothly into summer gym/boxing consistency."
       },
-      "next_action": "Verify final 3rd-year certificate grades with school administration.",
+      "sidequests": [
+        {
+          "id": "sq_jun_summer_launch",
+          "stream": "Code",
+          "title": "Summer Project Scoping",
+          "detail": "Pick 1 meaningful standalone coding/agency project to build once school ends June 26.",
+          "xp_label": "PROGRAMMING"
+        }
+      ],
+      "next_action": "Lock Class 3 transcript grades, then switch to Summer Break Sprint.",
       "deliverable_counts": {
         "Academics": {
           "count": 0,
-          "total": 46,
-          "unit": "problems"
+          "total": 12,
+          "unit": "sessions"
         },
-        "Code": {
+        "Physical": {
           "count": 0,
-          "total": 21,
-          "unit": "exercises"
-        },
-        "Harness": {
-          "count": 0,
-          "total": 10,
-          "unit": "reps"
+          "total": 14,
+          "unit": "sessions"
         }
       }
     },
@@ -417,37 +492,60 @@
       "id": "jul-aug-2027",
       "date": "2027-07",
       "month_label": "JUL '27",
-      "name": "Summer Build",
+      "name": "Summer Build Sprint",
       "phase": "Phase 2: Year 4 Liceum",
       "is_major": false,
       "status": "upcoming",
       "branches": [
         "academics",
+        "code",
         "german",
         "physical"
       ],
-      "objective": "Goethe B1 certification, Math Calculus sprint, and 74kg mass check.",
+      "objective": "Zero school homework or grades to defend -> full Break Sprint on Programming, Matura foundations & German B1.",
       "deliverables": {
-        "German": "Target Goethe-Zertifikat B1 exam or verify B1 competence. Start B2 reading. Target: 165 words in Anki (100 base + 65 summer catch-up).",
-        "Academics": "Math Rozszerzona topical review (Calculus, Stereometry, Combinatorics). Target: 54 Math R problems (40 base + 14 summer catch-up).",
-        "Physical": "Peak summer check: 73.5-74 kg, 13-14% body fat, 5k run maintained at sub-4:40 pace."
+        "Code": "Build & ship 1 real unassisted programming project + 25 raw algorithm/Matura CS tasks.",
+        "Academics": "Matura Math R foundations review without school-week rush (35 focused problem sets).",
+        "German": "Summer B1 push: consistent 20-30m morning German sessions.",
+        "Physical": "Keep lean athletic progress & 4x/wk consistency."
       },
-      "next_action": "Register for Goethe B1 examination.",
+      "sidequests": [
+        {
+          "id": "sq_jul_agency",
+          "stream": "Code",
+          "title": "Polish SME / Outreach Prototype",
+          "detail": "Use vacation mornings to sharpen automation / client prototype while zero tests exist.",
+          "xp_label": "REVENUE BUILD"
+        },
+        {
+          "id": "sq_jul_goethe",
+          "stream": "German",
+          "title": "Goethe B1 Mock Test",
+          "detail": "Sit 1 timed B1 mock before Class 4 starts.",
+          "xp_label": "CERTIFICATION"
+        }
+      ],
+      "next_action": "Run 2-3h morning Break Sprint cleanly while afternoons stay 100% open.",
       "deliverable_counts": {
-        "German": {
+        "Code": {
           "count": 0,
-          "total": 165,
-          "unit": "words"
+          "total": 25,
+          "unit": "exercises"
         },
         "Academics": {
           "count": 0,
-          "total": 54,
+          "total": 35,
           "unit": "problems"
+        },
+        "German": {
+          "count": 0,
+          "total": 60,
+          "unit": "sessions"
         },
         "Physical": {
           "count": 0,
-          "total": 30,
-          "unit": "days"
+          "total": 24,
+          "unit": "sessions"
         }
       }
     },
@@ -463,21 +561,30 @@
         "academics",
         "code"
       ],
-      "objective": "Official Matura declarations locked & daily timed algorithm speed drills.",
+      "objective": "Official Matura declarations locked & realistic Class 4 grade + Matura cadence.",
       "deliverables": {
-        "Academics": "Lock in official Matura declarations: Matematyka Podstawowa + Rozszerzona, Informatyka Rozszerzona, Język Angielski Dwujęzyczny / C1. Target: 46 Math R problems (40 base + 6 summer catch-up).",
-        "Code": "Daily timed Matura algorithm speed-drills (45 min/day). Target: 22 tasks (15 base + 7 summer catch-up)."
+        "Academics": "Lock Matura declarations (Math P+R, CS R, Eng C1) & keep Class 4 grades high from week 1.",
+        "Code": "Steady 15 CKE Matura CS exercises across the month."
       },
+      "sidequests": [
+        {
+          "id": "sq_sep27_drill",
+          "stream": "Code",
+          "title": "Extra Timed Algorithm Sets",
+          "detail": "Optional Friday/Saturday CKE CS timed speed-drills.",
+          "xp_label": "PROGRAMMING"
+        }
+      ],
       "next_action": "Submit official deklaracja maturalna to school director.",
       "deliverable_counts": {
         "Academics": {
           "count": 0,
-          "total": 46,
-          "unit": "problems"
+          "total": 18,
+          "unit": "sessions"
         },
         "Code": {
           "count": 0,
-          "total": 22,
+          "total": 15,
           "unit": "exercises"
         }
       }

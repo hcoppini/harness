@@ -48,6 +48,10 @@
         <span>TUM '28</span>
         <span class="key-pill">3</span>
       </button>
+      <button class="nav-tab" data-view="plans">
+        <span>Plans / Logs</span>
+        <span class="key-pill">4</span>
+      </button>
     </nav>
 
     <!-- Header Right Controls (Minimal Executive Chrome) -->
@@ -1055,6 +1059,76 @@
       </div>
     </section>
 
+    <!-- ====================================================================
+         6. PLANS / LOGS LAYER (A2UI Dynamic Outings, Rearrangement & AI Diary)
+         ==================================================================== -->
+    <section id="view-plans" class="view-section">
+      <div class="section-header">
+        <div>
+          <h1 class="section-headline">Plans / Logs</h1>
+          <p class="section-caption">AI Diary &amp; A2UI Protocol: announce trips, outings, or breaks to dynamically rearrange Harness.</p>
+        </div>
+        <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <span id="a2uiProviderBadge" class="mono-chip">LOCAL PARSER</span>
+          <button type="button" id="btnPlansSynthesize" class="btn-ghost-icon" title="Distill today's diary chat into reflection log &amp; tasks">
+            <span>Synthesize Log</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="plans-grid">
+        <!-- Left Column: AI Diary & Command Chatbox -->
+        <div class="monotone-card plans-chat-card">
+          <div class="card-label-row" style="margin-bottom: 10px;">
+            <span class="card-label">AI Diary &amp; Plan Command</span>
+            <div id="plansStanceBar" class="day-mode-segmented" role="group" aria-label="AI Diary Stance">
+              <button type="button" class="day-mode-btn plans-stance-btn active" data-stance="coach">Coach</button>
+              <button type="button" class="day-mode-btn plans-stance-btn" data-stance="mirror">Mirror</button>
+              <button type="button" class="day-mode-btn plans-stance-btn" data-stance="friend">Friend</button>
+            </div>
+          </div>
+
+          <div class="plans-quick-prompts">
+            <button type="button" class="plans-prompt-chip" onclick="PlansLogs.useQuickPrompt('I have a trip on December 23-27')">Trip Dec 23–27</button>
+            <button type="button" class="plans-prompt-chip" onclick="PlansLogs.useQuickPrompt('Break sprint at home Dec 24-31 for programming')">Break Sprint</button>
+            <button type="button" class="plans-prompt-chip" onclick="PlansLogs.useQuickPrompt('Log reflection: today felt heavy after school, stayed on floor.')">Log Reflection</button>
+          </div>
+
+          <div id="plansChatMessages" class="plans-chat-messages">
+            <!-- Rendered by plans_logs.js -->
+          </div>
+
+          <div class="plans-chat-input-row">
+            <input
+              type="text"
+              id="plansChatInput"
+              class="form-input"
+              placeholder="Announce an outing (e.g. 'trip Dec 23-27 to Krakow') or write a diary log..."
+              autocomplete="off"
+            />
+            <button type="button" id="btnPlansChatSend" class="btn-primary" style="padding: 8px 16px; white-space: nowrap;">Send</button>
+          </div>
+        </div>
+
+        <!-- Right Column: Live A2UI Dynamic Surface + Confirmed Outings Ledger -->
+        <div class="plans-right-col">
+          <div id="a2uiSurfaceMount">
+            <!-- Rendered dynamically by A2UI v1.0 catalog interpreter in plans_logs.js -->
+          </div>
+
+          <div class="monotone-card" style="margin-bottom: 0;">
+            <div class="card-label-row" style="margin-bottom: 8px;">
+              <span class="card-label">Active Outings &amp; Break Windows</span>
+              <span style="font-family: var(--font-mono); font-size: 9.5px; color: var(--text-tertiary);">travel_windows.json</span>
+            </div>
+            <div id="plansOutingsList" class="plans-outings-list">
+              <!-- Rendered by plans_logs.js -->
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
   </main>
 
   <!-- ====================================================================
@@ -2014,6 +2088,12 @@
       </svg>
       <span class="mobile-tab-label">Roadmap</span>
     </button>
+    <button class="mobile-nav-tab" data-view="plans" aria-label="Plans and Logs">
+      <svg class="mobile-tab-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+      </svg>
+      <span class="mobile-tab-label">Logs</span>
+    </button>
   </nav>
 
   <!-- App Script Modules -->
@@ -2026,6 +2106,7 @@
   <script src="js/projects.js?v=6.0"></script>
   <script src="js/body.js?v=6.0"></script>
   <script src="js/knowledge.js?v=6.0"></script>
+  <script src="js/plans_logs.js?v=6.0"></script>
   <script src="js/focus_timer.js?v=6.0"></script>
   <script src="js/command_palette.js?v=6.0"></script>
   <script src="js/kill_list.js?v=6.0"></script>

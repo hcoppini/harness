@@ -1701,6 +1701,102 @@ def sync_app_settings() -> int:
 
     return synced_count
 
+
+def sync_travel_windows(conn: sqlite3.Connection) -> int:
+    """Bi-directionally syncs SQLite travel_windows + travel_windows.json via Supabase app_settings."""
+    from app.services import a2ui_planner_service
+
+    a2ui_planner_service.ensure_travel_window_tables(conn)
+    local_rows = conn.execute(
+        "SELECT id, name, destination, type, confirmed, start_date, end_date, description, source FROM travel_windows ORDER BY start_date ASC, id ASC"
+    ).fetchall()
+    local_windows = [
+        {
+            "id": r["id"],
+            "name": r["name"],
+            "destination": r["destination"] or "",
+            "type": r["type"] or "travel",
+            "confirmed": bool(r["confirmed"]),
+            "start_date": r["start_date"],
+            "end_date": r["end_date"],
+            "description": r["description"] or "",
+            "source": r["source"] or "config",
+        }
+        for r in local_rows
+    ]
+
+    remote_items = _make_supabase_request("app_settings?select=*")
+    if remote_items is None:
+        return 0
+
+    remote_map = {item["key"]: item["value"] for item in remote_items if isinstance(item, dict) and "key" in item}
+    remote_doc = remote_map.get("cloud_travel_windows")
+    remote_windows = (
+        remote_doc.get("windows", [])
+        if isinstance(remote_doc, dict) and isinstance(remote_doc.get("windows"), list)
+        else []
+    )
+
+    synced_count = 0
+    if local_windows and (not remote_windows or (not os.environ.get("VERCEL") and local_windows != remote_windows)):
+        merged_by_id = {w["id"]: w for w in remote_windows if w.get("id")}
+        for lw in local_windows:
+            merged_by_id[lw["id"]] = lw
+        merged_list = sorted(merged_by_id.values(), key=lambda w: (w.get("start_date", ""), w.get("id", "")))
+        _make_supabase_request(
+            "app_settings?on_conflict=key",
+            method="POST",
+            payload={
+                "key": "cloud_travel_windows",
+                "value": {"windows": merged_list, "updated_at": datetime.now().isoformat()},
+            },
+            headers_extra={"Prefer": "resolution=merge-duplicates"},
+        )
+        synced_count += len(merged_list)
+    elif remote_windows:
+        for rw in remote_windows:
+            if not rw.get("id") or not rw.get("start_date") or not rw.get("end_date"):
+                continue
+            conn.execute(
+                """
+                INSERT INTO travel_windows
+                (id, name, destination, type, confirmed, start_date, end_date, description, source, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(id) DO UPDATE SET
+                    name = excluded.name,
+                    destination = excluded.destination,
+                    type = excluded.type,
+                    confirmed = excluded.confirmed,
+                    start_date = excluded.start_date,
+                    end_date = excluded.end_date,
+                    description = excluded.description,
+                    source = excluded.source,
+                    updated_at = CURRENT_TIMESTAMP
+                """,
+                (
+                    str(rw["id"]),
+                    str(rw.get("name") or "Outing"),
+                    str(rw.get("destination") or ""),
+                    str(rw.get("type") or "travel"),
+                    1 if rw.get("confirmed", True) else 0,
+                    str(rw["start_date"])[:10],
+                    str(rw["end_date"])[:10],
+                    str(rw.get("description") or ""),
+                    str(rw.get("source") or "a2ui"),
+                ),
+            )
+            synced_count += 1
+        conn.commit()
+        tw_path = DATA_DIR / "travel_windows.json"
+        try:
+            tw_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(tw_path, "w", encoding="utf-8") as f:
+                json.dump({"windows": remote_windows}, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
+
+    return synced_count
+
 # =========================================================================
 # 9. Direct Web Server Synchronizer (Local Executable <-> Web Version HTTP)
 # =========================================================================
@@ -2272,7 +2368,11 @@ def ensure_fresh_academic_sync(
         synced_count = 0
         errors = []
         try:
-            for step_name, step_fn in (("school_exams", sync_school_exams), ("homework_items", sync_homework_items)):
+            for step_name, step_fn in (
+                ("school_exams", sync_school_exams),
+                ("homework_items", sync_homework_items),
+                ("travel_windows", sync_travel_windows),
+            ):
                 try:
                     synced_count += int(step_fn(local_conn) or 0)
                 except Exception as ex:
@@ -2345,6 +2445,7 @@ def sync_all(conn: Optional[sqlite3.Connection] = None) -> Dict[str, Any]:
                 ("tum_grade_entries", lambda: sync_tum_grade_entries(conn)),
                 ("tum_matura", lambda: sync_tum_matura(conn)),
                 ("tum_language", lambda: sync_tum_language(conn)),
+                ("travel_windows", lambda: sync_travel_windows(conn)),
                 ("app_settings", lambda: sync_app_settings()),
             ]
             for step_name, step_fn in supabase_steps:

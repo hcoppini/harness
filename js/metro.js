@@ -1476,6 +1476,14 @@ const MetroMap = {
           })
           .join("");
 
+        const sqList = Array.isArray(station.sidequests) ? station.sidequests : [];
+        const sqDone = Array.isArray(station.completed_sidequests)
+          ? station.completed_sidequests.filter((id) => sqList.some((q) => q.id === id)).length
+          : 0;
+        const sqTagHtml = sqList.length > 0
+          ? `<span class="metro-micro-tag" style="background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.32);">SIDEQUESTS ${sqDone}/${sqList.length}</span>`
+          : "";
+
         const vel = isActive ? this.getSafeVelocity(station, progressPercent) : null;
 
         return `
@@ -1496,6 +1504,7 @@ const MetroMap = {
             </div>
             <div class="metro-micro-tags">
               ${tagsHtml}
+              ${sqTagHtml}
             </div>
             ${
               isActive && vel
@@ -1863,8 +1872,10 @@ const MetroMap = {
         ${itemsHtml || `<div style="font-size: 11px; color: var(--text-tertiary);">No deliverables defined for this milestone.</div>`}
       </div>
 
+      ${this.renderStationSidequestsHtml(station)}
+
       <div class="inspector-rule-footer">
-        Check off workout &amp; TUM Deep Work blocks in <strong>Daily</strong> to increment live stream metrics here automatically.
+        Check off workout &amp; Deep Work blocks in <strong>Daily</strong> to log Core Floor progress; complete Sidequests when you have spare time or on Break Sprint (zero penalty if skipped).
       </div>
     `;
 
@@ -2034,6 +2045,82 @@ const MetroMap = {
     if (!drawer) return;
 
     drawer.classList.remove("open");
+  },
+
+  renderStationSidequestsHtml(station) {
+    const sqList = Array.isArray(station?.sidequests) ? station.sidequests : [];
+    if (sqList.length === 0) return "";
+    const completedSq = Array.isArray(station.completed_sidequests) ? station.completed_sidequests : [];
+    const doneCount = sqList.filter((q) => completedSq.includes(q.id)).length;
+
+    const cardsHtml = sqList.map((sq) => {
+      const normKey = this.normalizeStreamKey(sq.stream || "code");
+      const badgeColor = this.getStreamColor(normKey);
+      const isDone = completedSq.includes(sq.id);
+      return `
+        <div class="sidequest-card ${isDone ? "is-done" : ""}" style="border-left: 2px solid ${badgeColor};">
+          <div class="sidequest-card-top">
+            <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
+              <span class="telemetry-stream-name" style="color: ${badgeColor};">${this.escapeHtml(sq.stream || "Bonus")}</span>
+              <span class="mono-chip" style="font-size: 8.5px; padding: 1px 5px;">${this.escapeHtml(sq.xp_label || "OPTIONAL")}</span>
+            </div>
+            <button
+              type="button"
+              class="sidequest-toggle-btn ${isDone ? "done" : ""}"
+              onclick="MetroMap.toggleSidequest('${this.escapeJs(station.id)}', '${this.escapeJs(sq.id)}')"
+            >${isDone ? "Completed \u2713" : "Mark Done"}</button>
+          </div>
+          <div class="sidequest-title">${this.escapeHtml(sq.title)}</div>
+          <div class="sidequest-detail">${this.escapeHtml(sq.detail || "")}</div>
+        </div>
+      `;
+    }).join("");
+
+    return `
+      <div class="sidequests-section">
+        <div class="sidequests-header">
+          <span class="card-label" style="color: #34d399;">OPTIONAL SIDEQUESTS &bull; BONUS XP (ZERO PENALTY IF SKIPPED)</span>
+          <span class="mono-chip green" style="font-size: 9px;">${doneCount}/${sqList.length} Cleared</span>
+        </div>
+        <div class="sidequests-grid">
+          ${cardsHtml}
+        </div>
+      </div>
+    `;
+  },
+
+  async toggleSidequest(stationId, sidequestId) {
+    try {
+      const st = this.data?.stations?.find((s) => s.id === stationId);
+      if (!st) return;
+      if (!Array.isArray(st.completed_sidequests)) st.completed_sidequests = [];
+
+      const wasDone = st.completed_sidequests.includes(sidequestId);
+      if (wasDone) {
+        st.completed_sidequests = st.completed_sidequests.filter((id) => id !== sidequestId);
+      } else {
+        st.completed_sidequests.push(sidequestId);
+      }
+      this.saveState();
+
+      if (window.pywebview?.api?.toggle_station_sidequest) {
+        const res = await window.pywebview.api.toggle_station_sidequest(stationId, sidequestId);
+        if (res && res.success && Array.isArray(res.completed_sidequests)) {
+          st.completed_sidequests = res.completed_sidequests;
+          this.saveState();
+        }
+      }
+
+      this.render();
+      if (this.selectedStation && this.selectedStation.id === stationId) {
+        this.renderInspector(st, true);
+      }
+      if (window.HarnessApp?.showToast) {
+        window.HarnessApp.showToast(wasDone ? "Sidequest reopened" : "Sidequest cleared! Bonus XP logged.");
+      }
+    } catch (err) {
+      console.error("Failed to toggle sidequest:", err);
+    }
   },
 
   async toggleDeliverable(stationId, deliverableKey) {
@@ -2259,6 +2346,15 @@ const MetroMap = {
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;")
       .replace(/'/g, "&#039;");
+  },
+
+  escapeJs(str) {
+    if (!str) return "";
+    return String(str)
+      .replace(/\\/g, "\\\\")
+      .replace(/'/g, "\\'")
+      .replace(/"/g, '\\"')
+      .replace(/\r|\n/g, " ");
   },
 };
 

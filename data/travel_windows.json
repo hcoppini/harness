@@ -4,25 +4,41 @@
       "id": "us_2026",
       "name": "US Deployment",
       "destination": "United States",
+      "type": "travel",
+      "confirmed": true,
       "start_date": "2026-10-04",
       "end_date": "2026-10-18",
-      "description": "Family travel & exploration. Daily 45-60m maintenance anchor. School timetable suspended."
+      "description": "Confirmed US family trip. Daily 45-60m maintenance anchor. School timetable suspended."
     },
     {
       "id": "christmas_2026",
-      "name": "Christmas & Year-End Trip",
-      "destination": "Holiday & Christmas Travel",
-      "start_date": "2026-12-22",
+      "name": "Christmas & Year-End Break",
+      "destination": "Holiday Break Sprint",
+      "type": "break",
+      "confirmed": true,
+      "start_date": "2026-12-23",
       "end_date": "2027-01-03",
-      "description": "Christmas & New Year break. 30m daily oxygen line anchor. Zero school debt before departure."
+      "description": "Polish Christmas school break. Zero school grades to defend -> switches to Break Sprint (programming/CS/Sidequests) unless Travel is toggled."
     },
     {
       "id": "brazil_2027",
-      "name": "Brazil Expedition",
+      "name": "Brazil Expedition (Tentative)",
       "destination": "Brazil",
+      "type": "travel",
+      "confirmed": false,
       "start_date": "2027-02-01",
       "end_date": "2027-02-28",
-      "description": "Family trip to Brazil. Morning 30-45m maintenance anchor. 100% guilt-free exploration, boxing, and rest."
+      "description": "Tentative travel window. Held inactive until exact travel dates are confirmed."
+    },
+    {
+      "id": "summer_2027",
+      "name": "Summer Break Build Sprint",
+      "destination": "Vacation Sprint",
+      "type": "break",
+      "confirmed": true,
+      "start_date": "2027-06-26",
+      "end_date": "2027-08-31",
+      "description": "Summer vacation: zero school homework/exams. Dedicated 2-3h morning programming, Matura CS/Math foundations, and German acceleration."
     }
   ]
 }
