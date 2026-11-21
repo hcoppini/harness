@@ -309,3 +309,39 @@ def test_travel_windows_sqlite_supabase_sync_and_heatmap_tracking(a2ui_env, monk
     restored = conn.execute("SELECT * FROM travel_windows WHERE id = ?", (saved_id,)).fetchone()
     assert restored is not None
     assert restored["destination"] == "Krakow"
+
+
+def test_zakopane_fast_preset_handling(a2ui_env, monkeypatch):
+    """Zakopane trip triggers tailored A2UI surface with dates editable on-screen even if dates are omitted."""
+    conn, _ = a2ui_env
+    monkeypatch.setattr(a2ui_planner_service, "_call_ollama_json", lambda *a, **k: None)
+    monkeypatch.setattr(a2ui_planner_service, "_call_free_cloud_json", lambda *a, **k: None)
+
+    # 1. Announce with dates
+    res1 = a2ui_planner_service.process_plan_message(
+        "Family trip to Zakopane Dec 12-15",
+        stance="coach",
+        date_str="2026-11-21",
+        conn=conn,
+    )
+    assert "agent_to_renderer" in res1
+    env1 = res1["agent_to_renderer"]
+    data1 = next(m["updateDataModel"]["data"] for m in env1["messages"] if "updateDataModel" in m)
+    assert data1["outing"]["destination"] == "Zakopane"
+    assert data1["outing"]["start_date"] == "2026-12-12"
+    assert data1["outing"]["end_date"] == "2026-12-15"
+
+    # 2. Announce without dates (Fast preset mode)
+    res2 = a2ui_planner_service.process_plan_message(
+        "Trip to Zakopane",
+        stance="coach",
+        date_str="2026-11-21",
+        conn=conn,
+    )
+    assert "agent_to_renderer" in res2
+    env2 = res2["agent_to_renderer"]
+    data2 = next(m["updateDataModel"]["data"] for m in env2["messages"] if "updateDataModel" in m)
+    assert data2["outing"]["destination"] == "Zakopane"
+    assert "Zakopane" in data2["outing"]["name"]
+    assert data2["outing"]["start_date"] is not None
+    assert data2["outing"]["end_date"] is not None

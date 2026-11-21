@@ -81,6 +81,7 @@ window.Dashboard = {
     this.renderHeatmap();
     this.renderUpcoming();
     this.renderRadar();
+    this.renderJetBrains();
   },
 
   renderCockpitGauges() {
@@ -701,6 +702,144 @@ window.Dashboard = {
           })
           .join("");
       }
+    }
+  },
+
+  async renderJetBrains() {
+    const card = document.getElementById("dashJetBrainsCard");
+    if (!card) return;
+
+    let jb = null;
+    try {
+      if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.get_jetbrains_tracker === "function") {
+        jb = await window.pywebview.api.get_jetbrains_tracker();
+      }
+    } catch (e) {
+      console.warn("[Dashboard] get_jetbrains_tracker notice:", e.message);
+    }
+    if (!jb) return;
+
+    this.jbData = jb;
+
+    const badge = document.getElementById("jbStatusBadge");
+    if (badge) {
+      if (jb.status === "active") {
+        badge.textContent = "ACTIVE CONTEST";
+        badge.className = "mono-chip optimal";
+      } else {
+        badge.textContent = "WAITING ADMIN";
+        badge.className = "mono-chip";
+      }
+    }
+
+    const countdown = document.getElementById("jbDeadlineCountdown");
+    if (countdown) {
+      if (jb.penalty_active) {
+        countdown.textContent = "LATE (40% penalty)";
+        countdown.style.color = "var(--color-rose, #ef4444)";
+      } else if (jb.days_left !== undefined) {
+        countdown.textContent = `T-${jb.days_left}d (40% penalty)`;
+        countdown.style.color = "var(--accent-lavender)";
+      }
+    }
+
+    const titleEl = document.getElementById("jbContestTitle");
+    if (titleEl && jb.current_contest) {
+      titleEl.textContent = `${jb.current_contest}: ${jb.current_topic || "Codeforces Round"}`;
+    }
+
+    const groupEl = document.getElementById("jbGroupLabel");
+    if (groupEl && jb.group_name) {
+      groupEl.textContent = jb.group_name;
+    }
+
+    const progLabel = document.getElementById("jbProblemsProgressLabel");
+    if (progLabel) {
+      progLabel.textContent = `Problems Solved: ${jb.problems_solved || 0} / ${jb.problems_total || 6} (${jb.progress_percentage || 0}%)`;
+    }
+
+    const targetLabel = document.getElementById("jbTargetLabel");
+    if (targetLabel) {
+      targetLabel.textContent = `Pass Quota: ≥ ${jb.pass_threshold_problems || 3} / ${jb.problems_total || 6}`;
+      targetLabel.style.color = jb.meets_problem_quota ? "#10b981" : "var(--accent-lavender)";
+    }
+
+    const pBar = document.getElementById("jbProgressBar");
+    if (pBar) {
+      const pct = Math.min(100, jb.progress_percentage || 0);
+      pBar.style.width = `${pct}%`;
+      pBar.style.background = jb.meets_problem_quota ? "#10b981" : "var(--accent-lavender)";
+    }
+
+    const ivBtn = document.getElementById("jbInterviewBtn");
+    const ivIcon = document.getElementById("jbInterviewIcon");
+    if (ivBtn && ivIcon) {
+      if (jb.interview_completed) {
+        ivIcon.textContent = "✓";
+        ivBtn.style.borderColor = "#10b981";
+        ivBtn.style.color = "#10b981";
+        ivBtn.title = "TA Solution Interview Completed";
+      } else {
+        ivIcon.textContent = "○";
+        ivBtn.style.borderColor = "var(--border-hairline)";
+        ivBtn.style.color = "var(--text-secondary)";
+        ivBtn.title = "TA Solution Interview Pending";
+      }
+    }
+
+    const approveBtn = document.getElementById("jbApproveBtn");
+    if (approveBtn) {
+      if (jb.status === "active") {
+        approveBtn.style.display = "none";
+      } else {
+        approveBtn.style.display = "inline-flex";
+      }
+    }
+
+    const cfLink = document.getElementById("jbCodeforcesLink");
+    if (cfLink && jb.codeforces_url) {
+      cfLink.href = jb.codeforces_url;
+    }
+  },
+
+  async adjustJetBrainsSolved(delta) {
+    if (!this.jbData) return;
+    const current = parseInt(this.jbData.problems_solved || 0, 10);
+    const nextCount = Math.max(0, current + delta);
+    try {
+      if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.set_jetbrains_problems_solved === "function") {
+        await window.pywebview.api.set_jetbrains_problems_solved(nextCount);
+        await this.renderJetBrains();
+      }
+    } catch (e) {
+      console.error("Error updating JetBrains solved count:", e);
+    }
+  },
+
+  async toggleJetBrainsInterview() {
+    if (!this.jbData) return;
+    const current = Boolean(this.jbData.interview_completed);
+    try {
+      if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.toggle_jetbrains_interview === "function") {
+        await window.pywebview.api.toggle_jetbrains_interview(!current);
+        await this.renderJetBrains();
+      }
+    } catch (e) {
+      console.error("Error toggling JetBrains interview:", e);
+    }
+  },
+
+  async promptApproveJetBrains() {
+    const groupName = window.prompt("Enter your JetBrains Greek Letter Group name (e.g. 'Omega Group'):", (this.jbData && this.jbData.group_name) || "Omega Group");
+    if (!groupName) return;
+    const taName = window.prompt("Enter your assigned TA name (optional):", (this.jbData && this.jbData.ta_name) || "TA");
+    try {
+      if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.approve_jetbrains_admin === "function") {
+        await window.pywebview.api.approve_jetbrains_admin(groupName.trim(), (taName || "").trim());
+        await this.renderJetBrains();
+      }
+    } catch (e) {
+      console.error("Error approving JetBrains group:", e);
     }
   },
 

@@ -286,6 +286,54 @@
             </div>
           </div>
         </div>
+
+        <!-- 5. JETBRAINS YOUTH CODING CLUB COCKPIT WIDGET -->
+        <div id="dashJetBrainsCard" class="monotone-card" style="margin-top: 16px; margin-bottom: 0;">
+          <div class="card-label-row" style="margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="card-label" style="letter-spacing: 0.06em; font-weight: 700;">JETBRAINS YOUTH CODING CLUB • SEMESTER 1</span>
+              <span id="jbStatusBadge" class="mono-chip" style="font-size: 9px; padding: 2px 7px;">WAITING ADMIN</span>
+            </div>
+            <div id="jbDeadlineCountdown" style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-lavender); font-weight: 600;">T-12d to 40% penalty</div>
+          </div>
+          
+          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
+            <div id="jbContestTitle" style="font-weight: 600; font-size: 13px; color: var(--text-primary);">Contest #1: Codeforces Round (Thursday Drop)</div>
+            <div id="jbGroupLabel" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary);">Greek Letter Group</div>
+          </div>
+
+          <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.4;" id="jbTopicNotes">
+            Rule: 2-week solve window per contest. Advance to Sem 2 requires: <strong style="color: var(--text-primary);">≥50% solved problems</strong> + <strong style="color: var(--text-primary);">1 TA Solution Interview</strong>.
+          </div>
+
+          <!-- Progress Bar & Quota -->
+          <div style="margin-bottom: 10px;">
+            <div style="display: flex; justify-content: space-between; font-size: 10.5px; font-family: var(--font-mono); margin-bottom: 4px;">
+              <span id="jbProblemsProgressLabel" style="color: var(--text-primary);">Problems Solved: 0 / 6 (0%)</span>
+              <span id="jbTargetLabel" style="color: var(--accent-lavender); font-weight: 600;">Pass Quota: ≥ 3 / 6</span>
+            </div>
+            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; height: 7px; overflow: hidden; position: relative;">
+              <div id="jbProgressBar" style="background: var(--accent-lavender); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+            </div>
+          </div>
+
+          <!-- Interactive Action Row -->
+          <div style="display: flex; gap: 8px; align-items: center; justify-content: space-between; padding-top: 4px; border-top: 1px solid var(--border-hairline);">
+            <div style="display: flex; gap: 6px; align-items: center;">
+              <button type="button" class="btn-ghost-icon" onclick="Dashboard.adjustJetBrainsSolved(-1)" title="Decrement solved count">-1</button>
+              <button type="button" class="btn-ghost-icon" onclick="Dashboard.adjustJetBrainsSolved(1)" title="Increment solved count" style="font-weight: 700; color: var(--text-primary);">+1 Solved</button>
+              <button type="button" id="jbInterviewBtn" class="btn-ghost-icon" onclick="Dashboard.toggleJetBrainsInterview()" title="Toggle TA Interview Status">
+                <span id="jbInterviewIcon">○</span> TA Interview
+              </button>
+              <button type="button" id="jbApproveBtn" class="btn-ghost-icon" onclick="Dashboard.promptApproveJetBrains()" title="Set group name when Codeforces admin adds you">
+                ✓ Group Approved
+              </button>
+            </div>
+            <a id="jbCodeforcesLink" href="https://codeforces.com/group" target="_blank" rel="noopener noreferrer" class="btn-ghost-icon" style="text-decoration: none; color: var(--accent-lavender); font-weight: 600;">
+              Codeforces Group ↗
+            </a>
+          </div>
+        </div>
       </div>
     </section>
 
@@ -1089,6 +1137,7 @@
           </div>
 
           <div class="plans-quick-prompts">
+            <button type="button" class="plans-prompt-chip" onclick="PlansLogs.useQuickPrompt('Family trip to Zakopane')">🏔️ Zakopane Trip</button>
             <button type="button" class="plans-prompt-chip" onclick="PlansLogs.useQuickPrompt('I have a trip on December 23-27')">Trip Dec 23–27</button>
             <button type="button" class="plans-prompt-chip" onclick="PlansLogs.useQuickPrompt('Break sprint at home Dec 24-31 for programming')">Break Sprint</button>
             <button type="button" class="plans-prompt-chip" onclick="PlansLogs.useQuickPrompt('Log reflection: today felt heavy after school, stayed on floor.')">Log Reflection</button>

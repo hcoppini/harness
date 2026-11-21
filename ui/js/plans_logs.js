@@ -120,6 +120,10 @@ const PlansLogs = {
     input.focus();
   },
 
+  planZakopaneTrip() {
+    this.sendMessage("Family trip to Zakopane");
+  },
+
   async sendMessage(overrideText = null) {
     if (this.isSending) return;
     const input = document.getElementById("plansChatInput");

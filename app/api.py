@@ -1044,6 +1044,35 @@ class HarnessAPI:
             self._trigger_auto_sync()
         return res
 
+    # --- JetBrains Youth Coding Club Tracker ---
+    def get_jetbrains_tracker(self) -> Dict[str, Any]:
+        from app.services import jetbrains_service
+        return jetbrains_service.get_jetbrains_status()
+
+    def update_jetbrains_tracker(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        from app.services import jetbrains_service
+        res = jetbrains_service.update_jetbrains_status(data)
+        self._trigger_auto_sync()
+        return res
+
+    def set_jetbrains_problems_solved(self, count: int) -> Dict[str, Any]:
+        from app.services import jetbrains_service
+        res = jetbrains_service.set_problems_solved(count)
+        self._trigger_auto_sync()
+        return res
+
+    def toggle_jetbrains_interview(self, completed: bool) -> Dict[str, Any]:
+        from app.services import jetbrains_service
+        res = jetbrains_service.toggle_interview(completed)
+        self._trigger_auto_sync()
+        return res
+
+    def approve_jetbrains_admin(self, group_name: str, ta_name: str = "") -> Dict[str, Any]:
+        from app.services import jetbrains_service
+        res = jetbrains_service.approve_group_access(group_name, ta_name)
+        self._trigger_auto_sync()
+        return res
+
     # --- Google Calendar Bidirectional Sync & Conflict Optimization ---
 
     _gcal_debounce_timer = None

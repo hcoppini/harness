@@ -357,14 +357,41 @@ def _resolve_year(month: int, day: int, ref_dt: date) -> int:
 
 def _extract_destination(text: str) -> str:
     """Extracts a clean destination name from phrases like 'to Krakow' or 'in Zakopane'."""
+    if re.search(r"\bzakopan[ea-z]*\b", text, re.IGNORECASE):
+        return "Zakopane"
+    if re.search(r"\bkrak[oó]w[a-z]*\b", text, re.IGNORECASE):
+        return "Krakow"
+    if re.search(r"\bwarszaw[a-z]*\b", text, re.IGNORECASE):
+        return "Warsaw"
+
     m = re.search(
         r"\b(?:to|in|at|do|w|na)\s+([A-ZŁŚĆŻŹÓĘĄ][A-Za-złśćżźóęąŁŚĆŻŹÓĘĄ\-]+(?:\s+[A-ZŁŚĆŻŹÓĘĄ][A-Za-złśćżźóęąŁŚĆŻŹÓĘĄ\-]+)?)",
         text,
     )
     if m:
         candidate = m.group(1).strip()
-        if candidate.lower() not in MONTH_MAP and candidate.lower() not in ("harness", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"):
-            return candidate
+        words = candidate.split()
+        clean_words = [
+            w
+            for w in words
+            if w.lower() not in MONTH_MAP
+            and w.lower()
+            not in (
+                "harness",
+                "monday",
+                "tuesday",
+                "wednesday",
+                "thursday",
+                "friday",
+                "saturday",
+                "sunday",
+                "trip",
+                "wyjazd",
+                "outing",
+            )
+        ]
+        if clean_words:
+            return " ".join(clean_words)
     return ""
 
 
@@ -461,6 +488,19 @@ def _parse_outing_offline(message: str, ref_dt: date) -> Optional[Dict[str, Any]
             end_dt = start_dt + timedelta(days=1)
 
     if start_dt is None or end_dt is None:
+        if "zakopane" in low:
+            # Zakopane fast-preset when exact dates are not yet provided in prompt
+            days_to_fri = (4 - ref_dt.weekday()) % 7 or 7
+            start_dt = ref_dt + timedelta(days=days_to_fri)
+            end_dt = start_dt + timedelta(days=3)
+            return {
+                "name": "Zakopane Expedition (Dates TBD)",
+                "destination": "Zakopane",
+                "start_date": start_dt.strftime("%Y-%m-%d"),
+                "end_date": end_dt.strftime("%Y-%m-%d"),
+                "mode": "travel",
+                "description": "Family trip to Zakopane. Edit exact dates on-screen below, check exam conflicts, and confirm schedule diff.",
+            }
         return None
     if end_dt < start_dt:
         start_dt, end_dt = end_dt, start_dt
