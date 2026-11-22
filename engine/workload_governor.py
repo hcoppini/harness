@@ -667,14 +667,16 @@ def get_workload_analysis(
             else:
                 tier_2_exams.append(e)
 
-    # 2. Fetch pending homework (including overdue items that require triage)
+    # 2. Fetch strictly upcoming homework (exclude today's already-submitted and past items: due_date > target_dt)
     cursor.execute(
         """
         SELECT * FROM homework_items
-        WHERE completed = 0 AND substr(trim(due_date), 1, 10) <= ?
+        WHERE completed = 0
+          AND substr(trim(due_date), 1, 10) > ?
+          AND substr(trim(due_date), 1, 10) <= ?
         ORDER BY substr(trim(due_date), 1, 10) ASC, id ASC
         """,
-        (hw_end_dt.strftime("%Y-%m-%d"),),
+        (target_dt.strftime("%Y-%m-%d"), hw_end_dt.strftime("%Y-%m-%d")),
     )
     homework = [dict(r) for r in cursor.fetchall()]
 
@@ -700,22 +702,16 @@ def get_workload_analysis(
         if is_travel or is_recovery or is_travel_or_vacation_date(h_date):
             h["is_travel_excused"] = True
 
-        if not h.get("is_travel_excused"):
-            # Acute homework deliverables due <= 24h: includes overdue (days_left <= 0) and due tomorrow (days_left == 1)
-            if days_left <= 1:
+        if days_left >= 1 and not h.get("is_travel_excused"):
+            # Acute homework deliverables due tomorrow (days_left == 1); today's (days_left == 0) are already elapsed
+            if days_left == 1:
                 urgent_homework.append(h)
             elif 2 <= days_left <= 5:
                 active_homework.append(h)
 
-    # Sort urgent homework so today's deliverables (days_left == 0) and essays are triaged first
+    # Sort urgent homework so essays due tomorrow are triaged first
     urgent_homework.sort(key=lambda x: (
-        0 if x.get("days_left") == 0 and x.get("is_essay") else (
-            1 if x.get("days_left") == 0 else (
-                2 if x.get("is_essay") else (
-                    3 if x.get("days_left") == 1 else 4
-                )
-            )
-        ),
+        0 if x.get("is_essay") else 1,
         x.get("due_date", "")
     ))
 
@@ -744,9 +740,12 @@ def get_workload_analysis(
         if g.get("numeric_value") is not None and g["numeric_value"] <= 2.5
     ]
 
-    # 4. Check Scheduled Retakes (poprawy)
+    # 4. Check Scheduled Retakes (poprawy) — strictly future (exclude today/past)
     try:
-        cursor.execute("SELECT * FROM school_exams WHERE completed = 0")
+        cursor.execute(
+            "SELECT * FROM school_exams WHERE completed = 0 AND substr(trim(exam_date), 1, 10) > ?",
+            (target_dt.strftime("%Y-%m-%d"),),
+        )
         all_uncompleted_exams = [dict(r) for r in cursor.fetchall()]
     except Exception:
         all_uncompleted_exams = []
@@ -787,9 +786,9 @@ def get_workload_analysis(
         score += (len(week_exams) - 1) * 1.5
     score += (len(urgent_homework) * 0.75)
     for h in homework:
-        if h.get("is_essay") and h.get("days_left", 99) <= 2 and not h.get("is_travel_excused"):
+        if h.get("is_essay") and 1 <= h.get("days_left", 99) <= 2 and not h.get("is_travel_excused"):
             score += 2.5
-        elif h.get("is_vulnerable") and h.get("days_left", 99) <= 2 and not h.get("is_travel_excused"):
+        elif h.get("is_vulnerable") and 1 <= h.get("days_left", 99) <= 2 and not h.get("is_travel_excused"):
             score += 1.0
     score += (len(active_homework) * 0.25)
 
@@ -863,7 +862,7 @@ def get_workload_analysis(
         "badge_class": badge_class,
         "description": desc,
         "workload_score": round(score, 1),
-        "total_exams": len(exams),
+        "total_exams": len(future_exams),
         "week_exams_count": len(week_exams),
         "tier_1_count": len(tier_1_exams),
         "tier_2_count": len(tier_2_exams),

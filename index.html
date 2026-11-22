@@ -56,11 +56,11 @@
 
     <!-- Header Right Controls (Minimal Executive Chrome) -->
     <div class="header-right">
-      <button id="vulcanAlarmBadge" class="vulcan-alarm-badge" style="display: none; background: rgba(239, 68, 68, 0.15); border: 1px solid var(--color-red); color: var(--color-red); border-radius: 6px; padding: 4px 8px; font-size: 10px; font-weight: 700; font-family: var(--font-mono); cursor: pointer; align-items: center; gap: 6px;" title="Vulcan Session Expired. Click to re-authenticate or log tests manually." onclick="window.Today && window.Today.openVulcanConfig ? window.Today.openVulcanConfig() : window.HarnessApp.openQuickTestModal();">
-        <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--color-red); animation: pulse 1.5s infinite;"></span>
+      <button id="vulcanAlarmBadge" class="vulcan-alarm-badge" style="display: none;" title="Vulcan Session Expired. Click to re-authenticate or log tests manually." onclick="window.Today && window.Today.openVulcanConfig ? window.Today.openVulcanConfig() : window.HarnessApp.openQuickTestModal();">
+        <span class="vulcan-alarm-dot"></span>
         <span>API DISCONNECTED</span>
       </button>
-      <button id="btnOpenQuickTest" class="btn-ghost-icon" onclick="window.HarnessApp.openQuickTestModal()" title="Quick Log Test / Obligation (Hotkeys: N or +)" style="font-weight: 700; color: var(--accent-lavender); border: 1px solid var(--border-medium); padding: 4px 9px; font-size: 11px;">
+      <button id="btnOpenQuickTest" class="btn-ghost-icon btn-quick-test" onclick="window.HarnessApp.openQuickTestModal()" title="Quick Log Test / Obligation (Hotkeys: N or +)">
         <span>+ Test</span>
       </button>
       <button id="syncStatusBadge" class="sync-badge" title="Cloud & Cross-Device Sync">
@@ -68,15 +68,15 @@
         <span class="sync-text" id="syncStatusText">Synced</span>
       </button>
       <button id="gcalSyncBadge" class="sync-badge" onclick="window.Today && window.Today.openGCalendarModal ? window.Today.openGCalendarModal() : null;" title="Google Calendar Bidirectional Cross-Sync & Optimizer">
-        <span class="sync-dot" id="gcalSyncDot" style="background: var(--text-tertiary);"></span>
+        <span class="sync-dot" id="gcalSyncDot"></span>
         <span class="sync-text" id="gcalSyncText">GCal</span>
       </button>
-      <div class="header-clock" style="display: flex; align-items: baseline; gap: 8px; font-family: var(--font-mono); font-size: 11px;">
-        <span id="currentDatePill" style="color: var(--text-tertiary);">--</span>
-        <span id="currentTimePill" style="color: var(--text-primary); font-weight: 600;">--:--</span>
+      <div class="header-clock">
+        <span id="currentDatePill">--</span>
+        <span id="currentTimePill">--:--</span>
       </div>
       <div class="header-settings-wrap">
-        <button id="btnHeaderSettings" class="btn-ghost-icon" title="Tools & Settings" aria-label="Tools and Settings" style="padding: 5px 7px;">
+        <button id="btnHeaderSettings" class="btn-ghost-icon btn-header-settings" title="Tools & Settings" aria-label="Tools and Settings">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
@@ -126,12 +126,12 @@
           <h1 class="section-headline">Executive Cockpit</h1>
           <p class="section-caption">High-signal trajectory: daily execution velocity, school defense balance, and TUM Heilbronn readiness.</p>
         </div>
-        <div style="display: flex; gap: 8px; align-items: center;">
-          <button type="button" class="btn-primary" onclick="window.HarnessApp.openQuickTestModal()" style="font-size: 11px; font-weight: 700; padding: 5px 12px; display: inline-flex; align-items: center; gap: 6px;" title="Quick Log Verbal Test / Obligation (Hotkeys: N or +)">
+        <div class="section-header-actions">
+          <button type="button" class="btn-primary btn-quick-action" onclick="window.HarnessApp.openQuickTestModal()" title="Quick Log Verbal Test / Obligation (Hotkeys: N or +)">
             <span>+ Quick Test / HW</span>
-            <span class="key-pill" style="font-size: 9px; padding: 1px 4px; background: rgba(0,0,0,0.2);">N</span>
+            <span class="key-pill">N</span>
           </button>
-          <div class="mono-chip" id="dashboardStreakPill" title="Consecutive execution streak" style="padding: 4px 8px;">
+          <div class="mono-chip streak-chip" id="dashboardStreakPill" title="Consecutive execution streak">
             <span id="streakCountVal">0</span>d streak
           </div>
           <button id="btnRefreshDashboard" class="btn-ghost-icon" title="Refresh Dashboard Data">
@@ -144,21 +144,21 @@
         <!-- 1. TOP EXECUTIVE COCKPIT GAUGES (3-Card Executive Grid) -->
         <div class="executive-kpi-grid">
           <!-- Gauge 1: Today's Execution Velocity -->
-          <div class="cockpit-card" onclick="window.HarnessApp.switchView('today')" style="cursor: pointer;">
+          <div class="cockpit-card" onclick="window.HarnessApp.switchView('today')">
             <div class="cockpit-header">
               <span class="cockpit-title">Today's Velocity</span>
               <span class="mono-chip" id="dashTodayRoutineTag">Schedule</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 14px; margin: 4px 0;">
-              <div style="position: relative; width: 48px; height: 48px; flex-shrink: 0;">
-                <svg width="48" height="48" viewBox="0 0 48 48" style="transform: rotate(-90deg);">
-                  <circle cx="24" cy="24" r="20" fill="none" stroke="var(--border-hairline)" stroke-width="4" />
-                  <circle id="dashTodayRadialArc" cx="24" cy="24" r="20" fill="none" stroke="var(--accent-lavender)" stroke-width="4" stroke-linecap="round" stroke-dasharray="125.66" stroke-dashoffset="125.66" style="transition: stroke-dashoffset 0.7s cubic-bezier(0.16, 1, 0.3, 1);" />
+            <div class="cockpit-velocity-body">
+              <div class="cockpit-radial-box">
+                <svg width="48" height="48" viewBox="0 0 48 48" class="cockpit-radial-svg">
+                  <circle cx="24" cy="24" r="20" fill="none" class="cockpit-radial-bg" stroke-width="4" />
+                  <circle id="dashTodayRadialArc" cx="24" cy="24" r="20" fill="none" stroke="var(--accent-lavender)" stroke-width="4" stroke-linecap="round" stroke-dasharray="125.66" stroke-dashoffset="125.66" />
                 </svg>
               </div>
-              <div style="flex: 1; min-width: 0;">
-                <div class="cockpit-value" id="dashTodayProgressVal" style="margin-bottom: 6px;">0%</div>
-                <div class="progress-bar-track" style="margin: 0;">
+              <div class="cockpit-velocity-info">
+                <div class="cockpit-value" id="dashTodayProgressVal">0%</div>
+                <div class="progress-bar-track">
                   <div class="progress-bar-fill" id="dashTodayProgressBar" style="width: 0%;"></div>
                 </div>
               </div>
@@ -169,19 +169,19 @@
           </div>
 
           <!-- Gauge 2: Academic Balance Status (School vs Matura) -->
-          <div class="cockpit-card" onclick="window.HarnessApp.switchView('study')" style="cursor: pointer;">
+          <div class="cockpit-card" onclick="window.HarnessApp.switchView('study')">
             <div class="cockpit-header">
               <span class="cockpit-title">Academic Balance</span>
               <span class="mono-chip" id="dashWorkloadModeBadge">CRUISE</span>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <div class="cockpit-kpi-columns">
               <div>
                 <div class="card-label">NEAREST EXAM</div>
-                <div class="cockpit-value" id="dashNearestExamVal" style="font-size: 18px; margin-top: 2px;">Clean Horizon</div>
+                <div class="cockpit-value" id="dashNearestExamVal">Clean Horizon</div>
               </div>
-              <div style="text-align: right;">
+              <div class="text-right">
                 <div class="card-label">OBLIGATIONS</div>
-                <div class="cockpit-value" id="dashSchoolObligationsVal" style="font-size: 18px; margin-top: 2px;">0 Tests &bull; 0 HW</div>
+                <div class="cockpit-value" id="dashSchoolObligationsVal">0 Tests &bull; 0 HW</div>
               </div>
             </div>
             <div class="cockpit-subtitle" id="dashWorkloadDesc">
@@ -190,19 +190,19 @@
           </div>
 
           <!-- Gauge 3: TUM '28 Admissions Readiness -->
-          <div class="cockpit-card" onclick="window.HarnessApp.switchView('tum')" style="cursor: pointer;">
+          <div class="cockpit-card" onclick="window.HarnessApp.switchView('tum')">
             <div class="cockpit-header">
               <span class="cockpit-title">TUM '28 Readiness</span>
               <span class="mono-chip" id="dashGermanLevel">A2 Active</span>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline;">
+            <div class="cockpit-kpi-columns">
               <div>
                 <div class="card-label">GPA STANDING</div>
-                <div class="cockpit-value" id="dashOverallGpa" style="font-size: 18px; margin-top: 2px;">--</div>
+                <div class="cockpit-value" id="dashOverallGpa">--</div>
               </div>
-              <div style="text-align: right;">
+              <div class="text-right">
                 <div class="card-label">PROJECTED TUM SCORE</div>
-                <div class="cockpit-value" id="dashTumScoreVal" style="font-size: 18px; margin-top: 2px;">-- pts</div>
+                <div class="cockpit-value" id="dashTumScoreVal">-- pts</div>
               </div>
             </div>
             <div class="cockpit-subtitle" id="dashActiveStationName">
@@ -288,48 +288,48 @@
         </div>
 
         <!-- 5. JETBRAINS YOUTH CODING CLUB COCKPIT WIDGET -->
-        <div id="dashJetBrainsCard" class="monotone-card" style="margin-top: 16px; margin-bottom: 0;">
-          <div class="card-label-row" style="margin-bottom: 8px;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="card-label" style="letter-spacing: 0.06em; font-weight: 700;">JETBRAINS YOUTH CODING CLUB • SEMESTER 1</span>
-              <span id="jbStatusBadge" class="mono-chip" style="font-size: 9px; padding: 2px 7px;">WAITING ADMIN</span>
+        <div id="dashJetBrainsCard" class="monotone-card dash-jb-card">
+          <div class="card-label-row">
+            <div class="dash-jb-header-left">
+              <span class="card-label">JETBRAINS YOUTH CODING CLUB • SEMESTER 1</span>
+              <span id="jbStatusBadge" class="mono-chip">WAITING ADMIN</span>
             </div>
-            <div id="jbDeadlineCountdown" style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-lavender); font-weight: 600;">T-12d to 40% penalty</div>
+            <div id="jbDeadlineCountdown" class="dash-jb-countdown">T-12d to 40% penalty</div>
           </div>
           
-          <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px;">
-            <div id="jbContestTitle" style="font-weight: 600; font-size: 13px; color: var(--text-primary);">Contest #1: Codeforces Round (Thursday Drop)</div>
-            <div id="jbGroupLabel" style="font-family: var(--font-mono); font-size: 10px; color: var(--text-secondary);">Greek Letter Group</div>
+          <div class="dash-jb-title-row">
+            <div id="jbContestTitle" class="dash-jb-contest-title">Contest #1: Codeforces Round (Thursday Drop)</div>
+            <div id="jbGroupLabel" class="dash-jb-group-label">Greek Letter Group</div>
           </div>
 
-          <div style="font-size: 11px; color: var(--text-secondary); margin-bottom: 10px; line-height: 1.4;" id="jbTopicNotes">
+          <div class="dash-jb-notes" id="jbTopicNotes">
             Rule: 2-week solve window per contest. Advance to Sem 2 requires: <strong style="color: var(--text-primary);">≥50% solved problems</strong> + <strong style="color: var(--text-primary);">1 TA Solution Interview</strong>.
           </div>
 
           <!-- Progress Bar & Quota -->
-          <div style="margin-bottom: 10px;">
-            <div style="display: flex; justify-content: space-between; font-size: 10.5px; font-family: var(--font-mono); margin-bottom: 4px;">
-              <span id="jbProblemsProgressLabel" style="color: var(--text-primary);">Problems Solved: 0 / 6 (0%)</span>
-              <span id="jbTargetLabel" style="color: var(--accent-lavender); font-weight: 600;">Pass Quota: ≥ 3 / 6</span>
+          <div class="dash-jb-progress-wrap">
+            <div class="dash-jb-progress-labels">
+              <span id="jbProblemsProgressLabel">Problems Solved: 0 / 6 (0%)</span>
+              <span id="jbTargetLabel" class="dash-jb-target-label">Pass Quota: ≥ 3 / 6</span>
             </div>
-            <div style="background: var(--bg-surface-elevated); border: 1px solid var(--border-hairline); border-radius: 4px; height: 7px; overflow: hidden; position: relative;">
-              <div id="jbProgressBar" style="background: var(--accent-lavender); height: 100%; width: 0%; transition: width 0.3s ease;"></div>
+            <div class="dash-jb-progress-track">
+              <div id="jbProgressBar" class="dash-jb-progress-bar" style="width: 0%;"></div>
             </div>
           </div>
 
           <!-- Interactive Action Row -->
-          <div style="display: flex; gap: 8px; align-items: center; justify-content: space-between; padding-top: 4px; border-top: 1px solid var(--border-hairline);">
-            <div style="display: flex; gap: 6px; align-items: center;">
-              <button type="button" class="btn-ghost-icon" onclick="Dashboard.adjustJetBrainsSolved(-1)" title="Decrement solved count">-1</button>
-              <button type="button" class="btn-ghost-icon" onclick="Dashboard.adjustJetBrainsSolved(1)" title="Increment solved count" style="font-weight: 700; color: var(--text-primary);">+1 Solved</button>
-              <button type="button" id="jbInterviewBtn" class="btn-ghost-icon" onclick="Dashboard.toggleJetBrainsInterview()" title="Toggle TA Interview Status">
+          <div class="dash-jb-actions-row">
+            <div class="dash-jb-btn-cluster">
+              <button type="button" class="btn-ghost-icon btn-sm" onclick="Dashboard.adjustJetBrainsSolved(-1)" title="Decrement solved count">-1</button>
+              <button type="button" class="btn-ghost-icon btn-sm btn-bold" onclick="Dashboard.adjustJetBrainsSolved(1)" title="Increment solved count">+1 Solved</button>
+              <button type="button" id="jbInterviewBtn" class="btn-ghost-icon btn-sm" onclick="Dashboard.toggleJetBrainsInterview()" title="Toggle TA Interview Status">
                 <span id="jbInterviewIcon">○</span> TA Interview
               </button>
-              <button type="button" id="jbApproveBtn" class="btn-ghost-icon" onclick="Dashboard.promptApproveJetBrains()" title="Set group name when Codeforces admin adds you">
+              <button type="button" id="jbApproveBtn" class="btn-ghost-icon btn-sm" onclick="Dashboard.promptApproveJetBrains()" title="Set group name when Codeforces admin adds you">
                 ✓ Group Approved
               </button>
             </div>
-            <a id="jbCodeforcesLink" href="https://codeforces.com/group" target="_blank" rel="noopener noreferrer" class="btn-ghost-icon" style="text-decoration: none; color: var(--accent-lavender); font-weight: 600;">
+            <a id="jbCodeforcesLink" href="https://codeforces.com/group" target="_blank" rel="noopener noreferrer" class="btn-ghost-icon btn-sm dash-jb-link">
               Codeforces Group ↗
             </a>
           </div>
@@ -371,22 +371,22 @@
         <!-- Left Column: Automated Routine & Tasks -->
         <div>
           <!-- Dynamic "Right Now" Execution Banner -->
-          <div id="dynamicNowBanner" class="now-banner" today-segment-target="routine" style="margin-bottom: 14px; background: var(--bg-surface-elevated); border: 1px solid var(--border-medium); border-radius: var(--radius-sm); padding: 12px 14px;">
-            <div style="display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 6px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
+          <div id="dynamicNowBanner" class="now-banner" today-segment-target="routine">
+            <div class="now-banner-header">
+              <div class="now-pulse-cluster">
                 <span class="now-pulse-dot"></span>
-                <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: var(--text-primary); letter-spacing: 0.08em; text-transform: uppercase;">
+                <span class="now-pulse-text">
                   RIGHT NOW &bull; <span id="nowCurrentClock">--:--</span>
                 </span>
               </div>
-              <span id="nowTimeRemainingPill" class="mono-chip" style="font-size: 9px; padding: 2px 6px;">-- min left</span>
+              <span id="nowTimeRemainingPill" class="mono-chip">-- min left</span>
             </div>
-            <div style="display: flex; justify-content: space-between; align-items: baseline; flex-wrap: wrap; gap: 8px;">
+            <div class="now-banner-content">
               <div>
-                <div id="nowBlockTitle" style="font-size: 14px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.01em;">
+                <div id="nowBlockTitle" class="now-block-title">
                   Detecting routine...
                 </div>
-                <div id="nowBlockFocus" style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
+                <div id="nowBlockFocus" class="now-block-focus">
                   Checking current schedule
                 </div>
               </div>
@@ -395,31 +395,31 @@
           </div>
 
           <!-- Schedule Banner + Reality Day Mode Switch -->
-          <div class="schedule-banner" today-segment-target="routine" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+          <div class="schedule-banner" today-segment-target="routine">
+            <div class="schedule-banner-info">
               <span id="scheduleBadge" class="mono-chip lavender">SCHEDULE --</span>
-              <span id="scheduleDayName" style="font-size: 13px; font-weight: 600; color: var(--text-primary);">
+              <span id="scheduleDayName" class="schedule-day-name">
                 Loading routine...
               </span>
               <span id="workloadBadge" class="mono-chip" style="display: none; cursor: pointer; font-size: 10px;" title="Workload Governor">CRUISE</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+            <div class="schedule-banner-controls">
               <div id="dayModeSwitchContainer"></div>
-              <button type="button" class="btn-ghost-icon" onclick="Today.syncVulcan()" style="font-size: 10px; padding: 3px 8px; color: var(--accent-lavender); border-color: rgba(196, 181, 253, 0.25);" title="Sync Vulcan tests & homework">Sync</button>
-              <button type="button" class="btn-ghost-icon" onclick="Today.syncGCalendarNow()" style="font-size: 10px; padding: 3px 8px; color: #34d399; border-color: rgba(52, 211, 153, 0.3);" title="Cross-sync tests, lessons & plan with Google Calendar">GCal</button>
-              <button type="button" class="btn-ghost-icon" onclick="Today.openGCalendarModal()" style="font-size: 10px; padding: 3px 6px; color: var(--text-tertiary);" title="Configure Google Calendar OAuth / iCal Feed & Auto-Optimizer">Cal Setup</button>
+              <button type="button" class="btn-ghost-icon btn-sm" onclick="Today.syncVulcan()" title="Sync Vulcan tests & homework">Sync</button>
+              <button type="button" class="btn-ghost-icon btn-sm" onclick="Today.syncGCalendarNow()" title="Cross-sync tests, lessons & plan with Google Calendar">GCal</button>
+              <button type="button" class="btn-ghost-icon btn-sm" onclick="Today.openGCalendarModal()" title="Configure Google Calendar OAuth / iCal Feed & Auto-Optimizer">Cal Setup</button>
               <span id="scheduleDescription" style="display: none;"></span>
             </div>
           </div>
 
           <!-- Embedded SGH / Deep Work Kill List (Daily Execution Center) -->
-          <div id="todayInlineKillListCard" class="monotone-card" today-segment-target="routine" style="display: none; margin-bottom: 14px; border: 1px solid var(--accent-lavender-border); background: var(--bg-surface-elevated);">
-            <div class="card-label-row" style="margin-bottom: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span id="todayInlineKillListTitle" class="card-label" style="color: var(--accent-lavender); font-weight: 700; font-size: 11px; letter-spacing: 0.05em;">SGH LIBRARY KILL LIST</span>
+          <div id="todayInlineKillListCard" class="monotone-card inline-kill-list-card" today-segment-target="routine" style="display: none;">
+            <div class="card-label-row">
+              <div class="card-label-cluster">
+                <span id="todayInlineKillListTitle" class="card-label">SGH LIBRARY KILL LIST</span>
                 <span id="todayInlineKillCountBadge" class="mono-chip lavender">0 / 3 Active</span>
               </div>
-              <button type="button" class="btn-ghost-icon" onclick="KillListDrawer.open()" style="font-size: 10px; padding: 2px 7px;">Manage Drawer &rarr;</button>
+              <button type="button" class="btn-ghost-icon btn-sm" onclick="KillListDrawer.open()">Manage Drawer &rarr;</button>
             </div>
             <div id="todayInlineKillListContainer">
               <!-- Rendered by today.js -->
@@ -432,19 +432,19 @@
           </div>
 
           <!-- Tue/Thu Structured Gym Card -->
-          <div id="todayLiftCard" class="monotone-card" today-segment-target="gym" style="display: none; border-color: var(--accent-lavender-border);">
+          <div id="todayLiftCard" class="monotone-card today-lift-card" today-segment-target="gym" style="display: none;">
             <div class="card-label-row">
-              <span id="todayLiftTitle" class="card-label" style="color: var(--accent-lavender);">Structured Gym Protocol</span>
+              <span id="todayLiftTitle" class="card-label">Structured Gym Protocol</span>
               <span class="mono-chip">Hypertrophy</span>
             </div>
-            <div id="todayLiftExercises" style="display: flex; flex-direction: column; gap: 6px;">
+            <div id="todayLiftExercises" class="today-lift-exercises">
               <!-- Rendered dynamically -->
             </div>
           </div>
 
           <!-- Quick Task Bar -->
           <form id="quickTaskForm" class="quick-task-bar" today-segment-target="routine">
-            <span style="color: var(--accent-lavender); font-weight: 600; padding: 0 4px; font-family: var(--font-mono); font-size: 11px;">+</span>
+            <span class="quick-task-plus">+</span>
             <input 
               type="text" 
               id="quickTaskInput" 
@@ -460,97 +460,96 @@
           </div>
 
           <!-- Daily Book Reading Tracker Card (1 Book / Month) -->
-          <div class="monotone-card" id="todayBookCard" today-segment-target="diary" style="margin-top: 14px; border: 1px solid var(--accent-lavender-border); background: var(--bg-surface-elevated);">
-            <div class="card-label-row" style="margin-bottom: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="card-label" style="font-weight: 700; font-size: 11px; letter-spacing: 0.06em; color: var(--accent-lavender);">DAILY BOOK PROTOCOL</span>
-                <span class="mono-chip lavender" id="bookReadingStatusBadge" style="font-size: 9px;">1 Book / Month</span>
+          <div class="monotone-card today-book-card" id="todayBookCard" today-segment-target="diary">
+            <div class="card-label-row">
+              <div class="card-label-cluster">
+                <span class="card-label">DAILY BOOK PROTOCOL</span>
+                <span class="mono-chip lavender" id="bookReadingStatusBadge">1 Book / Month</span>
               </div>
-              <button type="button" class="btn-ghost-icon" id="btnEditBookModal" onclick="Today.openEditBookModal()" style="font-size: 10px; padding: 2px 6px;" title="Change current book or total pages">Edit Book</button>
+              <button type="button" class="btn-ghost-icon btn-sm" id="btnEditBookModal" onclick="Today.openEditBookModal()" title="Change current book or total pages">Edit Book</button>
             </div>
             
-            <div style="display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px;">
-              <div style="font-weight: 700; font-size: 13px; color: var(--text-primary);" id="bookTitleDisplay">
+            <div class="today-book-meta">
+              <div class="today-book-title" id="bookTitleDisplay">
                 Loading book...
               </div>
-              <div style="font-family: var(--font-mono); font-size: 11px; color: var(--text-tertiary);" id="bookAuthorDisplay">
+              <div class="today-book-author" id="bookAuthorDisplay">
                 --
               </div>
             </div>
 
             <!-- Page-to-Page Target Indicator -->
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px 10px; background: var(--bg-surface); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); margin-bottom: 8px;">
+            <div class="today-book-target-box">
               <div>
-                <div style="font-size: 9.5px; font-family: var(--font-mono); color: var(--text-tertiary); text-transform: uppercase;">Today's Page Target</div>
-                <div style="font-size: 12.5px; font-weight: 700; font-family: var(--font-mono); color: var(--text-primary);" id="bookTodayTargetText">
+                <div class="today-book-target-lbl">Today's Page Target</div>
+                <div class="today-book-target-val" id="bookTodayTargetText">
                   Page 0 &rarr; 25 (+25 pages)
                 </div>
               </div>
-              <div style="text-align: right;">
-                <div style="font-size: 9.5px; font-family: var(--font-mono); color: var(--text-tertiary); text-transform: uppercase;">Required Pace</div>
-                <div style="font-size: 12px; font-weight: 600; font-family: var(--font-mono); color: var(--accent-lavender);" id="bookRequiredPaceText">
+              <div class="text-right">
+                <div class="today-book-target-lbl">Required Pace</div>
+                <div class="today-book-pace-val" id="bookRequiredPaceText">
                   -- pages/day
                 </div>
               </div>
             </div>
 
             <!-- Progress Bar -->
-            <div style="margin-bottom: 8px;">
-              <div style="display: flex; justify-content: space-between; font-size: 10px; font-family: var(--font-mono); color: var(--text-tertiary); margin-bottom: 3px;">
+            <div class="today-book-progress-wrap">
+              <div class="today-book-progress-labels">
                 <span id="bookPagesProgressText">0 / 300 pages (0%)</span>
                 <span id="bookDaysLeftText">-- days left</span>
               </div>
-              <div style="height: 6px; background: var(--border-hairline); border-radius: 3px; overflow: hidden;">
-                <div id="bookProgressBar" style="width: 0%; height: 100%; background: var(--accent-lavender); transition: width 0.3s ease;"></div>
+              <div class="progress-bar-track">
+                <div id="bookProgressBar" class="progress-bar-fill" style="width: 0%;"></div>
               </div>
             </div>
 
             <!-- Quick Log Row -->
-            <form id="bookQuickLogForm" onsubmit="event.preventDefault(); Today.logReadingPages();" style="display: flex; gap: 6px; align-items: center; margin-top: 8px;">
-              <span style="font-size: 11px; color: var(--text-secondary); font-family: var(--font-mono);">Read to page:</span>
-              <input type="number" id="bookInputEndPage" class="form-input" style="width: 75px; padding: 3px 6px; font-size: 11.5px; font-family: var(--font-mono); text-align: center;" placeholder="Page #" required min="1" />
-              <button type="submit" class="btn-primary" style="padding: 3px 10px; font-size: 11px;">Log Reading</button>
-              <span id="bookLogSuccessPill" class="mono-chip green" style="display: none; font-size: 9px; padding: 2px 6px;">Logged!</span>
+            <form id="bookQuickLogForm" class="today-book-form" onsubmit="event.preventDefault(); Today.logReadingPages();">
+              <span class="today-book-form-lbl">Read to page:</span>
+              <input type="number" id="bookInputEndPage" class="form-input book-page-input" placeholder="Page #" required min="1" />
+              <button type="submit" class="btn-primary btn-sm">Log Reading</button>
+              <span id="bookLogSuccessPill" class="mono-chip green" style="display: none;">Logged!</span>
             </form>
           </div>
 
           <!-- Evening Honesty Diary Card with AI Coach Trigger -->
-          <div class="monotone-card" id="todayEveningDiaryCard" today-segment-target="diary" style="margin-top: 14px; border: 1px solid var(--border-medium);">
-            <div class="card-label-row" style="margin-bottom: 8px;">
-              <div style="display: flex; align-items: center; gap: 8px;">
-                <span class="card-label" style="font-weight: 700; font-size: 11px; letter-spacing: 0.06em; color: var(--text-primary);">EVENING HONESTY DIARY</span>
-                <span class="mono-chip" id="honestyDiarySavePill" style="font-size: 9px;">Auto-saving</span>
+          <div class="monotone-card today-diary-card" id="todayEveningDiaryCard" today-segment-target="diary">
+            <div class="card-label-row">
+              <div class="card-label-cluster">
+                <span class="card-label">EVENING HONESTY DIARY</span>
+                <span class="mono-chip" id="honestyDiarySavePill">Auto-saving</span>
               </div>
-              <button type="button" class="btn-ghost-icon" id="btnOpenAiDiaryModal" onclick="Today.openAiDiaryModal()" style="font-size: 10.5px; padding: 2px 8px; color: var(--accent-lavender); border-color: var(--accent-lavender-border); font-weight: 600; display: flex; align-items: center; gap: 4px;" title="Chat with AI Coach, Friend, or Objective Mirror to structure raw thoughts">
+              <button type="button" class="btn-ghost-icon btn-sm diary-ai-btn" id="btnOpenAiDiaryModal" onclick="Today.openAiDiaryModal()" title="Chat with AI Coach, Friend, or Objective Mirror to structure raw thoughts">
                 <span>💬 AI Coach &amp; Diary</span>
               </button>
             </div>
-            <p style="font-size: 11px; color: var(--text-tertiary); margin-bottom: 8px; line-height: 1.4;">
+            <p class="today-diary-caption">
               Did I drift today? Was the honest output delivered? What actually happened? (Type directly or use AI Coach to structure your thoughts).
             </p>
             <textarea 
               id="reflectionWorked" 
-              class="form-textarea" 
+              class="form-textarea today-diary-textarea" 
               placeholder="Record the raw truth here or click 'AI Coach & Diary' above to reflect interactively..."
               spellcheck="false"
-              style="width: 100%; height: 95px; font-family: var(--font-sans); font-size: 12px; line-height: 1.5; resize: vertical;"
             ></textarea>
           </div>
         </div>
 
         <!-- Right Column: Mini-Calendar & School Timetable -->
-        <div style="display: flex; flex-direction: column; gap: 14px;">
+        <div class="today-side-col">
           <!-- Mini-Calendar Date Navigator -->
-          <div class="monotone-card" id="todayCalendarCard" today-segment-target="timetable">
+          <div class="monotone-card today-calendar-card" id="todayCalendarCard" today-segment-target="timetable">
             <div class="card-label-row">
               <span class="card-label">Calendar Navigator</span>
-              <button id="btnTodayReset" class="btn-ghost-icon" style="font-size: 10px; padding: 2px 6px;">Today</button>
+              <button id="btnTodayReset" class="btn-ghost-icon btn-sm">Today</button>
             </div>
             <div id="miniCalendarWrap">
-              <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                <button id="btnPrevMonth" class="btn-ghost-icon" style="padding: 2px 6px;">&larr;</button>
-                <span id="calMonthYearLabel" style="font-weight: 600; font-size: 11px; color: var(--text-primary); font-family: var(--font-mono);">Month Year</span>
-                <button id="btnNextMonth" class="btn-ghost-icon" style="padding: 2px 6px;">&rarr;</button>
+              <div class="mini-calendar-nav">
+                <button id="btnPrevMonth" class="btn-ghost-icon btn-cal-nav">&larr;</button>
+                <span id="calMonthYearLabel" class="mini-calendar-month-label">Month Year</span>
+                <button id="btnNextMonth" class="btn-ghost-icon btn-cal-nav">&rarr;</button>
               </div>
               <div id="miniCalendarGrid" class="mini-calendar-grid">
                 <!-- Days rendered dynamically -->
@@ -559,15 +558,15 @@
           </div>
 
           <!-- School Timetable Widget (TM1 / Optivum 3lb) -->
-          <div class="monotone-card" id="todayTimetableCard" today-segment-target="timetable">
+          <div class="monotone-card today-timetable-card" id="todayTimetableCard" today-segment-target="timetable">
             <div class="card-label-row">
               <span class="card-label">TM1 School Timetable</span>
               <div style="display: flex; gap: 4px;">
-                <button id="btnRefreshSchoolPlan" class="btn-ghost-icon" title="Sync live schedule" style="font-size: 10px; padding: 2px 6px;">Sync</button>
-                <button id="btnOpenTM1Web" class="btn-ghost-icon" title="Open Optivum plan" style="font-size: 10px; padding: 2px 6px;">Web &rarr;</button>
+                <button id="btnRefreshSchoolPlan" class="btn-ghost-icon btn-sm" title="Sync live schedule">Sync</button>
+                <button id="btnOpenTM1Web" class="btn-ghost-icon btn-sm" title="Open Optivum plan">Web &rarr;</button>
               </div>
             </div>
-            <div id="schoolLessonsList" style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
+            <div id="schoolLessonsList" class="school-lessons-list">
               <!-- Lessons rendered dynamically -->
             </div>
           </div>

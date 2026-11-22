@@ -136,9 +136,9 @@ class HarnessAPI:
         self._trigger_auto_sync()
         return res
 
-    def get_upcoming_exams(self) -> List[Dict[str, Any]]:
+    def get_upcoming_exams(self, limit: int = 15, date_str: Optional[str] = None) -> List[Dict[str, Any]]:
         from app.services import homework_service
-        return homework_service.get_upcoming_exams()
+        return homework_service.get_upcoming_exams(limit=limit, today_str=date_str)
 
     def add_exam(self, subject: str, title: str, exam_date: str, scope: str = "") -> Dict[str, Any]:
         from app.services import homework_service, sync_service

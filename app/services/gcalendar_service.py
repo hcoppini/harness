@@ -1028,9 +1028,13 @@ def collect_harness_events(
     try:
         from app.services import homework_service, school_service, today_service
 
+        # Calendar export range is inclusive of start_s..end_s; query with (start_dt - 1 day)
+        # so exams/homework scheduled on start_s still appear on that calendar day without pruning.
+        range_before_s = (start_dt - dt.timedelta(days=1)).isoformat()
+
         # 1. Upcoming Exams
         if cfg.get("sync_exams", True):
-            exams = homework_service.get_upcoming_exams(today_str=start_s, conn=conn) or []
+            exams = homework_service.get_upcoming_exams(today_str=range_before_s, conn=conn) or []
             for ex in exams:
                 ex_date = ex.get("exam_date", "")
                 if not ex_date or ex_date < start_s or ex_date > end_s:
@@ -1057,7 +1061,7 @@ def collect_harness_events(
 
         # 2. Homework Deadlines
         if cfg.get("sync_homework", True):
-            homeworks = homework_service.get_upcoming_homework(today_str=start_s, conn=conn) or []
+            homeworks = homework_service.get_upcoming_homework(today_str=range_before_s, auto_prune=False, conn=conn) or []
             for hw in homeworks:
                 due_d = hw.get("due_date", "")
                 if not due_d or due_d < start_s or due_d > end_s:

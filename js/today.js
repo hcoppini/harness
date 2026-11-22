@@ -855,10 +855,11 @@ const Today = {
         `;
       }).join("");
     } else {
-      // Fallback for blocks without plan_phases
-      const upcomingExams = (this.examsList && this.examsList.length > 0)
+      // Fallback for blocks without plan_phases (strictly future exams only, days_left >= 1)
+      const rawUpcomingExams = (this.examsList && this.examsList.length > 0)
         ? this.examsList
         : ((wl && wl.upcoming_exams) ? wl.upcoming_exams : []);
+      const upcomingExams = rawUpcomingExams.filter((e) => typeof e.days_left !== "number" || e.days_left >= 1);
       const nextExam = upcomingExams[0] || null;
       const todayExams = (wl && wl.today_exams && wl.today_exams.length > 0) ? wl.today_exams : [];
 
@@ -878,7 +879,7 @@ const Today = {
         step1Title = `Academic Defense: ${block ? (block.focus || "Exam / Essay Priority") : "Exam Priority"}`;
         step1Desc = (block ? block.activity : "") || "Complete and self-correct designated problem sets in ink.";
         step1Badge = "INK ON PAPER";
-      } else if (nextExam && nextExam.days_left <= 5) {
+      } else if (nextExam && nextExam.days_left >= 1 && nextExam.days_left <= 5) {
         const dueText = nextExam.days_left === 1 ? "TOMORROW" : `in ${nextExam.days_left}d (${nextExam.exam_date})`;
         step1Title = `Upcoming Exam Defense: [${nextExam.subject}] (${dueText})`;
         const scopeText = nextExam.scope ? ` • Scope: ${nextExam.scope}` : "";
@@ -1811,10 +1812,12 @@ const Today = {
     try {
       if (!window.pywebview || !window.pywebview.api) return;
       if (window.pywebview.api.get_upcoming_homework) {
-        this.homeworkList = await window.pywebview.api.get_upcoming_homework(this.selectedDateStr);
+        const rawHw = await window.pywebview.api.get_upcoming_homework(this.selectedDateStr);
+        this.homeworkList = (rawHw || []).filter((h) => typeof h.days_left !== "number" || h.days_left >= 1);
       }
       if (window.pywebview.api.get_upcoming_exams) {
-        this.examsList = await window.pywebview.api.get_upcoming_exams();
+        const rawExams = await window.pywebview.api.get_upcoming_exams(15, this.selectedDateStr);
+        this.examsList = (rawExams || []).filter((e) => typeof e.days_left !== "number" || e.days_left >= 1);
       }
       this.renderHomeworkAndExams();
     } catch (err) {
@@ -1839,11 +1842,11 @@ const Today = {
       if (this.homeworkList.length === 0) {
         hwContainer.innerHTML = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 8px 4px;">No pending homework. All caught up!</div>`;
       } else {
-        // Active Horizon Radar: Expired homework is automatically deleted when deadline passes.
-        // Group remaining active homework into:
-        // 1. Due This Week (0 to 7 days)
+        // Active Horizon Radar: Today's & expired homework are automatically removed.
+        // Group remaining upcoming homework into:
+        // 1. Due This Week (1 to 7 days)
         // 2. Upcoming Weeks (> 7 days)
-        const dueThisWeek = this.homeworkList.filter((h) => h.days_left >= 0 && h.days_left <= 7);
+        const dueThisWeek = this.homeworkList.filter((h) => h.days_left >= 1 && h.days_left <= 7);
         const dueLater = this.homeworkList.filter((h) => h.days_left > 7);
 
         const renderItem = (h) => {

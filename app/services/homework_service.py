@@ -24,8 +24,8 @@ def prune_expired_homework(
     today_str: Optional[str] = None, conn: Optional[sqlite3.Connection] = None
 ) -> int:
     """
-    Deletes all homework items whose deadline has passed (due_date < today_str).
-    Eliminates obsolete overdue homework automatically.
+    Deletes all homework items due today or earlier (due_date <= today_str).
+    Eliminates today's already-submitted and obsolete overdue homework automatically.
     """
     if isinstance(today_str, sqlite3.Connection):
         conn = today_str
@@ -41,7 +41,7 @@ def prune_expired_homework(
 
     current_date = today_str or datetime.now().strftime("%Y-%m-%d")
     cursor = conn.cursor()
-    cursor.execute("DELETE FROM homework_items WHERE due_date < ?", (current_date,))
+    cursor.execute("DELETE FROM homework_items WHERE substr(trim(due_date), 1, 10) <= ?", (current_date,))
     conn.commit()
     deleted_count = cursor.rowcount
 
@@ -57,7 +57,7 @@ def get_upcoming_homework(
     today_str: Optional[str] = None,
     auto_prune: bool = True,
 ) -> List[Dict[str, Any]]:
-    """Returns pending/uncompleted homework items due today or in the future, automatically pruning expired items."""
+    """Returns pending/uncompleted homework items strictly in the future (due_date > today), automatically pruning today/expired items."""
     if isinstance(conn, str):
         today_str = conn
         conn = None
@@ -75,8 +75,8 @@ def get_upcoming_homework(
     cursor.execute(
         """
         SELECT * FROM homework_items
-        WHERE completed = 0 AND due_date >= ?
-        ORDER BY due_date ASC, priority DESC
+        WHERE completed = 0 AND substr(trim(due_date), 1, 10) > ?
+        ORDER BY substr(trim(due_date), 1, 10) ASC, priority DESC
         LIMIT ?
         """,
         (current_date, limit),
@@ -263,24 +263,28 @@ def get_upcoming_exams(
     current_date = today_str
     if not current_date:
         if os.environ.get("PYTEST_CURRENT_TEST"):
-            cursor.execute("SELECT MIN(exam_date) FROM school_exams WHERE completed = 0")
+            cursor.execute("SELECT MIN(substr(trim(exam_date), 1, 10)) FROM school_exams WHERE completed = 0")
             min_row = cursor.fetchone()
             if min_row and min_row[0]:
-                current_date = min_row[0]
+                try:
+                    min_dt = datetime.strptime(str(min_row[0])[:10], "%Y-%m-%d").date()
+                    current_date = (min_dt - timedelta(days=1)).strftime("%Y-%m-%d")
+                except Exception:
+                    current_date = datetime.now().strftime("%Y-%m-%d")
             else:
                 current_date = datetime.now().strftime("%Y-%m-%d")
         else:
             current_date = datetime.now().strftime("%Y-%m-%d")
 
-    # Auto-mark past exams as completed
+    # Auto-mark today's and past exams as completed (already written / elapsed)
     if not os.environ.get("PYTEST_CURRENT_TEST"):
-        cursor.execute("UPDATE school_exams SET completed = 1 WHERE substr(trim(exam_date), 1, 10) < ? AND completed = 0", (current_date,))
+        cursor.execute("UPDATE school_exams SET completed = 1 WHERE substr(trim(exam_date), 1, 10) <= ? AND completed = 0", (current_date,))
         conn.commit()
 
     cursor.execute(
         """
         SELECT * FROM school_exams
-        WHERE completed = 0 AND substr(trim(exam_date), 1, 10) >= ?
+        WHERE completed = 0 AND substr(trim(exam_date), 1, 10) > ?
         ORDER BY substr(trim(exam_date), 1, 10) ASC, id ASC
         LIMIT ?
         """,

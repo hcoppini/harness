@@ -131,18 +131,46 @@ def test_prune_expired_homework(test_db):
     assert cursor.fetchone()[0] == 0
 
 
-def test_today_homework_retained_not_pruned(test_db):
-    # Homework due today (2026-09-14) must be strictly retained
+def test_today_homework_pruned_and_excluded(test_db):
+    # Homework due today (2026-09-14) has already passed at school and must be pruned/excluded
     homework_service.add_homework(
         subject="Język polski",
         title="Rozprawka",
         due_date="2026-09-14",
         conn=test_db,
     )
+    homework_service.add_homework(
+        subject="Matematyka",
+        title="Zadania na jutro",
+        due_date="2026-09-15",
+        conn=test_db,
+    )
     upcoming = homework_service.get_upcoming_homework(conn=test_db, today_str="2026-09-14")
     assert len(upcoming) == 1
-    assert upcoming[0]["due_date"] == "2026-09-14"
-    assert upcoming[0]["days_left"] == 0
+    assert upcoming[0]["subject"] == "Matematyka"
+    assert upcoming[0]["due_date"] == "2026-09-15"
+    assert upcoming[0]["days_left"] == 1
+
+
+def test_today_exam_excluded_from_upcoming(test_db):
+    # Exam scheduled for today (2026-09-14) is already written and must NOT appear in upcoming exams
+    homework_service.add_exam(
+        subject="Fizyka",
+        title="Sprawdzian dzisiejszy",
+        exam_date="2026-09-14",
+        conn=test_db,
+    )
+    homework_service.add_exam(
+        subject="Matematyka",
+        title="Sprawdzian jutrzejszy",
+        exam_date="2026-09-15",
+        conn=test_db,
+    )
+    upcoming = homework_service.get_upcoming_exams(conn=test_db, today_str="2026-09-14")
+    assert len(upcoming) == 1
+    assert upcoming[0]["subject"] == "Matematyka"
+    assert upcoming[0]["exam_date"] == "2026-09-15"
+    assert upcoming[0]["days_left"] == 1
 
 
 def test_sync_homework_items_and_exams(test_db, monkeypatch):

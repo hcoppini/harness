@@ -201,6 +201,66 @@ def test_post_exam_suppression_on_test_day(clean_db):
     assert "deliverable" in sgh_block
 
 
+def test_same_day_homework_and_exam_excluded_from_study_plan_and_radar(clean_db):
+    """
+    Tests and homework due TODAY (days_left == 0) have already happened at school:
+    - They must NOT appear in upcoming lists, dashboard radar, nearest_exam, or total_exams.
+    - Today's homework/essay must NOT trigger DEFENSE mode, urgent_homework, or study-plan prep.
+    - Today's retake (poprawa) must NOT appear in scheduled_poprawy.
+    """
+    from app.services import dashboard_service
+
+    today = "2026-11-17"  # Tuesday
+    cursor = clean_db.cursor()
+    cursor.execute(
+        """
+        INSERT INTO school_exams (subject, title, exam_date, scope, completed)
+        VALUES ('Fizyka', 'Poprawa: Kinematyka', ?, 'Ruch jednostajny', 0)
+        """,
+        (today,),
+    )
+    cursor.execute(
+        """
+        INSERT INTO homework_items (subject, title, due_date, completed, source, priority)
+        VALUES ('Język Polski', 'Rozprawka: Lalka', ?, 0, 'vulcan', 2)
+        """,
+        (today,),
+    )
+    clean_db.commit()
+
+    # Workload analysis must exclude today's exam and today's homework/essay from active study load
+    analysis = workload_governor.get_workload_analysis(today, conn=clean_db)
+    assert analysis["upcoming_exams"] == []
+    assert analysis["total_exams"] == 0
+    assert analysis["urgent_homework"] == []
+    assert analysis["active_homework"] == []
+    assert analysis["scheduled_poprawy"] == []
+    assert analysis["exam_week_plan"] is None
+    assert analysis["mode"] == "CRUISE"
+
+    # Schedule study plan must NOT tell user to study for today's test or essay
+    sched = today_service.get_schedule_for_date(today, conn=clean_db)
+    deep_block = next((b for b in sched["blocks"] if b.get("type") == "deep_work"), None)
+    assert deep_block is not None
+    assert deep_block["is_school_dedicated"] is False
+    assert "Kinematyka" not in deep_block["activity"]
+    assert "Rozprawka" not in deep_block["activity"]
+
+    # Kill list recommendations must NOT include today's homework or exam
+    recs = workload_governor.get_recommended_kill_items(today, conn=clean_db)
+    assert not any("Rozprawka" in r.get("title", "") for r in recs)
+    assert not any("Kinematyka" in r.get("title", "") for r in recs)
+
+    # Upcoming services and dashboard radar must exclude today's test & homework
+    assert homework_service.get_upcoming_exams(conn=clean_db, today_str=today) == []
+    assert homework_service.get_upcoming_homework(conn=clean_db, today_str=today) == []
+    dash = dashboard_service.get_dashboard_summary(conn=clean_db, client_date=today)
+    assert dash["radar"]["exams"] == []
+    assert dash["radar"]["homework"] == []
+    assert dash["academic_balance"]["nearest_exam"] is None
+    assert dash["academic_balance"]["total_exams_count"] == 0
+
+
 def test_non_defense_tum_roadmap_injection(clean_db):
     """
     On non-defense days (no acute exams/homework), SGH deep work blocks

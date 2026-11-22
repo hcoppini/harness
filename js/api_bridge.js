@@ -354,14 +354,14 @@
       if (immediateExams.length > 0) score += 2.0;
       if (weekExams.length > 1) score += (weekExams.length - 1) * 1.5;
 
-      const urgentHw = upcomingHw.filter((h) => h.days_left >= 0 && h.days_left <= 3);
+      const urgentHw = upcomingHw.filter((h) => h.days_left >= 1 && h.days_left <= 3);
       let hasAcuteEssays = false;
       upcomingHw.forEach((h) => {
         const dl = h.days_left;
         const essay = isClientEssay(h);
-        if (dl >= 0 && dl <= 1) score += 0.75;
+        if (dl === 1) score += 0.75;
         else if (dl >= 2 && dl <= 5) score += 0.25;
-        if (essay && dl >= 0 && dl <= 2) {
+        if (essay && dl >= 1 && dl <= 2) {
           score += 2.5;
           hasAcuteEssays = true;
         }
@@ -373,7 +373,8 @@
       const hasWeeklyExamSurge = weekExams.length >= 3;
       const cruiseUnlocked = !hasAcuteExams && !hasAcuteEssays && !hasWeeklyExamSurge;
 
-      const totalExamsCount = upcomingExams.length;
+      const futureExams = upcomingExams.filter((e) => e.days_left >= 1);
+      const totalExamsCount = futureExams.length;
       const obligationsCount = totalExamsCount + urgentHw.length;
 
       let mode = prev.mode || "CRUISE";
@@ -424,7 +425,7 @@
         total_exams_count: totalExamsCount,
         urgent_homework_count: urgentHw.length,
         school_obligations_count: obligationsCount,
-        nearest_exam: upcomingExams.length > 0 ? upcomingExams[0] : null,
+        nearest_exam: futureExams.length > 0 ? futureExams[0] : null,
       };
     };
 
@@ -534,7 +535,7 @@
 
       if (useLocalExams) {
         upcomingExamsForBalance = activeExams
-          .filter((e) => e.exam_date >= todayStr)
+          .filter((e) => e.exam_date > todayStr)
           .sort((a, b) => a.exam_date.localeCompare(b.exam_date))
           .map((e) => ({ ...e, days_left: calcUtcDaysLeft(e.exam_date, todayStr) }));
 
@@ -543,7 +544,7 @@
 
       if (useLocalHw) {
         upcomingHwForBalance = activeHw
-          .filter((h) => h.due_date >= todayStr)
+          .filter((h) => h.due_date > todayStr)
           .sort((a, b) => a.due_date.localeCompare(b.due_date))
           .map((h) => ({ ...h, days_left: calcUtcDaysLeft(h.due_date, todayStr) }));
 
@@ -2170,7 +2171,7 @@
               if (!Array.isArray(localHw)) localHw = [];
 
               const validHw = dedupeAcademicItems(localHw.map(normalizeHomeworkRecord), "due_date")
-                .filter((h) => h.due_date >= todayStr)
+                .filter((h) => h.due_date > todayStr)
                 .sort((a, b) => a.due_date.localeCompare(b.due_date))
                 .map((h) => ({
                   ...h,
@@ -2268,7 +2269,7 @@
             return async function (limit = 15, dateStr = null) {
               const todayStr = dateStr || _activeClientDate || getLocalDateStr();
               const [serverRes, authoritativeExams] = await Promise.all([
-                rpcCall("get_upcoming_exams", [limit]).catch(() => null),
+                rpcCall("get_upcoming_exams", [limit, todayStr]).catch(() => null),
                 ensureFreshAcademicCache(),
               ]);
 
@@ -2305,7 +2306,7 @@
                 localExams.map(normalizeExamRecord).filter((e) => !isPhantomExam(e)),
                 "exam_date"
               )
-                .filter((e) => e.exam_date >= todayStr && !e.completed)
+                .filter((e) => e.exam_date > todayStr && !e.completed)
                 .sort((a, b) => a.exam_date.localeCompare(b.exam_date))
                 .map((e) => ({
                   ...e,

@@ -360,6 +360,36 @@ function indexHeatmap(dash) {
     h3.cleanup();
   }
 
+  // Case 4: Same-day exam and same-day homework (2026-11-15) must be excluded from upcoming lists & radar
+  const h4 = buildHarness({ harness_sync_config_v3: cfgJson });
+  supabaseExams.splice(0, supabaseExams.length,
+    { id: 3001, subject: "Fizyka", title: "Already Written Today", exam_date: "2026-11-15", scope: "", completed: false },
+    { id: 3002, subject: "Matematyka", title: "Future Test", exam_date: "2026-11-18", scope: "", completed: false }
+  );
+  supabaseHomework.splice(0, supabaseHomework.length,
+    { id: 3010, subject: "Polski", title: "Rozprawka Today", due_date: "2026-11-15", completed: false, source: "vulcan", priority: 2 },
+    { id: 3011, subject: "Angielski", title: "Future HW", due_date: "2026-11-17", completed: false, source: "vulcan", priority: 1 }
+  );
+  try {
+    const dash5 = await h4.api.get_dashboard("2026-11-15");
+    assert.strictEqual(dash5.radar.exams.length, 1);
+    assert.strictEqual(dash5.radar.exams[0].exam_date, "2026-11-18");
+    assert.strictEqual(dash5.academic_balance.nearest_exam.exam_date, "2026-11-18");
+    assert.strictEqual(dash5.academic_balance.total_exams_count, 1);
+    assert.strictEqual(dash5.radar.homework.length, 1);
+    assert.strictEqual(dash5.radar.homework[0].due_date, "2026-11-17");
+
+    const upExams = await h4.api.get_upcoming_exams(15, "2026-11-15");
+    assert.strictEqual(upExams.length, 1);
+    assert.strictEqual(upExams[0].exam_date, "2026-11-18");
+
+    const upHw = await h4.api.get_upcoming_homework("2026-11-15");
+    assert.strictEqual(upHw.length, 1);
+    assert.strictEqual(upHw[0].due_date, "2026-11-17");
+  } finally {
+    h4.cleanup();
+  }
+
   console.log("JS_BRIDGE_HEATMAP_TESTS_PASSED");
 })().catch((err) => {
   console.error(err);

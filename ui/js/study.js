@@ -16,11 +16,12 @@ window.Study = {
     try {
       if (!window.pywebview || !window.pywebview.api) return;
 
-      // 1. Fetch upcoming exams
+      // 1. Fetch upcoming exams (strictly future: days_left >= 1)
       if (typeof window.pywebview.api.get_upcoming_exams === "function") {
         const rawExams = await window.pywebview.api.get_upcoming_exams();
-        // Strict filter: purge any mock phantom tests
+        // Strict filter: purge any mock phantom tests and already-elapsed today tests
         this.examsList = (rawExams || []).filter((e) => {
+          if (typeof e.days_left === "number" && e.days_left <= 0) return false;
           const t = ((e.title || "") + " " + (e.scope || "")).toLowerCase();
           return (
             !t.includes("trygonometria") &&
@@ -31,10 +32,11 @@ window.Study = {
         });
       }
 
-      // 2. Fetch upcoming homework
+      // 2. Fetch upcoming homework (strictly future: days_left >= 1)
       if (typeof window.pywebview.api.get_upcoming_homework === "function") {
         const rawHw = await window.pywebview.api.get_upcoming_homework();
         this.homeworkList = (rawHw || []).filter((h) => {
+          if (typeof h.days_left === "number" && h.days_left <= 0) return false;
           const t = (h.title || "").toLowerCase();
           return !t.includes("plecakowy") && !t.includes("trading");
         });

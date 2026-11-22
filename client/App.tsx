@@ -317,8 +317,8 @@ export default function App() {
       weeks.push(weekDays);
     }
 
-    // Inverted colors: Super dark black for completed, brighter for unchecked
-    const invertedShades = ['#f5f5f5', '#d4d4d4', '#737373', '#404040', '#000000'];
+    // Forward inverted heatmap shades (dark theme aligned)
+    const invertedShades = ['#13151e', '#1d2230', '#2e364c', '#4d5a7d', '#d8e0f0'];
 
     return (
       <View style={styles.card}>
@@ -329,11 +329,11 @@ export default function App() {
           </View>
           <View style={styles.heatmapLegend}>
             <Text style={styles.legendText}>Incomplete</Text>
-            <View style={[styles.legendBox, { backgroundColor: '#f5f5f5' }]} />
-            <View style={[styles.legendBox, { backgroundColor: '#d4d4d4' }]} />
-            <View style={[styles.legendBox, { backgroundColor: '#737373' }]} />
-            <View style={[styles.legendBox, { backgroundColor: '#404040' }]} />
-            <View style={[styles.legendBox, { backgroundColor: '#000000' }]} />
+            <View style={[styles.legendBox, { backgroundColor: '#13151e' }]} />
+            <View style={[styles.legendBox, { backgroundColor: '#1d2230' }]} />
+            <View style={[styles.legendBox, { backgroundColor: '#2e364c' }]} />
+            <View style={[styles.legendBox, { backgroundColor: '#4d5a7d' }]} />
+            <View style={[styles.legendBox, { backgroundColor: '#d8e0f0' }]} />
             <Text style={styles.legendText}>Done</Text>
           </View>
         </View>
@@ -374,7 +374,7 @@ export default function App() {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+      <StatusBar barStyle="light-content" backgroundColor="#090a0f" />
 
       {/* Main Container */}
       <View style={styles.viewportContainer}>
@@ -944,26 +944,26 @@ export default function App() {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#ffffff',
-    alignItems: 'center',
+    backgroundColor: '#090a0f',
   },
   viewportContainer: {
     flex: 1,
     width: '100%',
-    maxWidth: 520,
-    backgroundColor: '#fafafa',
+    maxWidth: 600,
+    alignSelf: 'center',
+    backgroundColor: '#090a0f',
   },
 
-  /* Monochrome Minimal Header */
+  /* Minimal Executive Header */
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingVertical: 14,
+    paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#e5e7eb',
-    backgroundColor: '#ffffff',
+    borderBottomColor: 'rgba(255, 255, 255, 0.07)',
+    backgroundColor: '#0f1118',
   },
   brandRow: {
     flexDirection: 'row',
@@ -971,30 +971,31 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   brandMark: {
-    width: 22,
-    height: 22,
-    borderRadius: 4,
-    backgroundColor: '#000000',
+    width: 24,
+    height: 24,
+    borderRadius: 6,
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.35)',
     justifyContent: 'center',
     alignItems: 'center',
   },
   brandMarkInner: {
-    width: 6,
-    height: 6,
-    borderRadius: 1,
-    backgroundColor: '#ffffff',
+    width: 8,
+    height: 8,
+    borderRadius: 2,
+    backgroundColor: '#818cf8',
   },
   brandTitle: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontWeight: '800',
     fontSize: 13,
-    color: '#000000',
+    color: '#f4f5f8',
     letterSpacing: 1.5,
   },
   brandSubtitle: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 9,
-    color: '#737373',
+    fontWeight: '600',
+    color: '#818cf8',
     letterSpacing: 0.8,
   },
   syncBadge: {
@@ -1004,38 +1005,41 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 12,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(16, 185, 129, 0.28)',
   },
   syncDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#000000',
+    backgroundColor: '#10b981',
   },
   syncText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 9,
-    color: '#000000',
+    color: '#34d399',
     fontWeight: '700',
+    letterSpacing: 0.5,
   },
 
   toast: {
     position: 'absolute',
     top: 60,
     alignSelf: 'center',
-    backgroundColor: '#000000',
+    backgroundColor: '#1e2230',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.3)',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     zIndex: 100,
     shadowColor: '#000',
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
+    elevation: 4,
   },
   toastText: {
-    color: '#ffffff',
+    color: '#f4f5f8',
     fontSize: 11,
     fontWeight: '700',
   },
@@ -1048,17 +1052,17 @@ const styles = StyleSheet.create({
 
   /* Cards */
   card: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#0f1118',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 10,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: 12,
     padding: 14,
     marginBottom: 12,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 2,
   },
   cardHeaderRow: {
     flexDirection: 'row',
@@ -1069,18 +1073,18 @@ const styles = StyleSheet.create({
   cardSectionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#000000',
+    color: '#f4f5f8',
     letterSpacing: -0.2,
   },
   cardSectionSubtitle: {
     fontSize: 11,
-    color: '#737373',
+    color: '#9aa1b2',
     marginTop: 2,
   },
   cardActionLink: {
     fontSize: 11,
     fontWeight: '600',
-    color: '#000000',
+    color: '#818cf8',
   },
 
   /* Cockpit Grid */
@@ -1089,16 +1093,16 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   gaugeCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#0f1118',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 10,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: 12,
     padding: 14,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   gaugeHeader: {
     flexDirection: 'row',
@@ -1107,72 +1111,71 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   gaugeLabel: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 10,
     fontWeight: '700',
-    color: '#737373',
+    color: '#9aa1b2',
     letterSpacing: 0.6,
   },
   gaugeValueBig: {
     fontSize: 26,
     fontWeight: '800',
-    color: '#000000',
+    color: '#f4f5f8',
     marginVertical: 4,
   },
   gaugeValueMedium: {
-    fontSize: 17,
+    fontSize: 16,
     fontWeight: '700',
-    color: '#000000',
+    color: '#f4f5f8',
   },
   gaugeSubtext: {
     fontSize: 11,
-    color: '#737373',
+    color: '#636b7e',
     marginTop: 4,
   },
   progressTrack: {
     height: 5,
-    backgroundColor: '#e5e7eb',
+    backgroundColor: 'rgba(255, 255, 255, 0.08)',
     borderRadius: 3,
     overflow: 'hidden',
     marginVertical: 4,
   },
   progressFill: {
     height: '100%',
-    backgroundColor: '#000000',
+    backgroundColor: '#6366f1',
   },
 
-  /* Monochrome Pills */
+  /* Monochrome / Accent Pills */
   pillBlack: {
-    backgroundColor: '#000000',
+    backgroundColor: 'rgba(99, 102, 241, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(99, 102, 241, 0.35)',
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 10,
   },
   pillBlackText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 9,
     fontWeight: '700',
-    color: '#ffffff',
+    color: '#a5b4fc',
     letterSpacing: 0.5,
   },
   pillOutline: {
     borderWidth: 1,
-    borderColor: '#000000',
+    borderColor: 'rgba(255, 255, 255, 0.12)',
     paddingHorizontal: 7,
     paddingVertical: 1,
     borderRadius: 10,
-    backgroundColor: '#ffffff',
+    backgroundColor: 'rgba(255, 255, 255, 0.04)',
   },
   pillOutlineText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 9,
     fontWeight: '700',
-    color: '#000000',
+    color: '#9aa1b2',
   },
   monoSubLabel: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 10,
-    color: '#737373',
+    color: '#9aa1b2',
+    fontWeight: '600',
   },
 
   /* Heatmap */
@@ -1183,7 +1186,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 9,
-    color: '#737373',
+    color: '#636b7e',
     marginHorizontal: 2,
   },
   legendBox: {
@@ -1191,34 +1194,34 @@ const styles = StyleSheet.create({
     height: 9,
     borderRadius: 2,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   heatCell: {
     width: 14,
     height: 14,
     borderRadius: 2,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(255, 255, 255, 0.07)',
   },
   heatCellDone: {
-    borderColor: '#000000',
+    borderColor: 'rgba(216, 224, 240, 0.6)',
   },
   heatCellToday: {
     borderWidth: 1.5,
-    borderColor: '#000000',
+    borderColor: '#6366f1',
   },
   dayInfoPill: {
     marginTop: 10,
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: 6,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#151822',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(255, 255, 255, 0.08)',
   },
   dayInfoText: {
     fontSize: 11,
-    color: '#000000',
+    color: '#f4f5f8',
     fontWeight: '600',
   },
 
@@ -1227,60 +1230,61 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 6,
+    paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: '#f5f5f5',
+    borderBottomColor: 'rgba(255, 255, 255, 0.05)',
   },
   horizonBullet: {
-    width: 5,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: '#000000',
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#6366f1',
   },
   horizonTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#000000',
+    color: '#f4f5f8',
   },
   horizonMeta: {
     fontSize: 10,
-    color: '#737373',
+    color: '#636b7e',
     marginTop: 1,
   },
 
-  /* Tactile Checkboxes (Visible contrast) */
+  /* Tactile Checkboxes (High contrast, modern) */
   tactileBox: {
     width: 22,
     height: 22,
-    borderRadius: 4,
+    borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: '#000000',
-    backgroundColor: '#ffffff',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: '#151822',
     justifyContent: 'center',
     alignItems: 'center',
   },
   tactileBoxChecked: {
-    backgroundColor: '#000000',
+    backgroundColor: '#6366f1',
+    borderColor: '#6366f1',
   },
   tactileCheckmark: {
     color: '#ffffff',
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: '800',
     lineHeight: 14,
   },
   tactileBoxSmall: {
     width: 18,
     height: 18,
-    borderRadius: 3,
+    borderRadius: 4,
     borderWidth: 1.5,
-    borderColor: '#000000',
-    backgroundColor: '#ffffff',
+    borderColor: 'rgba(255, 255, 255, 0.22)',
+    backgroundColor: '#151822',
     justifyContent: 'center',
     alignItems: 'center',
   },
   tactileCheckmarkSmall: {
     color: '#ffffff',
-    fontSize: 11,
+    fontSize: 10,
     fontWeight: '800',
     lineHeight: 12,
   },
@@ -1290,54 +1294,54 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
-    paddingVertical: 9,
-    paddingHorizontal: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
     borderRadius: 8,
-    backgroundColor: '#fafafa',
+    backgroundColor: '#151822',
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   routineRowDone: {
-    backgroundColor: '#f5f5f5',
-    opacity: 0.7,
+    backgroundColor: '#0c0e15',
+    opacity: 0.55,
   },
   routineTimePill: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 10,
     fontWeight: '700',
-    color: '#000000',
+    color: '#818cf8',
+    letterSpacing: 0.4,
   },
   routineCutoff: {
     fontSize: 10,
-    color: '#737373',
+    color: '#636b7e',
   },
   routineName: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#000000',
+    color: '#f4f5f8',
     marginTop: 2,
   },
   textCrossed: {
     textDecorationLine: 'line-through',
-    color: '#9ca3af',
+    color: '#636b7e',
   },
 
   /* Tasks */
   taskInput: {
-    height: 38,
-    backgroundColor: '#ffffff',
+    height: 40,
+    backgroundColor: '#151822',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 6,
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    borderRadius: 8,
     paddingHorizontal: 12,
     fontSize: 12,
-    color: '#000000',
+    color: '#f4f5f8',
   },
   btnBlack: {
-    height: 38,
-    backgroundColor: '#000000',
-    paddingHorizontal: 14,
-    borderRadius: 6,
+    height: 40,
+    backgroundColor: '#6366f1',
+    paddingHorizontal: 16,
+    borderRadius: 8,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -1350,38 +1354,38 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 10,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-    backgroundColor: '#ffffff',
+    paddingVertical: 9,
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#151822',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   taskRowDone: {
-    backgroundColor: '#fafafa',
-    opacity: 0.6,
+    backgroundColor: '#0c0e15',
+    opacity: 0.55,
   },
   taskTitle: {
     fontSize: 12,
     fontWeight: '600',
-    color: '#000000',
+    color: '#f4f5f8',
   },
   taskCategory: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 9,
-    color: '#737373',
+    color: '#818cf8',
+    fontWeight: '600',
     marginTop: 1,
   },
   btnDelete: {
     padding: 6,
   },
   btnDeleteText: {
-    color: '#9ca3af',
+    color: '#636b7e',
     fontSize: 12,
   },
   emptyNotice: {
     fontSize: 12,
-    color: '#9ca3af',
+    color: '#636b7e',
     textAlign: 'center',
     marginVertical: 8,
   },
@@ -1389,13 +1393,13 @@ const styles = StyleSheet.create({
   /* Scratchpad */
   scratchpadInput: {
     height: 90,
-    backgroundColor: '#fafafa',
+    backgroundColor: '#151822',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 6,
+    borderColor: 'rgba(255, 255, 255, 0.08)',
+    borderRadius: 8,
     padding: 10,
     fontSize: 12,
-    color: '#000000',
+    color: '#f4f5f8',
     textAlignVertical: 'top',
     marginTop: 8,
   },
@@ -1403,31 +1407,30 @@ const styles = StyleSheet.create({
   /* Obligations & Study */
   obligationCard: {
     padding: 12,
-    borderRadius: 8,
-    backgroundColor: '#ffffff',
+    borderRadius: 10,
+    backgroundColor: '#151822',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(255, 255, 255, 0.07)',
     gap: 4,
   },
   obligationDaysLeft: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 10,
     fontWeight: '700',
-    color: '#000000',
+    color: '#f59e0b',
   },
   obligationSubject: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#000000',
+    color: '#f4f5f8',
     marginTop: 2,
   },
   obligationTopic: {
     fontSize: 12,
-    color: '#404040',
+    color: '#9aa1b2',
   },
   obligationDate: {
     fontSize: 10,
-    color: '#737373',
+    color: '#636b7e',
     marginTop: 2,
   },
   studyProtocolRow: {
@@ -1435,20 +1438,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 12,
     paddingVertical: 10,
-    paddingHorizontal: 10,
-    borderRadius: 6,
-    backgroundColor: '#fafafa',
+    paddingHorizontal: 12,
+    borderRadius: 8,
+    backgroundColor: '#151822',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(255, 255, 255, 0.06)',
   },
   studyStepTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: '#000000',
+    color: '#f4f5f8',
   },
   studyStepDesc: {
     fontSize: 11,
-    color: '#737373',
+    color: '#9aa1b2',
     marginTop: 1,
   },
 
@@ -1458,31 +1461,31 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    backgroundColor: '#ffffff',
+    borderColor: 'rgba(255, 255, 255, 0.1)',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
   },
   ladderPillText: {
     fontSize: 11,
-    color: '#737373',
+    color: '#636b7e',
   },
   ladderPillDone: {
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#000000',
-    backgroundColor: '#f5f5f5',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
   },
   ladderPillDoneText: {
     fontSize: 11,
     fontWeight: '700',
-    color: '#000000',
+    color: '#34d399',
   },
   ladderPillActive: {
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 12,
-    backgroundColor: '#000000',
+    backgroundColor: '#6366f1',
   },
   ladderPillActiveText: {
     fontSize: 11,
@@ -1501,14 +1504,15 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   scoreLabel: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 9,
-    color: '#737373',
+    fontWeight: '700',
+    color: '#636b7e',
+    letterSpacing: 0.5,
   },
   scoreValue: {
     fontSize: 16,
     fontWeight: '800',
-    color: '#000000',
+    color: '#f4f5f8',
     marginTop: 3,
   },
 
@@ -1524,7 +1528,7 @@ const styles = StyleSheet.create({
     top: 10,
     bottom: 20,
     width: 2,
-    backgroundColor: '#000000',
+    backgroundColor: '#6366f1',
   },
   metroStationRow: {
     position: 'relative',
@@ -1537,21 +1541,21 @@ const styles = StyleSheet.create({
     width: 18,
     height: 18,
     borderRadius: 9,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#0f1118',
     borderWidth: 2,
-    borderColor: '#000000',
+    borderColor: '#6366f1',
     justifyContent: 'center',
     alignItems: 'center',
     zIndex: 2,
   },
   metroRailNodeDone: {
-    backgroundColor: '#000000',
+    backgroundColor: '#6366f1',
   },
   metroNodeInnerDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: '#000000',
+    backgroundColor: '#818cf8',
   },
   metroNodeCheck: {
     color: '#ffffff',
@@ -1559,41 +1563,39 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   metroCard: {
-    backgroundColor: '#ffffff',
+    backgroundColor: '#151822',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
-    borderRadius: 8,
+    borderColor: 'rgba(255, 255, 255, 0.07)',
+    borderRadius: 10,
     padding: 12,
   },
   metroCardDone: {
-    borderColor: '#d1d5db',
-    backgroundColor: '#fafafa',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
+    backgroundColor: '#0f1118',
   },
   stationMonthTag: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 10,
     fontWeight: '800',
-    color: '#000000',
+    color: '#818cf8',
   },
   stationPhaseTag: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 9,
-    color: '#737373',
+    color: '#636b7e',
   },
   stationStatusBadge: {
     fontSize: 10,
     fontWeight: '600',
-    color: '#737373',
+    color: '#9aa1b2',
   },
   stationName: {
     fontSize: 14,
     fontWeight: '700',
-    color: '#000000',
+    color: '#f4f5f8',
     marginTop: 4,
   },
   stationObjective: {
     fontSize: 11,
-    color: '#6b7280',
+    color: '#9aa1b2',
     marginTop: 2,
     lineHeight: 15,
   },
@@ -1607,20 +1609,20 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     paddingHorizontal: 8,
     borderRadius: 6,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
     borderWidth: 1,
-    borderColor: '#e5e7eb',
+    borderColor: 'rgba(245, 158, 11, 0.25)',
   },
   examDotIcon: {
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#000000',
+    backgroundColor: '#f59e0b',
   },
   examDotText: {
     fontSize: 10,
     fontWeight: '700',
-    color: '#000000',
+    color: '#fbbf24',
   },
 
   /* Deliverables Ledger */
@@ -1635,23 +1637,22 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 8,
     borderRadius: 6,
-    backgroundColor: '#fafafa',
+    backgroundColor: 'rgba(255, 255, 255, 0.03)',
     borderWidth: 1,
-    borderColor: '#f0f0f0',
+    borderColor: 'rgba(255, 255, 255, 0.05)',
   },
   deliverableItemDone: {
-    backgroundColor: '#f5f5f5',
-    opacity: 0.65,
+    backgroundColor: 'rgba(255, 255, 255, 0.015)',
+    opacity: 0.55,
   },
   streamBadgeText: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 9,
     fontWeight: '700',
-    color: '#000000',
+    color: '#818cf8',
   },
   deliverableText: {
     fontSize: 11,
-    color: '#374151',
+    color: '#f4f5f8',
     marginTop: 1,
   },
 
@@ -1660,11 +1661,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-around',
-    height: 60,
+    height: 62,
     borderTopWidth: 1,
-    borderTopColor: '#e5e7eb',
-    backgroundColor: '#ffffff',
-    paddingBottom: Platform.OS === 'ios' ? 4 : 0,
+    borderTopColor: 'rgba(255, 255, 255, 0.08)',
+    backgroundColor: 'rgba(15, 17, 24, 0.96)',
+    paddingBottom: Platform.OS === 'ios' ? 6 : 0,
   },
   navItem: {
     flex: 1,
@@ -1677,21 +1678,20 @@ const styles = StyleSheet.create({
   },
   navIcon: {
     fontSize: 15,
-    color: '#9ca3af',
+    color: '#636b7e',
   },
   navIconActive: {
-    color: '#000000',
+    color: '#818cf8',
     fontWeight: '800',
   },
   navLabel: {
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
     fontSize: 10,
-    fontWeight: '500',
-    color: '#9ca3af',
+    fontWeight: '600',
+    color: '#636b7e',
     marginTop: 2,
   },
   navLabelActive: {
-    color: '#000000',
+    color: '#f4f5f8',
     fontWeight: '800',
   },
 });
