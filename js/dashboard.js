@@ -109,7 +109,8 @@ window.Dashboard = {
       todayArc.style.strokeDashoffset = (circ * (1 - pct / 100)).toFixed(2);
     }
     if (todayRoutineLabel) {
-      todayRoutineLabel.textContent = `${velocity.checked_boxes || 0}/${velocity.total_boxes || 0} boxes checked • ${velocity.schedule_name || "Daily routine"}`;
+      const schedShort = (velocity.schedule_name || "Routine").split("(")[0].trim();
+      todayRoutineLabel.textContent = `${velocity.checked_boxes || 0}/${velocity.total_boxes || 0} checked · ${schedShort}`;
     }
 
     // 2. Academic Balance Status (School vs Matura)
@@ -128,19 +129,20 @@ window.Dashboard = {
       if (acBalance.nearest_exam) {
         const ex = acBalance.nearest_exam;
         const dueText = ex.days_left === 0 ? "TODAY" : ex.days_left === 1 ? "TOMORROW" : `in ${ex.days_left}d`;
-        nearestExamEl.textContent = `[${ex.subject}] ${dueText}`;
+        nearestExamEl.textContent = `${ex.subject} · ${dueText}`;
         nearestExamEl.title = `${ex.title} (${ex.exam_date})`;
       } else {
-        nearestExamEl.textContent = "Clean Horizon";
+        nearestExamEl.textContent = "None";
       }
     }
     if (obligationsEl) {
       const examsCount = acBalance.total_exams_count || 0;
       const hwCount = acBalance.urgent_homework_count || 0;
-      obligationsEl.textContent = `${examsCount} Tests • ${hwCount} Urgent HW`;
+      obligationsEl.textContent = `${examsCount} Tests · ${hwCount} HW`;
     }
     if (workloadDescEl) {
-      workloadDescEl.textContent = acBalance.description || "Clean 3-day horizon calibrated. Daily blocks feed TUM '28.";
+      workloadDescEl.textContent = "";
+      workloadDescEl.style.display = "none";
     }
 
     // 3. TUM '28 Admissions Velocity
@@ -151,25 +153,25 @@ window.Dashboard = {
 
     if (gpaEl) {
       const pl = (metrics.overall_gpa || 0.0).toFixed(2);
-      const de = metrics.bavarian_gpa ? ` (DE: ${Number(metrics.bavarian_gpa).toFixed(2)})` : "";
+      const de = metrics.bavarian_gpa ? ` · DE ${Number(metrics.bavarian_gpa).toFixed(2)}` : "";
       gpaEl.textContent = `${pl}${de}`;
     }
-    const tumScore = metrics.tum_score !== undefined ? Number(metrics.tum_score) : 90.0;
+    const tumScore = metrics.tum_score !== undefined ? Number(metrics.tum_score) : 0.0;
     const isRejection = Boolean(metrics.tum_rejection_breached || tumScore < 67.0);
     if (tumScoreEl) {
       tumScoreEl.textContent = `${tumScore.toFixed(1)} pts`;
-      if (isRejection) {
-        tumScoreEl.style.color = "var(--color-red)";
-      } else {
-        tumScoreEl.style.color = "";
-      }
+      tumScoreEl.style.color = isRejection ? "var(--color-red)" : (tumScore >= 88.0 ? "var(--color-green-light)" : "");
     }
     if (germanEl) germanEl.textContent = metrics.german_stage || "A2 Active";
     if (stName) {
       if (isRejection) {
-        stName.innerHTML = `<span style="color: var(--color-red); font-weight: 700;">⚠ REJECTION THRESHOLD BREACHED (&lt; 67.0)</span>`;
+        const gap = Math.max(0, 67.0 - tumScore).toFixed(1);
+        stName.innerHTML = `<span style="color: var(--color-red); font-weight: 600;">${gap} pts below 67 cutoff</span>`;
+      } else if (tumScore < 88.0) {
+        const gap = Math.max(0, 88.0 - tumScore).toFixed(1);
+        stName.textContent = `${gap} pts to Direct Admit (88)`;
       } else {
-        stName.textContent = `Station: ${metrics.active_station?.name || "Etap Główny"} (${metrics.active_station?.month || "NOV '26"})`;
+        stName.textContent = `Direct Admit safe · ${metrics.active_station?.name || ""}`;
       }
     }
   },
@@ -381,67 +383,57 @@ window.Dashboard = {
         if (schedKey.includes("b")) badgeClass = "sched-b";
         if (schedKey.includes("c")) badgeClass = "sched-c";
 
+        const shortSched = day.schedule_key
+          ? day.schedule_key.replace("C_", "").replace("_", " ")
+          : "ROUTINE";
+
+        const highlight = (day.key_highlight || "").trim();
+        const cutoff = (day.cutoff_info || "").trim();
+        // Avoid repeating cutoff text if key_highlight already mentions it
+        const showCutoff = cutoff && !highlight.toLowerCase().includes(cutoff.toLowerCase().slice(0, 12));
+
         let gymSnippet = "";
         if (day.gym_routine) {
+          const liftShort = (day.gym_routine.name.split("—")[1] || day.gym_routine.name).trim();
           gymSnippet = `
-            <div style="margin-top: 4px; font-size: 10px; color: var(--accent-lavender); font-weight: 500; font-family: var(--font-mono);">
-              LIFT: ${this.escapeHtml(day.gym_routine.name.split("—")[1] || day.gym_routine.name)}
+            <div style="margin-top: 6px; font-size: 10px; color: var(--accent-lavender); font-family: var(--font-mono); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${this.escapeHtml(liftShort)}">
+              Lift · ${this.escapeHtml(liftShort)}
             </div>
           `;
         }
 
-        let actionsHtml = "";
-        if (day.actions && day.actions.length > 0) {
-          actionsHtml = `
-            <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 2px;">
-              ${day.actions.slice(0, 3).map((act) => `
-                <div class="forecast-action-item">
-                  <span class="forecast-action-time">${this.escapeHtml(act.time.split(" - ")[0])}</span>
-                  <span class="forecast-action-label">${this.escapeHtml(act.label)}</span>
-                </div>
-              `).join("")}
-            </div>
-          `;
-        }
+        const gcalCount = (day.calendar_events || []).length;
+        const gcalHtml = gcalCount > 0
+          ? `<div style="font-family: var(--font-mono); font-size: 9.5px; color: #34d399; margin-top: 4px;">GCal · ${gcalCount} event${gcalCount === 1 ? "" : "s"}</div>`
+          : "";
 
         const klCount = (day.kill_list_items || []).length;
         const taskCount = day.task_count || 0;
-        const taskPill = klCount > 0 ? `${klCount} kill • ${taskCount} tasks` : taskCount > 0 ? `${taskCount} tasks` : "Routine ready";
+        const extraTag = klCount > 0
+          ? `<div style="margin-top: 6px; font-size: 10px; color: var(--accent-lavender); font-family: var(--font-mono);">${klCount} kill · ${taskCount} tasks</div>`
+          : (taskCount > 0 ? `<div style="margin-top: 6px; font-size: 10px; color: var(--text-tertiary); font-family: var(--font-mono);">${taskCount} task${taskCount === 1 ? "" : "s"}</div>` : "");
 
         return `
           <div 
             class="forecast-day-card ${isTomorrow ? "tomorrow-highlight" : ""}" 
             onclick="Dashboard.openDetailedScheduleModal('${day.date}')"
-            title="Click to view detailed timeline for ${day.day_name}"
-            style="cursor: pointer;"
+            title="Click to inspect ${day.day_name}"
+            style="cursor: pointer; justify-content: flex-start;"
           >
-            <div>
-              <div class="forecast-header">
-                <div class="forecast-day-name">
-                  <span>${day.day_name}</span>
-                  ${isTomorrow ? '<span class="forecast-tag-tomorrow">TOMORROW</span>' : ""}
-                </div>
-                <div class="forecast-date">${day.display_date}</div>
+            <div class="forecast-header" style="margin-bottom: 8px;">
+              <div class="forecast-day-name">
+                <span>${day.day_name.slice(0, 3)}</span>
+                ${isTomorrow ? '<span class="forecast-tag-tomorrow">NEXT</span>' : ""}
               </div>
-
-              <div>
-                <span class="forecast-schedule-badge ${badgeClass}">
-                  ${day.schedule_key ? `SCHED ${day.schedule_key}` : "ROUTINE"}
-                </span>
-                <div class="forecast-highlight-text">${this.escapeHtml(day.key_highlight)}</div>
-                ${day.cutoff_info ? `<div class="forecast-cutoff-text">${this.escapeHtml(day.cutoff_info)}</div>` : ""}
-                ${(day.calendar_events && day.calendar_events.length > 0) || (day.calendar_optimization && day.calendar_optimization.blocks_optimized > 0)
-                  ? `<div style="font-family: var(--font-mono); font-size: 9px; color: #34d399; margin-top: 3px;">GCal: ${(day.calendar_events || []).length} evt${day.calendar_optimization && day.calendar_optimization.blocks_optimized > 0 ? ` &bull; ${day.calendar_optimization.blocks_optimized} OPT` : ""}</div>`
-                  : ""}
-                ${actionsHtml}
-                ${gymSnippet}
-              </div>
+              <div class="forecast-date">${(day.display_date || "").replace(/^[A-Za-z]+,\s*/, "")}</div>
             </div>
 
-            <div style="margin-top: 8px; padding-top: 6px; border-top: 1px dashed var(--border-hairline); font-size: 10px; color: var(--text-tertiary); display: flex; justify-content: space-between;">
-              <span style="${klCount > 0 ? "color: var(--accent-lavender); font-weight: 600;" : ""}">${taskPill}</span>
-              <span>${day.is_tomorrow ? "Next day" : `in ${day.days_away}d &rarr;`}</span>
-            </div>
+            <span class="forecast-schedule-badge ${badgeClass}" style="margin-bottom: 6px;">${this.escapeHtml(shortSched)}</span>
+            <div class="forecast-highlight-text" style="font-size: 11.5px; color: var(--text-primary); line-height: 1.35;">${this.escapeHtml(highlight)}</div>
+            ${showCutoff ? `<div class="forecast-cutoff-text" style="font-size: 10.5px; margin-top: 4px;">${this.escapeHtml(cutoff)}</div>` : ""}
+            ${gcalHtml}
+            ${gymSnippet}
+            ${extraTag}
           </div>
         `;
       })

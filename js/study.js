@@ -94,8 +94,11 @@ window.Study = {
           dueLabel = `in ${ex.days_left}d`;
         }
 
-        const scopeHtml = ex.scope
-          ? `<div style="font-size: 11px; color: var(--text-secondary); margin-top: 4px; line-height: 1.4;">${this.escapeHtml(ex.scope)}</div>`
+        const titleNorm = (ex.title || "").toLowerCase().replace(/^sprawdzian:\s*/i, "").replace(/^kartkówka:\s*/i, "").trim();
+        const scopeNorm = (ex.scope || "").toLowerCase().trim();
+        const showScope = Boolean(ex.scope && scopeNorm && !titleNorm.includes(scopeNorm.slice(0, 20)) && !scopeNorm.includes(titleNorm.slice(0, 20)));
+        const scopeHtml = showScope
+          ? `<div style="font-size: 11px; color: var(--text-secondary); margin-top: 3px; line-height: 1.4;">${this.escapeHtml(ex.scope)}</div>`
           : "";
 
         return `
@@ -183,11 +186,27 @@ window.Study = {
   renderGrades() {
     const container = document.getElementById("studySubjectGradesList");
     const gpaEl = document.getElementById("studyCurrentGpaVal");
+    const tumScoreEl = document.getElementById("studyTumScoreVal");
+    const tumScoreSubEl = document.getElementById("studyTumScoreSub");
     if (!this.tumData) return;
 
     const gpa = this.tumData.overall_gpa || this.tumData.current_gpa || this.tumData.gpa;
     if (gpaEl && gpa) {
       gpaEl.textContent = Number(gpa).toFixed(2);
+    }
+
+    const ba = this.tumData.bavarian_assessment || {};
+    const score = ba.total_tum_points !== undefined ? Number(ba.total_tum_points) : null;
+    if (tumScoreEl) {
+      if (score !== null && Number.isFinite(score)) {
+        tumScoreEl.textContent = `${score.toFixed(1)} pts`;
+        tumScoreEl.style.color = score < 67.0 ? "var(--color-red)" : (score >= 88.0 ? "var(--color-green-light)" : "var(--accent-lavender)");
+      } else {
+        tumScoreEl.textContent = "-- pts";
+      }
+    }
+    if (tumScoreSubEl && ba.german_gpa !== undefined) {
+      tumScoreSubEl.textContent = `DE ${Number(ba.german_gpa).toFixed(2)} · Direct ≥ 88`;
     }
 
     if (!container) return;

@@ -292,14 +292,7 @@ const PlansLogs = {
   renderEmptySurface() {
     const mount = document.getElementById("a2uiSurfaceMount");
     if (!mount) return;
-    mount.innerHTML = `
-      <div class="monotone-card a2ui-surface a2ui-surface-idle">
-        <div class="card-label" style="margin-bottom: 6px;">A2UI DYNAMIC SURFACE // STANDBY</div>
-        <div style="font-size: 12px; color: var(--text-tertiary); line-height: 1.5;">
-          Announce a trip, outing, or vacation window in the chatbox on the left. Harness will render an interactive preview here—showing exam conflicts and day-by-day schedule changes—before anything touches your plan.
-        </div>
-      </div>
-    `;
+    mount.innerHTML = "";
   },
 
   renderA2UISurface() {

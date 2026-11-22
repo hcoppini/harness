@@ -118,13 +118,13 @@ def test_mobile_cockpit_clutter_free():
         assert ".heatmap-card,\n  #dashForecastCard" in css or ".heatmap-card" in css
 
 def test_service_worker_v6_and_controllerchange():
-    """Verify Service Worker version v6.0 and controllerchange auto-reload."""
+    """Verify Service Worker version v7.0 and controllerchange auto-reload."""
     for filename in ["sw.js", "ui/sw.js"]:
         path = Path(__file__).resolve().parent.parent / filename
         with open(path, "r", encoding="utf-8") as f:
             sw = f.read()
-        assert "harness-executive-v6.0" in sw
-        assert "?v=6.0" in sw
+        assert "harness-executive-v7.0" in sw
+        assert "?v=7.0" in sw
 
     for filename in ["index.html", "ui/index.html"]:
         path = Path(__file__).resolve().parent.parent / filename
@@ -132,7 +132,7 @@ def test_service_worker_v6_and_controllerchange():
             html = f.read()
         assert "controllerchange" in html
         assert "forceHardReload" in html
-        assert "v6.0" in html
+        assert "v7.0" in html
 
 
 def test_daily_exclusive_checkboxes_and_obsidian_ui_parity():

@@ -6264,6 +6264,36 @@ input[type="range"]::-moz-range-thumb {
   }
 }
 
+/* ==========================================================================
+   v7.0 SIGNAL-ONLY POLISH (Decluttered cards, collapsible mobile streams, safe-area)
+   ========================================================================== */
+.mobile-hud-deliv-summary {
+  list-style: none;
+  cursor: pointer;
+}
+.mobile-hud-deliv-summary::-webkit-details-marker {
+  display: none;
+}
+
+.forecast-day-card {
+  min-height: 118px;
+}
+
+.metro-grid-card {
+  min-height: 86px;
+}
+
+@media (max-width: 768px) {
+  .main-content {
+    padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  }
+  .section-header {
+    padding-top: 4px;
+    margin-bottom: 12px;
+  }
+}
+
+
 
 
 

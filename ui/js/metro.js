@@ -322,6 +322,65 @@ const MetroMap = {
     this.renderMobileHud();
   },
 
+  getAdmissionsSnapshot() {
+    const ov = window.Tum?.data || this.tumOverview || {};
+    const ba = ov.bavarian_assessment || {};
+
+    const rawGpa = ba.german_gpa !== undefined ? ba.german_gpa : ba.bavarian_gpa;
+    const rawScore = ba.total_tum_points !== undefined ? ba.total_tum_points : ba.total_score;
+    const rawSubj = ba.subject_score !== undefined ? ba.subject_score : ba.curricular_score;
+
+    const hasScore = rawScore !== undefined && rawScore !== null && Number.isFinite(Number(rawScore));
+    const totalScore = hasScore ? Number(rawScore) : null;
+    const bavGpa = rawGpa !== undefined && rawGpa !== null && Number.isFinite(Number(rawGpa)) ? Number(rawGpa).toFixed(2) : "--";
+    const polishGpa = ov.overall_gpa !== undefined && ov.overall_gpa !== null && Number.isFinite(Number(ov.overall_gpa)) ? Number(ov.overall_gpa).toFixed(2) : "--";
+    const curricularScore = rawSubj !== undefined && rawSubj !== null && Number.isFinite(Number(rawSubj)) ? Number(rawSubj).toFixed(1) : "--";
+
+    const directCutoff = Number(ba.target_direct_points || 88.0);
+    const interviewCutoff = Number(ba.target_interview_points || 67.0);
+    const distDirect = totalScore !== null ? Math.round((directCutoff - totalScore) * 10) / 10 : null;
+
+    const isDirect = totalScore !== null && totalScore >= directCutoff;
+    const isInterview = totalScore !== null && totalScore >= interviewCutoff && totalScore < directCutoff;
+
+    let statusLabel = "SYNCING";
+    let statusClass = "amber";
+    if (totalScore !== null) {
+      if (isDirect) {
+        statusLabel = "DIRECT ADMIT";
+        statusClass = "optimal";
+      } else if (isInterview) {
+        statusLabel = "INTERVIEW";
+        statusClass = "lavender";
+      } else {
+        statusLabel = "BELOW 67 CUTOFF";
+        statusClass = "amber";
+      }
+    }
+
+    const primaryAction = ba.primary_action || (
+      isDirect
+        ? "Above Direct Admit cutoff. Hold Math & CS averages."
+        : "Raise Math (2x) & CS (2x) in Study to close the gap."
+    );
+
+    return {
+      bavGpa,
+      polishGpa,
+      totalScore,
+      curricularScore,
+      directCutoff,
+      interviewCutoff,
+      distDirect,
+      isDirect,
+      isInterview,
+      statusLabel,
+      statusClass,
+      primaryAction,
+      barPct: totalScore !== null ? Math.min(100, Math.max(0, totalScore)) : 0,
+    };
+  },
+
   renderMobileHud() {
     const container = document.getElementById("mobileMetroHud");
     if (!container || !this.data || !this.data.stations) return;
@@ -339,21 +398,19 @@ const MetroMap = {
     const delivEntries = Object.entries(station.deliverables || {});
     const completedList = station.completed_deliverables || [];
     const velocity = this.getSafeVelocity(station, progressPercent);
-    const validDayOfMonth = velocity.day_of_month;
-    const validTotalDays = velocity.total_days;
-    const validElapsedPct = velocity.elapsed_pct;
+    const adm = this.getAdmissionsSnapshot();
 
     const optionsHtml = stations
       .map((s, idx) => {
         const isCur = s.id === station.id;
-        const tag = s.status === "active" ? " • ACTIVE" : (s.status === "completed" ? " ✓" : "");
-        return `<option value="${s.id}" ${isCur ? "selected" : ""}>${String(idx + 1).padStart(2, "0")}: ${s.month_label} — ${this.escapeHtml(s.name)}${tag}</option>`;
+        const tag = s.status === "active" ? " • NOW" : (s.status === "completed" ? " ✓" : "");
+        return `<option value="${s.id}" ${isCur ? "selected" : ""}>${s.month_label} — ${this.escapeHtml(s.name)}${tag}</option>`;
       })
       .join("");
 
     let delivsHtml = "";
     if (delivEntries.length === 0) {
-      delivsHtml = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 8px 0;">No active deliverables defined.</div>`;
+      delivsHtml = `<div style="font-size: 11px; color: var(--text-tertiary); padding: 6px 0;">No deliverables for this month.</div>`;
     } else {
       delivsHtml = delivEntries
         .map(([key, val]) => {
@@ -368,26 +425,19 @@ const MetroMap = {
           const unitLabel = countObj.unit || "reps";
           const itemPct = Math.min(100, Math.round((curCount / totalReq) * 100));
 
-          const targetPace = Math.round(((validDayOfMonth / validTotalDays) * totalReq) * 10) / 10;
-          const deficit = Math.round((targetPace - curCount) * 10) / 10;
-          const isBehind = deficit > 0;
-
           return `
-            <div class="mobile-hud-deliv-item ${isChecked || curCount >= totalReq ? "completed" : ""}" style="border-left: 2px solid ${lineBadgeColor};">
-              <div class="mobile-hud-deliv-top">
-                <span class="mobile-hud-stream" style="color: ${lineBadgeColor};">${this.escapeHtml(key)} STREAM</span>
-                <span class="mobile-hud-count">${curCount} / ${totalReq} ${this.escapeHtml(unitLabel)}</span>
-              </div>
-              <div class="mobile-hud-desc">${this.escapeHtml(val)}</div>
-              <div class="tum-mini-bar-track">
-                <div class="tum-mini-bar-fill" style="width: ${itemPct}%; background: ${lineBadgeColor};"></div>
-              </div>
-              ${status === "active" ? `
-                <div class="mobile-hud-pace ${isBehind ? "is-behind" : "is-optimal"}">
-                  ${isBehind ? `Target: ${targetPace} today (${deficit} ${this.escapeHtml(unitLabel)} behind)` : `On pace (+${Math.abs(Math.round((curCount - targetPace) * 10) / 10)} ahead)`}
+            <details class="mobile-hud-deliv-item ${isChecked || curCount >= totalReq ? "completed" : ""}" style="border-left: 2px solid ${lineBadgeColor};">
+              <summary class="mobile-hud-deliv-summary">
+                <div class="mobile-hud-deliv-top">
+                  <span class="mobile-hud-stream" style="color: ${lineBadgeColor};">${this.escapeHtml(key)}</span>
+                  <span class="mobile-hud-count">${curCount}/${totalReq} <span style="opacity:0.65;">${this.escapeHtml(unitLabel)}</span></span>
                 </div>
-              ` : ""}
-            </div>
+                <div class="tum-mini-bar-track" style="margin-top: 5px;">
+                  <div class="tum-mini-bar-fill" style="width: ${itemPct}%; background: ${lineBadgeColor};"></div>
+                </div>
+              </summary>
+              <div class="mobile-hud-desc" style="margin-top: 6px;">${this.escapeHtml(val)}</div>
+            </details>
           `;
         })
         .join("");
@@ -396,91 +446,56 @@ const MetroMap = {
     const prevDisabled = stationIndex === 0;
     const nextDisabled = stationIndex >= stations.length - 1;
 
-    // Live Bavarian Assessment Snapshot
-    const ov = window.Tum?.data || this.tumOverview || {};
-    const ba = ov.bavarian_assessment || {};
-    const bavGpa = Number.isFinite(Number(ba.bavarian_gpa)) ? Number(ba.bavarian_gpa).toFixed(2) : "--";
-    const totalScore = Number.isFinite(Number(ba.total_score)) ? Number(ba.total_score) : null;
-    const scorePct = totalScore !== null ? Math.min(100, Math.max(0, totalScore)) : 0;
-    const verdict = ba.admission_verdict || "Syncing Ledger...";
-
     container.innerHTML = `
+      <div class="monotone-card mobile-hud-card" style="margin-bottom: 10px;">
+        <div class="mobile-hud-adm-top">
+          <div>
+            <div class="card-label" style="margin-bottom: 2px;">TUM STAGE 1</div>
+            <div class="mobile-hud-adm-score">
+              <span>${adm.bavGpa} DE</span>
+              <span class="adm-sep">/</span>
+              <span class="adm-pts" style="color: ${adm.isDirect ? "var(--color-green-light)" : adm.isInterview ? "var(--accent-lavender)" : "var(--color-red)"};">${adm.totalScore !== null ? adm.totalScore.toFixed(1) : "--"} pts</span>
+            </div>
+          </div>
+          <button type="button" class="btn-ghost-icon" style="font-size: 10px; padding: 4px 10px;" onclick="MetroMap.openGradesLedger()">
+            Ledger &rarr;
+          </button>
+        </div>
+        <div class="tum-threshold-track" style="margin: 8px 0 6px;">
+          <div class="tum-threshold-fill ${adm.isDirect ? "is-direct" : ""}" style="width: ${adm.barPct}%;"></div>
+          <div class="tum-threshold-pin" style="left: ${adm.interviewCutoff}%;" title="67.0 Interview"></div>
+          <div class="tum-threshold-pin target" style="left: ${adm.directCutoff}%;" title="88.0 Direct Admit"></div>
+        </div>
+        <div class="mobile-hud-adm-sub">
+          <span>${this.escapeHtml(adm.primaryAction)}</span>
+          <span style="white-space: nowrap;">67 / 88</span>
+        </div>
+      </div>
+
       <div class="monotone-card mobile-hud-card">
         <div class="mobile-hud-nav">
-          <button type="button" class="btn-ghost-icon mobile-hud-nav-btn" ${prevDisabled ? 'disabled' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex - 1]?.id}')"`}>&larr; Prev</button>
+          <button type="button" class="btn-ghost-icon mobile-hud-nav-btn" ${prevDisabled ? 'disabled' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex - 1]?.id}')"`}>&larr;</button>
           <select class="mobile-hud-select" onchange="MetroMap.selectMobileStation(this.value)">
             ${optionsHtml}
           </select>
-          <button type="button" class="btn-ghost-icon mobile-hud-nav-btn" ${nextDisabled ? 'disabled' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex + 1]?.id}')"`}>Next &rarr;</button>
+          <button type="button" class="btn-ghost-icon mobile-hud-nav-btn" ${nextDisabled ? 'disabled' : `onclick="MetroMap.selectMobileStation('${stations[stationIndex + 1]?.id}')"`}>&rarr;</button>
         </div>
 
-        <div class="mobile-hud-hero-row">
-          ${this.buildRadialRingHtml(progressPercent, status === "completed" ? "var(--color-green-light)" : "var(--accent-lavender)", 76, "MILESTONE")}
-          <div class="mobile-hud-hero-meta">
-            <div class="mobile-hud-badges">
-              <span class="mono-chip lavender">${station.month_label || "2026"}</span>
-              <span class="mono-chip ${status === "active" ? "lavender" : status === "completed" ? "green" : ""}">${status === "active" ? "ACTIVE" : status.toUpperCase()}</span>
+        <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px;">
+          <div style="min-width: 0;">
+            <div style="display: flex; align-items: center; gap: 6px; margin-bottom: 2px;">
+              <span class="mono-chip lavender" style="font-size: 9px;">${station.month_label || ""}</span>
+              <span style="font-family: var(--font-mono); font-size: 10px; color: var(--text-tertiary);">Day ${velocity.day_of_month}/${velocity.total_days}</span>
             </div>
-            <h2 class="mobile-hud-title">${this.escapeHtml(station.name)}</h2>
-            <div class="mobile-hud-delta-tag ${velocity.is_behind ? "is-behind" : "is-optimal"}">
-              ${this.escapeHtml(velocity.status_text)}
-            </div>
+            <h2 class="mobile-hud-title" style="margin: 0;">${this.escapeHtml(station.name)}</h2>
+          </div>
+          <div style="font-family: var(--font-mono); font-size: 20px; font-weight: 700; color: ${status === "completed" ? "var(--color-green-light)" : "var(--accent-lavender)"}; flex-shrink: 0;">
+            ${progressPercent}%
           </div>
         </div>
 
-        <div class="mobile-hud-pace-box">
-          <div class="tum-pace-row">
-            <span>SHOULD BE (DAY ${validDayOfMonth}/${validTotalDays})</span>
-            <strong>${validElapsedPct}%</strong>
-          </div>
-          <div class="tum-mini-bar-track" style="margin-bottom: 8px;">
-            <div class="tum-mini-bar-fill" style="width: ${validElapsedPct}%; background: rgba(255, 255, 255, 0.35);"></div>
-          </div>
-          <div class="tum-pace-row">
-            <span>ACTUAL OUTPUT LOGGED</span>
-            <strong style="color: var(--accent-lavender);">${progressPercent}%</strong>
-          </div>
-          <div class="tum-mini-bar-track">
-            <div class="tum-mini-bar-fill" style="width: ${progressPercent}%; background: var(--accent-lavender);"></div>
-          </div>
-        </div>
-
-        ${station.objective ? `
-          <div class="mobile-hud-objective">
-            <div class="card-label" style="margin-bottom: 3px;">CORE OBJECTIVE</div>
-            <div>${this.escapeHtml(station.objective)}</div>
-          </div>
-        ` : ""}
-
-        <div style="margin-bottom: 12px;">
-          <div class="card-label" style="margin-bottom: 6px;">LIVE STREAM PROGRESS (AUTO FROM DAILY)</div>
-          <div style="display: flex; flex-direction: column; gap: 6px;">
-            ${delivsHtml}
-          </div>
-        </div>
-
-        <div class="mobile-hud-admissions">
-          <div class="mobile-hud-adm-top">
-            <div>
-              <div class="card-label" style="margin-bottom: 2px;">TUM STAGE 1 ADMISSIONS</div>
-              <div class="mobile-hud-adm-score">
-                <span>${bavGpa} DE</span>
-                <span class="adm-sep">/</span>
-                <span class="adm-pts">${totalScore !== null ? totalScore.toFixed(1) : "--"} pts</span>
-              </div>
-            </div>
-            <button type="button" class="btn-ghost-icon" style="font-size: 10px; padding: 4px 10px;" onclick="MetroMap.openGradesLedger()">
-              Ledger &rarr;
-            </button>
-          </div>
-          <div class="tum-threshold-track">
-            <div class="tum-threshold-fill" style="width: ${scorePct}%;"></div>
-            <div class="tum-threshold-pin" style="left: 88%;" title="88.0 pts Direct Admit Cutoff"></div>
-          </div>
-          <div class="mobile-hud-adm-sub">
-            <span>${this.escapeHtml(verdict)}</span>
-            <span>Direct Admit &ge; 88.0</span>
-          </div>
+        <div style="display: flex; flex-direction: column; gap: 6px;">
+          ${delivsHtml}
         </div>
       </div>
     `;
@@ -829,57 +844,30 @@ const MetroMap = {
       })
       .join("");
 
-    // TUM Admissions Assessment snapshot
-    const ov = window.Tum?.data || this.tumOverview || {};
-    const ba = ov.bavarian_assessment || {};
-    const hasAssessment = ba && ba.total_score !== undefined && ba.total_score !== null;
-    const bavGpa = Number.isFinite(Number(ba.bavarian_gpa)) ? Number(ba.bavarian_gpa).toFixed(2) : "--";
-    const polishGpa = Number.isFinite(Number(ov.overall_gpa)) ? Number(ov.overall_gpa).toFixed(2) : "--";
-    const totalScore = hasAssessment ? Number(ba.total_score) : null;
-    const curricularScore = Number.isFinite(Number(ba.curricular_score)) ? Number(ba.curricular_score).toFixed(1) : "--";
-    const dist88 = totalScore !== null ? Math.round((88.0 - totalScore) * 10) / 10 : null;
-    const verdict = ba.admission_verdict || (hasAssessment ? "Evaluated" : "Syncing Ledger...");
-    const isDirect = totalScore !== null && totalScore >= 88.0;
-    const isInterview = totalScore !== null && totalScore >= 72.0 && totalScore < 88.0;
-    const verdictClass = isDirect ? "optimal" : isInterview ? "lavender" : "amber";
-    const barPct = totalScore !== null ? Math.min(100, Math.max(0, totalScore)) : 0;
-
-    const deltaSign = vel.delta_pct >= 0 ? "+" : "";
-    const paceChipClass = vel.is_behind ? "amber" : "optimal";
+    // Live TUM Admissions Assessment snapshot (unified keys)
+    const adm = this.getAdmissionsSnapshot();
 
     heroEl.innerHTML = `
       <div class="tum-hero-card">
         <div class="tum-hero-card-top">
           <div>
-            <div class="tum-hero-eyebrow">WHERE I AM VS. WHERE I SHOULD BE // ${this.escapeHtml(station.month_label || "ACTIVE")}</div>
+            <div class="tum-hero-eyebrow">${this.escapeHtml(station.month_label || "ACTIVE")} &bull; DAY ${vel.day_of_month}/${vel.total_days}</div>
             <h2 class="tum-hero-title">${this.escapeHtml(station.name)}</h2>
           </div>
-          <span class="tum-pace-pill ${paceChipClass}">
-            ${vel.is_behind ? `BEHIND ${Math.abs(vel.delta_pct)}%` : `AHEAD ${deltaSign}${vel.delta_pct}%`}
+          <span class="tum-pace-pill ${progressPercent >= vel.elapsed_pct ? "optimal" : "amber"}">
+            ${progressPercent}% DONE
           </span>
         </div>
 
-        <div class="tum-hero-pace-body">
-          ${this.buildRadialRingHtml(progressPercent, vel.is_behind ? "#f59e0b" : "var(--accent-lavender)", 86, "EXECUTED")}
-          <div class="tum-hero-bars">
+        <div class="tum-hero-pace-body" style="margin-bottom: 12px;">
+          <div class="tum-hero-bars" style="width: 100%;">
             <div class="tum-pace-row">
-              <span>SHOULD BE &bull; MONTH CLOCK (DAY ${vel.day_of_month}/${vel.total_days})</span>
-              <strong>${vel.elapsed_pct}%</strong>
+              <span>MONTH PROGRESS</span>
+              <strong>${progressPercent}% <span style="opacity:0.55; font-weight:400;">/ ${vel.elapsed_pct}% clock</span></strong>
             </div>
-            <div class="tum-mini-bar-track" style="height: 5px; margin-bottom: 10px;">
-              <div class="tum-mini-bar-fill" style="width: ${vel.elapsed_pct}%; background: rgba(255, 255, 255, 0.35);"></div>
-            </div>
-
-            <div class="tum-pace-row">
-              <span>ACTUAL DELIVERABLES (${completedList.length}/${delivEntries.length} COMPLETE)</span>
-              <strong style="color: var(--accent-lavender);">${progressPercent}%</strong>
-            </div>
-            <div class="tum-mini-bar-track" style="height: 5px; margin-bottom: 8px;">
-              <div class="tum-mini-bar-fill" style="width: ${progressPercent}%; background: var(--accent-lavender);"></div>
-            </div>
-
-            <div class="tum-hero-delta-line ${vel.is_behind ? "is-behind" : "is-optimal"}">
-              ${this.escapeHtml(vel.status_text)} &bull; Checkboxes live in <strong>Daily</strong>
+            <div class="tum-threshold-track" style="height: 6px; margin-top: 6px;">
+              <div class="tum-mini-bar-fill" style="width: ${progressPercent}%; height: 100%; background: var(--accent-lavender); border-radius: 99px;"></div>
+              <div class="tum-threshold-pin" style="left: ${vel.elapsed_pct}%;" title="Month clock: ${vel.elapsed_pct}%"></div>
             </div>
           </div>
         </div>
@@ -892,56 +880,48 @@ const MetroMap = {
       <div class="tum-hero-card">
         <div class="tum-hero-card-top">
           <div>
-            <div class="tum-hero-eyebrow">TUM HEILBRONN STAGE 1 ADMISSIONS // BAVARIAN SCALE</div>
-            <h2 class="tum-hero-title">Direct Admit Standing (&ge; 88.0 pts)</h2>
+            <div class="tum-hero-eyebrow">TUM HEILBRONN STAGE 1</div>
+            <h2 class="tum-hero-title">Admissions Standing</h2>
           </div>
-          <span class="tum-pace-pill ${verdictClass}">${this.escapeHtml(verdict)}</span>
+          <span class="tum-pace-pill ${adm.statusClass}">${this.escapeHtml(adm.statusLabel)}</span>
         </div>
 
         <div class="tum-adm-kpi-row">
           <div class="tum-adm-kpi">
-            <span class="kpi-lbl">BAVARIAN GPA</span>
-            <span class="kpi-num">${bavGpa} <small>DE</small></span>
-            <span class="kpi-sub">Polish Avg: ${polishGpa}</span>
+            <span class="kpi-lbl">DE GPA</span>
+            <span class="kpi-num">${adm.bavGpa}</span>
+            <span class="kpi-sub">PL ${adm.polishGpa}</span>
           </div>
           <div class="tum-adm-kpi">
-            <span class="kpi-lbl">PROJECTED STAGE 1</span>
-            <span class="kpi-num accent">${totalScore !== null ? totalScore.toFixed(1) : "--"} <small>/ 100</small></span>
-            <span class="kpi-sub">Curricular: ${curricularScore} pts</span>
+            <span class="kpi-lbl">STAGE 1</span>
+            <span class="kpi-num accent" style="color: ${adm.isDirect ? "var(--color-green-light)" : adm.isInterview ? "var(--accent-lavender)" : "var(--color-red)"};">${adm.totalScore !== null ? adm.totalScore.toFixed(1) : "--"} <small>/ 100</small></span>
+            <span class="kpi-sub">STEM ${adm.curricularScore}</span>
           </div>
           <div class="tum-adm-kpi">
-            <span class="kpi-lbl">DISTANCE TO 88.0</span>
-            <span class="kpi-num ${isDirect ? "green" : ""}">${dist88 !== null ? (dist88 <= 0 ? `+${Math.abs(dist88).toFixed(1)}` : `-${dist88.toFixed(1)}`) : "--"} <small>pts</small></span>
-            <span class="kpi-sub">${isDirect ? "Direct Admit Zone" : "Target Cutoff Gap"}</span>
+            <span class="kpi-lbl">TO DIRECT (88)</span>
+            <span class="kpi-num ${adm.isDirect ? "green" : ""}">${adm.distDirect !== null ? (adm.distDirect <= 0 ? `+${Math.abs(adm.distDirect).toFixed(1)}` : `-${adm.distDirect.toFixed(1)}`) : "--"} <small>pts</small></span>
+            <span class="kpi-sub">${adm.isDirect ? "Safe" : "Gap"}</span>
           </div>
         </div>
 
         <div class="tum-threshold-block">
-          <div class="tum-pace-row" style="margin-bottom: 6px;">
-            <span>STAGE 1 SCORE GAUGE (0 &rarr; 100 PTS)</span>
-            <strong style="color: ${isDirect ? "var(--color-green-light)" : "var(--text-primary)"};">CUTOFF 88.0 PTS</strong>
-          </div>
           <div class="tum-threshold-track lg">
-            <div class="tum-threshold-fill ${isDirect ? "is-direct" : ""}" style="width: ${barPct}%;"></div>
-            <div class="tum-threshold-pin" style="left: 72%;" title="72.0 pts Stage 2 Interview Threshold"></div>
-            <div class="tum-threshold-pin target" style="left: 88%;" title="88.0 pts Direct Admit Cutoff"></div>
+            <div class="tum-threshold-fill ${adm.isDirect ? "is-direct" : ""}" style="width: ${adm.barPct}%;"></div>
+            <div class="tum-threshold-pin" style="left: ${adm.interviewCutoff}%;" title="67.0 pts Interview Cutoff"></div>
+            <div class="tum-threshold-pin target" style="left: ${adm.directCutoff}%;" title="88.0 pts Direct Admit Cutoff"></div>
           </div>
           <div class="tum-threshold-scale">
             <span>0</span>
-            <span style="left: 72%;">72 Interview</span>
-            <span style="left: 88%; color: var(--accent-lavender);">88 Direct</span>
+            <span style="left: ${adm.interviewCutoff}%;">67 Interview</span>
+            <span style="left: ${adm.directCutoff}%; color: var(--accent-lavender);">88 Direct</span>
             <span>100</span>
           </div>
         </div>
 
         <div class="tum-hero-adm-footer">
-          <div class="tum-hero-adm-note">
-            ${isDirect
-              ? "Standing exceeds Direct Admission cutoff. Maintain Math R (2&times;) &amp; CS (2&times;)."
-              : "Boost weighted Math R (2&times;) &amp; Informatics (2&times;) averages in Study to close gap."}
-          </div>
+          <div class="tum-hero-adm-note">${this.escapeHtml(adm.primaryAction)}</div>
           <button type="button" class="btn-ghost-icon tum-ledger-cta" onclick="MetroMap.openGradesLedger()">
-            Grades Ledger &amp; Simulator &rarr;
+            Grades &amp; Simulator &rarr;
           </button>
         </div>
       </div>
@@ -1471,20 +1451,10 @@ const MetroMap = {
           .map((b) => {
             const c = this.getStreamColor(this.normalizeStreamKey(b));
             const streamObj = this.streams.find((s) => s.id === b || s.id === this.normalizeStreamKey(b));
-            const sName = streamObj ? streamObj.name : b.toUpperCase();
-            return `<span class="metro-micro-tag" style="background: ${c}15; color: ${c}; border: 1px solid ${c}35;">${sName}</span>`;
+            const sName = streamObj ? streamObj.name : b;
+            return `<span class="metro-stream-dot-mini" title="${this.escapeHtml(sName)}" style="display:inline-block; width:7px; height:7px; border-radius:50%; background:${c};"></span>`;
           })
           .join("");
-
-        const sqList = Array.isArray(station.sidequests) ? station.sidequests : [];
-        const sqDone = Array.isArray(station.completed_sidequests)
-          ? station.completed_sidequests.filter((id) => sqList.some((q) => q.id === id)).length
-          : 0;
-        const sqTagHtml = sqList.length > 0
-          ? `<span class="metro-micro-tag" style="background: rgba(16, 185, 129, 0.12); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.32);">SIDEQUESTS ${sqDone}/${sqList.length}</span>`
-          : "";
-
-        const vel = isActive ? this.getSafeVelocity(station, progressPercent) : null;
 
         return `
           <div
@@ -1496,45 +1466,21 @@ const MetroMap = {
             onmouseleave="MetroMap.clearHighlightStationOnRail()"
           >
             <div class="metro-card-header">
-              <span class="metro-card-month">${station.month_label}:</span>
+              <span class="metro-card-month">${station.month_label}</span>
               ${chipHtml}
             </div>
             <div class="metro-card-title" title="${this.escapeHtml(station.name)}">
-              ${this.escapeHtml(station.name.toUpperCase())}
+              ${this.escapeHtml(station.name)}
             </div>
-            <div class="metro-micro-tags">
+            <div style="display: flex; align-items: center; gap: 5px; margin: 4px 0 6px;">
               ${tagsHtml}
-              ${sqTagHtml}
             </div>
-            ${
-              isActive && vel
-                ? `
-                  <div class="metro-card-active-progress">
-                    <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 8.5px;">
-                      <span style="color: var(--text-tertiary); font-weight: 600;">CLOCK: Day ${vel.day_of_month}/${vel.total_days}</span>
-                      <span style="color: rgba(255, 255, 255, 0.72); font-weight: 700;">${vel.elapsed_pct}%</span>
-                    </div>
-                    <div class="metro-progress-track">
-                      <div class="metro-progress-fill time-fill" style="width: ${vel.elapsed_pct}%;"></div>
-                    </div>
-                    <div style="display: flex; justify-content: space-between; align-items: center; font-family: var(--font-mono); font-size: 8.5px; margin-top: 2px;">
-                      <span style="color: var(--text-tertiary); font-weight: 600;">OUTPUT: ${completedList.length}/${totalDelivs}</span>
-                      <span style="color: var(--accent-lavender); font-weight: 700;">${progressPercent}%</span>
-                    </div>
-                    <div class="metro-progress-track">
-                      <div class="metro-progress-fill goals-fill" style="width: ${progressPercent}%;"></div>
-                    </div>
-                  </div>
-                `
-                : `
-                  <div class="metro-card-progress">
-                    <div class="metro-progress-track">
-                      <div class="metro-progress-fill" style="width: ${progressPercent}%;"></div>
-                    </div>
-                    <span class="metro-progress-pct">${progressPercent}%</span>
-                  </div>
-                `
-            }
+            <div class="metro-card-progress">
+              <div class="metro-progress-track">
+                <div class="metro-progress-fill ${isActive ? "goals-fill" : ""}" style="width: ${progressPercent}%;"></div>
+              </div>
+              <span class="metro-progress-pct">${progressPercent}%</span>
+            </div>
           </div>
         `;
       })

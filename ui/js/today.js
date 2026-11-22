@@ -489,23 +489,19 @@ const Today = {
       const gpaChip = gpaVal !== null && t.is_vulnerable
         ? `<span class="mono-chip rose" style="font-size: 9px; padding: 1px 5px;">Avg ${gpaVal.toFixed(1)}</span>`
         : "";
+      const topicText = (t.scope || t.title || "").trim();
       return `
         <div class="study-brief-row">
           <div style="flex: 1; min-width: 0;">
             <div style="display: flex; align-items: center; gap: 6px; flex-wrap: wrap;">
               <span style="font-family: var(--font-mono); font-size: 9.5px; font-weight: 700; color: ${roleColor};">
-                ${isNow ? "DO NOW" : "HEAD START"} &bull; ${t.allocated_minutes}M
+                ${isNow ? "DO NOW" : "HEAD START"} &bull; ${t.allocated_minutes}m
               </span>
               <strong style="font-size: 12.5px; color: var(--text-primary);">${this.escapeHtml(t.subject)}</strong>
               <span class="mono-chip ${t.days_left <= 1 ? "rose" : t.days_left <= 3 ? "amber" : ""}" style="font-size: 9px; padding: 1px 5px;">${this.escapeHtml(t.due_label || `${t.days_left}d`)}</span>
               ${gpaChip}
             </div>
-            <div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px;">
-              <strong>Topic:</strong> ${this.escapeHtml(t.scope || t.title || t.subject)}
-            </div>
-            <div style="font-size: 10.5px; color: var(--text-tertiary); margin-top: 1px;">
-              ${this.escapeHtml(t.action || "")}
-            </div>
+            ${topicText ? `<div style="font-size: 11px; color: var(--text-secondary); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;" title="${this.escapeHtml(topicText)}">${this.escapeHtml(topicText)}</div>` : ""}
           </div>
           <button
             type="button"
@@ -553,8 +549,15 @@ const Today = {
 
     if (!this.schedule || !blocksContainer) return;
 
-    if (badgeEl) badgeEl.textContent = this.schedule.key ? `SCHEDULE ${this.schedule.key.replace("C_", "")}` : "DAILY";
-    if (dayNameEl) dayNameEl.textContent = `${this.schedule.weekday || ""} • ${this.schedule.name || ""}`;
+    if (badgeEl) badgeEl.textContent = this.schedule.key ? this.schedule.key.replace("C_", "").replace("_", " ") : "DAILY";
+    if (dayNameEl) {
+      const wd = (this.schedule.weekday || "").trim();
+      let cleanName = (this.schedule.name || "").replace(/^Schedule\s+[A-Z0-9_]+:\s*/i, "").trim();
+      if (wd && cleanName.toLowerCase().startsWith(wd.toLowerCase())) {
+        cleanName = cleanName.slice(wd.length).replace(/^[\s\-:(]+/, "").replace(/\)$/, "").trim();
+      }
+      dayNameEl.textContent = cleanName ? `${wd} · ${cleanName}` : wd;
+    }
     if (descEl) descEl.textContent = this.schedule.description || "";
     this.renderDayModeSwitch();
 
@@ -689,18 +692,25 @@ const Today = {
           badgesHtml += `<span class="mono-chip rose" style="font-size: 9px; padding: 1px 6px; margin-left: 6px;">Deleted in GCal</span>`;
         }
 
-        const cutoffText = block.commute_cutoff ? ` &bull; Cutoff ${block.commute_cutoff}` : " &bull; Cutoff 16:30";
-        let compactActivity = this.escapeHtml(block.activity);
+        const cleanRawActivity = (block.activity || "")
+          .replace(/^\[[^\]]*\]\s*/g, "")
+          .replace(/^\[[^\]]*\]\s*/g, "")
+          .trim();
+        const isRedundantActivity =
+          !cleanRawActivity ||
+          cleanRawActivity.replace(/[.!?]+$/, "").toLowerCase() === (block.focus || "").replace(/[.!?]+$/, "").toLowerCase();
+
+        const cutoffText = block.commute_cutoff ? ` · Cutoff ${block.commute_cutoff}` : "";
+        let compactActivity = isRedundantActivity ? "" : this.escapeHtml(cleanRawActivity);
         if (isDeepWork) {
           if (block.is_school_dedicated) {
-            compactActivity = `${this.escapeHtml(block.activity)}${cutoffText}`;
+            const trimmed = cleanRawActivity.length > 110 ? `${cleanRawActivity.slice(0, 107)}...` : cleanRawActivity;
+            compactActivity = `${this.escapeHtml(trimmed)}${cutoffText}`;
           } else if (deliv) {
-            compactActivity = `Advances TUM '28 (${this.escapeHtml(deliv.category || "Stream")}) &bull; ${this.escapeHtml(deliv.target_spec || deliv.title || block.activity)}${cutoffText}`;
+            compactActivity = `${this.escapeHtml(deliv.target_spec || deliv.title || cleanRawActivity)}${cutoffText}`;
           } else {
-            compactActivity = `${this.escapeHtml(block.activity)}${cutoffText}`;
+            compactActivity = `${this.escapeHtml(cleanRawActivity)}${cutoffText}`;
           }
-        } else if (isTraining && physDeliv) {
-          compactActivity = `${this.escapeHtml(block.activity)} &bull; Checking off logs +1 Physical day`;
         }
 
         let actionsHtml = "";
@@ -737,7 +747,7 @@ const Today = {
                 <span>${this.escapeHtml(block.focus)}</span>
                 ${badgesHtml}
               </div>
-              <div class="routine-activity" style="font-size: 11px; color: var(--text-tertiary); line-height: 1.35;">${compactActivity}</div>
+              ${compactActivity ? `<div class="routine-activity" style="font-size: 11px; color: var(--text-tertiary); line-height: 1.35;">${compactActivity}</div>` : ""}
             </div>
             ${actionsHtml}
           </div>
