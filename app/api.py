@@ -1163,5 +1163,59 @@ class HarnessAPI:
         from app.services import gcalendar_service
         return gcalendar_service.generate_ics_feed(days_ahead=days_ahead, start_date=start_date)
 
+    # --- Self-Leveling, Material Deficit & System Diagnostics ---
 
+    def rebase_to_today(
+        self,
+        baseline_date: Optional[str] = None,
+        active_station_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        """Rebases active station pace to baseline_date and clears ghost debt without modifying grades."""
+        from app.services import leveling_service
+        res = leveling_service.rebase_to_today(
+            baseline_date=baseline_date,
+            active_station_id=active_station_id,
+        )
+        self._trigger_auto_sync()
+        return res
+
+    def get_material_deficit(self, status: Optional[str] = None) -> List[Dict[str, Any]]:
+        """Returns tracked school concept deficit items."""
+        from app.services import leveling_service
+        return leveling_service.get_material_deficit(status=status)
+
+    def add_material_deficit(
+        self,
+        subject: str,
+        topic: str,
+        priority: int = 2,
+        source_note: str = "",
+    ) -> Dict[str, Any]:
+        """Adds or updates a school concept deficit unit."""
+        from app.services import leveling_service
+        res = leveling_service.add_material_deficit(
+            subject=subject,
+            topic=topic,
+            priority=priority,
+            source_note=source_note,
+        )
+        self._trigger_auto_sync()
+        return res
+
+    def toggle_material_deficit(self, item_id: str) -> Dict[str, Any]:
+        """Toggles a school concept deficit unit between open and resolved."""
+        from app.services import leveling_service
+        res = leveling_service.toggle_material_deficit(item_id)
+        self._trigger_auto_sync()
+        return res
+
+    def get_weekly_math_slice(self, date_str: Optional[str] = None) -> Dict[str, Any]:
+        """Returns the weekly 40-exercise math split for the target date."""
+        from app.services import leveling_service
+        return leveling_service.get_weekly_math_slice(date_str=date_str)
+
+    def get_system_diagnostics(self) -> Dict[str, Any]:
+        """Returns live operational health diagnostics across DB, timetable, engine, and sync."""
+        from app.diagnostics import get_system_diagnostics
+        return get_system_diagnostics()
 

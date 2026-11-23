@@ -877,44 +877,6 @@ def advance_station(station_id: str, pass_over_unfinished: bool = True) -> Dict[
         return {"success": False, "error": str(e)}
 
 
-def toggle_station_sidequest(station_id: str, sidequest_id: str) -> Dict[str, Any]:
-    """Toggles completion of an optional Sidequest on a Metro station without affecting required station %."""
-    roadmap_file = DATA_DIR / "metro_roadmap.json"
-    if not roadmap_file.exists():
-        return {"success": False, "error": "Roadmap file not found"}
-
-    try:
-        with open(roadmap_file, "r", encoding="utf-8") as f:
-            data = json.load(f)
-
-        target_station = next((s for s in data.get("stations", []) if s.get("id") == station_id), None)
-        if not target_station:
-            return {"success": False, "error": f"Station {station_id} not found"}
-
-        completed_sq = list(target_station.get("completed_sidequests") or [])
-        if sidequest_id in completed_sq:
-            completed_sq.remove(sidequest_id)
-            is_completed = False
-        else:
-            completed_sq.append(sidequest_id)
-            is_completed = True
-
-        target_station["completed_sidequests"] = completed_sq
-        with open(roadmap_file, "w", encoding="utf-8") as f:
-            json.dump(data, f, indent=2, ensure_ascii=False)
-
-        return {
-            "success": True,
-            "station_id": station_id,
-            "sidequest_id": sidequest_id,
-            "is_completed": is_completed,
-            "completed_sidequests": completed_sq,
-            "total_sidequests": len(target_station.get("sidequests") or []),
-        }
-    except Exception as e:
-        return {"success": False, "error": str(e)}
-
-
 def pass_over_station_deliverable(station_id: str, deliverable_key: str) -> Dict[str, Any]:
     """Toggles a deliverable as passed over / deferred for a station.
     Allows passing over items that could not be completed without blocking milestone progress.

@@ -175,13 +175,13 @@ def test_post_exam_suppression_on_test_day(clean_db):
     afternoon SGH Library deep work must NOT tell the user to study for the test they already took.
     It must automatically pivot to the active TUM Roadmap deliverable.
     """
-    exam_day = "2026-09-28"  # Monday
+    exam_day = "2026-09-30"  # Wednesday (Schedule A_WED with SGH Library)
 
     cursor = clean_db.cursor()
     cursor.execute(
         """
         INSERT INTO school_exams (subject, title, exam_date, scope, completed)
-        VALUES ('Informatyka R', 'Sprawdzian: Złożoność Obliczeniowa', '2026-09-28', 'Big-O', 0)
+        VALUES ('Informatyka R', 'Sprawdzian: Złożoność Obliczeniowa', '2026-09-30', 'Big-O', 0)
         """
     )
     clean_db.commit()

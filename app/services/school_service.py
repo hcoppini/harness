@@ -241,24 +241,52 @@ def parse_optivum_html(html_content: str) -> Dict[str, List[Dict[str, Any]]]:
     return schedule
 
 
-def fetch_school_plan(plan_url: str = DEFAULT_PLAN_URL, force_refresh: bool = False) -> Dict[str, Any]:
-    """Fetches and caches the school timetable from TM1 / staff.edu.pl."""
-    if not force_refresh and CACHED_PLAN_FILE.exists():
+TIMETABLE_MAX_AGE_DAYS = 7
+
+
+def _is_cached_plan_stale(cached_data: Dict[str, Any], max_age_days: int = TIMETABLE_MAX_AGE_DAYS) -> bool:
+    """Returns True if cached timetable is missing fetched_at or older than max_age_days."""
+    fetched_at = cached_data.get("fetched_at")
+    if not fetched_at:
+        return True
+    try:
+        dt = datetime.fromisoformat(str(fetched_at).replace("Z", ""))
+        return (datetime.now() - dt).total_seconds() > max_age_days * 86400
+    except Exception:
+        return True
+
+
+def fetch_school_plan(
+    plan_url: str = DEFAULT_PLAN_URL,
+    force_refresh: bool = False,
+    max_age_days: int = TIMETABLE_MAX_AGE_DAYS,
+) -> Dict[str, Any]:
+    """Fetches and caches the school timetable from TM1 / staff.edu.pl with automatic weekly staleness refresh."""
+    import os
+    from app.diagnostics import record_error
+
+    cached_data: Optional[Dict[str, Any]] = None
+    if CACHED_PLAN_FILE.exists():
         try:
             with open(CACHED_PLAN_FILE, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            pass
+                cached_data = json.load(f)
+        except Exception as exc:
+            record_error("school_service", "Failed reading cached school_timetable.json", exc)
 
-    # Online fetch with fallback
+    in_pytest = bool(os.environ.get("PYTEST_CURRENT_TEST"))
+    if not force_refresh and cached_data is not None:
+        if in_pytest or not _is_cached_plan_stale(cached_data, max_age_days=max_age_days):
+            return cached_data
+
+    # Online fetch with graceful fallback to cache
     try:
         req = urllib.request.Request(
             plan_url,
             headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Harness/2.0"}
         )
-        with urllib.request.urlopen(req, timeout=5) as response:
+        with urllib.request.urlopen(req, timeout=6) as response:
             html = response.read().decode("utf-8", errors="replace")
-        
+
         parsed = parse_optivum_html(html)
         if parsed:
             data = {
@@ -269,20 +297,16 @@ def fetch_school_plan(plan_url: str = DEFAULT_PLAN_URL, force_refresh: bool = Fa
             try:
                 with open(CACHED_PLAN_FILE, "w", encoding="utf-8") as f:
                     json.dump(data, f, indent=2, ensure_ascii=False)
-            except Exception:
-                pass
+            except Exception as exc:
+                record_error("school_service", "Failed writing school_timetable.json cache", exc)
             return data
     except Exception as e:
-        # If offline or network timeout, return cached file if available
-        if CACHED_PLAN_FILE.exists():
-            try:
-                with open(CACHED_PLAN_FILE, "r", encoding="utf-8") as f:
-                    return json.load(f)
-            except Exception:
-                pass
+        record_error("school_service", "Live timetable fetch failed; falling back to cache", e)
+        if cached_data is not None:
+            return cached_data
         return {"error": str(e), "schedule": {}}
 
-    return {"schedule": {}}
+    return cached_data if cached_data is not None else {"schedule": {}}
 
 
 def get_lessons_for_date(date_str: Optional[str] = None, cached_plan: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:

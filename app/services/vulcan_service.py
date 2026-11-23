@@ -826,20 +826,24 @@ def sync_vulcan_data(
         scope = e.get("scope", "")
         weight = int(e.get("weight", 2))
 
+        def _canon(txt: str) -> str:
+            return re.sub(r"[^\w]+", "", (txt or "").lower())
+
+        canon_subj = _canon(subj)
+        canon_title = _canon(title)
+        canon_scope = _canon(scope)
         cursor.execute(
-            """
-            SELECT id FROM school_exams 
-            WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) 
-              AND (
-                LOWER(TRIM(title)) = LOWER(TRIM(?))
-                OR (scope != '' AND LOWER(TRIM(scope)) = LOWER(TRIM(?)))
-              )
-              AND exam_date = ?
-            ORDER BY id ASC
-            """,
-            (subj, title, scope, exam_date),
+            "SELECT id, subject, title, scope FROM school_exams WHERE exam_date = ? ORDER BY id ASC",
+            (exam_date,),
         )
-        existing_exams = cursor.fetchall()
+        existing_exams = [
+            r for r in cursor.fetchall()
+            if _canon(r["subject"]) == canon_subj and (
+                _canon(r["title"]) == canon_title
+                or (canon_scope and _canon(r["scope"]) == canon_scope)
+                or (len(canon_title) >= 10 and (canon_title in _canon(r["title"]) or _canon(r["title"]) in canon_title))
+            )
+        ]
         if not existing_exams:
             cursor.execute(
                 """
@@ -869,17 +873,17 @@ def sync_vulcan_data(
         prio = int(h.get("priority", 1))
         notes = h.get("notes", "")
 
+        canon_hw_subj = re.sub(r"[^\w]+", "", (subj or "").lower())
+        canon_hw_title = re.sub(r"[^\w]+", "", (title or "").lower())
         cursor.execute(
-            """
-            SELECT id FROM homework_items 
-            WHERE LOWER(TRIM(subject)) = LOWER(TRIM(?)) 
-              AND LOWER(TRIM(title)) = LOWER(TRIM(?)) 
-              AND due_date = ?
-            ORDER BY id ASC
-            """,
-            (subj, title, due_date),
+            "SELECT id, subject, title FROM homework_items WHERE due_date = ? ORDER BY id ASC",
+            (due_date,),
         )
-        existing_hw = cursor.fetchall()
+        existing_hw = [
+            r for r in cursor.fetchall()
+            if re.sub(r"[^\w]+", "", (r["subject"] or "").lower()) == canon_hw_subj
+            and re.sub(r"[^\w]+", "", (r["title"] or "").lower()) == canon_hw_title
+        ]
         if not existing_hw:
             cursor.execute(
                 """

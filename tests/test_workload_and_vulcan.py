@@ -56,11 +56,11 @@ def test_workload_governor_cruise_vs_surge(test_db):
 
 
 def test_adaptive_schedule_synthesis(test_db):
-    test_date = "2026-09-14"  # Monday (Schedule A_MON with SGH Library)
+    test_date = "2026-09-16"  # Wednesday (Schedule A_WED with SGH Library + Boxing)
     vulcan_service.sync_vulcan_data(client_date=test_date, conn=test_db)
 
     # Base schedule
-    base_sched = today_service.get_schedule_for_date("2026-09-14", conn=test_db)
+    base_sched = today_service.get_schedule_for_date("2026-09-16", conn=test_db)
     assert "workload" in base_sched
     assert base_sched["workload"]["mode"] == "SURGE"
 
@@ -328,12 +328,12 @@ def test_exam_day_afternoon_sgh_never_assigns_prep_for_today_exam(test_db):
     """Verifies that when an exam is scheduled for today (taken in morning school hours),
     the afternoon SGH Deep Work block does NOT assign prep for that exam."""
     from app.services import homework_service
-    test_date = "2026-09-21"  # Monday (Schedule A_MON)
+    test_date = "2026-09-23"  # Wednesday (Schedule A_WED with SGH Library)
 
     # CS exam occurred today (morning)
-    homework_service.add_exam("Informatyka", "Sprawdzian: Podstawy programowania", "2026-09-21", conn=test_db)
-    # Next exam is in 5 days (Geografia on Oct 02 is far, or Fizyka on 2026-09-26)
-    homework_service.add_exam("Fizyka", "Sprawdzian: Termodynamika", "2026-09-26", conn=test_db)
+    homework_service.add_exam("Informatyka", "Sprawdzian: Podstawy programowania", "2026-09-23", conn=test_db)
+    # Next exam is in 5 days
+    homework_service.add_exam("Fizyka", "Sprawdzian: Termodynamika", "2026-09-28", conn=test_db)
 
     sched = today_service.get_schedule_for_date(test_date, conn=test_db)
     deep_block = next((b for b in sched["blocks"] if b.get("type") == "deep_work"), None)
@@ -353,12 +353,12 @@ def test_acute_defense_single_nearest_exam_dominance(test_db):
     pausing TUM roadmap deliverables, and synchronizes phase durations.
     """
     from app.services import homework_service
-    test_date = "2026-09-28"  # Monday (Schedule A_MON)
+    test_date = "2026-09-30"  # Wednesday (Schedule A_WED)
 
     # Exam 1: Chemia in 1 day
-    homework_service.add_exam("Chemia", "Kartkówka: Alkany", "2026-09-29", scope="Alkany, izomeria", conn=test_db)
+    homework_service.add_exam("Chemia", "Kartkówka: Alkany", "2026-10-01", scope="Alkany, izomeria", conn=test_db)
     # Exam 2: Fizyka in 3 days
-    homework_service.add_exam("Fizyka", "Sprawdzian: Termodynamika", "2026-10-01", scope="Praca gazu", conn=test_db)
+    homework_service.add_exam("Fizyka", "Sprawdzian: Termodynamika", "2026-10-03", scope="Praca gazu", conn=test_db)
 
     sched = today_service.get_schedule_for_date(test_date, conn=test_db)
     deep_block = next((b for b in sched["blocks"] if b.get("type") == "deep_work"), None)
@@ -377,7 +377,7 @@ def test_acute_defense_single_nearest_exam_dominance(test_db):
     assert len(phases) == 3
     total_phase_min = sum(p["duration_min"] for p in phases)
     assert total_phase_min == deep_block["net_minutes"]
-    assert deep_block["commute_cutoff"] == "15:30"
+    assert deep_block["commute_cutoff"] == "16:15"
 
     # Descriptions must reference their exact duration minutes
     for p in phases:
@@ -418,7 +418,7 @@ def test_pure_cruise_3_pillar_pipeline(test_db):
     Monday Boxing day caps cognitive work at the realistic 60m window (55m net),
     while phases cleanly sum to net_minutes and bind the active TUM deliverable.
     """
-    test_date = "2026-11-02"  # Monday, clear academic horizon
+    test_date = "2026-11-04"  # Wednesday (Boxing + 60m deep work), clear academic horizon
 
     sched = today_service.get_schedule_for_date(test_date, conn=test_db)
     deep_block = next((b for b in sched["blocks"] if b.get("type") == "deep_work"), None)
@@ -678,7 +678,7 @@ def test_exam_week_study_brief_four_tests_allocation(test_db):
     Harness must rank all 4 tests, allocate tonight's 85m budget across at most 2 targets
     showing exact topics/scopes, park later tests, and bind them into plan_phases.
     """
-    tue_date = "2026-11-17"
+    tue_date = "2026-11-19"
     # Vulnerable low GPA in Fizyka & Informatyka
     test_db.execute(
         "INSERT INTO tum_grade_entries (subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average) VALUES ('Fizyka', 1, '1', 1.0, 1.0, 'Bieżące', 'termodynamika', '2026-10-05', 1)"
@@ -686,10 +686,10 @@ def test_exam_week_study_brief_four_tests_allocation(test_db):
     test_db.execute(
         "INSERT INTO tum_grade_entries (subject, semester, raw_input, numeric_value, weight, category, description, date, counts_in_average) VALUES ('Informatyka', 1, '3', 3.0, 1.0, 'Bieżące', 'C++', '2026-09-23', 1)"
     )
-    homework_service.add_exam("Język polski", "Poprawa - Rozprawka", "2026-11-18", scope="Wstęp, teza, argument, przykład, kontekst", conn=test_db)
-    homework_service.add_exam("Fizyka", "Sprawdzian: Elektrostatyka", "2026-11-19", scope="Prawo Coulomba, pole elektryczne", conn=test_db)
-    homework_service.add_exam("Język niemiecki", "Kartkówka: Pogoda", "2026-11-20", scope="Słownictwo pogoda", conn=test_db)
-    homework_service.add_exam("Informatyka", "Sprawdzian: NWD/NWW", "2026-11-23", scope="Funkcje i algorytmy NWD, NWW", conn=test_db)
+    homework_service.add_exam("Język polski", "Poprawa - Rozprawka", "2026-11-20", scope="Wstęp, teza, argument, przykład, kontekst", conn=test_db)
+    homework_service.add_exam("Fizyka", "Sprawdzian: Elektrostatyka", "2026-11-21", scope="Prawo Coulomba, pole elektryczne", conn=test_db)
+    homework_service.add_exam("Język niemiecki", "Kartkówka: Pogoda", "2026-11-22", scope="Słownictwo pogoda", conn=test_db)
+    homework_service.add_exam("Informatyka", "Sprawdzian: NWD/NWW", "2026-11-25", scope="Funkcje i algorytmy NWD, NWW", conn=test_db)
     test_db.commit()
 
     sched = today_service.get_schedule_for_date(tue_date, conn=test_db)

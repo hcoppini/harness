@@ -446,6 +446,13 @@ def init_db(db_path: Optional[Path] = None) -> None:
     except Exception as e:
         print(f"Warning: travel_windows table init notice: {e}")
 
+    # 12. School Material Deficit Ledger
+    try:
+        from app.services.leveling_service import ensure_material_deficit_table
+        ensure_material_deficit_table(conn)
+    except Exception as e:
+        print(f"Warning: material_deficit table init notice: {e}")
+
     conn.commit()
     conn.close()
 

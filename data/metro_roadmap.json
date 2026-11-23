@@ -99,7 +99,7 @@
       "id": "nov-2026",
       "date": "2026-11",
       "month_label": "NOV '26",
-      "name": "Sem 1 Grade Rescue (Recalibrated)",
+      "name": "Clean Slate Reset (Nov 24–30)",
       "phase": "Phase 1: Year 3 Liceum",
       "is_major": true,
       "status": "active",
@@ -109,10 +109,10 @@
         "sigg",
         "physical"
       ],
-      "objective": "Defend acute Nov exams (Informatyka, Niemiecki, Math Trygonometria) + lock 140g protein floor. JetBrains triggers upon Codeforces invite.",
+      "objective": "First & final leveling from Nov 24: check 100% of remaining Nov boxes — defend Tue Niemiecki & Fri Math Trygonometria, clear Week 1 (40 math exercises), and restore 2x Gym + 2x Boxing.",
       "deliverables": {
-        "Academics": "Acute Exam Defense: pass/ace Nov tests (Mon Informatyka, Tue Niemiecki, Fri Matematyka trygonometria). Complete 18 targeted paper-and-ink problems.",
-        "Physical": "140g Daily Protein Floor + Sunday Run & Boxing resumption (9 days remaining in Nov)."
+        "Academics": "Week 1 Math Homework (40 exercises across Tue–Sat: 5/8/9/9/9) + Tue Niemiecki (Kapitel 1) & Fri Matematyka (Trygonometria) defense.",
+        "Physical": "7-Day Floor (Nov 24–30): 140g Daily Protein + Tue/Thu Gym resumption + Wed Boxing."
       },
       "sidequests": [
         {
@@ -137,19 +137,20 @@
           "xp_label": "LANGUAGE"
         }
       ],
-      "next_action": "Mon Informatyka (NWD/NWW/fractions) -> Tue Niemiecki (open-book) -> Fri Matematyka (Trygonometria).",
+      "next_action": "Tue Nov 24 Niemiecki (Kapitel 1) + Gym Day 1 + 19:00 Online Math -> Fri Nov 27 Matematyka (Trygonometria) -> 40/40 Math exercises by Sat.",
       "deliverable_counts": {
         "Academics": {
           "count": 0,
-          "total": 18,
-          "unit": "sessions"
+          "total": 40,
+          "unit": "exercises"
         },
         "Physical": {
-          "count": 4,
-          "total": 16,
-          "unit": "sessions"
+          "count": 0,
+          "total": 7,
+          "unit": "days"
         }
-      }
+      },
+      "baseline_date": "2026-11-24"
     },
     {
       "id": "dec-2026",
@@ -167,8 +168,8 @@
       ],
       "objective": "Lock Semester 1 proposed grades cleanly before Dec 23 holiday break; shift to Break Sprint programming once school pauses.",
       "deliverables": {
-        "Academics": "Finalize Semester 1 proposed grades: raise Math & Physics out of danger and protect 4.0+ in core subjects.",
-        "Physical": "Maintain 4x/wk Boxing & Gym anchor across pre-holiday weeks."
+        "Academics": "Maintain 40 math exercises/wk + clear School Material Deficit units (Math Okręgi/Tożsamości, CS C++ Loops/Functions, Physics) & defend Dec 11 Geografia.",
+        "Physical": "Maintain 2x Boxing (Mon/Wed) + 2x Gym (Tue/Thu) anchor across pre-holiday weeks."
       },
       "sidequests": [
         {

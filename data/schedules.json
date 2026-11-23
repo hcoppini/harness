@@ -1,11 +1,39 @@
 {
+  "weekly_commitments": {
+    "math_extra_classes": [
+      {
+        "id": "math_matura_mon",
+        "day": "Monday",
+        "time": "15:00 – 16:00",
+        "title": "Online Matura Math Class #1 (Home)",
+        "mode": "online_home",
+        "weekly_homework_exercises": 20
+      },
+      {
+        "id": "math_extra_tue",
+        "day": "Tuesday",
+        "time": "19:00 – 20:00",
+        "title": "Online Math Class #2 (Home)",
+        "mode": "online_home",
+        "weekly_homework_exercises": 20
+      }
+    ],
+    "math_homework_weekly_total": 40,
+    "math_homework_daily_splits": {
+      "Tuesday": 5,
+      "Wednesday": 8,
+      "Thursday": 9,
+      "Friday": 9,
+      "Saturday": 9
+    }
+  },
   "schedules": {
     "A_MON": {
-      "name": "Schedule A: Monday (Focused Study + Boxing)",
+      "name": "Schedule A: Monday (Online Matura Math + Boxing)",
       "days": [
         "Monday"
       ],
-      "description": "Late start (08:50). Realistic 60m focused school study after lessons, then comfortable buffer before 2x/wk Boxing.",
+      "description": "Late start (08:50). Head straight home after school for 15:00 Online Matura Math (1h, +20 exercises/wk), real meal, then 17:20 Boxing.",
       "blocks": [
         {
           "time": "07:15 – 08:00",
@@ -16,19 +44,26 @@
         {
           "time": "08:50 – 14:15",
           "focus": "Liceum",
-          "activity": "Physics, Polish, CS (2h), Math (2h). Complete minor homework during breaks.",
+          "activity": "Physics, Polish, CS (2h), Math (2h). Complete minor items during breaks.",
           "type": "school"
         },
         {
-          "time": "14:30 – 15:30",
-          "focus": "SGH Library / Home: Focused Study (60m)",
-          "activity": "60m focused clearance: nearest test / Math gaps or homework before boxing.",
-          "type": "deep_work"
+          "time": "14:15 – 14:55",
+          "focus": "Commute Home (Direct)",
+          "activity": "40 min direct commute home to set up quiet desk before 15:00 online call.",
+          "type": "chore"
         },
         {
-          "time": "15:30 – 17:15",
-          "focus": "Commute Home, Meal & Boxing Prep",
-          "activity": "40 min commute home, real meal, pack boxing bag without rushing.",
+          "time": "15:00 – 16:00",
+          "focus": "Online Matura Math Class #1 (Home, 60m)",
+          "activity": "Live online Matura math session at home (+20 exercises assigned for Tue–Sat split).",
+          "type": "class",
+          "protected": true
+        },
+        {
+          "time": "16:00 – 17:15",
+          "focus": "Meal, Decompress & Boxing Prep",
+          "activity": "Full lunch/meal, 15m mental reset, pack boxing bag without rushing.",
           "type": "chore"
         },
         {
@@ -40,7 +75,7 @@
         {
           "time": "20:30/21:00 – 21:45",
           "focus": "Nutrition & Shower",
-          "activity": "Post-workout dinner, protein, hot shower.",
+          "activity": "Post-workout dinner, protein floor (140g), hot shower.",
           "type": "nutrition"
         },
         {
@@ -57,12 +92,77 @@
         }
       ]
     },
+    "B_TUE": {
+      "name": "Schedule B: Tuesday (Afternoon Gym + Online Math)",
+      "days": [
+        "Tuesday"
+      ],
+      "description": "School ends 14:15 (no Religia). Afternoon Gym Day 1, dinner, 40m Math Slice #1 (5 ex), then 19:00 Online Math at home.",
+      "blocks": [
+        {
+          "time": "06:35 – 07:20",
+          "focus": "Launch & Commute",
+          "activity": "Breakfast and 40 min commute for 08:00 start.",
+          "type": "routine"
+        },
+        {
+          "time": "08:00 – 14:15",
+          "focus": "Liceum",
+          "activity": "Bio, Polish (2h), German/CS, Chem, Homeroom, English (ends 14:15, no Religia).",
+          "type": "school"
+        },
+        {
+          "time": "14:15 – 15:15",
+          "focus": "Commute Home & Pre-Workout",
+          "activity": "40 min commute home, quick snack, change for gym.",
+          "type": "chore"
+        },
+        {
+          "time": "15:30 – 16:40",
+          "focus": "Gym (60 min) — Day 1: Posterior Chain",
+          "activity": "Posterior Chain & Horizontal Power (Protocol in Harness Body tab).",
+          "type": "training"
+        },
+        {
+          "time": "16:45 – 18:10",
+          "focus": "Shower, Dinner & Recovery",
+          "activity": "Post-workout high-protein dinner, shower, calm reset before evening study.",
+          "type": "nutrition"
+        },
+        {
+          "time": "18:15 – 18:55",
+          "focus": "Home: Focused Study & Math Slice #1 (40m)",
+          "activity": "Math Homework Slice #1 (5/40 exercises from Monday set) or urgent Wed test check.",
+          "type": "deep_work",
+          "math_exercises_target": 5
+        },
+        {
+          "time": "19:00 – 20:00",
+          "focus": "Online Math Class #2 (Home, 60m)",
+          "activity": "Live online math class at home (+20 exercises assigned for Wed–Sat split).",
+          "type": "class",
+          "protected": true
+        },
+        {
+          "time": "20:00 – 22:45",
+          "focus": "Free Time (2h 45m)",
+          "activity": "Zero forced night study. Guilt-free evening to decompress.",
+          "type": "rest"
+        },
+        {
+          "time": "22:45 – 06:45",
+          "focus": "Sleep (8 hrs)",
+          "activity": "Rest.",
+          "type": "sleep"
+        }
+      ]
+    },
     "A_WED": {
       "name": "Schedule A: Wednesday (Focused Study + Boxing)",
       "days": [
         "Wednesday"
       ],
-      "description": "School ends at 15:05. Tight 60m focused study window before commute & Boxing.",
+      "description": "School ends at 15:05. Tight 60m focused study window (Math Slice #2: 8 ex / test prep) before commute & Boxing.",
       "blocks": [
         {
           "time": "06:35 – 07:20",
@@ -79,8 +179,9 @@
         {
           "time": "15:15 – 16:15",
           "focus": "SGH Library / Home: Focused Study (60m)",
-          "activity": "60m targeted prep on upcoming test / Math catch-up before heading home.",
-          "type": "deep_work"
+          "activity": "60m focused block: Math Homework Slice #2 (8/40 exercises) + upcoming test defense.",
+          "type": "deep_work",
+          "math_exercises_target": 8
         },
         {
           "time": "16:15 – 17:15",
@@ -114,58 +215,12 @@
         }
       ]
     },
-    "A_FRI": {
-      "name": "Schedule A: Friday (Coding & Weekend Kickoff)",
+    "B_THU": {
+      "name": "Schedule B: Thursday (Focused Study + Gym Day 2)",
       "days": [
-        "Friday"
-      ],
-      "description": "School ends at 14:15. Max 90m focused wrap-up / JetBrains Club, then 100% free Friday evening.",
-      "blocks": [
-        {
-          "time": "06:35 – 07:20",
-          "focus": "Launch & Commute",
-          "activity": "Wake up, breakfast, commute to school for 08:00 start.",
-          "type": "routine"
-        },
-        {
-          "time": "08:00 – 14:15",
-          "focus": "Liceum",
-          "activity": "Polish, CS, Geo, Health, Math, German, PE.",
-          "type": "school"
-        },
-        {
-          "time": "14:30 – 16:00",
-          "focus": "SGH Library / Home: JetBrains Club & Wrap-Up (90m)",
-          "activity": "Weekend homework/test triage or JetBrains Youth Coding Club / CS Sidequest.",
-          "type": "deep_work"
-        },
-        {
-          "time": "16:00 – 16:45",
-          "focus": "Commute Home & Chores",
-          "activity": "40 min commute home, unpack for weekend.",
-          "type": "chore"
-        },
-        {
-          "time": "16:45 – 22:45",
-          "focus": "Weekend Kickoff Free Time",
-          "activity": "Zero workouts. Guilt-free relaxation, gaming, friends, or optional sidequests.",
-          "type": "rest"
-        },
-        {
-          "time": "22:45 – 07:30",
-          "focus": "Sleep (8.5 hrs)",
-          "activity": "Deep weekend recovery.",
-          "type": "sleep"
-        }
-      ]
-    },
-    "B": {
-      "name": "Schedule B: Gym & TUM Sprint (1.5h Cap)",
-      "days": [
-        "Tuesday",
         "Thursday"
       ],
-      "description": "School ends 14:15. Realistic 1.5h focused study ceiling, followed by commute, 50m gym lift, and completely free evening.",
+      "description": "School ends 14:15. 90m max study cap (Math Slice #3: 9 ex + test/deficit prep), commute, Gym Day 2, free evening.",
       "blocks": [
         {
           "time": "06:35 – 07:20",
@@ -176,14 +231,15 @@
         {
           "time": "08:00 – 14:15",
           "focus": "Liceum",
-          "activity": "Focus in class; finish easy items between lessons.",
+          "activity": "Math, Physics, English (2h), CS, PE (2h). Finish quick notes between lessons.",
           "type": "school"
         },
         {
           "time": "14:30 – 16:00",
-          "focus": "SGH Library / Home: Focused Study (1.5h Max)",
-          "activity": "90m cap: class Math catch-up + upcoming tests (optional Sidequest only if horizon is clear).",
-          "type": "deep_work"
+          "focus": "SGH Library / Home: Focused Study (90m Max)",
+          "activity": "90m cap: Math Homework Slice #3 (9/40 exercises) + Friday exam / Material Deficit repair.",
+          "type": "deep_work",
+          "math_exercises_target": 9
         },
         {
           "time": "16:00 – 16:55",
@@ -193,8 +249,8 @@
         },
         {
           "time": "17:45 – 18:45",
-          "focus": "Gym (50–60 min)",
-          "activity": "Tue: Posterior Chain / Thu: Unilateral & Pull (Protocol in Harness Body tab).",
+          "focus": "Gym (60 min) — Day 2: Unilateral & Pull",
+          "activity": "Unilateral & Pull (Protocol in Harness Body tab).",
           "type": "training"
         },
         {
@@ -217,12 +273,58 @@
         }
       ]
     },
+    "A_FRI": {
+      "name": "Schedule A: Friday (Coding & Weekend Kickoff)",
+      "days": [
+        "Friday"
+      ],
+      "description": "School ends at 14:15. Max 90m wrap-up (Math Slice #4: 9 ex + JetBrains Club), then 100% free Friday evening.",
+      "blocks": [
+        {
+          "time": "06:35 – 07:20",
+          "focus": "Launch & Commute",
+          "activity": "Wake up, breakfast, commute to school for 08:00 start.",
+          "type": "routine"
+        },
+        {
+          "time": "08:00 – 14:15",
+          "focus": "Liceum",
+          "activity": "Polish, CS, Geo, Health, Math, German, PE.",
+          "type": "school"
+        },
+        {
+          "time": "14:30 – 16:00",
+          "focus": "SGH Library / Home: Math Slice #4 & JetBrains (90m)",
+          "activity": "Math Homework Slice #4 (9/40 exercises) + JetBrains Youth Coding Club / weekend triage.",
+          "type": "deep_work",
+          "math_exercises_target": 9
+        },
+        {
+          "time": "16:00 – 16:45",
+          "focus": "Commute Home & Chores",
+          "activity": "40 min commute home, unpack for weekend.",
+          "type": "chore"
+        },
+        {
+          "time": "16:45 – 22:45",
+          "focus": "Weekend Kickoff Free Time",
+          "activity": "Zero workouts. Guilt-free relaxation, gaming, friends, or optional sidequests.",
+          "type": "rest"
+        },
+        {
+          "time": "22:45 – 07:30",
+          "focus": "Sleep (8.5 hrs)",
+          "activity": "Deep weekend recovery.",
+          "type": "sleep"
+        }
+      ]
+    },
     "C_SAT": {
       "name": "Schedule C: Saturday (Fresh Morning Block)",
       "days": [
         "Saturday"
       ],
-      "description": "Optional 5k Zone 2 Run, then 1.5h catch-up or Sidequest sprint. Afternoon and night 100% open.",
+      "description": "Optional 5k Zone 2 Run, then 90m morning closeout (Math Slice #5: final 9 ex -> 40/40 done + Material Deficit). Afternoon/night 100% free.",
       "blocks": [
         {
           "time": "09:30 – 10:15",
@@ -232,9 +334,10 @@
         },
         {
           "time": "11:00 – 12:30",
-          "focus": "TUM Deep Work (90m)",
-          "activity": "Next week test preview, Math catch-up, or optional Coding Sidequest.",
-          "type": "deep_work"
+          "focus": "TUM Deep Work & Math Closeout (90m)",
+          "activity": "Math Homework Slice #5 (final 9/40 exercises) + 1 Material Deficit unit / next week preview.",
+          "type": "deep_work",
+          "math_exercises_target": 9
         },
         {
           "time": "12:30 onwards",
@@ -260,7 +363,7 @@
         {
           "time": "18:00 – 19:00",
           "focus": "Weekly Prep",
-          "activity": "Chores, verify the upcoming week in Harness, pack your bags.",
+          "activity": "Confirm 40/40 math exercises checked, review upcoming Vulcan week in Harness, pack bags.",
           "type": "routine"
         },
         {

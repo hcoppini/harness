@@ -757,6 +757,23 @@ def get_station_pace_velocity(
     day_of_month = target_dt.day
     _, total_days_in_month = calendar.monthrange(target_dt.year, target_dt.month)
 
+    # Self-leveling baseline anchor: if station was rebased mid-month, measure pace
+    # fairly over [baseline_day .. total_days_in_month] instead of [1 .. total_days_in_month].
+    baseline_date_str = None
+    elapsed_ratio = (day_of_month / total_days_in_month) if total_days_in_month > 0 else 0.0
+    try:
+        from app.services import leveling_service
+        b_str = leveling_service.get_station_baseline_date(station_id)
+        if b_str:
+            b_dt = datetime.strptime(b_str[:10], "%Y-%m-%d")
+            if b_dt.year == target_dt.year and b_dt.month == target_dt.month:
+                baseline_date_str = b_str[:10]
+                span_days = max(1, total_days_in_month - b_dt.day + 1)
+                elapsed_days = max(0, target_dt.day - b_dt.day)
+                elapsed_ratio = min(1.0, elapsed_days / span_days)
+    except Exception:
+        pass
+
     deliverables = get_station_deliverables(station_id, conn=conn)
 
     pace_items = []
@@ -768,7 +785,7 @@ def get_station_pace_velocity(
     for d in deliverables:
         total = d["total_required"]
         comp = d["completed_count"]
-        target_pace = (day_of_month / total_days_in_month) * total
+        target_pace = elapsed_ratio * total
         delta = comp - target_pace
 
         is_behind = comp < target_pace
@@ -804,10 +821,11 @@ def get_station_pace_velocity(
         status_text = f"Pace Velocity: Optimal (+{abs(round(avg_delta, 1))})"
         badge_variant = "optimal"
 
-    elapsed_pct = min(100, max(0, round((day_of_month / total_days_in_month) * 100))) if total_days_in_month > 0 else 0
+    elapsed_pct = min(100, max(0, round(elapsed_ratio * 100)))
 
     return {
         "station_id": station_id,
+        "baseline_date": baseline_date_str,
         "date": target_dt.strftime("%Y-%m-%d"),
         "day_of_month": day_of_month,
         "total_days": total_days_in_month,

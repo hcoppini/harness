@@ -10,19 +10,20 @@ if sys.stderr is None:
 
 import webview
 from app.api import HarnessAPI
+from app.diagnostics import record_error
 
-# Determine base directory for UI assets
+# Determine base directory for canonical root UI assets (single source of truth)
 if getattr(sys, "frozen", False):
     candidates = [
         Path(getattr(sys, "_MEIPASS", "")),
         Path(sys.executable).resolve().parent / "_internal",
         Path(sys.executable).resolve().parent,
     ]
-    BASE_DIR = next((p for p in candidates if (p / "ui" / "index.html").exists()), Path(sys.executable).resolve().parent)
+    BASE_DIR = next((p for p in candidates if (p / "index.html").exists()), Path(sys.executable).resolve().parent)
 else:
     BASE_DIR = Path(__file__).resolve().parent
 
-UI_INDEX = BASE_DIR / "ui" / "index.html"
+UI_INDEX = BASE_DIR / "index.html"
 
 
 def main():
@@ -35,8 +36,8 @@ def main():
             vulcan_service.auto_sync_vulcan_if_needed()
             vulcan_service.start_vulcan_daily_scheduler()
             vulcan_service.setup_windows_scheduled_sync()
-        except Exception:
-            pass
+        except Exception as exc:
+            record_error("main", "Startup Vulcan auto-sync initialization failed", exc)
 
         # Create native Windows desktop window using Chromium WebView2
         window = webview.create_window(
@@ -51,7 +52,7 @@ def main():
 
         # Launch event loop
         webview.start(debug=False)
-    except Exception as e:
+    except Exception:
         import traceback
         log_file = BASE_DIR / "crash.log"
         with open(log_file, "w", encoding="utf-8") as f:

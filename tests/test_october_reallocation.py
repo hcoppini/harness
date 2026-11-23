@@ -41,8 +41,8 @@ def test_station_states_and_reallocation():
 
     assert "nov-2026" in stations
     assert stations["nov-2026"]["status"] == "active"
-    assert stations["nov-2026"]["deliverable_counts"]["Academics"]["total"] == 18
-    assert stations["nov-2026"]["deliverable_counts"]["Physical"]["total"] == 16
+    assert stations["nov-2026"]["deliverable_counts"]["Academics"]["total"] == 40
+    assert stations["nov-2026"]["deliverable_counts"]["Physical"]["total"] == 7
     assert len(stations["nov-2026"].get("sidequests", [])) >= 2
 
     # Dec 2026 (school grades lock + break Sidequests, no cumulative catch-up penalty)

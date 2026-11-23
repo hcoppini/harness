@@ -6,7 +6,7 @@ from pathlib import Path
 
 def test_html_tag_balancing():
     """Verify that both root index.html and ui/index.html have perfectly balanced tags."""
-    for filename in ["index.html", "ui/index.html"]:
+    for filename in ["index.html"]:
         path = Path(__file__).resolve().parent.parent / filename
         assert path.exists(), f"{filename} does not exist"
         with open(path, "r", encoding="utf-8") as f:
@@ -33,7 +33,7 @@ def test_html_tag_balancing():
 
 def test_mobile_bottom_nav_not_nested_in_modal():
     """Verify that mobileBottomNav is outside of aiDiaryModal and all other modal overlays."""
-    for filename in ["index.html", "ui/index.html"]:
+    for filename in ["index.html"]:
         path = Path(__file__).resolve().parent.parent / filename
         with open(path, "r", encoding="utf-8") as f:
             content = f.read()
@@ -49,7 +49,7 @@ def test_mobile_bottom_nav_not_nested_in_modal():
 
 def test_css_mobile_rules_and_calendar():
     """Verify that mobile rules in css/app.css and ui/css/app.css have proper grid track limits."""
-    for filename in ["css/app.css", "ui/css/app.css"]:
+    for filename in ["css/app.css"]:
         path = Path(__file__).resolve().parent.parent / filename
         with open(path, "r", encoding="utf-8") as f:
             css = f.read()
@@ -62,14 +62,14 @@ def test_css_mobile_rules_and_calendar():
 
 def test_mobile_metro_hud_present_and_responsive():
     """Verify that Mobile Metro HUD is present and replaces the 4,800px track on mobile."""
-    for filename in ["index.html", "ui/index.html"]:
+    for filename in ["index.html"]:
         path = Path(__file__).resolve().parent.parent / filename
         with open(path, "r", encoding="utf-8") as f:
             html = f.read()
         assert 'id="mobileMetroHud"' in html
         assert 'class="mobile-metro-hud"' in html
 
-    for filename in ["css/app.css", "ui/css/app.css"]:
+    for filename in ["css/app.css"]:
         path = Path(__file__).resolve().parent.parent / filename
         with open(path, "r", encoding="utf-8") as f:
             css = f.read()
@@ -81,7 +81,7 @@ def test_mobile_metro_hud_present_and_responsive():
 
 def test_today_mobile_segmented_bar():
     """Verify that Daily Execution has a Segmented Tab Switcher for scroll-free navigation."""
-    for filename in ["index.html", "ui/index.html"]:
+    for filename in ["index.html"]:
         path = Path(__file__).resolve().parent.parent / filename
         with open(path, "r", encoding="utf-8") as f:
             html = f.read()
@@ -95,7 +95,7 @@ def test_today_mobile_segmented_bar():
         assert 'today-segment-target="diary"' in html
         assert 'today-segment-target="timetable"' in html
 
-    for filename in ["css/app.css", "ui/css/app.css"]:
+    for filename in ["css/app.css"]:
         path = Path(__file__).resolve().parent.parent / filename
         with open(path, "r", encoding="utf-8") as f:
             css = f.read()
@@ -105,13 +105,13 @@ def test_today_mobile_segmented_bar():
 
 def test_mobile_cockpit_clutter_free():
     """Verify that the 365-day heatmap and 7-day schedule forecast are hidden on mobile."""
-    for filename in ["index.html", "ui/index.html"]:
+    for filename in ["index.html"]:
         path = Path(__file__).resolve().parent.parent / filename
         with open(path, "r", encoding="utf-8") as f:
             html = f.read()
         assert 'id="dashForecastCard"' in html
 
-    for filename in ["css/app.css", "ui/css/app.css"]:
+    for filename in ["css/app.css"]:
         path = Path(__file__).resolve().parent.parent / filename
         with open(path, "r", encoding="utf-8") as f:
             css = f.read()
@@ -119,14 +119,14 @@ def test_mobile_cockpit_clutter_free():
 
 def test_service_worker_v6_and_controllerchange():
     """Verify Service Worker version v7.0 and controllerchange auto-reload."""
-    for filename in ["sw.js", "ui/sw.js"]:
+    for filename in ["sw.js"]:
         path = Path(__file__).resolve().parent.parent / filename
         with open(path, "r", encoding="utf-8") as f:
             sw = f.read()
         assert "harness-executive-v7.0" in sw
         assert "?v=7.0" in sw
 
-    for filename in ["index.html", "ui/index.html"]:
+    for filename in ["index.html"]:
         path = Path(__file__).resolve().parent.parent / filename
         with open(path, "r", encoding="utf-8") as f:
             html = f.read()
@@ -139,7 +139,7 @@ def test_daily_exclusive_checkboxes_and_obsidian_ui_parity():
     """Verify checkboxes live exclusively in Daily, no duplicate mobile segmented bar, and root == ui parity."""
     root = Path(__file__).resolve().parent.parent
 
-    for filename in ["index.html", "ui/index.html"]:
+    for filename in ["index.html"]:
         html = (root / filename).read_text(encoding="utf-8")
         assert html.count('id="todayMobileSegmentedBar"') == 1
         assert 'id="tumComparisonHero"' in html
@@ -156,7 +156,7 @@ def test_daily_exclusive_checkboxes_and_obsidian_ui_parity():
         assert 'check-dot' not in tum_slice
         assert 'id="gcalendarModal" class="modal-overlay"' in html
 
-    for filename in ["js/study.js", "ui/js/study.js"]:
+    for filename in ["js/study.js"]:
         study_js = (root / filename).read_text(encoding="utf-8")
         assert "Clear" in study_js and "Reopen" in study_js
         assert "check-dot" not in study_js
@@ -175,8 +175,11 @@ def test_daily_exclusive_checkboxes_and_obsidian_ui_parity():
         "js/today.js",
         "js/tum.js",
     ]
+    # Single-source-of-truth guardrail: canonical root assets exist and duplicated ui/ + stale client/ trees are removed
+    assert not (root / "ui").exists(), "Duplicate ui/ directory must remain removed"
+    assert not (root / "client").exists(), "Deprecated Expo client/ directory must remain removed"
     for rel in mirrored_paths:
-        assert (root / rel).read_bytes() == (root / "ui" / rel).read_bytes(), f"Mismatch between {rel} and ui/{rel}"
+        assert (root / rel).exists(), f"Missing canonical root asset: {rel}"
 
 
 def test_metro_timeline_maps_dates_between_station_anchors():

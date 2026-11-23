@@ -4,7 +4,9 @@ Enables real-time cross-device sync between iPhone PWA and Desktop Application.
 Deployable on Render, Railway, Fly.io, or run locally via Cloudflare Tunnel.
 """
 
+import hmac
 import os
+import threading
 os.environ["HARNESS_SERVER"] = "1"
 import json
 from datetime import datetime
@@ -14,42 +16,135 @@ from flask import Flask, request, jsonify, send_from_directory, send_file
 # Initialize SQLite database on launch
 from app.db import init_db, ensure_db_and_data_files
 from app.api import HarnessAPI
+from app.diagnostics import record_error, record_sync_result
 from app.services import sync_service
 
 # Ensure data directory, templates and DB exist before syncing
 try:
     ensure_db_and_data_files()
     init_db()
-except Exception:
-    pass
+except Exception as exc:
+    record_error("server", "Database initialization failed on startup", exc)
 
 # Preload state from Supabase on startup if configured (skip during test suite execution)
 if not os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("TESTING") and not os.environ.get("PYTEST_VERSION"):
     try:
         sync_service.sync_all()
-    except Exception:
-        pass
+        record_sync_result(True)
+    except Exception as exc:
+        record_sync_result(False, str(exc))
+        record_error("server", "Startup Supabase sync failed", exc)
 
 if not os.environ.get("PYTEST_CURRENT_TEST") and not os.environ.get("TESTING") and not os.environ.get("PYTEST_VERSION"):
     try:
         from app.services import vulcan_service
         vulcan_service.auto_sync_vulcan_if_needed()
         vulcan_service.start_vulcan_daily_scheduler()
-    except Exception:
-        pass
+    except Exception as exc:
+        record_error("server", "Startup Vulcan scheduler failed", exc)
 
 BASE_DIR = Path(__file__).resolve().parent
-UI_DIR = BASE_DIR / "ui"
 DATA_DIR = BASE_DIR / "data"
+
+# Strict allowlist for publicly readable static JSON files under /data/
+PUBLIC_DATA_FILES = {
+    "schedules.json",
+    "metro_roadmap.json",
+    "school_timetable.json",
+    "gym_routines.json",
+    "easy_links.json",
+    "operating_mode.json",
+    "travel_windows.json",
+}
+
+# Methods that touch local desktop OS resources and must never execute on hosted servers
+DESKTOP_ONLY_RPC_METHODS = {
+    "launch_kill_item",
+    "open_external_url",
+    "setup_windows_scheduled_sync",
+}
 
 app = Flask(__name__, static_folder=None)
 
+_SYNC_TIMER_LOCK = threading.Lock()
+_BG_SYNC_TIMER = None
+
+
+def _schedule_background_sync(delay_seconds: float = 1.5) -> None:
+    """Debounces cloud sync onto a non-blocking daemon thread so HTTP writes never stall."""
+    global _BG_SYNC_TIMER
+    if app.config.get("TESTING") or os.environ.get("PYTEST_CURRENT_TEST"):
+        return
+
+    def _run_sync() -> None:
+        try:
+            sync_service.sync_all()
+            record_sync_result(True)
+        except Exception as exc:
+            record_sync_result(False, str(exc))
+            record_error("sync", "Background sync failed", exc)
+
+    if os.environ.get("VERCEL") or os.environ.get("VERCEL_ENV"):
+        # Serverless functions freeze background threads after response; run immediately with error capture
+        _run_sync()
+        return
+
+    with _SYNC_TIMER_LOCK:
+        if _BG_SYNC_TIMER is not None:
+            try:
+                _BG_SYNC_TIMER.cancel()
+            except Exception:
+                pass
+        timer = threading.Timer(delay_seconds, _run_sync)
+        timer.daemon = True
+        _BG_SYNC_TIMER = timer
+        timer.start()
+
+
+def _is_headless_or_hosted() -> bool:
+    return bool(
+        os.environ.get("VERCEL")
+        or os.environ.get("VERCEL_ENV")
+        or os.environ.get("HARNESS_HEADLESS") == "1"
+    )
+
+
 # --------------------------------------------------------------------------
-# CORS & Header Middleware
+# Security, Auth & CORS Middleware
 # --------------------------------------------------------------------------
+@app.before_request
+def enforce_api_key_auth():
+    """Enforces X-Harness-Key / Bearer token auth on /api/* when HARNESS_API_KEY is configured."""
+    if request.method == "OPTIONS":
+        return None
+    if not request.path.startswith("/api/") or request.path == "/api/health":
+        return None
+    expected_key = (os.environ.get("HARNESS_API_KEY") or "").strip()
+    if not expected_key:
+        return None
+
+    provided = (request.headers.get("X-Harness-Key") or "").strip()
+    if not provided:
+        auth_header = (request.headers.get("Authorization") or "").strip()
+        if auth_header.lower().startswith("bearer "):
+            provided = auth_header[7:].strip()
+
+    if not provided or not hmac.compare_digest(provided, expected_key):
+        return jsonify({"error": "Unauthorized: invalid or missing X-Harness-Key", "status": "error"}), 401
+    return None
+
+
 @app.after_request
 def add_cors_headers(response):
-    response.headers["Access-Control-Allow-Origin"] = "*"
+    allowed_env = (os.environ.get("HARNESS_ALLOWED_ORIGINS") or "").strip()
+    origin = request.headers.get("Origin", "")
+    if allowed_env:
+        allowed_list = [o.strip() for o in allowed_env.split(",") if o.strip()]
+        if origin and origin in allowed_list:
+            response.headers["Access-Control-Allow-Origin"] = origin
+            response.headers["Vary"] = "Origin"
+    else:
+        response.headers["Access-Control-Allow-Origin"] = origin or "*"
     response.headers["Access-Control-Allow-Headers"] = "Content-Type, Authorization, X-Harness-Key"
     response.headers["Access-Control-Allow-Methods"] = "GET, POST, PUT, DELETE, OPTIONS"
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
@@ -62,22 +157,19 @@ def api_options(path):
     return jsonify({"status": "ok"}), 200
 
 # --------------------------------------------------------------------------
-# Static & PWA Routes
+# Static & PWA Routes (Single Canonical Root UI Tree)
 # --------------------------------------------------------------------------
 @app.route("/")
 def index():
-    # Always serve the unified full-fledged Harness OS for both desktop and mobile
-    return send_file(UI_DIR / "index.html")
+    return send_file(BASE_DIR / "index.html")
 
 @app.route("/mobile")
 @app.route("/mobile/")
 def mobile_index():
-    return send_file(UI_DIR / "index.html")
+    return send_file(BASE_DIR / "index.html")
 
 @app.route("/manifest.json")
 def pwa_manifest():
-    if (UI_DIR / "manifest.json").exists():
-        return send_file(UI_DIR / "manifest.json", mimetype="application/manifest+json")
     if (BASE_DIR / "manifest.json").exists():
         return send_file(BASE_DIR / "manifest.json", mimetype="application/manifest+json")
     return jsonify({
@@ -92,82 +184,70 @@ def pwa_manifest():
 
 @app.route("/apple-touch-icon.png")
 def apple_touch_icon():
-    if (UI_DIR / "apple-touch-icon.png").exists():
-        return send_file(UI_DIR / "apple-touch-icon.png", mimetype="image/png")
     if (BASE_DIR / "apple-touch-icon.png").exists():
         return send_file(BASE_DIR / "apple-touch-icon.png", mimetype="image/png")
-    if (UI_DIR / "favicon.png").exists():
-        return send_file(UI_DIR / "favicon.png", mimetype="image/png")
+    if (BASE_DIR / "favicon.png").exists():
+        return send_file(BASE_DIR / "favicon.png", mimetype="image/png")
     return "", 404
 
 @app.route("/icon-192.png")
 def icon_192():
-    if (UI_DIR / "icon-192.png").exists():
-        return send_file(UI_DIR / "icon-192.png", mimetype="image/png")
     if (BASE_DIR / "icon-192.png").exists():
         return send_file(BASE_DIR / "icon-192.png", mimetype="image/png")
     return "", 404
 
 @app.route("/icon-512.png")
 def icon_512():
-    if (UI_DIR / "icon-512.png").exists():
-        return send_file(UI_DIR / "icon-512.png", mimetype="image/png")
     if (BASE_DIR / "icon-512.png").exists():
         return send_file(BASE_DIR / "icon-512.png", mimetype="image/png")
     return "", 404
 
 @app.route("/sw.js")
 def service_worker():
-    if (UI_DIR / "sw.js").exists():
-        return send_file(UI_DIR / "sw.js", mimetype="application/javascript")
     if (BASE_DIR / "sw.js").exists():
         return send_file(BASE_DIR / "sw.js", mimetype="application/javascript")
     return "", 404
 
 @app.route("/mobile/<path:filename>")
 def mobile_static(filename):
-    if (UI_DIR / filename).exists():
-        return send_from_directory(UI_DIR, filename)
+    # Prevent reading sensitive files via /mobile/data/...
+    norm = filename.replace("\\", "/").lstrip("/")
+    if norm.startswith("data/") or norm.endswith((".db", ".log")) or "config" in norm.lower():
+        return jsonify({"error": "Access denied"}), 403
     if (BASE_DIR / filename).exists():
         return send_from_directory(BASE_DIR, filename)
-    if (UI_DIR / "favicon.png").exists():
-        return send_file(UI_DIR / "favicon.png")
+    if (BASE_DIR / "favicon.png").exists():
+        return send_file(BASE_DIR / "favicon.png")
     return jsonify({"status": "redirected"}), 200
 
 @app.route("/css/<path:filename>")
 def css_static(filename):
-    if (BASE_DIR / "css" / filename).exists():
-        return send_from_directory(BASE_DIR / "css", filename)
-    return send_from_directory(UI_DIR / "css", filename)
+    return send_from_directory(BASE_DIR / "css", filename)
 
 @app.route("/js/<path:filename>")
 def js_static(filename):
-    if (BASE_DIR / "js" / filename).exists():
-        return send_from_directory(BASE_DIR / "js", filename)
-    return send_from_directory(UI_DIR / "js", filename)
+    return send_from_directory(BASE_DIR / "js", filename)
 
 @app.route("/data/<path:filename>")
 def data_static(filename):
-    if (UI_DIR / "data" / filename).exists():
-        return send_from_directory(UI_DIR / "data", filename)
-    if (BASE_DIR / "data" / filename).exists():
-        return send_from_directory(BASE_DIR / "data", filename)
+    # Strictly allowlist public static JSON files; never expose SQLite DBs or credential configs
+    clean_name = Path(filename).name
+    if filename != clean_name or clean_name not in PUBLIC_DATA_FILES:
+        return jsonify({"error": "Access denied"}), 403
+    if (DATA_DIR / clean_name).exists():
+        return send_from_directory(DATA_DIR, clean_name)
     return jsonify({"error": "File not found"}), 404
 
 @app.route("/favicon.png")
 def favicon_png():
     if (BASE_DIR / "favicon.png").exists():
         return send_file(BASE_DIR / "favicon.png", mimetype="image/png")
-    if (UI_DIR / "favicon.png").exists():
-        return send_file(UI_DIR / "favicon.png", mimetype="image/png")
     return "", 404
 
 @app.route("/favicon.ico")
 def favicon_ico():
     if (BASE_DIR / "favicon.ico").exists():
         return send_file(BASE_DIR / "favicon.ico", mimetype="image/x-icon")
-    if (UI_DIR / "favicon.ico").exists():
-        return send_file(UI_DIR / "favicon.ico", mimetype="image/x-icon")
     return "", 404
 
 # --------------------------------------------------------------------------
@@ -183,6 +263,39 @@ def health_check():
         "timestamp": datetime.now().isoformat()
     })
 
+@app.route("/api/health/diagnostics", methods=["GET"])
+def health_diagnostics():
+    return jsonify(api.get_system_diagnostics()), 200
+
+@app.route("/api/leveling/rebase", methods=["POST"])
+def leveling_rebase():
+    payload = request.get_json(silent=True) or {}
+    res = api.rebase_to_today(
+        baseline_date=payload.get("baseline_date"),
+        active_station_id=payload.get("active_station_id"),
+    )
+    return jsonify(res), 200
+
+@app.route("/api/leveling/deficit", methods=["GET", "POST"])
+def leveling_deficit():
+    if request.method == "POST":
+        payload = request.get_json(silent=True) or {}
+        if not payload.get("subject") or not payload.get("topic"):
+            return jsonify({"error": "subject and topic are required"}), 400
+        item = api.add_material_deficit(
+            subject=payload["subject"],
+            topic=payload["topic"],
+            priority=int(payload.get("priority", 2)),
+            source_note=payload.get("source_note", ""),
+        )
+        return jsonify(item), 200
+    status = request.args.get("status")
+    return jsonify(api.get_material_deficit(status=status)), 200
+
+@app.route("/api/leveling/deficit/<item_id>/toggle", methods=["POST"])
+def leveling_deficit_toggle(item_id):
+    return jsonify(api.toggle_material_deficit(item_id)), 200
+
 # --------------------------------------------------------------------------
 # Universal RPC Bridge (For Web Browsers & Cloud Deployments)
 # --------------------------------------------------------------------------
@@ -195,6 +308,9 @@ def rpc_dispatcher(method_name):
     """
     if not hasattr(api, method_name) or method_name.startswith("_"):
         return jsonify({"error": f"Method '{method_name}' not found on HarnessAPI", "status": "error"}), 404
+
+    if _is_headless_or_hosted() and method_name in DESKTOP_ONLY_RPC_METHODS:
+        return jsonify({"error": f"Method '{method_name}' is disabled in headless/hosted server mode", "status": "error"}), 403
 
     if request.method == "POST":
         payload = request.get_json(silent=True) or {}
@@ -217,21 +333,19 @@ def rpc_dispatcher(method_name):
         ):
             try:
                 sync_service.ensure_fresh_academic_sync()
-            except Exception:
-                pass
+            except Exception as exc:
+                record_error("server", f"Pre-read academic sync failed for {method_name}", exc)
 
         method = getattr(api, method_name)
         result = method(*args, **kwargs)
 
-        # If write mutation, trigger immediate background sync to Supabase
-        if any(method_name.startswith(p) for p in ["add_", "toggle_", "delete_", "update_", "save_", "log_", "rollover_", "import_", "quick_"]):
-            try:
-                sync_service.sync_all()
-            except Exception:
-                pass
+        # If write mutation, trigger debounced non-blocking background sync to Supabase
+        if any(method_name.startswith(p) for p in ["add_", "toggle_", "delete_", "update_", "save_", "log_", "rollover_", "import_", "quick_", "rebase_"]):
+            _schedule_background_sync()
 
         return jsonify({"result": result, "status": "ok"}), 200
     except Exception as e:
+        record_error("rpc", f"RPC call '{method_name}' failed", e)
         return jsonify({"error": str(e), "status": "error"}), 500
 
 # --------------------------------------------------------------------------

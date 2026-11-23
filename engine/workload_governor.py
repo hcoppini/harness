@@ -57,8 +57,17 @@ def set_operating_mode(mode: str) -> Dict[str, Any]:
         }
 
     DATA_DIR.mkdir(parents=True, exist_ok=True)
+    existing_cfg: Dict[str, Any] = {}
+    if OPERATING_MODE_FILE.exists():
+        try:
+            with open(OPERATING_MODE_FILE, "r", encoding="utf-8") as f:
+                existing_cfg = json.load(f) or {}
+        except Exception:
+            existing_cfg = {}
+    existing_cfg["mode"] = clean_mode
+    existing_cfg["updated_at"] = datetime.now().isoformat()
     with open(OPERATING_MODE_FILE, "w", encoding="utf-8") as f:
-        json.dump({"mode": clean_mode, "updated_at": datetime.now().isoformat()}, f, indent=2)
+        json.dump(existing_cfg, f, indent=2)
     return {"success": True, "mode": clean_mode}
 
 
@@ -82,7 +91,16 @@ def is_us_travel_date(target_date: Optional[Any] = None) -> bool:
     else:
         dt = datetime.now().date()
 
-    return date(2026, 10, 4) <= dt <= date(2026, 10, 18)
+    for win in get_travel_windows():
+        if win.get("id") == "us_2026" or "united states" in (win.get("destination") or "").lower():
+            try:
+                s = datetime.strptime(win["start_date"][:10], "%Y-%m-%d").date()
+                e = datetime.strptime(win["end_date"][:10], "%Y-%m-%d").date()
+                if s <= dt <= e:
+                    return True
+            except Exception:
+                continue
+    return False
 
 
 TRAVEL_WINDOWS_FILE = DATA_DIR / "travel_windows.json"
@@ -1059,6 +1077,11 @@ def synthesize_adaptive_schedule(
     analysis = get_workload_analysis(date_str, conn=conn)
 
     schedule["workload"] = analysis
+    try:
+        from app.services import leveling_service
+        schedule["weekly_math_slice"] = leveling_service.get_weekly_math_slice(date_str)
+    except Exception:
+        schedule["weekly_math_slice"] = {"daily_target": 0, "weekly_total": 40}
 
     target_dt = datetime.strptime(date_str, "%Y-%m-%d").date() if date_str else datetime.now().date()
     weekday = target_dt.weekday()  # Monday=0, ... Saturday=5, Sunday=6
@@ -1433,6 +1456,8 @@ def synthesize_adaptive_schedule(
     urgent_hw = analysis.get("urgent_homework", [])
 
     for b in blocks:
+        if b.get("protected") or b.get("type") == "class":
+            continue
         is_deep_work = b.get("type") == "deep_work" or "SGH Library" in b.get("focus", "")
         if not is_deep_work:
             continue

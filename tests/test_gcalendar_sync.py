@@ -167,7 +167,7 @@ def test_ics_feed_generation_and_parsing(gcal_env):
 
 def test_conflict_aware_schedule_optimization(gcal_env):
     conn, _, _ = gcal_env
-    tue_date = "2026-11-17"  # Tuesday (Schedule B: School 08:00-14:15, Deep Work 14:30-16:30, Gym 17:45-18:45)
+    tue_date = "2026-11-19"  # Thursday (Schedule B_THU: School 08:00-14:15, Deep Work 14:30-16:00, Gym 17:45-18:45)
 
     # Insert an external Google Calendar event overlapping SGH Deep Work (14:30-16:00)
     conn.execute(
@@ -207,7 +207,7 @@ def test_conflict_aware_schedule_optimization(gcal_env):
 
 def test_user_override_in_gcal_sync_map_respected(gcal_env):
     conn, _, _ = gcal_env
-    mon_date = "2026-11-16"  # Monday (SGH Deep Work is block index 2)
+    mon_date = "2026-11-18"  # Wednesday (SGH Deep Work is block index 2)
 
     base_sched = today_service.get_schedule_for_date(mon_date, conn=conn)
     dw_idx = next(i for i, b in enumerate(base_sched["blocks"]) if b.get("type") == "deep_work")

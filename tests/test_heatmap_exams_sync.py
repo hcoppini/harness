@@ -86,7 +86,7 @@ def test_heatmap_exams_and_homework_today_and_date_normalization(test_db):
 
 
 def test_css_supports_today_exam_and_homework_dots():
-    for rel in ["css/app.css", "ui/css/app.css"]:
+    for rel in ["css/app.css"]:
         css = (REPO_ROOT / rel).read_text(encoding="utf-8")
         assert ".heatmap-cell.cell-today.has-exam::after" in css
         assert ".heatmap-cell.cell-today.has-homework::before" in css
