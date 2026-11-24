@@ -906,6 +906,123 @@ window.HarnessApp = {
     }
   },
 
+  async rebaseBaselineToday() {
+    if (!confirm("Rebase baseline to today? This will calibrate your pace window from today forward, zeroing out phantom historical deficits while leaving all verified grades and completions 100% intact.")) {
+      return;
+    }
+    try {
+      let res = null;
+      if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.rebase_to_today === "function") {
+        res = await window.pywebview.api.rebase_to_today();
+      } else {
+        const resp = await fetch("/api/leveling/rebase", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+        res = await resp.json();
+      }
+
+      if (res && res.success) {
+        this.showToast(`Baseline rebased to ${res.baseline_date || "today"}. Phantom debt cleared.`);
+        if (window.HarnessDashboard && typeof window.HarnessDashboard.load === "function") {
+          await window.HarnessDashboard.load();
+        }
+        if (window.Today && typeof window.Today.loadTodayData === "function") {
+          await window.Today.loadTodayData();
+        }
+        if (window.MetroMap && typeof window.MetroMap.load === "function") {
+          await window.MetroMap.load();
+        }
+      } else {
+        this.showToast((res && res.error) || "Rebase failed", 3000);
+      }
+    } catch (err) {
+      console.error("Rebase error:", err);
+      this.showToast("Failed to rebase baseline: " + err.message, 3000);
+    }
+  },
+
+  async logMathHomework(delta) {
+    try {
+      let deliverableId = "nov2026_acad";
+      try {
+        let delivs = null;
+        if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.get_station_deliverables === "function") {
+          delivs = await window.pywebview.api.get_station_deliverables();
+        } else {
+          const resp = await fetch("/api/rpc/get_station_deliverables", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ args: [] }),
+          });
+          const json = await resp.json();
+          delivs = json.result || json;
+        }
+        if (Array.isArray(delivs) && delivs.length > 0) {
+          const mathDeliv = delivs.find(d => (d.deliverable_id && d.deliverable_id.includes("acad")) || (d.title && d.title.toLowerCase().includes("math")));
+          if (mathDeliv) deliverableId = mathDeliv.deliverable_id;
+        }
+      } catch (e) {
+        // Fall back to default
+      }
+
+      let res = null;
+      if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.update_deliverable_progress === "function") {
+        res = await window.pywebview.api.update_deliverable_progress(deliverableId, null, delta);
+      } else {
+        const resp = await fetch("/api/rpc/update_deliverable_progress", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ args: [deliverableId, null, delta] }),
+        });
+        const json = await resp.json();
+        res = json.result || json;
+      }
+
+      if (res && res.success) {
+        const completed = res.completed_count !== undefined ? res.completed_count : 0;
+        const total = (res.deliverable && res.deliverable.total_required) || 40;
+        this.updateMathHomeworkUI(completed, total);
+        const sign = delta > 0 ? `+${delta}` : `${delta}`;
+        this.showToast(`Logged math exercises: ${sign} (${completed}/${total})`);
+      }
+    } catch (err) {
+      console.error("Error logging math homework:", err);
+      this.showToast("Failed to log math: " + err.message);
+    }
+  },
+
+  updateMathHomeworkUI(completed, total = 40) {
+    const fractionEl = document.getElementById("dashMathProgressFraction");
+    const barEl = document.getElementById("dashMathProgressBar");
+    const todayFractionEl = document.getElementById("todayMathProgressFraction");
+    const todayBarEl = document.getElementById("todayMathProgressBar");
+
+    const pct = Math.min(100, Math.max(0, Math.round((completed / total) * 100)));
+    const text = `${completed} / ${total} EXERCISES`;
+
+    if (fractionEl) fractionEl.textContent = text;
+    if (barEl) barEl.style.width = `${pct}%`;
+    if (todayFractionEl) todayFractionEl.textContent = text;
+    if (todayBarEl) todayBarEl.style.width = `${pct}%`;
+
+    // Highlight daily split pill for current day of week (Tue..Sat)
+    const day = new Date().getDay();
+    const map = { 2: "splitTue", 3: "splitWed", 4: "splitThu", 5: "splitFri", 6: "splitSat" };
+    const todaySplitId = map[day];
+    ["splitTue", "splitWed", "splitThu", "splitFri", "splitSat"].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) {
+        if (id === todaySplitId) {
+          el.style.borderColor = "var(--accent-glow)";
+          el.style.color = "var(--text-primary)";
+          el.style.background = "rgba(99, 102, 241, 0.15)";
+        }
+      }
+    });
+  },
+
   startClock() {
     const dateEl = document.getElementById("currentDatePill");
     const timeEl = document.getElementById("currentTimePill");

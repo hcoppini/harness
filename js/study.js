@@ -47,6 +47,7 @@ window.Study = {
         this.tumData = await window.pywebview.api.get_tum_overview();
       }
 
+      await this.loadMaterialDeficits();
       this.render();
     } catch (err) {
       console.error("[Study] Error loading study data:", err);
@@ -57,6 +58,122 @@ window.Study = {
     this.renderExams();
     this.renderHomework();
     this.renderGrades();
+    this.renderMaterialDeficits();
+  },
+
+  materialDeficits: [],
+
+  async loadMaterialDeficits() {
+    try {
+      if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.get_material_deficit === "function") {
+        this.materialDeficits = await window.pywebview.api.get_material_deficit();
+      } else {
+        const res = await fetch("/api/rpc/get_material_deficit", { credentials: "omit" });
+        if (res.ok) {
+          const data = await res.json();
+          this.materialDeficits = data.result || [];
+        }
+      }
+    } catch (e) {
+      console.warn("[Study] Error loading material deficits:", e);
+    }
+  },
+
+  renderMaterialDeficits() {
+    const container = document.getElementById("studyMaterialDeficitList");
+    const badge = document.getElementById("studyDeficitOpenBadge");
+    if (!container) return;
+
+    const openCount = (this.materialDeficits || []).filter((d) => d.status !== "mastered").length;
+    if (badge) {
+      badge.textContent = `${openCount} Open Concepts`;
+      badge.className = openCount > 0 ? "mono-chip amber" : "mono-chip green";
+    }
+
+    if (!this.materialDeficits || this.materialDeficits.length === 0) {
+      container.innerHTML = `
+        <div style="font-size: 11px; color: var(--text-tertiary); padding: 12px 6px; text-align: center;">
+          Zero material deficits recorded. Solid foundation.
+        </div>
+      `;
+      return;
+    }
+
+    container.innerHTML = this.materialDeficits
+      .map((item) => {
+        const isMastered = item.status === "mastered";
+        const pClass = item.priority === 1 ? "amber" : item.priority === 2 ? "lavender" : "";
+        return `
+          <div style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.07); border-radius: 8px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+            <div style="display: flex; flex-direction: column; gap: 3px; min-width: 0;">
+              <div style="display: flex; align-items: center; gap: 6px;">
+                <span class="mono-chip ${pClass}" style="font-size: 8.5px; padding: 1px 5px;">P${item.priority}</span>
+                <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: #818CF8;">${this.escapeHtml(item.subject)}</span>
+              </div>
+              <div style="font-size: 12px; font-weight: 500; color: ${isMastered ? 'var(--text-tertiary)' : 'var(--text-primary)'}; ${isMastered ? 'text-decoration: line-through;' : ''}">
+                ${this.escapeHtml(item.topic)}
+              </div>
+              ${item.source_note ? `<div style="font-size: 10.5px; color: var(--text-tertiary);">${this.escapeHtml(item.source_note)}</div>` : ''}
+            </div>
+            <button type="button" class="btn-ghost-icon btn-sm" onclick="Study.toggleDeficit('${item.id}')" style="white-space: nowrap; ${isMastered ? 'color: var(--color-green-light); border-color: rgba(16, 185, 129, 0.3);' : ''}">
+              ${isMastered ? 'Mastered \u2713' : 'Mark Done'}
+            </button>
+          </div>
+        `;
+      })
+      .join("");
+  },
+
+  async toggleDeficit(itemId) {
+    try {
+      if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.toggle_material_deficit === "function") {
+        await window.pywebview.api.toggle_material_deficit(itemId);
+      } else {
+        await fetch("/api/rpc/toggle_material_deficit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ item_id: itemId }),
+        });
+      }
+      await this.loadMaterialDeficits();
+      this.renderMaterialDeficits();
+    } catch (e) {
+      console.error("[Study] Error toggling deficit:", e);
+    }
+  },
+
+  openAddDeficitModal() {
+    const modal = document.getElementById("addDeficitModal");
+    if (modal) modal.classList.add("open");
+  },
+
+  async handleAddDeficitSubmit(e) {
+    if (e) e.preventDefault();
+    const subj = document.getElementById("deficitSubjectInput")?.value || "Matematyka";
+    const topic = document.getElementById("deficitTopicInput")?.value || "";
+    const prio = parseInt(document.getElementById("deficitPriorityInput")?.value || "1", 10);
+    const note = document.getElementById("deficitNoteInput")?.value || "";
+
+    if (!topic.trim()) return;
+
+    try {
+      if (window.pywebview && window.pywebview.api && typeof window.pywebview.api.add_material_deficit === "function") {
+        await window.pywebview.api.add_material_deficit(subj, topic, prio, "active", note);
+      } else {
+        await fetch("/api/rpc/add_material_deficit", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ subject: subj, topic, priority: prio, status: "active", source_note: note }),
+        });
+      }
+      document.getElementById("addDeficitModal")?.classList.remove("open");
+      const form = document.getElementById("addDeficitForm");
+      if (form) form.reset();
+      await this.loadMaterialDeficits();
+      this.renderMaterialDeficits();
+    } catch (err) {
+      console.error("[Study] Error adding deficit:", err);
+    }
   },
 
   renderExams() {

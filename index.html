@@ -130,6 +130,9 @@
             <span>+ Test / HW</span>
             <span class="key-pill">N</span>
           </button>
+          <button id="btnRebaseToday" class="btn-ghost-icon" onclick="window.HarnessApp.rebaseBaselineToday()" title="Rebase pace velocity to today, clear phantom deficits & sync cloud">
+            <span>Level Baseline</span>
+          </button>
           <div class="mono-chip streak-chip" id="dashboardStreakPill" title="Consecutive execution streak">
             <span id="streakCountVal">0</span>d streak
           </div>
@@ -198,6 +201,34 @@
             </div>
             <div class="cockpit-subtitle" id="dashActiveStationName">
               Syncing...
+            </div>
+          </div>
+        </div>
+
+        <!-- 1B. WEEKLY MATH COMMITMENT (40 Exercises / Tue-Sat Live Split) -->
+        <div class="monotone-card" id="dashWeeklyMathCard" style="margin-bottom: 16px;">
+          <div class="card-label-row" style="margin-bottom: 8px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="card-label" style="font-weight: 700; color: var(--text-primary);">WEEKLY MATH COMMITMENT</span>
+              <span class="mono-chip lavender" id="dashMathPaceChip">Optimal Pace</span>
+            </div>
+            <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #818CF8;" id="dashMathProgressFraction">0 / 40 EXERCISES</span>
+          </div>
+          <div class="progress-bar-track" style="height: 7px; margin-bottom: 12px;">
+            <div class="progress-bar-fill" id="dashMathProgressBar" style="width: 0%; background: linear-gradient(90deg, #6366F1, #818CF8);"></div>
+          </div>
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+            <div id="dashMathSplitPills" style="display: flex; gap: 6px; flex-wrap: wrap;">
+              <span class="mono-chip" id="splitTue">Tue: 5</span>
+              <span class="mono-chip" id="splitWed">Wed: 8</span>
+              <span class="mono-chip" id="splitThu">Thu: 9</span>
+              <span class="mono-chip" id="splitFri">Fri: 9</span>
+              <span class="mono-chip" id="splitSat">Sat: 9</span>
+            </div>
+            <div style="display: flex; gap: 6px;">
+              <button type="button" class="btn-ghost-icon btn-sm" onclick="window.HarnessApp.logMathHomework(-1)" title="Decrement 1 exercise">-1</button>
+              <button type="button" class="btn-primary btn-sm" onclick="window.HarnessApp.logMathHomework(+1)" title="Log 1 completed math exercise">+1 Problem</button>
+              <button type="button" class="btn-primary btn-sm" onclick="window.HarnessApp.logMathHomework(+5)" title="Log 5 completed math exercises">+5 Set</button>
             </div>
           </div>
         </div>
@@ -395,6 +426,28 @@
             <div class="schedule-banner-controls">
               <div id="dayModeSwitchContainer"></div>
               <span id="scheduleDescription" style="display: none;"></span>
+            </div>
+          </div>
+
+          <!-- Weekly Math Execution Tracker (Zero-AI Matura Drill) -->
+          <div id="todayWeeklyMathCard" class="monotone-card" today-segment-target="routine" style="padding: 12px 16px; margin-bottom: 12px;">
+            <div class="card-label-row" style="margin-bottom: 8px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="card-label" style="font-weight: 700; color: var(--text-primary);">WEEKLY MATH COMMITMENT</span>
+                <span class="mono-chip lavender" id="todayMathPaceChip">Daily Target</span>
+              </div>
+              <span style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #818CF8;" id="todayMathProgressFraction">0 / 40 EXERCISES</span>
+            </div>
+            <div class="progress-bar-track" style="height: 6px; margin-bottom: 10px;">
+              <div class="progress-bar-fill" id="todayMathProgressBar" style="width: 0%; background: linear-gradient(90deg, #6366F1, #818CF8);"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <span style="font-size: 11px; color: var(--text-secondary);">Tue–Sat 40-Ex Run Rate (5/8/9/9/9)</span>
+              <div style="display: flex; gap: 6px;">
+                <button type="button" class="btn-ghost-icon btn-sm" onclick="window.HarnessApp.logMathHomework(-1)" title="Decrement 1 exercise">-1</button>
+                <button type="button" class="btn-primary btn-sm" onclick="window.HarnessApp.logMathHomework(+1)" title="Log 1 completed math exercise">+1 Problem</button>
+                <button type="button" class="btn-primary btn-sm" onclick="window.HarnessApp.logMathHomework(+5)" title="Log 5 completed math exercises">+5 Set</button>
+              </div>
             </div>
           </div>
 
@@ -610,6 +663,20 @@
               <!-- Rendered dynamically by study.js -->
             </div>
           </div>
+
+          <!-- Material Deficit Ledger Card -->
+          <div class="monotone-card" id="studyMaterialDeficitCard">
+            <div class="card-label-row" style="margin-bottom: 10px;">
+              <div style="display: flex; align-items: center; gap: 8px;">
+                <span class="card-label" style="font-weight: 700; color: var(--text-primary);">MATERIAL DEFICIT LEDGER</span>
+                <span id="studyDeficitOpenBadge" class="mono-chip amber">7 Open Concepts</span>
+              </div>
+              <button type="button" class="btn-ghost-icon btn-sm" onclick="Study.openAddDeficitModal()">+ Add Topic</button>
+            </div>
+            <div id="studyMaterialDeficitList" style="display: flex; flex-direction: column; gap: 8px;">
+              <!-- Rendered dynamically by Study.renderMaterialDeficits() -->
+            </div>
+          </div>
         </div>
 
         <!-- Right Column: TUM GPA Standing & Subject Breakdown -->
@@ -647,94 +714,59 @@
 
 
     <!-- ====================================================================
-         2. TUM METRO ROADMAP LAYER (Single Main Line + Stream Highlighters)
+         2. TUM METRO ROADMAP LAYER (Executive 3-Pillar Clarity System)
+         Pillar 1: Admissions Scorecard Hero (#tumComparisonHero)
+         Pillar 2: Active Milestone Focus Card (#tumActiveMilestoneCard)
+         Pillar 3: Clean Vertical Phase Roadmap (#tumVerticalRoadmap)
          ==================================================================== -->
     <section id="view-tum" class="view-section">
-      <div class="section-header" style="margin-bottom: 12px; padding-bottom: 10px;">
+      <div class="section-header" style="margin-bottom: 16px; padding-bottom: 12px;">
         <div>
           <h1 class="section-headline">TUM &lsquo;28</h1>
+          <div class="section-caption">Executive Roadmap &bull; B.Sc. Management and Data Science &bull; Campus Heilbronn</div>
         </div>
         <div style="display: flex; gap: 8px; align-items: center;">
-          <button id="btnJumpCurrentStation" class="btn-ghost-icon">Active</button>
+          <button id="btnJumpCurrentStation" class="btn-ghost-icon">Active Month</button>
           <button id="btnToggleGradesView" class="btn-ghost-icon">Grades &amp; Simulator</button>
         </div>
       </div>
 
-      <!-- Mobile Executive Station HUD (Phone Viewport) -->
-      <div id="mobileMetroHud" class="mobile-metro-hud">
-        <!-- Rendered dynamically by MetroMap.renderMobileHud() -->
-      </div>
-
-      <!-- Band 1: Always-Visible Desktop/Tablet Hero Panel -->
+      <!-- Pillar 1: Admissions Scorecard Hero -->
       <div id="tumComparisonHero" class="tum-hero-grid">
         <!-- Populated dynamically by MetroMap.renderComparisonHero() -->
       </div>
 
-      <!-- Band 2: Animated Multi-Stream Trajectory Roadmap -->
-      <div class="metro-viewport">
-        <div class="metro-toolbar">
-          <div class="metro-filters">
-            <button class="metro-filter-btn active" data-stream="all">All</button>
-            <button class="metro-filter-btn" data-stream="academics">Academics</button>
-            <button class="metro-filter-btn" data-stream="code">Code</button>
-            <button class="metro-filter-btn" data-stream="sigg">SIGG</button>
-            <button class="metro-filter-btn" data-stream="german">German</button>
-            <button class="metro-filter-btn" data-stream="physical">Physical</button>
+      <!-- Pillar 2: Active Milestone Focus Card -->
+      <div id="tumActiveMilestoneCard" class="tum-active-milestone-card">
+        <!-- Populated dynamically by MetroMap.renderActiveMilestone() -->
+      </div>
+
+      <!-- Pillar 3: Vertical Phase Roadmap -->
+      <div class="tum-roadmap-container">
+        <div class="metro-cards-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; margin-bottom: 14px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span class="card-label" style="font-size: 11px;">2026 &ndash; 2028 MILESTONE ROADMAP</span>
+            <span class="mono-chip lavender">4 PHASES</span>
+          </div>
+          <div class="metro-phase-filters" id="metroPhaseFilters">
+            <button type="button" class="metro-phase-btn active" data-phase="all" onclick="MetroMap.setPhaseFilter('all')">All</button>
+            <button type="button" class="metro-phase-btn" data-phase="phase1" onclick="MetroMap.setPhaseFilter('phase1')">Year 3</button>
+            <button type="button" class="metro-phase-btn" data-phase="phase2" onclick="MetroMap.setPhaseFilter('phase2')">Summer &lsquo;27</button>
+            <button type="button" class="metro-phase-btn" data-phase="phase3" onclick="MetroMap.setPhaseFilter('phase3')">Year 4 &amp; TUM</button>
           </div>
         </div>
 
-        <!-- Draggable Horizontal Track Container -->
-        <div id="metroScrollContainer" class="metro-scroll-container">
-          <div id="metroCanvasWrap" class="metro-canvas-wrap">
-            <!-- Rendered by MetroMap engine -->
-          </div>
-        </div>
-
-        <!-- Inline Selected Station Inspector (Zero Drawer Overlap, Zero Checkboxes) -->
-        <div id="stationInspectorPanel" class="station-inspector-panel" style="display: none;">
-          <!-- Rendered dynamically by MetroMap.renderInspector(station) -->
-        </div>
-
-        <!-- Band 3: Phase-Filtered Milestone Strip -->
-        <div class="metro-cards-section">
-          <div class="metro-cards-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-            <span class="card-label">Milestones</span>
-            <div class="metro-phase-filters" id="metroPhaseFilters">
-              <button type="button" class="metro-phase-btn active" data-phase="all" onclick="MetroMap.setPhaseFilter('all')">All</button>
-              <button type="button" class="metro-phase-btn" data-phase="phase1" onclick="MetroMap.setPhaseFilter('phase1')">Year 3</button>
-              <button type="button" class="metro-phase-btn" data-phase="phase2" onclick="MetroMap.setPhaseFilter('phase2')">Summer &lsquo;27</button>
-              <button type="button" class="metro-phase-btn" data-phase="phase3" onclick="MetroMap.setPhaseFilter('phase3')">Year 4 &amp; TUM</button>
-            </div>
-          </div>
-          <div id="metroCardsGrid" class="metro-cards-grid">
-            <!-- Rendered by MetroMap engine -->
-          </div>
-        </div>
-
-        <!-- Legacy Station Drawer DOM preserved hidden/clean for graceful fallback -->
-        <div id="stationDrawer" class="station-drawer">
-          <button id="closeStationDrawerBtn" class="drawer-close-btn">&times;</button>
-          <div style="margin-top: 8px; margin-bottom: 16px;">
-            <div id="drawerStationMonth" style="font-family: var(--font-mono); font-size: 10px; color: var(--accent-lavender); font-weight: 600;">--</div>
-            <h2 id="drawerStationTitle" style="font-size: 17px; font-weight: 700; color: var(--text-primary); margin-top: 2px;">--</h2>
-          </div>
-          <div id="drawerStationStatusContainer" style="margin-bottom: 14px;">
-            <input type="hidden" id="drawerStationStatus" value="upcoming" />
-          </div>
-          <div style="background: var(--bg-card); border: 1px solid var(--border-hairline); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 16px;">
-            <div class="card-label" style="margin-bottom: 4px;">CORE OBJECTIVE</div>
-            <div id="drawerStationObjective" style="font-size: 12px; color: var(--text-primary); line-height: 1.5;">--</div>
-          </div>
-          <div style="margin-bottom: 16px;">
-            <div class="card-label" style="margin-bottom: 8px;">DELIVERABLES BREAKDOWN</div>
-            <div id="drawerDeliverablesList"></div>
-          </div>
-          <div style="border-top: 1px solid var(--border-hairline); padding-top: 14px;">
-            <div class="card-label" style="margin-bottom: 4px;">IMMEDIATE NEXT ACTION</div>
-            <div id="drawerStationNextAction" style="font-size: 12px; font-weight: 600; color: var(--text-primary); line-height: 1.4;">--</div>
-          </div>
+        <div id="tumVerticalRoadmap" class="tum-vertical-roadmap">
+          <!-- Populated dynamically by MetroMap.renderVerticalRoadmap() -->
         </div>
       </div>
+
+      <!-- Compatibility & Headless Test DOM Elements (Preserved Cleanly, No Checkboxes) -->
+      <div id="mobileMetroHud" class="mobile-metro-hud" style="display: none;" hidden></div>
+      <div id="stationInspectorPanel" class="station-inspector-panel" style="display: none;" hidden></div>
+      <div id="metroCardsGrid" class="metro-cards-grid" style="display: none;" hidden></div>
+      <div id="metroCanvasWrap" class="metro-canvas-wrap" style="display: none;" hidden></div>
+      <div id="stationDrawer" class="station-drawer" style="display: none;" hidden></div>
 
       <!-- Collapsible 4-Semester Grade Ledger -->
       <div id="gradesTableDrawer" class="monotone-card" style="display: none; margin-top: 16px;">
@@ -2057,6 +2089,49 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- Add Deficit Topic Modal -->
+  <div id="addDeficitModal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h3 class="modal-title">Log Concept Material Deficit</h3>
+        <button class="modal-close-btn" onclick="document.getElementById('addDeficitModal').classList.remove('open')">&times;</button>
+      </div>
+      <form id="addDeficitForm" onsubmit="window.Study?.handleAddDeficitSubmit(event)">
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Subject</label>
+          <select id="deficitSubjectInput" class="form-input" required>
+            <option value="Matematyka" selected>Matematyka</option>
+            <option value="Fizyka">Fizyka</option>
+            <option value="Informatyka">Informatyka</option>
+            <option value="Chemia">Chemia</option>
+            <option value="Język angielski">Język angielski</option>
+            <option value="Język niemiecki">Język niemiecki</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Concept / Learning Gap</label>
+          <input type="text" id="deficitTopicInput" class="form-input" placeholder="e.g. Trygonometria — tożsamości i równania" required />
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label class="form-label">Priority</label>
+          <select id="deficitPriorityInput" class="form-input">
+            <option value="1" selected>P1 — Critical Defense</option>
+            <option value="2">P2 — Core Foundation</option>
+            <option value="3">P3 — Secondary</option>
+          </select>
+        </div>
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label class="form-label">Context / Source Note (Optional)</label>
+          <input type="text" id="deficitNoteInput" class="form-input" placeholder="e.g. Needs review before Friday exam" />
+        </div>
+        <div style="display: flex; justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn-ghost-icon" onclick="document.getElementById('addDeficitModal').classList.remove('open')">Cancel</button>
+          <button type="submit" class="btn-primary">Add Concept</button>
+        </div>
+      </form>
     </div>
   </div>
 

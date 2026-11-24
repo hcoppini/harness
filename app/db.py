@@ -453,6 +453,13 @@ def init_db(db_path: Optional[Path] = None) -> None:
     except Exception as e:
         print(f"Warning: material_deficit table init notice: {e}")
 
+    # 13. Two-Way Sync Conflict Ledger
+    try:
+        from app.services.sync_service import ensure_sync_conflict_table
+        ensure_sync_conflict_table(conn)
+    except Exception as e:
+        print(f"Warning: sync_conflicts table init notice: {e}")
+
     conn.commit()
     conn.close()
 

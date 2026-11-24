@@ -227,6 +227,7 @@ const MetroMap = {
     if (this.data?.stations) {
       const { progressRatio } = this.calculateJourneyProgress();
       this.renderCardsGrid(this.data.stations, progressRatio);
+      this.renderVerticalRoadmap();
     }
   },
 
@@ -710,7 +711,14 @@ const MetroMap = {
     // Jump to active station / beacon
     const btnJump = document.getElementById("btnJumpCurrentStation");
     if (btnJump) {
-      btnJump.addEventListener("click", () => this.scrollToBeacon());
+      btnJump.addEventListener("click", () => {
+        const activeCard = document.getElementById("tumActiveMilestoneCard");
+        if (activeCard) {
+          activeCard.scrollIntoView({ behavior: "smooth", block: "start" });
+        } else {
+          this.scrollToBeacon();
+        }
+      });
     }
 
     // Stream Filter Buttons
@@ -851,38 +859,6 @@ const MetroMap = {
     const heroEl = document.getElementById("tumComparisonHero");
     if (!heroEl || !this.data || !this.data.stations) return;
 
-    const stations = this.data.stations;
-    const station = stations.find((s) => s.status === "active") || stations[0];
-    if (!station) return;
-
-    const progressPercent = this.calculateStationProgress(station);
-    const vel = this.getSafeVelocity(station, progressPercent);
-    const completedList = station.completed_deliverables || [];
-    const delivEntries = Object.entries(station.deliverables || {});
-
-    const streamsHtml = delivEntries
-      .map(([key, val]) => {
-        const normKey = this.normalizeStreamKey(key);
-        const color = this.getStreamColor(normKey);
-        const countObj = this.getDeliverableCounter(station.id, key, val);
-        const curCount = completedList.includes(key) ? countObj.total : (countObj.count || 0);
-        const totalReq = Math.max(1, countObj.total || 10);
-        const itemPct = Math.min(100, Math.round((curCount / totalReq) * 100));
-        return `
-          <div class="tum-hero-stream-row" title="${this.escapeHtml(val)}">
-            <div class="tum-hero-stream-label">
-              <span class="tum-stream-dot" style="background: ${color};"></span>
-              <span>${this.escapeHtml(key)}</span>
-            </div>
-            <div class="tum-mini-bar-track" style="flex: 1;">
-              <div class="tum-mini-bar-fill" style="width: ${itemPct}%; background: ${color};"></div>
-            </div>
-            <div class="tum-hero-stream-val">${curCount}/${totalReq} <span class="unit">${this.escapeHtml(countObj.unit || "")}</span></div>
-          </div>
-        `;
-      })
-      .join("");
-
     // Live TUM Admissions Assessment snapshot (unified keys)
     const adm = this.getAdmissionsSnapshot();
 
@@ -890,56 +866,31 @@ const MetroMap = {
       <div class="tum-hero-card">
         <div class="tum-hero-card-top">
           <div>
-            <div class="tum-hero-eyebrow">${this.escapeHtml(station.month_label || "ACTIVE")} &bull; DAY ${vel.day_of_month}/${vel.total_days}</div>
-            <h2 class="tum-hero-title">${this.escapeHtml(station.name)}</h2>
-          </div>
-          <span class="tum-pace-pill ${progressPercent >= vel.elapsed_pct ? "optimal" : "amber"}">
-            ${progressPercent}% DONE
-          </span>
-        </div>
-
-        <div class="tum-hero-pace-body" style="margin-bottom: 12px;">
-          <div class="tum-hero-bars" style="width: 100%;">
-            <div class="tum-pace-row">
-              <span>MONTH PROGRESS</span>
-              <strong>${progressPercent}% <span style="opacity:0.55; font-weight:400;">/ ${vel.elapsed_pct}% clock</span></strong>
-            </div>
-            <div class="tum-threshold-track" style="height: 6px; margin-top: 6px;">
-              <div class="tum-mini-bar-fill" style="width: ${progressPercent}%; height: 100%; background: var(--accent-lavender); border-radius: 99px;"></div>
-              <div class="tum-threshold-pin" style="left: ${vel.elapsed_pct}%;" title="Month clock: ${vel.elapsed_pct}%"></div>
-            </div>
-          </div>
-        </div>
-
-        <div class="tum-hero-streams-list">
-          ${streamsHtml || `<div style="font-size: 11px; color: var(--text-tertiary);">No stream deliverables bound.</div>`}
-        </div>
-      </div>
-
-      <div class="tum-hero-card">
-        <div class="tum-hero-card-top">
-          <div>
-            <div class="tum-hero-eyebrow">TUM HEILBRONN STAGE 1</div>
-            <h2 class="tum-hero-title">Admissions Standing</h2>
+            <div class="tum-hero-eyebrow">TUM HEILBRONN B.SC. MANAGEMENT &amp; DATA SCIENCE</div>
+            <h2 class="tum-hero-title">Stage 1 Aptitude Scorecard</h2>
           </div>
           <span class="tum-pace-pill ${adm.statusClass}">${this.escapeHtml(adm.statusLabel)}</span>
         </div>
 
         <div class="tum-adm-kpi-row">
           <div class="tum-adm-kpi">
-            <span class="kpi-lbl">DE GPA</span>
-            <span class="kpi-num">${adm.bavGpa}</span>
-            <span class="kpi-sub">PL ${adm.polishGpa}</span>
+            <span class="kpi-lbl">STAGE 1 SCORE</span>
+            <span class="kpi-num accent" style="color: ${adm.isDirect ? "var(--color-green-light)" : adm.isInterview ? "var(--accent-lavender)" : "var(--color-red)"};">
+              ${adm.totalScore !== null ? adm.totalScore.toFixed(1) : "--"} <small>/ 100</small>
+            </span>
+            <span class="kpi-sub">&ge; 88.0 pts Direct Admit</span>
           </div>
           <div class="tum-adm-kpi">
-            <span class="kpi-lbl">STAGE 1</span>
-            <span class="kpi-num accent" style="color: ${adm.isDirect ? "var(--color-green-light)" : adm.isInterview ? "var(--accent-lavender)" : "var(--color-red)"};">${adm.totalScore !== null ? adm.totalScore.toFixed(1) : "--"} <small>/ 100</small></span>
-            <span class="kpi-sub">STEM ${adm.curricularScore}</span>
+            <span class="kpi-lbl">DISTANCE TO 88</span>
+            <span class="kpi-num ${adm.isDirect ? "green" : ""}">
+              ${adm.distDirect !== null ? (adm.distDirect <= 0 ? `+${Math.abs(adm.distDirect).toFixed(1)}` : `-${adm.distDirect.toFixed(1)}`) : "--"} <small>pts</small>
+            </span>
+            <span class="kpi-sub">${adm.isDirect ? "Direct Admit Safe" : "Points to Clear"}</span>
           </div>
           <div class="tum-adm-kpi">
-            <span class="kpi-lbl">TO DIRECT (88)</span>
-            <span class="kpi-num ${adm.isDirect ? "green" : ""}">${adm.distDirect !== null ? (adm.distDirect <= 0 ? `+${Math.abs(adm.distDirect).toFixed(1)}` : `-${adm.distDirect.toFixed(1)}`) : "--"} <small>pts</small></span>
-            <span class="kpi-sub">${adm.isDirect ? "Safe" : "Gap"}</span>
+            <span class="kpi-lbl">TOP LEVERAGE</span>
+            <span class="kpi-num" style="font-size: 15px; color: #818CF8;">MATH &bull; CS</span>
+            <span class="kpi-sub">Double-Weighted (2x)</span>
           </div>
         </div>
 
@@ -952,19 +903,238 @@ const MetroMap = {
           <div class="tum-threshold-scale">
             <span>0</span>
             <span style="left: ${adm.interviewCutoff}%;">67 Interview</span>
-            <span style="left: ${adm.directCutoff}%; color: var(--accent-lavender);">88 Direct</span>
+            <span style="left: ${adm.directCutoff}%; color: var(--accent-lavender);">88 Direct Admit</span>
             <span>100</span>
           </div>
         </div>
+      </div>
 
-        <div class="tum-hero-adm-footer">
-          <div class="tum-hero-adm-note">${this.escapeHtml(adm.primaryAction)}</div>
+      <div class="tum-hero-card">
+        <div class="tum-hero-card-top">
+          <div>
+            <div class="tum-hero-eyebrow">BAVARIAN FORMULA &bull; 65% GPA + 35% STEM</div>
+            <h2 class="tum-hero-title">Academic Conversion Standing</h2>
+          </div>
           <button type="button" class="btn-ghost-icon tum-ledger-cta" onclick="MetroMap.openGradesLedger()">
             Grades &amp; Simulator &rarr;
           </button>
         </div>
+
+        <div class="tum-adm-kpi-row">
+          <div class="tum-adm-kpi">
+            <span class="kpi-lbl">BAVARIAN GPA</span>
+            <span class="kpi-num" style="color: #818CF8;">${adm.bavGpa}</span>
+            <span class="kpi-sub">DE Scale (1.0 Best)</span>
+          </div>
+          <div class="tum-adm-kpi">
+            <span class="kpi-lbl">POLISH GPA</span>
+            <span class="kpi-num">${adm.polishGpa}</span>
+            <span class="kpi-sub">PL Scale (6.0 Best)</span>
+          </div>
+          <div class="tum-adm-kpi">
+            <span class="kpi-lbl">CURRICULAR SCORE</span>
+            <span class="kpi-num">${adm.curricularScore}</span>
+            <span class="kpi-sub">Math, CS, Lang</span>
+          </div>
+        </div>
+
+        <div class="tum-hero-adm-footer" style="border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px;">
+          <div class="tum-hero-adm-note" style="font-size: 11.5px; color: #CBD5E1;">
+            <strong>Core Strategy:</strong> ${this.escapeHtml(adm.primaryAction)}
+          </div>
+        </div>
       </div>
     `;
+  },
+
+  renderActiveMilestone() {
+    const container = document.getElementById("tumActiveMilestoneCard");
+    if (!container || !this.data || !this.data.stations) return;
+
+    const stations = this.data.stations;
+    const activeStation = stations.find((s) => s.status === "active") || stations[0];
+    if (!activeStation) return;
+
+    const progressPercent = this.calculateStationProgress(activeStation);
+    const vel = this.getSafeVelocity(activeStation, progressPercent);
+    const delivEntries = Object.entries(activeStation.deliverables || {});
+    const completedList = activeStation.completed_deliverables || [];
+
+    const delivsHtml = delivEntries.map(([key, val]) => {
+      const countObj = this.getDeliverableCounter(activeStation.id, key, val);
+      const curCount = completedList.includes(key) ? countObj.total : (countObj.count || 0);
+      const totalReq = Math.max(1, countObj.total || 10);
+      const itemPct = Math.min(100, Math.round((curCount / totalReq) * 100));
+      const isDone = itemPct >= 100 || completedList.includes(key);
+
+      return `
+        <div class="tum-active-deliv-item">
+          <div class="tum-active-deliv-header">
+            <span style="color: ${isDone ? '#10B981' : '#818CF8'}; font-weight: 700;">${this.escapeHtml(key.toUpperCase())}</span>
+            <span style="color: ${isDone ? '#10B981' : '#CBD5E1'}; font-weight: 600;">${curCount} / ${totalReq} <small style="color: #64748B;">${this.escapeHtml(countObj.unit || "")}</small></span>
+          </div>
+          <div class="tum-active-deliv-title">${this.escapeHtml(val)}</div>
+          <div class="tum-mini-bar-track" style="margin-top: 4px;">
+            <div class="tum-mini-bar-fill" style="width: ${itemPct}%; background: ${isDone ? '#10B981' : '#818CF8'};"></div>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    container.innerHTML = `
+      <div class="tum-active-header">
+        <div class="tum-active-badge">
+          <span class="tum-active-pulse"></span>
+          <span>CURRENT FOCUS &bull; ${this.escapeHtml(activeStation.month_label || "ACTIVE")}</span>
+        </div>
+        <div style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: #818CF8;">
+          DAY ${vel.day_of_month} / ${vel.total_days} &bull; ${progressPercent}% COMPLETED
+        </div>
+      </div>
+      <h2 class="tum-active-title">${this.escapeHtml(activeStation.name)}</h2>
+      <div class="tum-active-obj">${this.escapeHtml(activeStation.objective || "")}</div>
+      <div class="tum-active-delivs-grid">
+        ${delivsHtml || '<div style="color: #64748B; font-size: 12px;">No deliverables recorded for this milestone.</div>'}
+      </div>
+      ${activeStation.next_action ? `
+        <div class="tum-active-next-box">
+          <span style="font-size: 14px;">🎯</span>
+          <div><strong>NEXT ACTION:</strong> ${this.escapeHtml(activeStation.next_action)}</div>
+        </div>
+      ` : ""}
+    `;
+  },
+
+  renderVerticalRoadmap() {
+    const container = document.getElementById("tumVerticalRoadmap");
+    if (!container || !this.data || !this.data.stations) return;
+
+    const stations = this.data.stations;
+    const phaseFilter = this.activePhaseFilter || "all";
+
+    const chapters = [
+      {
+        id: "phase1",
+        title: "Phase 1: Year 3 Liceum",
+        period: "Sep 2026 – Jun 2027",
+        filterKey: "phase1",
+      },
+      {
+        id: "phase2",
+        title: "Phase 2: Summer '27 Build Sprint",
+        period: "Jul – Aug 2027",
+        filterKey: "phase2",
+      },
+      {
+        id: "phase3",
+        title: "Phase 3: Year 4 & Matura Sprint",
+        period: "Sep 2027 – May 2028",
+        filterKey: "phase3",
+      },
+      {
+        id: "phase4",
+        title: "Phase 4: Uni-Assist & TUM Admission",
+        period: "Jun – Jul 2028",
+        filterKey: "phase3",
+      },
+    ];
+
+    const visibleChapters = chapters.filter((c) => phaseFilter === "all" || c.filterKey === phaseFilter);
+
+    container.innerHTML = visibleChapters.map((chap) => {
+      const chapStations = stations.filter((st, idx) => {
+        const pKey = this.getStationPhaseKey(st, idx);
+        if (chap.id === "phase1") return pKey === "phase1";
+        if (chap.id === "phase2") return pKey === "phase2";
+        if (chap.id === "phase3") return pKey === "phase3" && !st.id.includes("2028");
+        if (chap.id === "phase4") return pKey === "phase3" && (st.id.includes("2028") || st.id.includes("tum"));
+        return false;
+      });
+
+      if (chapStations.length === 0) return "";
+
+      const milestonesHtml = chapStations.map((station) => {
+        const status = station.status || "upcoming";
+        const isActive = status === "active";
+        const isCompleted = status === "completed";
+        const isExpanded = this.expandedStationIds?.has(station.id) || (isActive && !this.expandedStationIds);
+        const delivEntries = Object.entries(station.deliverables || {});
+        const completedList = station.completed_deliverables || [];
+
+        const delivRowsHtml = delivEntries.map(([key, val]) => {
+          const countObj = this.getDeliverableCounter(station.id, key, val);
+          const curCount = completedList.includes(key) ? countObj.total : (countObj.count || 0);
+          const totalReq = Math.max(1, countObj.total || 10);
+          const isDone = completedList.includes(key) || curCount >= totalReq;
+
+          return `
+            <div class="tum-details-deliv-row">
+              <div>
+                <strong style="color: #818CF8; font-size: 11px; font-family: var(--font-mono); text-transform: uppercase;">${this.escapeHtml(key)}:</strong>
+                <span class="tum-details-deliv-text" style="${isDone ? 'text-decoration: line-through; opacity: 0.75;' : ''}">${this.escapeHtml(val)}</span>
+              </div>
+              <span style="font-family: var(--font-mono); font-size: 10px; font-weight: 700; color: ${isDone ? '#10B981' : '#94A3B8'}; white-space: nowrap;">
+                ${curCount}/${totalReq} ${this.escapeHtml(countObj.unit || "")}
+              </span>
+            </div>
+          `;
+        }).join("");
+
+        return `
+          <div class="tum-milestone-card ${isActive ? 'active' : ''} ${isCompleted ? 'completed' : ''} ${isExpanded ? 'expanded' : ''}"
+               data-station-id="${station.id}"
+               onclick="MetroMap.toggleMilestoneExpand('${station.id}')">
+            <div class="tum-milestone-summary">
+              <div class="tum-month-badge">${this.escapeHtml(station.month_label || station.id)}</div>
+              <div class="tum-milestone-info">
+                <div class="tum-milestone-name">${this.escapeHtml(station.name)}</div>
+                <div class="tum-milestone-obj-snippet">${this.escapeHtml(station.objective || "")}</div>
+              </div>
+              <span class="tum-milestone-status ${status}">${isActive ? 'ACTIVE' : isCompleted ? 'DONE' : 'UPCOMING'}</span>
+              <span class="tum-expand-arrow">&#9660;</span>
+            </div>
+            <div class="tum-milestone-details">
+              <div class="tum-details-objective">
+                <strong>OBJECTIVE:</strong> ${this.escapeHtml(station.objective || "No description provided.")}
+              </div>
+              <div class="tum-details-delivs-list">
+                ${delivRowsHtml || '<div style="color: #64748B; font-size: 11.5px;">No individual deliverables recorded.</div>'}
+              </div>
+              ${station.next_action ? `
+                <div class="tum-details-next-box">
+                  <strong>NEXT ACTION:</strong> ${this.escapeHtml(station.next_action)}
+                </div>
+              ` : ""}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      return `
+        <div class="tum-phase-chapter">
+          <div class="tum-phase-chapter-header">
+            <span class="tum-phase-chapter-title">${this.escapeHtml(chap.title)}</span>
+            <span class="tum-phase-chapter-sub">${this.escapeHtml(chap.period)}</span>
+          </div>
+          <div class="tum-milestone-stack">
+            ${milestonesHtml}
+          </div>
+        </div>
+      `;
+    }).join("");
+  },
+
+  toggleMilestoneExpand(stationId) {
+    if (!this.expandedStationIds) this.expandedStationIds = new Set();
+    if (this.expandedStationIds.has(stationId)) {
+      this.expandedStationIds.delete(stationId);
+    } else {
+      this.expandedStationIds.add(stationId);
+    }
+    const card = document.querySelector(`.tum-milestone-card[data-station-id="${stationId}"]`);
+    if (card) {
+      card.classList.toggle("expanded", this.expandedStationIds.has(stationId));
+    }
   },
 
   render() {
@@ -993,8 +1163,10 @@ const MetroMap = {
 
     this.currentBeaconX = currentX;
 
-    // Update Band 1 & Mobile HUD alongside Track
+    // Update Executive 3-Pillar Clarity UI
     this.renderComparisonHero();
+    this.renderActiveMilestone();
+    this.renderVerticalRoadmap();
     this.renderMobileHud();
 
     // Phase Headers Ribbon (Top Zone Y=10)

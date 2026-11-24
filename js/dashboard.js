@@ -78,10 +78,23 @@ window.Dashboard = {
     if (!this.data) return;
 
     this.renderCockpitGauges();
+    this.renderWeeklyMathTracker();
     this.renderHeatmap();
     this.renderUpcoming();
     this.renderRadar();
     this.renderJetBrains();
+  },
+
+  renderWeeklyMathTracker() {
+    if (!this.data) return;
+    const deliverables = this.data.station_deliverables || [];
+    const mathDeliv = deliverables.find(d => 
+      (d.deliverable_id && d.deliverable_id.includes("acad")) || 
+      (d.title && d.title.toLowerCase().includes("math"))
+    );
+    if (mathDeliv && window.HarnessApp && typeof window.HarnessApp.updateMathHomeworkUI === "function") {
+      window.HarnessApp.updateMathHomeworkUI(mathDeliv.completed_count, mathDeliv.total_required);
+    }
   },
 
   renderCockpitGauges() {

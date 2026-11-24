@@ -833,6 +833,19 @@ class HarnessAPI:
         sync_service.save_sync_config(cfg)
         return True
 
+    def get_pending_conflicts(self) -> List[Dict[str, Any]]:
+        """Returns unresolved two-way sync conflicts."""
+        from app.services import sync_service
+        return sync_service.get_pending_conflicts()
+
+    def resolve_sync_conflict(self, conflict_id: str, resolution_choice: str = "remote") -> Dict[str, Any]:
+        """Resolves a pending sync conflict with the chosen authority ('local' or 'remote')."""
+        from app.services import sync_service
+        res = sync_service.resolve_sync_conflict(conflict_id, resolution_choice)
+        if res.get("success"):
+            self._trigger_auto_sync()
+        return res
+
     # --- Harness 3.0: Vulcan UONET+ & Adaptive Workload Governor ---
     def get_workload_analysis(self, target_date: Optional[str] = None) -> Dict[str, Any]:
         from engine import workload_governor

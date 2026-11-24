@@ -2789,3 +2789,123 @@ def pull_all_supabase_to_local(conn: Optional[sqlite3.Connection] = None) -> Dic
             conn.close()
 
 
+def ensure_sync_conflict_table(conn: sqlite3.Connection) -> None:
+    """Ensures the sync_conflicts table exists in SQLite for durable conflict audit & resolution."""
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS sync_conflicts (
+            id TEXT PRIMARY KEY,
+            entity_type TEXT NOT NULL,
+            entity_id TEXT NOT NULL,
+            local_data TEXT NOT NULL,
+            remote_data TEXT NOT NULL,
+            conflict_detected_at TEXT NOT NULL,
+            resolved INTEGER DEFAULT 0,
+            resolution_choice TEXT,
+            resolved_at TEXT
+        )
+        """
+    )
+    conn.commit()
+
+
+def record_sync_conflict(
+    entity_type: str,
+    entity_id: str,
+    local_data: Any,
+    remote_data: Any,
+    conn: Optional[sqlite3.Connection] = None,
+) -> str:
+    """Records a detected concurrent conflict for user prompt/audit rather than silently overwriting."""
+    should_close = False
+    if conn is None:
+        conn = get_connection()
+        should_close = True
+
+    try:
+        ensure_sync_conflict_table(conn)
+        import uuid
+        conflict_id = f"conf_{uuid.uuid4().hex[:12]}"
+        now_iso = datetime.now().isoformat()
+        loc_str = json.dumps(local_data, ensure_ascii=False) if not isinstance(local_data, str) else local_data
+        rem_str = json.dumps(remote_data, ensure_ascii=False) if not isinstance(remote_data, str) else remote_data
+
+        conn.execute(
+            """
+            INSERT INTO sync_conflicts 
+            (id, entity_type, entity_id, local_data, remote_data, conflict_detected_at, resolved)
+            VALUES (?, ?, ?, ?, ?, ?, 0)
+            """,
+            (conflict_id, entity_type, entity_id, loc_str, rem_str, now_iso),
+        )
+        conn.commit()
+        return conflict_id
+    finally:
+        if should_close:
+            conn.close()
+
+
+def get_pending_conflicts(conn: Optional[sqlite3.Connection] = None) -> List[Dict[str, Any]]:
+    """Returns all unresolved sync conflicts."""
+    should_close = False
+    if conn is None:
+        conn = get_connection()
+        should_close = True
+
+    try:
+        ensure_sync_conflict_table(conn)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM sync_conflicts WHERE resolved = 0 ORDER BY conflict_detected_at DESC")
+        rows = cursor.fetchall()
+        conflicts = []
+        for r in rows:
+            conflicts.append({
+                "id": r["id"],
+                "entity_type": r["entity_type"],
+                "entity_id": r["entity_id"],
+                "local_data": json.loads(r["local_data"]) if r["local_data"] else {},
+                "remote_data": json.loads(r["remote_data"]) if r["remote_data"] else {},
+                "conflict_detected_at": r["conflict_detected_at"],
+                "resolved": bool(r["resolved"]),
+            })
+        return conflicts
+    finally:
+        if should_close:
+            conn.close()
+
+
+def resolve_sync_conflict(
+    conflict_id: str,
+    resolution_choice: str = "remote",
+    conn: Optional[sqlite3.Connection] = None,
+) -> Dict[str, Any]:
+    """Resolves a pending sync conflict by marking it resolved with the chosen authority ('local' or 'remote')."""
+    should_close = False
+    if conn is None:
+        conn = get_connection()
+        should_close = True
+
+    try:
+        ensure_sync_conflict_table(conn)
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM sync_conflicts WHERE id = ?", (conflict_id,))
+        row = cursor.fetchone()
+        if not row:
+            return {"success": False, "error": f"Conflict {conflict_id} not found"}
+
+        now_iso = datetime.now().isoformat()
+        conn.execute(
+            """
+            UPDATE sync_conflicts 
+            SET resolved = 1, resolution_choice = ?, resolved_at = ?
+            WHERE id = ?
+            """,
+            (resolution_choice, now_iso, conflict_id),
+        )
+        conn.commit()
+        return {"success": True, "conflict_id": conflict_id, "resolution": resolution_choice}
+    finally:
+        if should_close:
+            conn.close()
+
+

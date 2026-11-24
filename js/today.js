@@ -359,6 +359,18 @@ const Today = {
         } catch (e) {
           console.error("Error loading kill list in Today.load:", e);
         }
+
+        try {
+          if (typeof window.pywebview.api.get_station_deliverables === "function") {
+            const sDelivs = await window.pywebview.api.get_station_deliverables();
+            if (Array.isArray(sDelivs)) {
+              const mathDeliv = sDelivs.find(d => (d.deliverable_id && d.deliverable_id.includes("acad")) || (d.title && d.title.toLowerCase().includes("math")));
+              if (mathDeliv && window.HarnessApp && typeof window.HarnessApp.updateMathHomeworkUI === "function") {
+                window.HarnessApp.updateMathHomeworkUI(mathDeliv.completed_count, mathDeliv.total_required);
+              }
+            }
+          }
+        } catch (_) {}
       }
     } catch (err) {
       console.error("Error loading Today data:", err);

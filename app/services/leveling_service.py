@@ -155,19 +155,29 @@ def get_material_deficit(
             "SELECT * FROM material_deficit ORDER BY CASE status WHEN 'active' THEN 0 WHEN 'open' THEN 1 ELSE 2 END, priority ASC, subject ASC"
         ).fetchall()
 
-    items = [dict(r) for r in rows]
+    items = []
+    for r in rows:
+        d = dict(r)
+        d["mastered"] = d.get("status") == "resolved"
+        items.append(d)
+
     if close_conn:
         conn.close()
     return items
 
 
+get_material_deficits = get_material_deficit
+
+
 def add_material_deficit(
     subject: str,
     topic: str,
-    priority: int = 2,
+    priority: Any = 2,
     source_note: str = "",
     item_id: Optional[str] = None,
     conn: Optional[sqlite3.Connection] = None,
+    notes: Optional[str] = None,
+    **kwargs,
 ) -> Dict[str, Any]:
     """Adds a new school material deficit unit."""
     close_conn = False
@@ -178,6 +188,16 @@ def add_material_deficit(
     ensure_material_deficit_table(conn)
     slug = re.sub(r"[^a-z0-9]+", "_", f"{subject}_{topic}".lower()).strip("_")[:48]
     uid = item_id or f"def_{slug}"
+    
+    # Clean priority (e.g. 'P1' -> 1)
+    if isinstance(priority, str):
+        digits = re.sub(r"\D", "", priority)
+        p_val = int(digits) if digits else 2
+    else:
+        p_val = int(priority) if priority else 2
+
+    final_note = source_note or notes or kwargs.get("notes") or ""
+
     cur = conn.cursor()
     cur.execute(
         """
@@ -190,10 +210,11 @@ def add_material_deficit(
             source_note = excluded.source_note,
             updated_at = CURRENT_TIMESTAMP
         """,
-        (uid, subject.strip(), topic.strip(), int(priority), source_note.strip()),
+        (uid, subject.strip(), topic.strip(), p_val, final_note.strip()),
     )
     conn.commit()
     row = dict(cur.execute("SELECT * FROM material_deficit WHERE id = ?", (uid,)).fetchone())
+    row["mastered"] = row.get("status") == "resolved"
     if close_conn:
         conn.close()
     return row
@@ -221,9 +242,10 @@ def toggle_material_deficit(item_id: str, conn: Optional[sqlite3.Connection] = N
     )
     conn.commit()
     updated = dict(cur.execute("SELECT * FROM material_deficit WHERE id = ?", (item_id,)).fetchone())
+    updated["mastered"] = new_status == "resolved"
     if close_conn:
         conn.close()
-    return {"success": True, "item": updated}
+    return {"success": True, "mastered": new_status == "resolved", "item": updated}
 
 
 def get_station_baseline_date(station_id: str) -> Optional[str]:
@@ -325,6 +347,7 @@ def rebase_to_today(
     cur = conn.cursor()
 
     summary: Dict[str, Any] = {
+        "success": True,
         "baseline_date": clean_date,
         "grades_untouched": True,
         "past_deliverables_closed": 0,

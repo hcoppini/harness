@@ -579,6 +579,9 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None, client_date
     if not active_station and stations:
         active_station = stations[0]
 
+    active_station_id = active_station.get("id") if active_station else "nov-2026"
+    station_deliverables = kill_list_controller.get_station_deliverables(active_station_id, conn=conn)
+
     # German current level
     german_ladder = tum_overview.get("language", [])
     current_german = "A2 (In Progress)"
@@ -689,6 +692,7 @@ def get_dashboard_summary(conn: Optional[sqlite3.Connection] = None, client_date
             "homework": upcoming_homework,
             "exams": upcoming_exams,
         },
+        "station_deliverables": station_deliverables,
     }
 
     if close_conn:

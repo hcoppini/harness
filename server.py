@@ -161,12 +161,20 @@ def api_options(path):
 # --------------------------------------------------------------------------
 @app.route("/")
 def index():
-    return send_file(BASE_DIR / "index.html")
+    resp = send_file(BASE_DIR / "index.html")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 @app.route("/mobile")
 @app.route("/mobile/")
 def mobile_index():
-    return send_file(BASE_DIR / "index.html")
+    resp = send_file(BASE_DIR / "index.html")
+    resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+    resp.headers["Pragma"] = "no-cache"
+    resp.headers["Expires"] = "0"
+    return resp
 
 @app.route("/manifest.json")
 def pwa_manifest():
@@ -205,7 +213,11 @@ def icon_512():
 @app.route("/sw.js")
 def service_worker():
     if (BASE_DIR / "sw.js").exists():
-        return send_file(BASE_DIR / "sw.js", mimetype="application/javascript")
+        resp = send_file(BASE_DIR / "sw.js", mimetype="application/javascript")
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
     return "", 404
 
 @app.route("/mobile/<path:filename>")
@@ -351,6 +363,20 @@ def rpc_dispatcher(method_name):
 # --------------------------------------------------------------------------
 # Direct Cross-Device Sync Endpoints (Local Executable <-> Web Server)
 # --------------------------------------------------------------------------
+@app.route("/api/sync/conflicts", methods=["GET"])
+def sync_conflicts_endpoint():
+    return jsonify(api.get_pending_conflicts()), 200
+
+@app.route("/api/sync/resolve_conflict", methods=["POST"])
+def sync_resolve_conflict_endpoint():
+    payload = request.get_json(silent=True) or {}
+    conflict_id = payload.get("conflict_id")
+    resolution = payload.get("resolution", "remote")
+    if not conflict_id:
+        return jsonify({"error": "conflict_id is required"}), 400
+    res = api.resolve_sync_conflict(conflict_id, resolution_choice=resolution)
+    return jsonify(res), 200
+
 @app.route("/api/sync/status", methods=["GET"])
 def sync_status_endpoint():
     return jsonify(api.get_sync_status())

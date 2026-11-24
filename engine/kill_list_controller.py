@@ -706,15 +706,42 @@ def get_station_deliverables(
 
 
 def get_active_station_id(conn: Optional[sqlite3.Connection] = None) -> str:
-    """Returns the currently active metro station id from metro_roadmap.json, defaulting to nov-2026."""
+    """Returns the currently active metro station id from metro_roadmap.json, with zero-touch auto-rollover for new months."""
     try:
         roadmap_file = DATA_DIR / "metro_roadmap.json"
         if roadmap_file.exists():
             with open(roadmap_file, "r", encoding="utf-8") as f:
                 data = json.load(f)
+
+            today_dt = datetime.now()
+            today_candidate = f"{today_dt.strftime('%b').lower()}-{today_dt.year}"
+
+            active_station = None
+            candidate_station = None
             for s in data.get("stations", []):
                 if s.get("status") == "active":
-                    return s["id"]
+                    active_station = s
+                if s.get("id") == today_candidate:
+                    candidate_station = s
+
+            # Zero-touch automatic rollover: if today is in a new month that has a defined station
+            if candidate_station and active_station and candidate_station["id"] != active_station["id"]:
+                act_date = (active_station.get("date") or "2026-11")[:7]
+                cand_date = (candidate_station.get("date") or "2026-11")[:7]
+                if cand_date > act_date:
+                    active_station["status"] = "completed"
+                    candidate_station["status"] = "active"
+                    try:
+                        with open(roadmap_file, "w", encoding="utf-8") as f:
+                            json.dump(data, f, indent=2)
+                    except Exception:
+                        pass
+                    return candidate_station["id"]
+
+            if active_station:
+                return active_station["id"]
+            if candidate_station:
+                return candidate_station["id"]
     except Exception:
         pass
     return "nov-2026"
@@ -788,14 +815,32 @@ def get_station_pace_velocity(
     deficit_unit = ""
     overall_behind = False
 
+    remaining_days = max(1, window_total_days - window_day + 1)
+
     for d in deliverables:
         total = d["total_required"]
         comp = d["completed_count"]
         target_pace = elapsed_ratio * total
         delta = comp - target_pace
 
+        # Smart Catch-Up Redistribution calculation:
+        # Computes required run-rate over remaining days against human capacity ceiling
+        remaining_units = max(0, total - comp)
+        daily_run_rate = remaining_units / remaining_days
+
+        unit_str = (d.get("unit_label") or "").lower()
+        if "exercise" in unit_str or "problem" in unit_str:
+            capacity_ceiling = 14.0
+        elif "session" in unit_str or "day" in unit_str:
+            capacity_ceiling = 1.6
+        elif "word" in unit_str:
+            capacity_ceiling = 30.0
+        else:
+            capacity_ceiling = max(2.0, (total / max(1, window_total_days)) * 2.0)
+
         is_behind = comp < target_pace
         deficit = round(target_pace - comp, 1) if is_behind else 0.0
+        catch_up_achievable = is_behind and (daily_run_rate <= capacity_ceiling)
 
         if deficit > max_deficit:
             max_deficit = deficit
@@ -812,6 +857,9 @@ def get_station_pace_velocity(
             "unit_label": d["unit_label"],
             "target_pace": round(target_pace, 1),
             "pace_delta": round(delta, 1),
+            "daily_run_rate": round(daily_run_rate, 1),
+            "catch_up_achievable": catch_up_achievable,
+            "capacity_ceiling": capacity_ceiling,
             "is_behind": is_behind,
             "deficit": deficit,
             "is_completed": d["is_completed"],
