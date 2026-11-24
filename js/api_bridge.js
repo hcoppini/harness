@@ -183,7 +183,12 @@
     // =========================================================================
     // Virtual Dynamic API Layer with Optimistic Persistence
     // =========================================================================
-    const PHANTOM_EXAM_KEYWORDS = ["trygonometria", "kinematyka", "wyszukiwania", "powstanie styczniowe"];
+    const PHANTOM_EXAM_KEYWORDS = [
+      "trygonometria i wzory redukcyjne",
+      "kinematyka i dynamika punktu materialnego",
+      "algorytmy sortowania i wyszukiwania",
+      "powstanie styczniowe i pozytywizm",
+    ];
     const ACADEMIC_CACHE_TTL_MS = 30000;
     let _academicHydratedAt = 0;
     let _academicHydrationPromise = null;

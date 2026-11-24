@@ -761,14 +761,15 @@ const MetroMap = {
         }
         if (window.pywebview.api.get_upcoming_exams) {
           const rawExams = await window.pywebview.api.get_upcoming_exams();
+          const demoPhrases = [
+            "trygonometria i wzory redukcyjne",
+            "kinematyka i dynamika punktu materialnego",
+            "algorytmy sortowania i wyszukiwania",
+            "powstanie styczniowe i pozytywizm",
+          ];
           this.upcomingExams = (rawExams || []).filter((e) => {
             const t = ((e.title || "") + " " + (e.scope || "")).toLowerCase();
-            return (
-              !t.includes("trygonometria") &&
-              !t.includes("kinematyka") &&
-              !t.includes("wyszukiwania") &&
-              !t.includes("powstanie styczniowe")
-            );
+            return !demoPhrases.some((kw) => t.includes(kw));
           });
         }
       }
@@ -785,10 +786,16 @@ const MetroMap = {
             const d = new Date();
             return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
           })();
+          const demoPhrases = [
+            "trygonometria i wzory redukcyjne",
+            "kinematyka i dynamika punktu materialnego",
+            "algorytmy sortowania i wyszukiwania",
+            "powstanie styczniowe i pozytywizm",
+          ];
           this.upcomingExams = cachedExams.filter((e) => {
             if (e.completed || (e.exam_date && e.exam_date < todayStr)) return false;
             const t = ((e.title || "") + " " + (e.scope || "")).toLowerCase();
-            return !t.includes("trygonometria") && !t.includes("kinematyka") && !t.includes("wyszukiwania") && !t.includes("powstanie styczniowe");
+            return !demoPhrases.some((kw) => t.includes(kw));
           });
         }
       }

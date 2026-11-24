@@ -24,10 +24,10 @@ window.Study = {
           if (typeof e.days_left === "number" && e.days_left <= 0) return false;
           const t = ((e.title || "") + " " + (e.scope || "")).toLowerCase();
           return (
-            !t.includes("trygonometria") &&
-            !t.includes("kinematyka") &&
-            !t.includes("wyszukiwania") &&
-            !t.includes("powstanie styczniowe")
+            !t.includes("trygonometria i wzory redukcyjne") &&
+            !t.includes("kinematyka i dynamika punktu materialnego") &&
+            !t.includes("algorytmy sortowania i wyszukiwania") &&
+            !t.includes("powstanie styczniowe i pozytywizm")
           );
         });
       }
