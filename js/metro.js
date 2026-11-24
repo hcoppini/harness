@@ -234,7 +234,6 @@ const MetroMap = {
     const now = new Date();
     const dayFallback = now.getDate();
     const daysInMonthFallback = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
-    const fallbackPct = Math.min(100, Math.max(0, Math.round((dayFallback / daysInMonthFallback) * 100)));
 
     const rawVel = (this.paceVelocity && this.paceVelocity.station_id === station?.id) ? this.paceVelocity : null;
     const validDay = Number.isFinite(Number(rawVel?.day_of_month)) && Number(rawVel.day_of_month) > 0
@@ -243,9 +242,37 @@ const MetroMap = {
     const validTotal = Number.isFinite(Number(rawVel?.total_days)) && Number(rawVel.total_days) > 0
       ? Number(rawVel.total_days)
       : daysInMonthFallback;
+
+    const baselineDate = rawVel?.baseline_date || station?.baseline_date || null;
+    let isRebased = Boolean(rawVel?.is_rebased);
+    let windowDay = Number.isFinite(Number(rawVel?.window_day)) && Number(rawVel.window_day) > 0
+      ? Number(rawVel.window_day)
+      : validDay;
+    let windowTotalDays = Number.isFinite(Number(rawVel?.window_total_days)) && Number(rawVel.window_total_days) > 0
+      ? Number(rawVel.window_total_days)
+      : validTotal;
+    let fallbackPct = validTotal > 0 ? Math.min(100, Math.max(0, Math.round((validDay / validTotal) * 100))) : 0;
+
+    if (baselineDate) {
+      const m = String(baselineDate).match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if (m) {
+        const bYear = Number(m[1]);
+        const bMonth = Number(m[2]) - 1;
+        const bDay = Number(m[3]);
+        if (bYear === now.getFullYear() && bMonth === now.getMonth()) {
+          const spanDays = Math.max(1, validTotal - bDay + 1);
+          const elapsedDays = Math.max(0, validDay - bDay);
+          isRebased = true;
+          if (!rawVel?.window_day) windowDay = Math.min(spanDays, elapsedDays + 1);
+          if (!rawVel?.window_total_days) windowTotalDays = spanDays;
+          fallbackPct = Math.min(100, Math.max(0, Math.round((elapsedDays / spanDays) * 100)));
+        }
+      }
+    }
+
     const validElapsedPct = Number.isFinite(Number(rawVel?.elapsed_pct))
       ? Math.min(100, Math.max(0, Math.round(Number(rawVel.elapsed_pct))))
-      : (validTotal > 0 ? Math.min(100, Math.max(0, Math.round((validDay / validTotal) * 100))) : fallbackPct);
+      : fallbackPct;
 
     const safeProgress = Number.isFinite(Number(progressPercent)) ? Number(progressPercent) : 0;
     const deltaPct = Math.round((safeProgress - validElapsedPct) * 10) / 10;
@@ -260,17 +287,22 @@ const MetroMap = {
 
     if (!statusText) {
       statusText = isBehind
-        ? `Pace Deficit: ${Math.abs(deltaPct)}% behind month clock`
-        : `On Pace: ${deltaPct >= 0 ? `+${deltaPct}%` : "0%"} vs month clock`;
+        ? `Pace Deficit: ${Math.abs(deltaPct)}% behind ${isRebased ? "window" : "month"} clock`
+        : `On Pace: ${deltaPct >= 0 ? `+${deltaPct}%` : "0%"} vs ${isRebased ? "window" : "month"} clock`;
     }
 
     return {
       day_of_month: validDay,
       total_days: validTotal,
+      baseline_date: baselineDate,
+      is_rebased: isRebased,
+      window_day: windowDay,
+      window_total_days: windowTotalDays,
       elapsed_pct: validElapsedPct,
       delta_pct: deltaPct,
       is_behind: isBehind,
       status_text: statusText,
+      deliverables: Array.isArray(rawVel?.deliverables) ? rawVel.deliverables : [],
     };
   },
 
@@ -1739,7 +1771,12 @@ const MetroMap = {
         const unitLabel = countObj.unit || "reps";
         const itemPct = Math.min(100, Math.round((curCount / totalReq) * 100));
 
-        const targetPace = Math.round(((vel.day_of_month / vel.total_days) * totalReq) * 10) / 10;
+        const velMatch = (vel.deliverables || []).find(
+          (d) => this.normalizeStreamKey(d.stream) === normKey
+        );
+        const targetPace = velMatch && Number.isFinite(Number(velMatch.target_pace))
+          ? Math.round(Number(velMatch.target_pace) * 10) / 10
+          : Math.round(((vel.elapsed_pct / 100) * totalReq) * 10) / 10;
         const deficit = Math.round((targetPace - curCount) * 10) / 10;
         const isBehind = deficit > 0;
 
@@ -1808,7 +1845,7 @@ const MetroMap = {
         <div class="inspector-meta-box">
           <div class="card-label" style="margin-bottom: 4px;">CLOCK VS. OUTPUT</div>
           <div class="inspector-clock-compare">
-            <span>Month Clock: <strong>Day ${vel.day_of_month}/${vel.total_days} (${vel.elapsed_pct}%)</strong></span>
+            <span>${vel.is_rebased ? "Window Clock" : "Month Clock"}: <strong>Day ${vel.is_rebased ? vel.window_day : vel.day_of_month}/${vel.is_rebased ? vel.window_total_days : vel.total_days} (${vel.elapsed_pct}%)</strong></span>
             <span>Deliverables: <strong style="color: var(--accent-lavender);">${progressPercent}%</strong></span>
           </div>
         </div>

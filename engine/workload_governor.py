@@ -1481,6 +1481,15 @@ def synthesize_adaptive_schedule(
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
             b["deliverable"] = None
+            acad_deliv = next(
+                (d for d in (candidate_deliverables or []) if str(d.get("stream", "")).lower() == "academics"),
+                deliv_dict if (deliv_dict and str(deliv_dict.get("stream", "")).lower() == "academics") else None,
+            )
+            if acad_deliv:
+                linked_acad = dict(acad_deliv)
+                if b.get("math_exercises_target"):
+                    linked_acad["quantity"] = int(b["math_exercises_target"])
+                b["academic_deliverable"] = linked_acad
             b["plan_phases"] = [
                 {
                     "phase_num": 1,
@@ -1544,6 +1553,15 @@ def synthesize_adaptive_schedule(
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
             b["deliverable"] = None
+            acad_deliv = next(
+                (d for d in (candidate_deliverables or []) if str(d.get("stream", "")).lower() == "academics"),
+                deliv_dict if (deliv_dict and str(deliv_dict.get("stream", "")).lower() == "academics") else None,
+            )
+            if acad_deliv:
+                linked_acad = dict(acad_deliv)
+                if b.get("math_exercises_target"):
+                    linked_acad["quantity"] = int(b["math_exercises_target"])
+                b["academic_deliverable"] = linked_acad
 
             if secondary:
                 prim_min = int(primary.get("allocated_minutes", max(25, net_min - 20)))
@@ -1655,6 +1673,15 @@ def synthesize_adaptive_schedule(
             b["is_school_dedicated"] = True
             b["is_tum_roadmap"] = False
             b["deliverable"] = None
+            acad_deliv = next(
+                (d for d in (candidate_deliverables or []) if str(d.get("stream", "")).lower() == "academics"),
+                deliv_dict if (deliv_dict and str(deliv_dict.get("stream", "")).lower() == "academics") else None,
+            )
+            if acad_deliv:
+                linked_acad = dict(acad_deliv)
+                if b.get("math_exercises_target"):
+                    linked_acad["quantity"] = int(b["math_exercises_target"])
+                b["academic_deliverable"] = linked_acad
 
             # Phase 1: Primary Urgent Homework Deliverable
             if primary_hw:
@@ -1742,7 +1769,13 @@ def synthesize_adaptive_schedule(
             )
             b["is_school_dedicated"] = False
             b["is_tum_roadmap"] = True
-            b["deliverable"] = deliv_dict
+            if deliv_dict:
+                linked_deliv = dict(deliv_dict)
+                if b.get("math_exercises_target") and str(linked_deliv.get("stream", "")).lower() == "academics":
+                    linked_deliv["quantity"] = int(b["math_exercises_target"])
+                b["deliverable"] = linked_deliv
+            else:
+                b["deliverable"] = None
             b["plan_phases"] = [
                 {
                     "phase_num": 1,
@@ -1795,7 +1828,13 @@ def synthesize_adaptive_schedule(
             )
             b["is_school_dedicated"] = False
             b["is_tum_roadmap"] = True
-            b["deliverable"] = deliv_dict
+            if deliv_dict:
+                linked_deliv = dict(deliv_dict)
+                if b.get("math_exercises_target") and str(linked_deliv.get("stream", "")).lower() == "academics":
+                    linked_deliv["quantity"] = int(b["math_exercises_target"])
+                b["deliverable"] = linked_deliv
+            else:
+                b["deliverable"] = None
             b["plan_phases"] = [
                 {
                     "phase_num": 1,
@@ -1846,7 +1885,13 @@ def synthesize_adaptive_schedule(
             )
             b["is_school_dedicated"] = False
             b["is_tum_roadmap"] = True
-            b["deliverable"] = deliv_dict
+            if deliv_dict:
+                linked_deliv = dict(deliv_dict)
+                if b.get("math_exercises_target") and str(linked_deliv.get("stream", "")).lower() == "academics":
+                    linked_deliv["quantity"] = int(b["math_exercises_target"])
+                b["deliverable"] = linked_deliv
+            else:
+                b["deliverable"] = None
             b["plan_phases"] = [
                 {
                     "phase_num": 1,

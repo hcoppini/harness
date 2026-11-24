@@ -42,11 +42,11 @@ def test_station_states_and_reallocation():
     assert "nov-2026" in stations
     assert stations["nov-2026"]["status"] == "active"
     assert stations["nov-2026"]["deliverable_counts"]["Academics"]["total"] == 40
-    assert stations["nov-2026"]["deliverable_counts"]["Physical"]["total"] == 7
+    assert stations["nov-2026"]["deliverable_counts"]["Physical"]["total"] == 4
     assert len(stations["nov-2026"].get("sidequests", [])) >= 2
 
-    # Dec 2026 (school grades lock + break Sidequests, no cumulative catch-up penalty)
-    assert stations["dec-2026"]["deliverable_counts"]["Academics"]["total"] == 15
+    # Dec 2026 (school grades lock + break Sidequests, 3 weeks x 40 math exercises)
+    assert stations["dec-2026"]["deliverable_counts"]["Academics"]["total"] == 120
     assert len(stations["dec-2026"].get("sidequests", [])) >= 2
 
     # Year 3 final & Summer vacation acceleration (Programming moves to Summer/Break)

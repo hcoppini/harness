@@ -1316,16 +1316,41 @@
 
           if (prop === "get_station_pace_velocity") {
             return async function (stationId = null, dateStr = null) {
+              const serverVel = await rpcCall("get_station_pace_velocity", [stationId, dateStr]).catch(() => null);
+              if (serverVel && typeof serverVel === "object" && serverVel.station_id) {
+                return serverVel;
+              }
+              const roadmap = await apiProxy.get_metro_roadmap().catch(() => ({}));
+              const stations = roadmap?.stations || [];
               if (!stationId) {
-                const roadmap = await apiProxy.get_metro_roadmap().catch(() => ({}));
-                const activeSt = (roadmap?.stations || []).find((s) => s.status === "active");
+                const activeSt = stations.find((s) => s.status === "active");
                 stationId = activeSt ? activeSt.id : "nov-2026";
               }
+              const stationObj = stations.find((s) => s.id === stationId) || null;
               const todayDt = dateStr ? new Date(dateStr) : new Date();
               const dayOfMonth = todayDt.getDate();
               const year = todayDt.getFullYear();
               const month = todayDt.getMonth();
               const totalDays = new Date(year, month + 1, 0).getDate();
+
+              let baselineDateStr = null;
+              let isRebased = false;
+              let windowDay = dayOfMonth;
+              let windowTotalDays = totalDays;
+              let elapsedRatio = totalDays > 0 ? dayOfMonth / totalDays : 0.0;
+              if (stationObj?.baseline_date) {
+                const m = String(stationObj.baseline_date).match(/^(\d{4})-(\d{2})-(\d{2})/);
+                if (m && Number(m[1]) === year && Number(m[2]) - 1 === month) {
+                  const bDay = Number(m[3]);
+                  baselineDateStr = `${m[1]}-${m[2]}-${m[3]}`;
+                  isRebased = true;
+                  const spanDays = Math.max(1, totalDays - bDay + 1);
+                  const elapsedDays = Math.max(0, dayOfMonth - bDay);
+                  windowDay = Math.min(spanDays, elapsedDays + 1);
+                  windowTotalDays = spanDays;
+                  elapsedRatio = Math.min(1.0, elapsedDays / spanDays);
+                }
+              }
 
               const deliverables = await apiProxy.get_station_deliverables(stationId);
 
@@ -1337,7 +1362,7 @@
               const paceItems = deliverables.map((d) => {
                 const total = d.total_required || 1;
                 const comp = d.completed_count || 0;
-                const targetPace = (dayOfMonth / totalDays) * total;
+                const targetPace = elapsedRatio * total;
                 const delta = comp - targetPace;
                 const isBehind = comp < targetPace;
                 const deficit = isBehind ? Math.round((targetPace - comp) * 10) / 10 : 0.0;
@@ -1375,10 +1400,14 @@
                 badgeVariant = "optimal";
               }
 
-              const elapsedPct = totalDays > 0 ? Math.min(100, Math.max(0, Math.round((dayOfMonth / totalDays) * 100))) : 0;
+              const elapsedPct = Math.min(100, Math.max(0, Math.round(elapsedRatio * 100)));
 
               return {
                 station_id: stationId,
+                baseline_date: baselineDateStr,
+                is_rebased: isRebased,
+                window_day: windowDay,
+                window_total_days: windowTotalDays,
                 date: getLocalDateStr(todayDt),
                 day_of_month: dayOfMonth,
                 total_days: totalDays,
@@ -2692,6 +2721,7 @@
               try {
                 const serverRes = await rpcCall("sync_vulcan_data", [dateStr, forceRefresh]);
                 if (serverRes) {
+                  _academicHydratedAt = 0;
                   await apiProxy.get_upcoming_homework(dateStr);
                   await apiProxy.get_upcoming_exams();
                   if (apiProxy.get_tum_overview) {
@@ -2709,6 +2739,7 @@
               try {
                 const serverRes = await rpcCall("auto_sync_vulcan", [dateStr]);
                 if (serverRes) {
+                  _academicHydratedAt = 0;
                   await apiProxy.get_upcoming_homework(dateStr);
                   await apiProxy.get_upcoming_exams();
                   if (apiProxy.get_tum_overview) {

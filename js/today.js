@@ -1090,11 +1090,12 @@ const Today = {
           null
         );
 
-        // Bi-directional link 1: checking off Clean Horizon TUM Deep Work advances selected TUM stream
+        // Bi-directional link 1: checking off Deep Work (TUM Roadmap or linked Academics/Exam Defense) advances milestone progress
         const block = (this.schedule && this.schedule.blocks && this.schedule.blocks[idx]);
-        const activeDeliv = this.getActiveBlockDeliverable(block, idx);
-        if (block && block.is_tum_roadmap && activeDeliv && activeDeliv.deliverable_id && window.pywebview.api.update_deliverable_progress) {
-          const qty = activeDeliv.quantity || 1;
+        const activeDeliv = this.getActiveBlockDeliverable(block, idx) || (block && block.academic_deliverable) || null;
+        const shouldCreditDeliv = Boolean(block && (block.is_tum_roadmap || block.academic_deliverable));
+        if (shouldCreditDeliv && activeDeliv && activeDeliv.deliverable_id && window.pywebview.api.update_deliverable_progress) {
+          const qty = activeDeliv.quantity || block.math_exercises_target || 1;
           const delta = isNowChecked ? qty : -qty;
           const res = await window.pywebview.api.update_deliverable_progress(activeDeliv.deliverable_id, null, delta);
           if (res && typeof res.completed_count === "number") {

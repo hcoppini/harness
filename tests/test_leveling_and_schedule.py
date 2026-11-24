@@ -38,8 +38,8 @@ def test_monday_and_tuesday_online_math_and_gym_schedule(test_db):
     tue_gym = next((b for b in tue["blocks"] if "Gym" in b["focus"]), None)
     tue_math = next((b for b in tue["blocks"] if "19:00" in b["time"] and b.get("type") == "class"), None)
     assert tue_school is not None and "14:15" in tue_school["time"], "Tuesday school must end at 14:15 (no Religia)"
-    assert tue_gym is not None and "15:30" in tue_gym["time"], "Tuesday must fit afternoon Gym Day 1"
     assert tue_math is not None and tue_math.get("protected") is True, "Tuesday must include 19:00 Online Math class"
+    assert tue_gym is not None and "20:10" in tue_gym["time"], "Tuesday Gym Day 1 must be scheduled after 20:00 Online Math"
 
     # Verify weekly math split sums to exactly 40 exercises across Tue-Sat
     week_dates = [
@@ -132,13 +132,17 @@ def test_rebase_to_today_clears_ghost_debt_and_preserves_grades(test_db):
     assert len(grades) == 1
     assert grades[0]["raw_input"] == "1"
 
-    # Pace velocity on baseline date (Nov 24) must be 0.0 deficit / optimal!
+    # Pace velocity on baseline date (Nov 24) must be 0.0 deficit / optimal and report rebased window!
     pace = kill_list_controller.get_station_pace_velocity(
         station_id="nov-2026",
         date_str="2026-11-24",
         conn=test_db,
     )
     assert pace["baseline_date"] == "2026-11-24"
+    assert pace["is_rebased"] is True
+    assert pace["window_day"] == 1
+    assert pace["window_total_days"] == 7
+    assert pace["elapsed_pct"] == 0
     assert pace["is_behind"] is False
     assert pace["max_deficit"] == 0.0
 
@@ -148,7 +152,7 @@ def test_rebase_to_today_clears_ghost_debt_and_preserves_grades(test_db):
 
 
 def test_vulcan_canonical_exam_deduplication(test_db, monkeypatch):
-    """TD-11: Vulcan sync deduplicates exams even when punctuation or casing differs."""
+    """TD-11: Vulcan sync deduplicates exams even when punctuation, casing, or rescheduled date differs."""
     payload = {
         "exams": [
             {"subject": "Język niemiecki", "title": "Kartkówka: Pogoda", "exam_date": "2026-12-01", "scope": ""},
@@ -160,6 +164,7 @@ def test_vulcan_canonical_exam_deduplication(test_db, monkeypatch):
         ],
         "grades": [],
     }
+    monkeypatch.setattr(vulcan_service, "get_vulcan_config", lambda: {**vulcan_service.DEFAULT_CONFIG, "demo_mode": True})
     monkeypatch.setattr(vulcan_service, "_get_demo_school_data", lambda d: payload)
     vulcan_service.sync_vulcan_data(client_date="2026-11-24", conn=test_db)
 

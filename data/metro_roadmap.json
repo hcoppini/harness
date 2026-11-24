@@ -109,10 +109,10 @@
         "sigg",
         "physical"
       ],
-      "objective": "First & final leveling from Nov 24: check 100% of remaining Nov boxes — defend Tue Niemiecki & Fri Math Trygonometria, clear Week 1 (40 math exercises), and restore 2x Gym + 2x Boxing.",
+      "objective": "First & final leveling from Nov 24: check 100% of remaining Nov boxes — defend Fri Math Trygonometria, clear Week 1 (40 math exercises Tue–Sat), and hit 4/4 core training sessions (Tue/Thu Gym + Wed/Mon Boxing).",
       "deliverables": {
-        "Academics": "Week 1 Math Homework (40 exercises across Tue–Sat: 5/8/9/9/9) + Tue Niemiecki (Kapitel 1) & Fri Matematyka (Trygonometria) defense.",
-        "Physical": "7-Day Floor (Nov 24–30): 140g Daily Protein + Tue/Thu Gym resumption + Wed Boxing."
+        "Academics": "Week 1 Math Homework (40 exercises across Tue–Sat: 5/8/9/9/9) + Fri Matematyka (Trygonometria) defense.",
+        "Physical": "4/4 Core Training Sessions (Tue/Thu Gym + Wed/Mon Boxing) + 140g Daily Protein floor."
       },
       "sidequests": [
         {
@@ -137,7 +137,7 @@
           "xp_label": "LANGUAGE"
         }
       ],
-      "next_action": "Tue Nov 24 Niemiecki (Kapitel 1) + Gym Day 1 + 19:00 Online Math -> Fri Nov 27 Matematyka (Trygonometria) -> 40/40 Math exercises by Sat.",
+      "next_action": "Tue Nov 24 19:00 Online Math + 20:10 Gym Day 1 -> Fri Nov 27 Matematyka (Trygonometria) -> 40/40 Math exercises by Sat.",
       "deliverable_counts": {
         "Academics": {
           "count": 0,
@@ -146,8 +146,8 @@
         },
         "Physical": {
           "count": 0,
-          "total": 7,
-          "unit": "days"
+          "total": 4,
+          "unit": "sessions"
         }
       },
       "baseline_date": "2026-11-24"
@@ -168,8 +168,8 @@
       ],
       "objective": "Lock Semester 1 proposed grades cleanly before Dec 23 holiday break; shift to Break Sprint programming once school pauses.",
       "deliverables": {
-        "Academics": "Maintain 40 math exercises/wk + clear School Material Deficit units (Math Okręgi/Tożsamości, CS C++ Loops/Functions, Physics) & defend Dec 11 Geografia.",
-        "Physical": "Maintain 2x Boxing (Mon/Wed) + 2x Gym (Tue/Thu) anchor across pre-holiday weeks."
+        "Academics": "Maintain 40 math exercises/wk (3 school weeks = 120 ex) + clear School Material Deficit units & defend Dec 1 Chemia + Dec 4 Geografia.",
+        "Physical": "Maintain 2x Boxing (Mon/Wed) + 2x Gym (Tue/Thu) anchor across 3 pre-holiday school weeks (12 sessions)."
       },
       "sidequests": [
         {
@@ -198,12 +198,12 @@
       "deliverable_counts": {
         "Academics": {
           "count": 0,
-          "total": 15,
-          "unit": "sessions"
+          "total": 120,
+          "unit": "exercises"
         },
         "Physical": {
           "count": 0,
-          "total": 14,
+          "total": 12,
           "unit": "sessions"
         }
       }

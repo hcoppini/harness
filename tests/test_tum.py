@@ -143,8 +143,8 @@ def test_metro_roadmap_sqlite_deliverable_overlay(test_db):
     nov_station = next(s for s in roadmap["stations"] if s["id"] == "nov-2026")
     phys_counts = nov_station.get("deliverable_counts", {}).get("Physical")
     assert phys_counts is not None
-    assert phys_counts["count"] == 7
-    assert phys_counts["total"] == 7  # Reconciled with leveled Nov 24-30 station ceiling
+    assert phys_counts["count"] == 4
+    assert phys_counts["total"] == 4  # Reconciled with leveled Nov 24-30 4-session core training ceiling
 
 
 def test_metro_roadmap_sidequests_optional_and_toggleable():

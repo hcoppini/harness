@@ -833,7 +833,7 @@ def sync_vulcan_data(
         canon_title = _canon(title)
         canon_scope = _canon(scope)
         cursor.execute(
-            "SELECT id, subject, title, scope FROM school_exams WHERE exam_date = ? ORDER BY id ASC",
+            "SELECT id, subject, title, scope, exam_date FROM school_exams WHERE exam_date = ? ORDER BY id ASC",
             (exam_date,),
         )
         existing_exams = [
@@ -845,14 +845,36 @@ def sync_vulcan_data(
             )
         ]
         if not existing_exams:
+            # Check if the same exam was rescheduled in Vulcan (same subject + title/scope on another date)
             cursor.execute(
-                """
-                INSERT INTO school_exams (subject, title, exam_date, scope, completed)
-                VALUES (?, ?, ?, ?, 0)
-                """,
-                (subj, title, exam_date, scope),
+                "SELECT id, subject, title, scope, exam_date FROM school_exams WHERE completed = 0 ORDER BY id ASC"
             )
-            exams_synced += 1
+            rescheduled = [
+                r for r in cursor.fetchall()
+                if _canon(r["subject"]) == canon_subj and (
+                    (len(canon_title) >= 10 and _canon(r["title"]) == canon_title)
+                    or (len(canon_scope) >= 10 and _canon(r["scope"]) == canon_scope)
+                )
+            ]
+            if rescheduled:
+                primary_id = rescheduled[0]["id"]
+                cursor.execute(
+                    "UPDATE school_exams SET exam_date = ?, title = ?, scope = ? WHERE id = ?",
+                    (exam_date, title, scope, primary_id),
+                )
+                if len(rescheduled) > 1:
+                    dup_ids = [r["id"] for r in rescheduled[1:]]
+                    cursor.execute(f"DELETE FROM school_exams WHERE id IN ({','.join(['?']*len(dup_ids))})", dup_ids)
+                exams_synced += 1
+            else:
+                cursor.execute(
+                    """
+                    INSERT INTO school_exams (subject, title, exam_date, scope, completed)
+                    VALUES (?, ?, ?, ?, 0)
+                    """,
+                    (subj, title, exam_date, scope),
+                )
+                exams_synced += 1
         else:
             primary_id = existing_exams[0]["id"]
             cursor.execute("UPDATE school_exams SET scope = ? WHERE id = ?", (scope, primary_id))

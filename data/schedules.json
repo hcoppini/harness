@@ -93,11 +93,11 @@
       ]
     },
     "B_TUE": {
-      "name": "Schedule B: Tuesday (Afternoon Gym + Online Math)",
+      "name": "Schedule B: Tuesday (Study + Online Math + Evening Gym)",
       "days": [
         "Tuesday"
       ],
-      "description": "School ends 14:15 (no Religia). Afternoon Gym Day 1, dinner, 40m Math Slice #1 (5 ex), then 19:00 Online Math at home.",
+      "description": "School ends 14:15 (no Religia). Afternoon Focused Study & Math Slice #1 (5 ex), dinner & decompress, 19:00 Online Math at home, then Gym Day 1 after 20:00.",
       "blocks": [
         {
           "time": "06:35 – 07:20",
@@ -112,29 +112,23 @@
           "type": "school"
         },
         {
-          "time": "14:15 – 15:15",
-          "focus": "Commute Home & Pre-Workout",
-          "activity": "40 min commute home, quick snack, change for gym.",
+          "time": "14:15 – 15:00",
+          "focus": "Commute Home & Lunch",
+          "activity": "40 min commute home, quick meal and desk reset.",
           "type": "chore"
         },
         {
-          "time": "15:30 – 16:40",
-          "focus": "Gym (60 min) — Day 1: Posterior Chain",
-          "activity": "Posterior Chain & Horizontal Power (Protocol in Harness Body tab).",
-          "type": "training"
-        },
-        {
-          "time": "16:45 – 18:10",
-          "focus": "Shower, Dinner & Recovery",
-          "activity": "Post-workout high-protein dinner, shower, calm reset before evening study.",
-          "type": "nutrition"
-        },
-        {
-          "time": "18:15 – 18:55",
-          "focus": "Home: Focused Study & Math Slice #1 (40m)",
-          "activity": "Math Homework Slice #1 (5/40 exercises from Monday set) or urgent Wed test check.",
+          "time": "15:00 – 16:00",
+          "focus": "Home: Focused Study & Math Slice #1 (60m)",
+          "activity": "Math Homework Slice #1 (5/40 exercises from Monday set) + upcoming test defense.",
           "type": "deep_work",
           "math_exercises_target": 5
+        },
+        {
+          "time": "16:00 – 18:55",
+          "focus": "Dinner, Decompress & Free Time",
+          "activity": "Full dinner, guilt-free downtime, and prep before 19:00 online math class.",
+          "type": "rest"
         },
         {
           "time": "19:00 – 20:00",
@@ -144,9 +138,21 @@
           "protected": true
         },
         {
-          "time": "20:00 – 22:45",
-          "focus": "Free Time (2h 45m)",
-          "activity": "Zero forced night study. Guilt-free evening to decompress.",
+          "time": "20:10 – 21:20",
+          "focus": "Gym (60 min) — Day 1: Posterior Chain",
+          "activity": "Post-math evening session: Posterior Chain & Horizontal Power (Protocol in Harness Body tab).",
+          "type": "training"
+        },
+        {
+          "time": "21:25 – 22:15",
+          "focus": "Post-Workout Meal & Shower",
+          "activity": "High-protein post-workout meal (140g floor), hot shower.",
+          "type": "nutrition"
+        },
+        {
+          "time": "22:15 – 22:45",
+          "focus": "Wind-Down",
+          "activity": "Zero cognitive load. Decompress before sleep.",
           "type": "rest"
         },
         {

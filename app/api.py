@@ -873,6 +873,12 @@ class HarnessAPI:
     def sync_vulcan_data(self, client_date: Optional[str] = None, force_refresh: bool = False) -> Dict[str, Any]:
         from app.services import vulcan_service
         res = vulcan_service.sync_vulcan_data(client_date, force_refresh)
+        try:
+            conn = sync_service.get_connection()
+            sync_service.sync_school_exams(conn)
+            conn.close()
+        except Exception:
+            pass
         self._trigger_auto_sync()
         return res
 

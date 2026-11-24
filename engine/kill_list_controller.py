@@ -760,6 +760,9 @@ def get_station_pace_velocity(
     # Self-leveling baseline anchor: if station was rebased mid-month, measure pace
     # fairly over [baseline_day .. total_days_in_month] instead of [1 .. total_days_in_month].
     baseline_date_str = None
+    is_rebased = False
+    window_day = day_of_month
+    window_total_days = total_days_in_month
     elapsed_ratio = (day_of_month / total_days_in_month) if total_days_in_month > 0 else 0.0
     try:
         from app.services import leveling_service
@@ -768,8 +771,11 @@ def get_station_pace_velocity(
             b_dt = datetime.strptime(b_str[:10], "%Y-%m-%d")
             if b_dt.year == target_dt.year and b_dt.month == target_dt.month:
                 baseline_date_str = b_str[:10]
+                is_rebased = True
                 span_days = max(1, total_days_in_month - b_dt.day + 1)
                 elapsed_days = max(0, target_dt.day - b_dt.day)
+                window_day = min(span_days, elapsed_days + 1)
+                window_total_days = span_days
                 elapsed_ratio = min(1.0, elapsed_days / span_days)
     except Exception:
         pass
@@ -826,6 +832,9 @@ def get_station_pace_velocity(
     return {
         "station_id": station_id,
         "baseline_date": baseline_date_str,
+        "is_rebased": is_rebased,
+        "window_day": window_day,
+        "window_total_days": window_total_days,
         "date": target_dt.strftime("%Y-%m-%d"),
         "day_of_month": day_of_month,
         "total_days": total_days_in_month,
